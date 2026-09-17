@@ -1,0 +1,8 @@
+.small-font-toast {
+  font-size: 10px !important;
+}
+
+.react-datepicker-wrapper {
+ width: "100%" !important;
+  /* Apply full width using Tailwind */
+}
