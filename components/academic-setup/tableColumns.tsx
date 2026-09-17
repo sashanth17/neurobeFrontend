@@ -1,5 +1,6 @@
 import IconEdit from "@/components/Icon/IconEdit";
 import IconTrash from "@/components/Icon/IconTrash";
+import { Users } from "lucide-react";
 
 // ─── Shared action cell ───────────────────────────────────────────────────────
 const ActionCell = ({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) => (
@@ -99,11 +100,6 @@ export const makeProgrammeColumns = (onEdit: (r: any) => void, onDelete: (r: any
     render: (row: any) => <span className="text-[#000] dark:text-gray-200">{row.programme_name || row.name || "-"}</span>,
   },
   {
-    accessor: "department",
-    title: "DEPARTMENT",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.department_name || row.department?.department_name || row.department || "-"}</span>,
-  },
-  {
     accessor: "type",
     title: "DEGREE LEVEL",
     render: (row: any) => (
@@ -169,12 +165,12 @@ export const makeBatchColumns = (onEdit: (r: any) => void, onDelete: (r: any) =>
 
 // ─── COURSES ──────────────────────────────────────────────────────────────────
 export const MOCK_COURSES = [
-  { id: 1, code: "CS301", title: "Data Structures",                l: 3, t: 0, p: 2, c: 4, theory: "45 hrs", lab: "30 hrs", status: "Active", department: "CSE" },
-  { id: 2, code: "CS302", title: "Database Management Systems",    l: 3, t: 0, p: 2, c: 4, theory: "45 hrs", lab: "30 hrs", status: "Active", department: "CSE" },
-  { id: 3, code: "CS303", title: "Operating Systems",              l: 3, t: 0, p: 2, c: 4, theory: "45 hrs", lab: "30 hrs", status: "Active", department: "CSE" },
-  { id: 4, code: "CS304", title: "Computer Networks",              l: 3, t: 0, p: 0, c: 3, theory: "45 hrs", lab: "—",      status: "Active", department: "CSE" },
-  { id: 5, code: "EC201", title: "Digital Signal Processing",      l: 3, t: 1, p: 0, c: 4, theory: "45 hrs", lab: "15 hrs", status: "Active", department: "ECE" },
-  { id: 6, code: "AI101", title: "Foundations of Machine Learning",l: 3, t: 0, p: 2, c: 4, theory: "45 hrs", lab: "30 hrs", status: "Active", department: "AI"  },
+  { id: 1, code: "CS301", title: "Data Structures", status: "Active", coordinator: "Arjun Kumar", instructors: ["Arjun Kumar", "Priya Selvan"] },
+  { id: 2, code: "CS302", title: "Database Management Systems", status: "Active", coordinator: "Priya Balwani", instructors: ["Priya Selvan", "Sanjay Murugan"] },
+  { id: 3, code: "CS303", title: "Operating Systems", status: "Active", coordinator: "Vignesh Kumar", instructors: ["Vignesh Kumar"] },
+  { id: 4, code: "CS304", title: "Computer Networks", status: "Active", coordinator: "Arun Kumar", instructors: ["Arun Kumar"] },
+  { id: 5, code: "EC201", title: "Digital Signal Processing", status: "Active", coordinator: "Vignesh Kumar", instructors: ["Vignesh Kumar"] },
+  { id: 6, code: "AI101", title: "Foundations of Machine Learning", status: "Active", coordinator: "Deepa Nair", instructors: ["Deepa Nair"] },
 ];
 
 export const makeCourseColumns = (onEdit: (r: any) => void, onDelete: (r: any) => void) => [
@@ -189,52 +185,48 @@ export const makeCourseColumns = (onEdit: (r: any) => void, onDelete: (r: any) =
     render: (row: any) => <span className="text-[#000] dark:text-gray-200">{row.course_title || row.title || "-"}</span>,
   },
   {
-    accessor: "department",
-    title: "DEPARTMENT",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.department_name || row.department?.department_name || row.department || "-"}</span>,
+    accessor: "coordinator",
+    title: "COORDINATOR",
+    render: (row: any) => {
+      const coordinatorName = row.coordinator_name || row.coordinator || row.course_coordinator?.name;
+      return (
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-color2-l text-xs font-bold text-color2">
+            {((coordinatorName || "C").charAt(0)).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[#000] dark:text-gray-100">{coordinatorName || "Unassigned"}</p>
+          </div>
+        </div>
+      );
+    },
   },
   {
-    accessor: "l",
-    title: "L",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.lecture_hours ?? row.l ?? 0}</span>,
-  },
-  {
-    accessor: "t",
-    title: "T",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.tutorial_hours ?? row.t ?? 0}</span>,
-  },
-  {
-    accessor: "p",
-    title: "P",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.practical_hours ?? row.p ?? 0}</span>,
-  },
-  {
-    accessor: "c",
-    title: "C",
-    render: (row: any) => <PurpleBadge value={row.credits ?? row.c ?? 0} />,
-  },
-  {
-    accessor: "theory",
-    title: "THEORY HOURS",
-    render: (row: any) => (
-      <span className="text-[#000] dark:text-[#000]">
-        {row.total_theory_hours !== undefined && row.total_theory_hours !== null ? `${row.total_theory_hours} hrs` : row.theory || "-"}
-      </span>
-    ),
-  },
-  {
-    accessor: "lab",
-    title: "LAB HOURS",
-    render: (row: any) => (
-      <span className="text-[#000] dark:text-[#000]">
-        {row.total_lab_hours !== undefined && row.total_lab_hours !== null ? `${row.total_lab_hours} hrs` : row.lab || "-"}
-      </span>
-    ),
+    accessor: "instructors",
+    title: "INSTRUCTOR(S)",
+    render: (row: any) => {
+      const raw = row.instructors || row.course_instructors || row.instructor_names;
+      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      if (!list.length) return <span className="text-xs text-gray-400">Unassigned</span>;
+      return (
+        <div className="flex flex-col gap-1">
+          {list.map((item: any, i: number) => {
+            const name = typeof item === "string" ? item : item?.instructor_name || item?.name || "Instructor";
+            return (
+              <div key={i} className="flex items-center gap-1.5 text-xs text-[#000] dark:text-[#000]">
+                <Users className="h-3 w-3 shrink-0 text-[#000]" />
+                {name}
+              </div>
+            );
+          })}
+        </div>
+      );
+    },
   },
   {
     accessor: "status",
     title: "STATUS",
-    render: (row: any) => <StatusCell status={row.status || "Active"} />,
+    render: (row: any) => <StatusCell status={row.status || (row.is_active !== false ? "Active" : "Inactive")} />,
   },
   {
     accessor: "actions",

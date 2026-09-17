@@ -7,7 +7,7 @@ import { Failure } from "@/utils/function.utils";
 const toOpts = (arr: string[]) => arr.map((v) => ({ value: v, label: v }));
 const toOpt  = (v: string | null | undefined) => v ? { value: v, label: v } : null;
 
-const ROLE_OPTS   = toOpts(["Course Coordinator", "Course Instructor", "Student", "ERP Admin"]);
+const ROLE_OPTS   = toOpts(["ERP Admin", "Faculty", "Student"]);
 const DEPT_OPTS   = toOpts(["Computer Science & Engineering", "Electronics & Communication", "Artificial Intelligence", "Information Technology", "Mechanical Engineering"]);
 const PROG_OPTS   = toOpts(["B.E. Computer Science and Engineering", "B.Tech Electronics & Communication", "D.Tech Artificial Intelligence", "D.Tech Information Technology", "MBA"]);
 const BATCH_OPTS  = toOpts(["2024-2028", "2023-2027", "2022-2026", "2021-2025", "Faculty / Staff"]);
@@ -67,7 +67,7 @@ const AddUserModal = ({
   const deptOpts = departmentOptions || [];
   const progOpts = programmeOptions || [];
   const batchOpts = batchOptions || [];
-  const roleOpts = roleOptions || [];
+  const roleOpts = roleOptions && roleOptions.length > 0 ? roleOptions : ROLE_OPTS;
   const statusOpts = statusOptions || [];
 
   const [form, setForm] = useState({
@@ -126,7 +126,7 @@ const AddUserModal = ({
         lastName:   last,
         email:      initialData.email  ?? "",
         password:   "",
-        regNo:      initialData.regNo  ?? initialData.registry_number ?? (initialData.id ? `USR-${String(initialData.id).padStart(4, "0")}` : ""),
+        regNo:      initialData.register_number ?? initialData.regNo ?? (initialData.id ? `USR-${String(initialData.id).padStart(4, "0")}` : ""),
         role:       roleMatch,
         department: deptMatch,
         programme:  progMatch,
@@ -177,8 +177,7 @@ const AddUserModal = ({
     const isStudent = form.role.value === "Student";
     const isActive = (form.status?.value ?? "Active").toLowerCase() === "active";
 
-    onSubmit({
-      ...form,
+    const payload: any = {
       first_name: form.firstName.trim(),
       last_name: form.lastName.trim(),
       email: form.email.trim(),
@@ -186,12 +185,16 @@ const AddUserModal = ({
       role: form.role.value,
       status: form.status?.value ?? "Active",
       is_active: isActive,
-      is_staff: !isStudent,
       department_id: form.department?.value && Number(form.department.value) > 0 ? Number(form.department.value) : null,
       programme_id: form.programme?.value && Number(form.programme.value) > 0 ? Number(form.programme.value) : null,
-      batch_id: form.batch?.value && Number(form.batch.value) > 0 ? Number(form.batch.value) : null,
-      regNo: form.regNo?.trim() || undefined,
-    });
+      batch_id: isStudent && form.batch?.value && Number(form.batch.value) > 0 ? Number(form.batch.value) : null,
+    };
+
+    if (form.regNo?.trim()) {
+      payload.register_number = form.regNo.trim();
+    }
+
+    onSubmit(payload);
   };
 
   const { visible, closing } = useAnimatedVisibility(open);
@@ -269,7 +272,12 @@ const AddUserModal = ({
                 rightIconOnlick={() => setShowPassword((prev) => !prev)}
               />
 
-              <TextInput title="Registry / Employee Number" placeholder="e.g. FAC-CSE-038 / 24C0068" value={form.regNo} onChange={(e) => set("regNo", e.target.value)} />
+              <TextInput
+                title={form.role?.value === "Student" ? "Register Number" : "Employee Number"}
+                placeholder={form.role?.value === "Student" ? "e.g. 2026BE0101" : "e.g. FAC-CSE-038"}
+                value={form.regNo}
+                onChange={(e) => set("regNo", e.target.value)}
+              />
 
               <CustomSelect title="Role"       required options={roleOpts}   value={form.role}       onChange={(v) => set("role",       v)} placeholder="Select role..." />
               <CustomSelect title="Department" options={deptOpts}   value={form.department} onChange={(v) => set("department", v)} placeholder="Select department..." />

@@ -4,7 +4,7 @@ export const CLIENT_ID =
 // export const BACKEND_URL = "http://31.97.206.165/api/";
 
 // export const BACKEND_URL = "http://88.222.213.249/api/";
-export const BACKEND_URL = "https://neurobebk.irepute.co.in/";
+export const BACKEND_URL = "http://localhost:8080/";
 export const FRONTEND_URL = "https://localhost:3000";
 
 export const CALENDAR_CLIENT_ID =
@@ -18,7 +18,7 @@ export const ROLES = {
   COURSE_COORDINATOR: "Course Coordinator",
   COURSE_INSTRUCTOR: "Course Instructor",
   STUDENT: "Student",
-  FACULTY:"Faculty",
+  FACULTY: "Faculty",
 };
 
 export const DROPDOWN_ROLES = [
@@ -27,12 +27,8 @@ export const DROPDOWN_ROLES = [
     label: "ERP Admin",
   },
   {
-    value: ROLES.COURSE_COORDINATOR,
-    label: "Course Coordinator",
-  },
-  {
-    value: ROLES.COURSE_INSTRUCTOR,
-    label: "Course Instructor",
+    value: ROLES.FACULTY,
+    label: "Faculty",
   },
   {
     value: ROLES.STUDENT,

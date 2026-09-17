@@ -11,13 +11,13 @@ const TEMPLATE_META: Record<
   { required: string[]; optional: string[]; filename: string }
 > = {
   user: {
-    required: ["Email", "Register Number", "First Name", "Programme", "Department", "Batch"],
-    optional: ["Last Name"],
+    required: ["Email", "First Name", "Role (Faculty / Student)", "Register Number"],
+    optional: ["Last Name", "Department", "Programme", "Batch"],
     filename: "users_bulk_import_template.csv",
   },
   course: {
-    required: ["Course Code", "Course Title", "Department", "Programme", "Semester"],
-    optional: ["Credits", "Description"],
+    required: ["Course Code", "Course Title"],
+    optional: ["Status"],
     filename: "courses_bulk_import_template.csv",
   },
 };

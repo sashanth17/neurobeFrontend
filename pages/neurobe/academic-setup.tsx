@@ -290,7 +290,6 @@ const AcademicSetup = () => {
   };
 
   const handleSaveProgramme = async (formData: {
-    department_id: number;
     programme_name: string;
     short_name: string;
     degree_level: string;
@@ -301,7 +300,6 @@ const AcademicSetup = () => {
 
       const body = {
         organization_id: getOrganizationId(),
-        department_id: formData.department_id,
         programme_name: formData.programme_name,
         short_name: formData.short_name,
         degree_level: formData.degree_level,
@@ -366,84 +364,22 @@ const AcademicSetup = () => {
   };
 
   const handleSaveCourse = async (formData: any) => {
-    console.log("formData", formData)
     try {
       setState({ submitting: true });
 
-      const body = new FormData();
-      body.append("organization_id", String(getOrganizationId()));
-      body.append("department_id", String(formData.department_id));
-      body.append("course_code", formData.course_code);
-      body.append("course_title", formData.course_title);
-      body.append("status", formData.status || "Active");
-      body.append("lecture_hours", String(formData.lecture_hours ?? 0));
-      body.append("tutorial_hours", String(formData.tutorial_hours ?? 0));
-      body.append("practical_hours", String(formData.practical_hours ?? 0));
-      body.append("credits", String(formData.credits ?? 0));
-      body.append("total_theory_hours", String(formData.total_theory_hours ?? 0));
-      body.append("total_lab_hours", String(formData.total_lab_hours ?? 0));
-      body.append("regulation", formData.regulation || "R2023");
-      body.append("is_active", String(formData.is_active !== undefined ? formData.is_active : true));
-
-      // only include syllabus_file if a new File was selected
-      if (formData.syllabus_file instanceof File) {
-        body.append("syllabus_file", formData.syllabus_file);
-      }
-      console.log("org/api/v1/", body)
+      const body = {
+        organization_id: getOrganizationId(),
+        course_code: formData.course_code,
+        course_title: formData.course_title,
+        status: formData.status || "Active",
+        is_active: (formData.status || "Active").toLowerCase() === "active",
+      };
 
       if (state.editRow?.id) {
-        const res:any = await Models.course.update(state.editRow.id, body);
-        console.log("editRow", res)
-
-        if (formData?.coordinator?.value) {
-          await Models.course.create_course_coordinators({
-            course_id: res?.id,
-            organization_id: res?.organization_id,
-            coordinator_id: formData.coordinator.value,
-          });
-        }
-
-        // assign each instructor
-        if (formData?.instructors?.length) {
-          await Promise.all(
-            formData.instructors.map((instructor: any) =>
-              Models.course.create_course_instructors({
-                course_id: res?.id,
-                organization_id: res?.organization_id,
-                instructor_id: instructor.value,
-              })
-            )
-          );
-        }
-
+        await Models.course.update(state.editRow.id, body);
         Success("Course updated successfully");
       } else {
-        const res: any = await Models.course.create(body);
-        console.log("res", res)
-
-        // assign coordinator
-        if (formData?.coordinator?.value) {
-          await Models.course.create_course_coordinators({
-            course_id: res?.id,
-            organization_id: res?.organization_id,
-            coordinator_id: formData.coordinator.value,
-          });
-        }
-
-        // assign each instructor
-        if (formData?.instructors?.length) {
-          await Promise.all(
-            formData.instructors.map((instructor: any) =>
-              Models.course.create_course_instructors({
-                course_id: res?.id,
-                organization_id: res?.organization_id,
-                instructor_id: instructor.value,
-              })
-            )
-          );
-        }
-
-
+        await Models.course.create(body);
         Success("Course created successfully");
       }
 
@@ -652,7 +588,6 @@ const AcademicSetup = () => {
         initialData={state.editRow}
         onSubmit={handleSaveProgramme}
         submitting={state.submitting}
-        departmentOptions={departmentOptions}
       />
       <CreateBatchModal
         open={state.showModal && state.activeTab === "batches"}

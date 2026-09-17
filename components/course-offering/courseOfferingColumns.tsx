@@ -107,91 +107,67 @@ export const MOCK_OFFERINGS = [
 ];
 
 // ─── Column factory — accepts onEdit callback ─────────────────────────────────
-export const makeCourseOfferingColumns = (onEdit: (row: any) => void) => [
+export const makeCourseOfferingColumns = (onEdit?: (row: any) => void) => [
   {
     accessor: "course",
-    title: "COURSE",
-    render: ({ code, course, subtitle }: any) => (
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#ede9fe] text-xs font-bold text-color2">
-          {code}
-        </span>
-        <div>
-          <p className="text-sm font-medium text-[#000] dark:text-gray-100">{course}</p>
-          <p className="text-xs text-pri">{subtitle}</p>
+    title: "COURSE OFFERING",
+    render: (row: any) => {
+      const code = row.course_code || row.code || "CS";
+      const title = row.course_instance_name || row.course || row.course_title || "Course Offering";
+      const sub = row.course_title ? `${row.course_code || ""} · ${row.course_title}` : (row.subtitle || `Semester ${row.semester || 1}`);
+      return (
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#ede9fe] text-xs font-bold text-color2">
+            {code.substring(0, 4)}
+          </span>
+          <div>
+            <p className="text-sm font-medium text-[#000] dark:text-gray-100">{title}</p>
+            <p className="text-xs text-pri">{sub}</p>
+          </div>
         </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     accessor: "programme",
     title: "PROGRAMME",
-    render: ({ programme }: any) => <ProgrammeBadge programme={programme} />,
-  },
-  {
-    accessor: "batch",
-    title: "BATCH",
-    render: ({ batch }: any) => <span className="text-sm text-[#000] dark:text-[#000]">{batch}</span>,
-  },
-  {
-    accessor: "term",
-    title: "ACADEMIC YEAR / TERM",
-    render: ({ term, ay }: any) => (
-      <div>
-        <p className="text-sm font-medium text-[#000] dark:text-gray-100">{term}</p>
-        <p className="text-xs text-pri">{ay}</p>
-      </div>
+    render: (row: any) => (
+      <ProgrammeBadge programme={row.programme_name || row.programme || "B.Tech"} />
     ),
   },
   {
-    accessor: "coordinator",
-    title: "COORDINATOR",
-    render: ({ coordinator, coordinatorInfo }: any) => (
-      <div className="flex items-center gap-2">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-color2-l text-xs font-bold text-color2">
-          {coordinator.charAt(0)}
-        </div>
-        <div>
-          <p className="text-sm font-medium text-[#000] dark:text-gray-100">{coordinator}</p>
-          <p className="text-xs text-pri">{coordinatorInfo}</p>
-        </div>
-      </div>
+    accessor: "semester",
+    title: "TERM / SEMESTER",
+    render: (row: any) => (
+      <span className="text-sm text-[#000] dark:text-[#000]">
+        {row.semester ? `Semester ${row.semester}` : (row.term || "Semester 1")}
+      </span>
     ),
   },
   {
-    accessor: "instructors",
-    title: "INSTRUCTOR(S)",
-    render: ({ instructors }: any) => (
-      <div className="flex flex-col gap-1">
-        {instructors.map((name: string, i: number) => (
-          <div key={i} className="flex items-center gap-1.5 text-xs text-[#000] dark:text-[#000]">
-            <Users className="h-3 w-3 shrink-0 text-[#000]" />
-            {name}
-          </div>
-        ))}
+    accessor: "created_by",
+    title: "CREATED BY",
+    render: (row: any) => (
+      <div className="flex items-center gap-1.5 text-xs text-[#000] dark:text-[#000]">
+        <Users className="h-3 w-3 shrink-0 text-[#000]" />
+        {row.created_by_name || row.created_by || `User #${row.created_by_id || 1}`}
       </div>
     ),
   },
   {
     accessor: "students",
-    title: "STUDENTS",
-    render: ({ students }: any) => <span className="text-sm font-semibold text-[#000] dark:text-gray-300">{students}</span>,
+    title: "ENROLLED STUDENTS",
+    render: (row: any) => (
+      <span className="text-sm font-semibold text-[#000] dark:text-gray-300">
+        {row.enrolled_count ?? row.students ?? 0} Students
+      </span>
+    ),
   },
   {
     accessor: "status",
     title: "STATUS",
-    render: ({ status }: any) => <StatusCell status={status} />,
-  },
-  {
-    accessor: "actions",
-    title: "ACTIONS",
     render: (row: any) => (
-      <div className="flex items-center gap-2">
-        {/* <FacultyBadge label={row.type} /> */}
-        <button onClick={() => onEdit(row)} className="text-[#000] hover:text-color2" title="Edit">
-          <IconEdit className="h-4 w-4" />
-        </button>
-      </div>
+      <StatusCell status={row.status || (row.is_active !== false ? "Active" : "Inactive")} />
     ),
   },
 ];

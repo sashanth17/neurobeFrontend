@@ -33,9 +33,6 @@ const DepartmentsTable = ({ search, statusFilter, loading }: Props) => {
         { accessor: "code",  title: "CODE",  render: ({ code }) => <span className="font-medium text-color2">{code}</span> },
         { accessor: "name",  title: "DEPARTMENT NAME", render: ({ name }) => <span className="text-[#000] dark:text-gray-200">{name}</span> },
         { accessor: "hod",   title: "HEAD OF DEPARTMENT", render: ({ hod }) => <span className="text-[#000] dark:text-[#000]">{hod}</span> },
-        { accessor: "programmes", title: "PROGRAMMES", render: ({ programmes }) => (
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#ede9fe] text-xs font-bold text-color2">{programmes}</span>
-        )},
         { accessor: "status", title: "STATUS", render: ({ status }) => (
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${status === "Active" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${status === "Active" ? "bg-green-500" : "bg-red-400"}`} />{status}

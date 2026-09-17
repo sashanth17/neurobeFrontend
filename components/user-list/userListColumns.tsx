@@ -40,10 +40,12 @@ export const AvatarCell = ({ name, sub }: { name: string; sub: string }) => (
 const RoleBadge = ({ role }: { role: string }) => {
   const normRole = role === "ERP_ADMIN" ? "ERP Admin" : role;
   const map: Record<string, string> = {
+    "Super Admin": "bg-purple-50 text-purple-700",
+    "ERP Admin": "bg-orange-50 text-orange-700",
+    Faculty: "bg-blue-50 text-blue-700",
     "Course Coordinator": "bg-purple-50 text-purple-700",
     "Course Instructor": "bg-blue-50 text-blue-700",
     Student: "bg-gray-100 text-[#000]",
-    "ERP Admin": "bg-orange-50 text-orange-700",
   };
   return (
     <span
@@ -238,7 +240,7 @@ export const makeUserListColumns = (
     title: "REGISTER NO.",
     render: (row: any) => (
       <span className="font-mono text-xs font-medium text-[#000] dark:text-gray-300">
-        {row.regNo || row.registry_number || (row.id ? `USR-${String(row.id).padStart(4, "0")}` : "-")}
+        {row.register_number || row.regNo || (row.id ? `USR-${String(row.id).padStart(4, "0")}` : "-")}
       </span>
     ),
   },

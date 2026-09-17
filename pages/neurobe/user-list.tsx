@@ -203,7 +203,6 @@ const UserList = () => {
         email: formData.email,
         role: formData.role,
         is_active: isActive,
-        is_staff: formData.is_staff !== undefined ? formData.is_staff : !isStudent,
         organization_id: getOrganizationId(),
         department_id:
           formData.department_id && Number(formData.department_id) > 0
@@ -214,10 +213,14 @@ const UserList = () => {
             ? Number(formData.programme_id)
             : null,
         batch_id:
-          formData.batch_id && Number(formData.batch_id) > 0
+          isStudent && formData.batch_id && Number(formData.batch_id) > 0
             ? Number(formData.batch_id)
             : null,
       };
+
+      if (formData.register_number || formData.regNo) {
+        payload.register_number = formData.register_number || formData.regNo;
+      }
 
       if (formData.password) {
         payload.password = formData.password;
@@ -267,7 +270,7 @@ const UserList = () => {
     const s = state.search.toLowerCase();
     const fullName = (r.first_name ? `${r.first_name} ${r.last_name || ""}` : r.name || "").toLowerCase();
     const email = (r.email || "").toLowerCase();
-    const regNo = (r.regNo || r.registry_number || (r.id ? `USR-${String(r.id).padStart(4, "0")}` : "")).toLowerCase();
+    const regNo = (r.register_number || r.regNo || (r.id ? `USR-${String(r.id).padStart(4, "0")}` : "")).toLowerCase();
     const matchSearch = !s || fullName.includes(s) || email.includes(s) || regNo.includes(s);
 
     const rRole = (r.role === "ERP_ADMIN" ? "ERP Admin" : r.role || "").toLowerCase();

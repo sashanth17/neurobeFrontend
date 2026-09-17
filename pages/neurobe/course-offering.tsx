@@ -48,6 +48,7 @@ const CourseOffering = () => {
     loading: false,
     showModal: false,
     editRow: null as any,
+    instanceList: null as any[] | null,
   });
 
   const openCreate = () => setState({ showModal: true, editRow: null });
@@ -58,66 +59,48 @@ const CourseOffering = () => {
     dispatch(setPageTitle("Course Offerings"));
   }, []);
 
-   useEffect(() => {
-   course_instance_list()
+  useEffect(() => {
+    course_instance_list();
   }, []);
 
-  const course_instance_list=async()=>{
+  const course_instance_list = async () => {
     try {
-      const res=await Models.course_instance.list()
-      console.log("res",res)
-      
+      setState({ loading: true });
+      const res: any = await Models.course_instance.list();
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      setState({ instanceList: list, loading: false });
     } catch (error) {
-      console.log("error",error)
-      
+      console.log("error", error);
+      setState({ loading: false });
     }
-  }
+  };
 
   // ── filtered records ───────────────────────────────────────────────────────
-  const records = MOCK_OFFERINGS.filter((r) => {
+  const rawList = state.instanceList && state.instanceList.length > 0 ? state.instanceList : MOCK_OFFERINGS;
+  const records = rawList.filter((r: any) => {
     const s = state.search.toLowerCase();
+    const courseTitle = r.course_instance_name || r.course || r.course_title || "";
+    const courseCode = r.course_code || r.code || "";
+    const createdBy = r.created_by_name || r.created_by || "";
     const matchSearch =
       !s ||
-      r.course.toLowerCase().includes(s) ||
-      r.code.toLowerCase().includes(s) ||
-      r.coordinator.toLowerCase().includes(s) ||
-      r.instructors.some((i) => i.toLowerCase().includes(s));
-    const matchProg =
-      !state.programmeFilter ||
-      state.programmeFilter === "all" ||
-      r.programme ===
-        PROGRAMME_OPTIONS.find((o) => o.value === state.programmeFilter)?.label;
-    const matchBatch =
-      !state.batchFilter ||
-      state.batchFilter === "all" ||
-      r.batch === state.batchFilter;
+      courseTitle.toLowerCase().includes(s) ||
+      courseCode.toLowerCase().includes(s) ||
+      createdBy.toLowerCase().includes(s);
     const matchStatus =
       !state.statusFilter ||
       state.statusFilter === "all" ||
-      r.status ===
-        STATUS_OPTIONS.find((o) => o.value === state.statusFilter)?.label;
-    return matchSearch && matchProg && matchBatch && matchStatus;
+      String(r.status || (r.is_active ? "active" : "inactive")).toLowerCase() === state.statusFilter.toLowerCase();
+    return matchSearch && matchStatus;
   });
 
   return (
     <div className="min-h-screen">
-      {/* Breadcrumb */}
-      {/* <p className="mb-2 text-xs text-[#000]">
-        ADMIN INSTITUTION &nbsp;›&nbsp; COURSE OFFERINGS
-      </p> */}
-
-      {/* <h1 className="page-ti mb-5">Course Offerings</h1> */}
-
       {/* Info banner */}
       <PageHeader
-        title="Course Offerings & Faculty Assignment"
-        subtitle="Manage course offerings across programmes, batches, and terms with automated Coordinator-to-Instructor access maintenance."
+        title="Course Offerings"
+        subtitle="Overview of course offerings and section instances across programmes and terms."
         icon={<BookOpen className="h-5 w-5 text-color2" />}
-        actionBtn1={{
-          label: "Create Course Offering",
-          icon: <IconPlus className="h-4 w-4" />,
-          onClick: openCreate,
-        }}
         records={`${records.length} Records`}
       />
 

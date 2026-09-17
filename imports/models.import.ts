@@ -17,6 +17,7 @@ import learning_material from "@/models/learning_material.model";
 import COPOMap from "@/models/copo_map.models";
 import topics from "@/models/topics.models";
 import pedagogy from "@/models/pedagogy.models";
+import course_enrollment from "@/models/course_enrollment.model";
 
 export const Models = {
   test,
@@ -28,6 +29,7 @@ export const Models = {
   batches,
   course,
   course_instance,
+  course_enrollment,
   stats,
   users,
   user_import,

@@ -51,10 +51,9 @@ const course = {
     create: (data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `courses/`;
+            const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
             instance()
-                .post(url, data, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                })
+                .post(url, data, config)
                 .then((res) => {
                     resolve(res.data);
                 })
@@ -91,11 +90,9 @@ const course = {
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `courses/${id}`;
+            const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
             instance()
-                .patch(url, data, {
-                    headers: { "Content-Type": "multipart/form-data" },
-
-                })
+                .patch(url, data, config)
                 .then((res) => {
                     resolve(res.data);
                 })
