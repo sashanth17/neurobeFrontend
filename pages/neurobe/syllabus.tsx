@@ -115,24 +115,15 @@ const Syllabus = () => {
       // Load file versions
       loadFileVersions(course_id);
 
-      // If job_id is passed from dashboard, use it directly
+      // If job_id is explicitly passed in URL from an active action, poll it
       if (job_id) {
         try { sessionStorage.setItem(jobKey, String(job_id)); } catch { }
+        setStep(3);
         job_Data(job_id);
-      } else {
-        // Restore from sessionStorage or check workflow status for persistent state
-        const savedJobId = getSavedJobId();
-        if (savedJobId && getSavedStep() >= 3) {
-          job_Data(savedJobId);
-        } else {
-          // Check workflow status to auto-restore step (persistent state across browser closes)
-          restoreStepFromWorkflow(course_id);
-        }
-      }
-
-      // restore syllabus detail on refresh if step >= 3
-      if (state.courseData?.latest_syllabus?.id && getSavedStep() >= 3) {
-        syllabus_detail(state.courseData.latest_syllabus.id);
+      } else if (searchParams.get("step") === "3" || searchParams.get("view") === "review") {
+        setStep(3);
+        const sid = searchParams.get("syllabus_id") || getSavedSyllabusId();
+        if (sid) syllabus_detail(sid);
       }
     }
   }, [course_id, job_id]);
@@ -147,32 +138,6 @@ const Syllabus = () => {
       }
     }
   }, [state.currentStep]);
-
-  // Check if course has latest_syllabus.id - if yes, go to review/edit, if no, start AI extraction
-  useEffect(() => {
-    if (state.courseData && course_id && state.currentStep < 3) {
-      console.log("courseData updated:", state.courseData);
-      
-      if (state.courseData?.latest_syllabus?.id) {
-        // Syllabus already exists and we're still on upload step, go to review and edit
-        console.log("Latest syllabus found:", state.courseData.latest_syllabus.id);
-        
-        // Stop any ongoing polling
-        stopPolling();
-        
-        try {
-          sessionStorage.setItem(syllabusKey, String(state.courseData.latest_syllabus.id));
-        } catch { }
-        setStep(3);
-        syllabus_detail(state.courseData.latest_syllabus.id);
-      }
-    } else if (state.courseData && course_id && state.currentStep >= 3) {
-      // On step 3 or 4, just stop polling if syllabus exists
-      if (state.courseData?.latest_syllabus?.id) {
-        stopPolling();
-      }
-    }
-  }, [state.courseData, course_id, state.currentStep]);
 
   const course_data = async (id: string) => {
     try {
@@ -430,6 +395,13 @@ const Syllabus = () => {
           }
         }
 
+        if (res?.status === "not_found") {
+          console.log("Job status is not_found, stopping polling");
+          setState({ isJobLoading: false });
+          stopPolling();
+          return;
+        }
+
         const isCompleted =
           res?.status === "complete" ||
           res?.status === "completed" ||
@@ -471,20 +443,8 @@ const Syllabus = () => {
         }
       } catch (error: any) {
         console.log("job_Data error:", error);
-        
-        const errorMsg = error?.message || error?.detail || String(error);
-        const isJobNotFound = errorMsg.includes("not found");
-        
-        if (isJobNotFound && retries < maxRetries) {
-          console.log(`Job not found, retrying... (${retries + 1}/${maxRetries})`);
-          retries++;
-        } else if (retries >= maxRetries) {
-          console.log("Max retries reached for job polling");
-          setState({ isJobLoading: false });
-          stopPolling();
-        } else {
-          retries++;
-        }
+        setState({ isJobLoading: false });
+        stopPolling();
       }
     };
 
@@ -805,6 +765,32 @@ const Syllabus = () => {
               title="Syllabus File Versions"
               description={`Upload one or more syllabus PDF versions, then press Extract on any version to start AI extraction.`}
             />
+
+            {state.courseData?.latest_syllabus?.id && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-800/50 dark:bg-emerald-950/30">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                      Extracted Syllabus Available
+                    </p>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 truncate">
+                      An extracted syllabus is saved. You can upload new files below or review the current syllabus.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep(3);
+                    syllabus_detail(state.courseData.latest_syllabus.id);
+                  }}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 active:scale-95"
+                >
+                  Review Syllabus →
+                </button>
+              </div>
+            )}
 
             {/* File Version List */}
             <div className="mt-4 flex flex-col gap-3">

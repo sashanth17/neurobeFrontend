@@ -115,16 +115,22 @@ export default function CourseCard(props: any) {
     fallbackState?: string
   ) => {
     const status = wfItem?.status || fallbackState || "not_started";
-    const ver = wfItem?.active_version || 1;
-    const totalVers = wfItem?.total_versions || 1;
+    const hasVersions =
+      status !== "not_started" &&
+      ((wfItem?.total_versions !== undefined && wfItem.total_versions > 0) ||
+        (wfItem?.active_version !== undefined && wfItem.active_version > 0));
+    const ver = hasVersions ? (wfItem?.active_version || 1) : null;
+    const totalVers = hasVersions ? (wfItem?.total_versions || 1) : 0;
     // Derive real available versions: strictly what backend reports or 1..totalVers, never synthesize beyond totalVers
     const availableVersions: number[] =
-      wfItem?.available_versions && wfItem.available_versions.length > 0
-        ? wfItem.available_versions
-        : totalVers > 1
-        ? Array.from({ length: totalVers }, (_, i) => i + 1)
-        : [ver];
-    return { status, ver, totalVers, availableVersions, canGenerate: wfItem?.can_generate ?? true };
+      hasVersions
+        ? (wfItem?.available_versions && wfItem.available_versions.length > 0
+          ? wfItem.available_versions
+          : totalVers > 1
+          ? Array.from({ length: totalVers }, (_, i) => i + 1)
+          : (ver ? [ver] : []))
+        : [];
+    return { status, ver, totalVers, availableVersions, canGenerate: wfItem?.can_generate ?? true, hasVersions };
   };
 
   const sSyllabus = getStageInfo("extraction", workflowStatus?.step_1_syllabus_extraction, data?.academic_preparation?.syllabus?.state);
@@ -467,7 +473,20 @@ export default function CourseCard(props: any) {
                           </>
                         )}
                       </div>
-                    ) : item.version ? (
+                    ) : (!item.version || item.status === "not_started") ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenSection(item);
+                        }}
+                        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-indigo-400 bg-indigo-50/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                        title={`Create ${item.label}`}
+                      >
+                        <Plus className="h-2.5 w-2.5" />
+                        <span>Add</span>
+                      </button>
+                    ) : (
                       <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
                         {item.availableVersions && item.availableVersions.length > 1 ? (
                           <>
@@ -514,7 +533,7 @@ export default function CourseCard(props: any) {
                           </span>
                         )}
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 </div>
 

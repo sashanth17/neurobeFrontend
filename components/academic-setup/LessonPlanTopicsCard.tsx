@@ -30,212 +30,11 @@ export interface LessonPlanTopicsCardProps {
   className?: string;
 }
 
-const DEFAULT_UNITS: LessonPlanUnitData[] = [
-  {
-    id: "unit-1",
-    unitNumber: 1,
-    unitCodeText: "Unit 1",
-    title: "Introduction & Physical Layer",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "1.1",
-        title: "Fundamentals of Computer Networks",
-        bloomLevel: "K2",
-        hoursText: "2 Hours",
-        pedagogy: ["Lecture", "Concept Mapping", "Group Discussion"],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "Data Communications and Networking — Forouzan",
-      },
-      {
-        code: "1.2",
-        title: "Network Architecture and Layered Communication",
-        bloomLevel: "K2",
-        hoursText: "2 Hours",
-        pedagogy: [
-          "Interactive Lecture",
-          "Concept Mapping",
-          "Comparative Discussion",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "Data Communications and Networking — Forouzan",
-      },
-      {
-        code: "1.3",
-        title: "OSI and TCP/IP Reference Models",
-        bloomLevel: "K2",
-        hoursText: "3 Hours",
-        pedagogy: [
-          "Diagrammatic Walkthrough",
-          "Comparative Analysis",
-          "Peer Instruction",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "Internetworking with TCP/IP — Douglas Comer",
-      },
-      {
-        code: "1.4",
-        title: "Physical Layer and Transmission Media",
-        bloomLevel: "K2",
-        hoursText: "2 Hours",
-        pedagogy: ["Demonstration", "Lecture", "Discussion"],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "Data Communications and Networking — Forouzan",
-      },
-    ],
-  },
-  {
-    id: "unit-2",
-    unitNumber: 2,
-    unitCodeText: "Unit 2",
-    title: "Data Link Layer & MAC Sublayer",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "2.1",
-        title: "Data Link Layer Design & Framing",
-        bloomLevel: "K3",
-        hoursText: "2 Hours",
-        pedagogy: [
-          "Interactive Lecture",
-          "Problem Solving",
-          "Simulation Lab",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "Data Communications and Networking — Forouzan",
-      },
-      {
-        code: "2.2",
-        title: "Medium Access Control & Ethernet",
-        bloomLevel: "K3",
-        hoursText: "3 Hours",
-        pedagogy: [
-          "Case Study",
-          "Group Discussion",
-          "Protocol Animation",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "IEEE 802.3 Standard Documents",
-      },
-    ],
-  },
-  {
-    id: "unit-3",
-    unitNumber: 3,
-    unitCodeText: "Unit 3",
-    title: "Network Layer & Routing",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "3.1",
-        title: "IPv4/IPv6 Addressing & Subnetting",
-        bloomLevel: "K3",
-        hoursText: "3 Hours",
-        pedagogy: [
-          "Subnet Workshop",
-          "Interactive Quiz",
-          "Guided Problem Solving",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "TCP/IP Illustrated, Vol. 1 — W. Richard Stevens",
-      },
-      {
-        code: "3.2",
-        title: "Routing Algorithms & Protocols",
-        bloomLevel: "K4",
-        hoursText: "4 Hours",
-        pedagogy: [
-          "Algorithm Walkthrough",
-          "Packet Tracer Demo",
-          "Comparative Analysis",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "Routing TCP/IP, Vol. 1 — Jeff Doyle",
-      },
-    ],
-  },
-  {
-    id: "unit-4",
-    unitNumber: 4,
-    unitCodeText: "Unit 4",
-    title: "Transport Layer Protocols",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "4.1",
-        title: "TCP Connection Management & Flow Control",
-        bloomLevel: "K3",
-        hoursText: "4 Hours",
-        pedagogy: [
-          "Wireshark Lab",
-          "Interactive Lecture",
-          "Handshake Role Play",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "TCP/IP Illustrated, Vol. 1 — W. Richard Stevens",
-      },
-      {
-        code: "4.2",
-        title: "UDP & Socket Programming",
-        bloomLevel: "K3",
-        hoursText: "3 Hours",
-        pedagogy: [
-          "Live Coding Demo",
-          "Peer Code Review",
-          "Lab Assignment",
-        ],
-        textbook: "Unix Network Programming — W. Richard Stevens",
-        referenceBook: "Computer Networks — Tanenbaum & Wetherall",
-      },
-    ],
-  },
-  {
-    id: "unit-5",
-    unitNumber: 5,
-    unitCodeText: "Unit 5",
-    title: "Application Layer",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "5.1",
-        title: "Application Protocols",
-        bloomLevel: "K2",
-        hoursText: "4 Hours",
-        pedagogy: [
-          "Protocol Inspection",
-          "Concept Mapping",
-          "Interactive Lecture",
-        ],
-        textbook: "Computer Networks — Tanenbaum & Wetherall",
-        referenceBook: "HTTP: The Definitive Guide — David Gourley",
-      },
-      {
-        code: "5.2",
-        title: "Network Management & Security",
-        bloomLevel: "K3",
-        hoursText: "4 Hours",
-        pedagogy: [
-          "Security Case Study",
-          "Demonstration",
-          "Group Discussion",
-        ],
-        textbook: "Cryptography and Network Security — William Stallings",
-        referenceBook: "Computer Networks — Tanenbaum & Wetherall",
-      },
-    ],
-  },
-];
-
 const LessonPlanTopicsCard: React.FC<LessonPlanTopicsCardProps> = ({
   title = "LESSON PLAN OF TOPICS",
   subtitle = "Prescribed teaching methods, textbooks and reference books for each topic.",
-  headerStatsText = "5 Units • 20 Main Topics",
-  units = DEFAULT_UNITS,
+  headerStatsText,
+  units = [],
   className = "",
 }) => {
   const [openUnits, setOpenUnits] = useState<Record<string, boolean>>({});
@@ -310,11 +109,9 @@ const LessonPlanTopicsCard: React.FC<LessonPlanTopicsCardProps> = ({
           )}
         </div>
 
-        {headerStatsText && (
-          <span className="text-xs sm:text-sm font-bold text-[#1e1b4b] dark:text-white shrink-0">
-            {headerStatsText}
-          </span>
-        )}
+        <span className="text-xs sm:text-sm font-bold text-[#1e1b4b] dark:text-white shrink-0">
+          {headerStatsText || `${units.length} Unit${units.length === 1 ? "" : "s"}`}
+        </span>
       </div>
 
       {/* Toolbar Controls */}
@@ -351,7 +148,12 @@ const LessonPlanTopicsCard: React.FC<LessonPlanTopicsCardProps> = ({
 
       {/* Accordion Units List */}
       <div className="space-y-3">
-        {filteredUnits.map((unit) => {
+        {filteredUnits.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">
+            No approved lesson plan / schedule available for this course.
+          </div>
+        ) : (
+          filteredUnits.map((unit) => {
           const isOpen = Boolean(openUnits[unit.id] || searchQuery.trim());
           return (
             <div
