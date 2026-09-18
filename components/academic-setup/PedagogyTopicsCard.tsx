@@ -248,7 +248,7 @@ const PedagogyTopicsCard: React.FC<PedagogyTopicsCardProps> = ({
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

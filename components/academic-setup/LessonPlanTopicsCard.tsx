@@ -276,7 +276,7 @@ const LessonPlanTopicsCard: React.FC<LessonPlanTopicsCardProps> = ({
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

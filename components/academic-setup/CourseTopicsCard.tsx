@@ -265,7 +265,7 @@ const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );
