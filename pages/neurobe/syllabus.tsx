@@ -328,7 +328,7 @@ const Syllabus = () => {
         console.log("job_Data response:", res);
         setStep(3);
 
-        const status = res?.status ?? res?.state?.live_redis_status;
+        const status = res?.status;
         if (
           status === "complete" ||
           status === "completed" ||

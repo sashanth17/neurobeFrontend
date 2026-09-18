@@ -302,14 +302,80 @@ const syllabus = {
         return promise;
     },
 
-    
+    get_full_tree: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/full-tree`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
 
-   
+    get_file: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/file`;
+            commonInstance()
+                .get(url, {
+                    responseType: 'blob',
+                    transformResponse: [(data) => data]
+                })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
 
+    get_workflow_status: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/workflow-status`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
 
-   
+    get_versions: (id: string | number, stage: string) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/versions/${stage}`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
 
-    
+    activate_version: (id: string | number, stage: string, ver: number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/versions/${stage}/${ver}/activate`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
+
+    cancel_stage: (id: string | number, stage: string) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/stages/${stage}/cancel?cancelled_by=user`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    }
 
 };
 

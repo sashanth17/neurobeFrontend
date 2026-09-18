@@ -20,8 +20,11 @@ import pedagogy from "@/models/pedagogy.models";
 import course_enrollment from "@/models/course_enrollment.model";
 import faculty from "@/models/faculty.model";
 import pso from "@/models/pso.model";
+import application from "@/models/application.model";
+import master from "@/models/master.model";
+import notification from "@/models/notification.model";
 
-export const Models = {
+export const Models: any = {
   test,
   auth,
   department,
@@ -48,6 +51,9 @@ export const Models = {
   pedagogy,
   pso,
   psos: pso,
+  application,
+  master,
+  notification,
 };
 
 export default Models;

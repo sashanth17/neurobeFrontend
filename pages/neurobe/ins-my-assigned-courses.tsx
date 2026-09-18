@@ -160,6 +160,9 @@ const MyAssignedCourses = () => {
               key={card.code}
               {...card}
               onOpenCourse={() => onAction(card)}
+              onTriggerStage={(stageKey) => {
+                router.push(`/neurobe/ins-course-artifacts?code=${card.code}&stage=${stageKey}`);
+              }}
             />
           ))}
         </div>

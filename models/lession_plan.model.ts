@@ -98,13 +98,36 @@ const lession_plan = {
         return promise;
     },
 
+    get_schedules: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/schedules`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
 
-    
+    generate_timeline: (id: string | number, body?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/generate-timeline`;
+            commonInstance()
+                .post(url, body || {})
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
 
-   
+    approve_schedule: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/approve-schedule`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    }
 
-
-    
 };
 
 export default lession_plan;

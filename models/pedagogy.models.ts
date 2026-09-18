@@ -174,6 +174,45 @@ const pedagogy = {
         return promise;
     },
 
+    get_workspace: (id: string | number, unitNumber: number = 1) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/pedagogy-workspace?unit_number=${unitNumber}`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    generate_pedagogies: (id: string | number, body?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/generate-pedagogies`;
+            commonInstance()
+                .post(url, body || {})
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    update_selection: (id: string | number, pedagogy_id: string | number, body: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
+            commonInstance()
+                .put(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    approve_pedagogy: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/approve-pedagogy`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    }
 
 }
 
