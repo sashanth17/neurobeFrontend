@@ -19,6 +19,7 @@ import topics from "@/models/topics.models";
 import pedagogy from "@/models/pedagogy.models";
 import course_enrollment from "@/models/course_enrollment.model";
 import faculty from "@/models/faculty.model";
+import pso from "@/models/pso.model";
 
 export const Models = {
   test,
@@ -45,6 +46,8 @@ export const Models = {
   COPOMap,
   topics,
   pedagogy,
+  pso,
+  psos: pso,
 };
 
 export default Models;

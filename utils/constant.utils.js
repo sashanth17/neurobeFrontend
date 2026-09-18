@@ -97,7 +97,7 @@ export const OwnmenuConfig = {
       type: "link",
       icon: "IconMenuTables",
       label: "Roles & Permissions",
-      href: "/",
+      href: "/neurobe/roles-permissions",
       notifyKey: "new_application_count",
     },
     {

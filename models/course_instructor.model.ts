@@ -83,11 +83,9 @@ const course_instructor = {
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course-instructors/${id}`;
+            const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
             instance()
-                .patch(url, data,{
-                    headers: { "Content-Type": "multipart/form-data" },
-
-                })
+                .patch(url, data, config)
                 .then((res) => {
                     resolve(res.data);
                 })

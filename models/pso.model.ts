@@ -1,10 +1,10 @@
 import instance from '@/utils/axios.utils';
 import { getOrganizationId } from '@/utils/function.utils';
 
-const course_instance = {
+const pso = {
     list: (body?: any, page?: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course-instances/`;
+            let url = `psos/`;
             const params = new URLSearchParams();
 
             const orgId = body?.organization_id || getOrganizationId();
@@ -15,14 +15,21 @@ const course_instance = {
             if (body?.search) {
                 params.append("search", body.search);
             }
+
             if (body?.status && body.status !== "All Statuses" && body.status !== "all_status") {
                 params.append("status", body.status);
             }
-            if (body?.department_id) {
-                params.append("department_id", body.department_id);
+
+            if (body?.programme_id) {
+                params.append("programme_id", String(body.programme_id));
             }
+
+            if (body?.department_id) {
+                params.append("department_id", String(body.department_id));
+            }
+
             if (page) {
-                params.append("page", page);
+                params.append("page", String(page));
             }
 
             if (params.toString()) {
@@ -45,31 +52,9 @@ const course_instance = {
         return promise;
     },
 
-    create: (data: any) => {
-        let promise = new Promise((resolve, reject) => {
-                     let url = `course-instances/`;
-
-            instance()
-                .post(url, data, {
-                })
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
-                });
-        });
-        return promise;
-    },
-
     detail: (id: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course-instances/${id}`;
-            
+            let url = `psos/${id}`;
             instance()
                 .get(url)
                 .then((res) => {
@@ -86,9 +71,28 @@ const course_instance = {
         return promise;
     },
 
+    create: (data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `psos/`;
+            instance()
+                .post(url, data)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
+
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course-instances/${id}`;
+            let url = `psos/${id}`;
             const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
             instance()
                 .patch(url, data, config)
@@ -108,7 +112,7 @@ const course_instance = {
 
     delete: (id: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course-instances/${id}`;
+            let url = `psos/${id}`;
             instance()
                 .delete(url)
                 .then((res) => {
@@ -124,10 +128,6 @@ const course_instance = {
         });
         return promise;
     },
-
-    
-
-    
 };
 
-export default course_instance;
+export default pso;

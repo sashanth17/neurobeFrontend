@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { ArrowRight, BookOpen, Info, User, UserCheck } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState } from "@/utils/function.utils";
+import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
 import IconSearch from "@/components/Icon/IconSearch";
 import IconPlus from "@/components/Icon/IconPlus";
 import AcademicTable from "@/components/common-components/TableComponent";
@@ -73,6 +73,24 @@ const CourseOffering = () => {
       console.log("error", error);
       setState({ loading: false });
     }
+  };
+
+  const handleDelete = (row: any) => {
+    showDeleteAlert(
+      async () => {
+        try {
+          setState({ loading: true });
+          await Models.course_instance.delete(row.id);
+          Success("Course offering deleted successfully");
+          course_instance_list();
+        } catch (error: any) {
+          Failure(typeof error === "string" ? error : error?.message || "Failed to delete course offering");
+          setState({ loading: false });
+        }
+      },
+      () => { },
+      `Are you sure you want to delete ${row.course_instance_name || row.course || "this course offering"}?`
+    );
   };
 
   // ── filtered records ───────────────────────────────────────────────────────
@@ -146,14 +164,14 @@ const CourseOffering = () => {
       <div className=" mb-4 flex flex-wrap items-center justify-between gap-3  py-4">
         {/* Search */}
         <div className="relative max-w-[300px] flex-1">
-         
+
           <TextInput
-             placeholder="Search by code, title, faculty..."
-              type="text"
-              value={state.search}
-              onChange={(e) => setState({ search: e.target.value })}
-              icon={<IconSearch className="h-4 w-4" />}
-            />
+            placeholder="Search by code, title, faculty..."
+            type="text"
+            value={state.search}
+            onChange={(e) => setState({ search: e.target.value })}
+            icon={<IconSearch className="h-4 w-4" />}
+          />
         </div>
 
         <div className="flex gap-3">
@@ -198,7 +216,7 @@ const CourseOffering = () => {
       <div className="panel">
         <AcademicTable
           records={records}
-          columns={makeCourseOfferingColumns(openEdit)}
+          columns={makeCourseOfferingColumns(openEdit, handleDelete)}
           loading={state.loading}
           noRecordsText="No course offerings found"
         />

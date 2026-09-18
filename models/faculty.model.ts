@@ -196,6 +196,58 @@ const faculty = {
         });
     });
   },
+
+  downloadInstructorTemplate: (format: string = 'xlsx') => {
+    return new Promise<any>((resolve, reject) => {
+      const url = `faculties/excel-instructors/template?format=${format}`;
+      instance()
+        .get(url, { responseType: 'blob' })
+        .then((res) => resolve(res))
+        .catch(async (error) => {
+          if (error.response?.data instanceof Blob) {
+            try {
+              const text = await error.response.data.text();
+              const json = JSON.parse(text);
+              reject(json.message || json.error || text);
+              return;
+            } catch {
+              // Non-JSON blob error
+            }
+          }
+          reject(error.response?.data?.message || error.response?.data || error);
+        });
+    });
+  },
+
+  validateInstructorImport: (file: File, courseId: number | string) => {
+    return new Promise<any>((resolve, reject) => {
+      const url = `faculties/excel-instructors/validate`;
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('course_id', String(courseId));
+      instance()
+        .post(url, fd)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.message || error.response?.data || error);
+        });
+    });
+  },
+
+  importInstructors: (file: File, courseId: number | string) => {
+    return new Promise<any>((resolve, reject) => {
+      const url = `faculties/excel-instructors/import`;
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('course_id', String(courseId));
+      instance()
+        .post(url, fd)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.message || error.response?.data || error);
+        });
+    });
+  },
 };
 
 export default faculty;

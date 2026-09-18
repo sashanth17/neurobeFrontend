@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
-import { Check, Edit, PlusIcon, Search, Users, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, Edit, PlusIcon, Search, Users, X, Upload, Download, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import TextInput from "@/components/FormFields/TextInput.component";
 import TextArea from "@/components/FormFields/TextArea.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
-import { Failure, useSetState } from "@/utils/function.utils";
+import { Failure, Success, useSetState, getOrganizationId } from "@/utils/function.utils";
 import Models from "@/imports/models.import";
 import { ROLES } from "@/utils/constant.utils";
 import PDFUploadDropzone from "./PDFUploadDropzone";
@@ -150,6 +151,346 @@ const PROG_OPTS = toOpts(["BTECH-CSE", "BTECH-ECE", "MTECH-AI", "MBA"]);
 const TYPE_OPTS = toOpts(["UG", "PG", "Diploma", "PhD"]);
 const BATCH_STATUS_OPTS = toOpts(["Active", "Inactive"]);
 
+// ─── UPLOAD INSTRUCTORS MODAL ─────────────────────────────────────────────────
+interface UploadInstructorsModalProps {
+  open: boolean;
+  onClose: () => void;
+  courseId: number | string;
+  courseTitle?: string;
+  onImportComplete?: () => void;
+}
+
+const UploadInstructorsModal = ({
+  open,
+  onClose,
+  courseId,
+  courseTitle,
+  onImportComplete,
+}: UploadInstructorsModalProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [state, setState] = useSetState({
+    step: 1 as 1 | 2 | 3 | 4,
+    selectedFile: null as File | null,
+    isDownloading: false,
+    isValidating: false,
+    isImporting: false,
+    validationResult: null as any,
+    importResult: null as any,
+    dragActive: false,
+  });
+
+  useEffect(() => {
+    if (open) {
+      setState({
+        step: 1,
+        selectedFile: null,
+        isDownloading: false,
+        isValidating: false,
+        isImporting: false,
+        validationResult: null,
+        importResult: null,
+        dragActive: false,
+      });
+    }
+  }, [open]);
+
+  const handleDownloadTemplate = async () => {
+    try {
+      setState({ isDownloading: true });
+      const response: any = await Models.faculty.downloadInstructorTemplate('xlsx');
+      let filename = 'instructor_import_template.xlsx';
+      const disposition = response?.headers?.['content-disposition'];
+      if (disposition) {
+        const match = disposition.match(/filename\*?=['"]?(?:UTF-\d['"])?([^;\r\n"']*)['"]?/i);
+        if (match?.[1]) filename = decodeURIComponent(match[1].trim());
+      }
+      const blobData =
+        response?.data instanceof Blob
+          ? response.data
+          : response instanceof Blob
+            ? response
+            : new Blob([response?.data || response], {
+              type: response?.headers?.['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+      const url = window.URL.createObjectURL(blobData);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      Success('Template downloaded');
+    } catch (err: any) {
+      Failure(typeof err === 'string' ? err : err?.message || 'Failed to download template');
+    } finally {
+      setState({ isDownloading: false });
+    }
+  };
+
+  const handleFileChange = (file: File | null) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
+      Failure('Please upload an Excel (.xlsx, .xls) or CSV file');
+      return;
+    }
+    setState({ selectedFile: file, step: 2 });
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setState({ dragActive: false });
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFileChange(file);
+  };
+
+  const handleValidate = async () => {
+    if (!state.selectedFile) return;
+    try {
+      setState({ isValidating: true });
+      const result = await Models.faculty.validateInstructorImport(state.selectedFile, courseId);
+      setState({ validationResult: result, step: 3, isValidating: false });
+    } catch (err: any) {
+      Failure(typeof err === 'string' ? err : err?.message || 'Validation failed');
+      setState({ isValidating: false });
+    }
+  };
+
+  const handleImport = async () => {
+    if (!state.selectedFile) return;
+    try {
+      setState({ isImporting: true });
+      const result = await Models.faculty.importInstructors(state.selectedFile, courseId);
+      setState({ importResult: result, step: 4, isImporting: false });
+      Success('Instructors imported successfully');
+      onImportComplete?.();
+    } catch (err: any) {
+      Failure(typeof err === 'string' ? err : err?.message || 'Import failed');
+      setState({ isImporting: false });
+    }
+  };
+
+  const handleReset = () => {
+    setState({
+      step: 1,
+      selectedFile: null,
+      validationResult: null,
+      importResult: null,
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  if (!open) return null;
+
+  const validRows = state.validationResult?.valid || state.validationResult?.valid_rows || [];
+  const invalidRows = state.validationResult?.invalid || state.validationResult?.invalid_rows || state.validationResult?.errors || [];
+  const totalValid = typeof state.validationResult?.valid_count === 'number' ? state.validationResult.valid_count : validRows.length;
+  const totalInvalid = typeof state.validationResult?.invalid_count === 'number' ? state.validationResult.invalid_count : invalidRows.length;
+
+  const STEP_LABELS = ['Upload File', 'Validate', 'Review', 'Complete'];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg">
+              <Upload className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">Upload Instructors</h3>
+              {courseTitle && <p className="text-xs text-gray-500">{courseTitle}</p>}
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Progress Steps */}
+        <div className="border-b border-gray-100 px-6 py-3 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            {STEP_LABELS.map((label, i) => {
+              const stepNum = i + 1;
+              const isActive = state.step === stepNum;
+              const isDone = state.step > stepNum;
+              return (
+                <div key={label} className="flex items-center gap-2">
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all ${isDone ? 'bg-emerald-500 text-white' : isActive ? 'bg-color2 text-white' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                    }`}>
+                    {isDone ? <Check className="h-3 w-3" /> : stepNum}
+                  </div>
+                  <span className={`text-xs font-medium ${isActive ? 'text-color2' : isDone ? 'text-emerald-600' : 'text-gray-400'}`}>{label}</span>
+                  {i < 3 && <div className={`mx-2 h-px w-8 ${isDone ? 'bg-emerald-400' : 'bg-gray-200 dark:bg-gray-700'}`} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
+          {/* Step 1: Download template + Upload file */}
+          {state.step === 1 && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-900/20">
+                <div className="flex items-start gap-3">
+                  <Download className="mt-0.5 h-5 w-5 text-emerald-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Step 1: Download Template</p>
+                    <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-400/70">Download the Excel template, fill in employee numbers, then upload it below.</p>
+                    <button
+                      onClick={handleDownloadTemplate}
+                      disabled={state.isDownloading}
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {state.isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                      {state.isDownloading ? 'Downloading…' : 'Download Template'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-all ${state.dragActive
+                  ? 'border-color2 bg-blue-50/50 dark:bg-blue-900/20'
+                  : 'border-gray-300 bg-gray-50/50 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800/50'
+                  }`}
+                onDragOver={(e) => { e.preventDefault(); setState({ dragActive: true }); }}
+                onDragLeave={() => setState({ dragActive: false })}
+                onDrop={handleDrop}
+              >
+                <Upload className="mx-auto h-10 w-10 text-gray-400" />
+                <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">Drop your filled template here</p>
+                <p className="mt-1 text-xs text-gray-500">or click to browse — .xlsx, .xls, .csv</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: File selected, ready to validate */}
+          {state.step === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                <FileText className="h-8 w-8 text-blue-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">{state.selectedFile?.name}</p>
+                  <p className="text-xs text-blue-600/70">{((state.selectedFile?.size || 0) / 1024).toFixed(1)} KB</p>
+                </div>
+                <button onClick={handleReset} className="rounded-lg p-1.5 text-blue-400 hover:bg-blue-100 hover:text-red-500 dark:hover:bg-blue-900">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Change File
+                </button>
+                <button
+                  onClick={handleValidate}
+                  disabled={state.isValidating}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-color2 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {state.isValidating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  {state.isValidating ? 'Validating…' : 'Validate'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Validation results */}
+          {state.step === 3 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center dark:border-emerald-800 dark:bg-emerald-900/20">
+                  <CheckCircle className="mx-auto h-6 w-6 text-emerald-600" />
+                  <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">{totalValid}</p>
+                  <p className="text-xs text-emerald-600/70">Valid Records</p>
+                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 text-center dark:border-red-800 dark:bg-red-900/20">
+                  <AlertCircle className="mx-auto h-6 w-6 text-red-500" />
+                  <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{totalInvalid}</p>
+                  <p className="text-xs text-red-500/70">Invalid Records</p>
+                </div>
+              </div>
+
+              {invalidRows.length > 0 && (
+                <div className="rounded-xl border border-red-200 bg-red-50/40 p-3 dark:border-red-800 dark:bg-red-900/10">
+                  <p className="mb-2 text-xs font-bold text-red-700 dark:text-red-400">Issues Found:</p>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {invalidRows.map((row: any, idx: number) => (
+                      <div key={idx} className="text-xs text-red-600/90 dark:text-red-400/80">
+                        <span className="font-semibold">Row {row.row || row.row_number || idx + 1}:</span> {row.error || row.message || row.reason || JSON.stringify(row)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {totalValid > 0 && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleReset}
+                    className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Re-upload
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={state.isImporting}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {state.isImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {state.isImporting ? 'Importing…' : `Import ${totalValid} Instructor${totalValid !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              )}
+
+              {totalValid === 0 && (
+                <button
+                  onClick={handleReset}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Re-upload
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Step 4: Import complete */}
+          {state.step === 4 && (
+            <div className="py-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                <CheckCircle className="h-8 w-8 text-emerald-600" />
+              </div>
+              <h4 className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Import Complete!</h4>
+              <p className="mt-1 text-sm text-gray-500">
+                {state.importResult?.imported_count ?? state.importResult?.count ?? totalValid} instructor(s) have been assigned to this course.
+              </p>
+              <button
+                onClick={onClose}
+                className="mt-5 rounded-lg bg-color2 px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── CREATE / EDIT COURSE MODAL ───────────────────────────────────────────────
 export interface CourseFormData {
   course_code: string;
@@ -186,6 +527,7 @@ export const CreateCourseModal = ({
     instructors: [] as any[],
     facultyOptions: [] as any[],
     selectedInstructorToAdd: null as any,
+    showUploadModal: false,
   });
 
   useEffect(() => {
@@ -234,28 +576,32 @@ export const CreateCourseModal = ({
           Models.faculty
             .getCourseAssignments(initialData.id)
             .then((res: any) => {
+              let coordObj = null;
+              const coordFacultyId = res?.coordinator?.faculty_id ?? res?.coordinator?.id ?? null;
               if (res?.coordinator) {
                 const coord = res.coordinator;
-                const facultyId = coord.faculty_id ?? coord.id;
+                const facultyId = coordFacultyId;
                 const name = coord.name || `Faculty #${facultyId}`;
                 const secondary = coord.register_number || coord.email;
                 const label = secondary ? `${name} (${secondary})` : name;
-                setState({
-                  coordinator: {
-                    value: facultyId,
-                    label,
-                    id: facultyId,
-                    faculty_id: facultyId,
-                    name,
-                    email: coord.email,
-                    register_number: coord.register_number,
-                    role: coord.role,
-                  },
-                });
+                coordObj = {
+                  value: facultyId,
+                  label,
+                  id: facultyId,
+                  faculty_id: facultyId,
+                  name,
+                  email: coord.email,
+                  register_number: coord.register_number,
+                  role: coord.role,
+                };
               }
-              if (Array.isArray(res?.instructors)) {
-                setState({
-                  instructors: res.instructors.map((ins: any) => {
+              const instructorsList = Array.isArray(res?.instructors)
+                ? res.instructors
+                  .filter((ins: any) => {
+                    const fId = ins.faculty_id ?? ins.id;
+                    return !coordFacultyId || fId !== coordFacultyId;
+                  })
+                  .map((ins: any) => {
                     const facultyId = ins.faculty_id ?? ins.id;
                     const name = ins.name || `Faculty #${facultyId}`;
                     const secondary = ins.register_number || ins.email;
@@ -270,9 +616,12 @@ export const CreateCourseModal = ({
                       register_number: ins.register_number,
                       role: ins.role,
                     };
-                  }),
-                });
-              }
+                  })
+                : [];
+              setState({
+                coordinator: coordObj,
+                instructors: instructorsList,
+              });
             })
             .catch((err) =>
               console.error("Failed to load assignments for course", err)
@@ -291,8 +640,18 @@ export const CreateCourseModal = ({
     }
   }, [open, initialData]);
 
+  const handleCoordinatorChange = (v: any) => {
+    setState({
+      coordinator: v,
+      instructors: v
+        ? state.instructors.filter((ins: any) => ins.value !== v.value)
+        : state.instructors,
+    });
+  };
+
   const handleAddInstructor = (opt: any) => {
     if (!opt?.value) return;
+    if (state.coordinator && opt.value === state.coordinator.value) return;
     const exists = state.instructors.some((i: any) => i.value === opt.value);
     if (!exists) {
       setState({
@@ -335,7 +694,7 @@ export const CreateCourseModal = ({
         : null,
       instructor_ids: state.instructors
         .map((i: any) => Number(i.value))
-        .filter(Boolean),
+        .filter((id) => Boolean(id) && (!state.coordinator || id !== Number(state.coordinator.value))),
     };
 
     onSubmit(payload);
@@ -404,7 +763,7 @@ export const CreateCourseModal = ({
             <CustomSelect
               options={state.facultyOptions}
               value={state.coordinator}
-              onChange={(v) => setState({ coordinator: v })}
+              onChange={handleCoordinatorChange}
               isClearable
             />
             {state.coordinator && (
@@ -428,15 +787,28 @@ export const CreateCourseModal = ({
 
           {/* ── COURSE INSTRUCTORS SECTION (Multiple allowed) ── */}
           <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-            <label className="mb-2 block text-sm font-bold text-[#000] dark:text-white">
-              Course Instructors{" "}
-              <span className="text-xs font-normal text-gray-500">
-                (Multiple instructors allowed)
-              </span>
-            </label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-bold text-[#000] dark:text-white">
+                Course Instructors{" "}
+                <span className="text-xs font-normal text-gray-500">
+                  (Multiple instructors allowed)
+                </span>
+              </label>
+              {isEdit && initialData?.id && (
+                <button
+                  type="button"
+                  onClick={() => setState({ showUploadModal: true })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 hover:shadow-sm dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
+                >
+                  <Upload className="h-3 w-3" />
+                  Upload Instructors
+                </button>
+              )}
+            </div>
             <CustomSelect
               options={state.facultyOptions.filter(
                 (f: any) =>
+                  (!state.coordinator || f.value !== state.coordinator.value) &&
                   !state.instructors.some((i: any) => i.value === f.value)
               )}
               value={state.selectedInstructorToAdd}
@@ -470,6 +842,49 @@ export const CreateCourseModal = ({
               </p>
             )}
           </div>
+
+          {/* Upload Instructors Modal */}
+          {isEdit && initialData?.id && (
+            <UploadInstructorsModal
+              open={state.showUploadModal}
+              onClose={() => setState({ showUploadModal: false })}
+              courseId={initialData.id}
+              courseTitle={initialData.course_title || initialData.title || state.title}
+              onImportComplete={() => {
+                // Reload instructors after import
+                Models.faculty
+                  .getCourseAssignments(initialData.id)
+                  .then((res: any) => {
+                    const coordFacultyId = res?.coordinator?.faculty_id ?? res?.coordinator?.id ?? null;
+                    const instructorsList = Array.isArray(res?.instructors)
+                      ? res.instructors
+                        .filter((ins: any) => {
+                          const fId = ins.faculty_id ?? ins.id;
+                          return !coordFacultyId || fId !== coordFacultyId;
+                        })
+                        .map((ins: any) => {
+                          const facultyId = ins.faculty_id ?? ins.id;
+                          const name = ins.name || `Faculty #${facultyId}`;
+                          const secondary = ins.register_number || ins.email;
+                          const label = secondary ? `${name} (${secondary})` : name;
+                          return {
+                            value: facultyId,
+                            label,
+                            id: facultyId,
+                            faculty_id: facultyId,
+                            name,
+                            email: ins.email,
+                            register_number: ins.register_number,
+                            role: ins.role,
+                          };
+                        })
+                      : [];
+                    setState({ instructors: instructorsList });
+                  })
+                  .catch(() => { });
+              }}
+            />
+          )}
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -537,7 +952,7 @@ export const CreateDepartmentModal = ({
   onSubmit,
   submitting = false,
 }: DeptModalProps) => {
-  console.log("initialData",initialData)
+  console.log("initialData", initialData)
   const isEdit = !!initialData;
   const [state, setState] = useSetState({
     code: "",
@@ -935,108 +1350,108 @@ interface PSOModalProps {
   initialData?: any;
 }
 
-export const CreatePSOModal = ({
-  open,
-  onClose,
-  initialData,
-}: PSOModalProps) => {
-  const isEdit = !!initialData;
-  const [state, setState] = useSetState({
-    code: "",
-    programme: null as any,
-    description: "",
-    status: null as any,
-    version: "",
-  });
+// export const CreatePSOModal = ({
+//   open,
+//   onClose,
+//   initialData,
+// }: PSOModalProps) => {
+//   const isEdit = !!initialData;
+//   const [state, setState] = useSetState({
+//     code: "",
+//     programme: null as any,
+//     description: "",
+//     status: null as any,
+//     version: "",
+//   });
 
-  useEffect(() => {
-    if (initialData) {
-      setState({
-        code: initialData.code ?? "",
-        programme: toOpt(initialData.programme),
-        description: initialData.description ?? "",
-        status: toOpt(initialData.status),
-        version: initialData.version ?? "",
-      });
-    } else {
-      setState({
-        code: "",
-        programme: null,
-        description: "",
-        status: null,
-        version: "",
-      });
-    }
-  }, [initialData, open]);
+//   useEffect(() => {
+//     if (initialData) {
+//       setState({
+//         code: initialData.code ?? "",
+//         programme: toOpt(initialData.programme),
+//         description: initialData.description ?? "",
+//         status: toOpt(initialData.status),
+//         version: initialData.version ?? "",
+//       });
+//     } else {
+//       setState({
+//         code: "",
+//         programme: null,
+//         description: "",
+//         status: null,
+//         version: "",
+//       });
+//     }
+//   }, [initialData, open]);
 
-  return (
-    <ModalShell
-      title={isEdit ? "Edit PSO" : "Create New PSO"}
-      icon={
-        isEdit ? (
-          <Edit className="h-3.5 w-3.5" />
-        ) : (
-          <PlusIcon className="h-3.5 w-3.5" />
-        )
-      }
-      open={open}
-      onClose={onClose}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onClose();
-        }}
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <TextInput
-            title="PSO Code"
-            required
-            placeholder="e.g. PSO1"
-            value={state.code}
-            onChange={(e) => setState({ code: e.target.value })}
-          />
-          <CustomSelect
-            title="Programme"
-            required
-            options={PROG_OPTS}
-            value={state.programme}
-            onChange={(v) => setState({ programme: v })}
-          />
-        </div>
-        <div className="mt-4">
-          <TextArea
-            title="Description"
-            required
-            rows={3}
-            placeholder="e.g. Apply knowledge of computing..."
-            value={state.description}
-            onChange={(e) => setState({ description: e.target.value })}
-          />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-4">
-          <TextInput
-            title="Version"
-            required
-            placeholder="e.g. v1.04"
-            value={state.version}
-            onChange={(e) => setState({ version: e.target.value })}
-          />
-          <CustomSelect
-            title="Status"
-            options={STATUS_OPTS}
-            value={state.status}
-            onChange={(v) => setState({ status: v })}
-          />
-        </div>
-        <ModalFooter
-          onClose={onClose}
-          submitLabel={isEdit ? "Update PSO" : "Create PSO"}
-        />
-      </form>
-    </ModalShell>
-  );
-};
+//   return (
+//     <ModalShell
+//       title={isEdit ? "Edit PSO" : "Create New PSO"}
+//       icon={
+//         isEdit ? (
+//           <Edit className="h-3.5 w-3.5" />
+//         ) : (
+//           <PlusIcon className="h-3.5 w-3.5" />
+//         )
+//       }
+//       open={open}
+//       onClose={onClose}
+//     >
+//       <form
+//         onSubmit={(e) => {
+//           e.preventDefault();
+//           onClose();
+//         }}
+//       >
+//         <div className="grid grid-cols-2 gap-4">
+//           <TextInput
+//             title="PSO Code"
+//             required
+//             placeholder="e.g. PSO1"
+//             value={state.code}
+//             onChange={(e) => setState({ code: e.target.value })}
+//           />
+//           <CustomSelect
+//             title="Programme"
+//             required
+//             options={PROG_OPTS}
+//             value={state.programme}
+//             onChange={(v) => setState({ programme: v })}
+//           />
+//         </div>
+//         <div className="mt-4">
+//           <TextArea
+//             title="Description"
+//             required
+//             rows={3}
+//             placeholder="e.g. Apply knowledge of computing..."
+//             value={state.description}
+//             onChange={(e) => setState({ description: e.target.value })}
+//           />
+//         </div>
+//         <div className="mt-3 grid grid-cols-2 gap-4">
+//           <TextInput
+//             title="Version"
+//             required
+//             placeholder="e.g. v1.04"
+//             value={state.version}
+//             onChange={(e) => setState({ version: e.target.value })}
+//           />
+//           <CustomSelect
+//             title="Status"
+//             options={STATUS_OPTS}
+//             value={state.status}
+//             onChange={(v) => setState({ status: v })}
+//           />
+//         </div>
+//         <ModalFooter
+//           onClose={onClose}
+//           submitLabel={isEdit ? "Update PSO" : "Create PSO"}
+//         />
+//       </form>
+//     </ModalShell>
+//   );
+// };
 
 // ─── ENROLL STUDENTS MODAL ────────────────────────────────────────────────────
 
@@ -1209,3 +1624,183 @@ export const EnrollStudentsModal = ({
     </ModalShell>
   );
 };
+
+// ─── CREATE / EDIT PSO MODAL ──────────────────────────────────────────
+export interface PSOFormData {
+  organization_id: number;
+  pso_code: string;
+  description: string;
+  version: string;
+  programme_id: number;
+  department_id: number;
+  status: string;
+  is_active: boolean;
+}
+
+interface PSOModalProps {
+  open: boolean;
+  onClose: () => void;
+  initialData?: any;
+  onSubmit: (formData: PSOFormData) => void;
+  submitting?: boolean;
+  departmentOptions?: { value: any; label: string }[];
+  programmeOptions?: { value: any; label: string }[];
+}
+
+export const CreatePSOModal = ({
+  open,
+  onClose,
+  initialData,
+  onSubmit,
+  submitting = false,
+  departmentOptions = [],
+  programmeOptions = [],
+}: PSOModalProps) => {
+  const isEdit = !!initialData;
+  const [state, setState] = useSetState({
+    pso_code: "",
+    description: "",
+    version: "v1.0",
+    programme: null as any,
+    department: null as any,
+    status: { value: "Active", label: "Active" } as any,
+  });
+
+  useEffect(() => {
+    if (initialData) {
+      const progVal = initialData.programme_id ?? initialData.programme;
+      const deptVal = initialData.department_id ?? initialData.department;
+      const matchedProg = programmeOptions.find((p) => String(p.value) === String(progVal));
+      const matchedDept = departmentOptions.find((d) => String(d.value) === String(deptVal));
+
+      setState({
+        pso_code: initialData.pso_code ?? initialData.code ?? "",
+        description: initialData.description ?? "",
+        version: initialData.version ?? "v1.0",
+        programme: progVal ? { value: progVal, label: matchedProg?.label || initialData.programme_name || String(progVal) } : null,
+        department: deptVal ? { value: deptVal, label: matchedDept?.label || initialData.department_name || String(deptVal) } : null,
+        status: toOpt(initialData.status?.toLowerCase() === "inactive" || initialData.is_active === false ? "Inactive" : "Active"),
+      });
+    } else {
+      setState({
+        pso_code: "",
+        description: "",
+        version: "v1.0",
+        programme: null,
+        department: null,
+        status: { value: "Active", label: "Active" },
+      });
+    }
+  }, [initialData, open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!state.pso_code?.trim()) {
+      Failure("Please enter PSO Code");
+      return;
+    }
+    if (!state.description?.trim()) {
+      Failure("Please enter PSO Description");
+      return;
+    }
+
+    const payload: PSOFormData = {
+      organization_id: getOrganizationId(),
+      pso_code: state.pso_code.trim(),
+      description: state.description.trim(),
+      version: state.version || "v1.0",
+      programme_id: Number(state.programme?.value || 0),
+      department_id: Number(state.department?.value || 0),
+      status: state.status?.value || "Active",
+      is_active: (state.status?.value || "Active") === "Active",
+    };
+
+    onSubmit(payload);
+  };
+
+  return (
+    <ModalShell
+      title={isEdit ? "Edit PSO" : "Add Programme Specific Outcome (PSO)"}
+      icon={isEdit ? <Edit className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
+      open={open}
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <TextInput
+            title="PSO Code"
+            required
+            placeholder="e.g. PSO1"
+            value={state.pso_code}
+            onChange={(e) => setState({ pso_code: e.target.value })}
+          />
+
+          <TextInput
+            title="Version"
+            placeholder="v1.0"
+            value={state.version}
+            onChange={(e) => setState({ version: e.target.value })}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <CustomSelect
+            title="Academic Programme"
+            required
+            options={programmeOptions}
+            value={state.programme}
+            onChange={(v) => setState({ programme: v })}
+            placeholder="Select Programme"
+          />
+
+          <CustomSelect
+            title="Department"
+            required
+            options={departmentOptions}
+            value={state.department}
+            onChange={(v) => setState({ department: v })}
+            placeholder="Select Department"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-[#000] dark:text-gray-200">
+            Description <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            rows={3}
+            className="form-textarea w-full rounded-lg border border-gray-200 p-2.5 text-xs text-[#000] focus:border-color2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            placeholder="Enter detailed outcome description..."
+            value={state.description}
+            onChange={(e) => setState({ description: e.target.value })}
+          />
+        </div>
+
+        <CustomSelect
+          title="Status"
+          options={STATUS_OPTS}
+          value={state.status}
+          onChange={(v) => setState({ status: v })}
+        />
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-[#000] hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="bg-color2 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {submitting ? "Saving..." : isEdit ? "Update PSO" : "Create PSO"}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+};
+
