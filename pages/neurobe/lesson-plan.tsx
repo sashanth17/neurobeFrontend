@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useDispatch } from "react-redux";
 import {
   Hourglass,
@@ -10,7 +10,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Success, useSetState } from "@/utils/function.utils";
+import { Dropdown, Success, Failure, useSetState } from "@/utils/function.utils";
 import TableComponent from "@/components/common-components/TableComponent";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
@@ -30,100 +30,8 @@ import { useSearchParams } from "next/navigation";
 import Models from "@/imports/models.import";
 import GenericTabsData from "@/components/common-components/GenericTabsData";
 
-const MOCK_LESSON_PLANS = [
-  {
-    id: 1,
-    sessionNo: 1,
-    unit: "Unit I",
-    topic: "Introduction to Stacks & LIFO Principle",
-    plannedDate: "2026-08-05",
-    actualDate: "2026-08-05",
-    pedagogy: "Chalk & Board + Animation",
-    coMapped: "CO1",
-    status: "Completed",
-  },
-  {
-    id: 2,
-    sessionNo: 2,
-    unit: "Unit I",
-    topic: "Array Implementation of Stacks & Operations",
-    plannedDate: "2026-08-07",
-    actualDate: "2026-08-07",
-    pedagogy: "Live Coding Walkthrough",
-    coMapped: "CO1",
-    status: "Completed",
-  },
-  {
-    id: 3,
-    sessionNo: 3,
-    unit: "Unit I",
-    topic: "Infix to Postfix Expression Conversion Algorithm",
-    plannedDate: "2026-08-10",
-    actualDate: "2026-08-12",
-    pedagogy: "Problem Solving Workshop",
-    coMapped: "CO1",
-    status: "Completed",
-  },
-  {
-    id: 4,
-    sessionNo: 4,
-    unit: "Unit II",
-    topic: "Binary Search Trees: Insertion & Search",
-    plannedDate: "2026-08-14",
-    actualDate: "-",
-    pedagogy: "Interactive Visualizer",
-    coMapped: "CO2",
-    status: "In Progress",
-  },
-  {
-    id: 5,
-    sessionNo: 5,
-    unit: "Unit II",
-    topic: "Tree Deletion & AVL Tree Balancing",
-    plannedDate: "2026-08-17",
-    actualDate: "-",
-    pedagogy: "Flipped Classroom",
-    coMapped: "CO2",
-    status: "Scheduled",
-  },
-];
 
-const UNIT_OPTIONS = [
-  { value: "all", label: "All Units" },
-  { value: "Unit I", label: "Unit I - Stacks & Queues" },
-  { value: "Unit II", label: "Unit II - Trees" },
-];
 
-const STATUS_OPTIONS = [
-  { value: "all", label: "All Statuses" },
-  { value: "Completed", label: "Completed" },
-  { value: "In Progress", label: "In Progress" },
-  { value: "Scheduled", label: "Scheduled" },
-];
-
-const STAT_TABS = [
-  {
-    key: "total-topics",
-    label: " Total Topics",
-    count: 22,
-    subLabel: "Approved curriculum count",
-    icon: <Check className="h-5 w-5" />,
-  },
-  {
-    key: "total-hours",
-    label: "Total Hours",
-    subLabel: "Allocated semester teaching time",
-    count: 45,
-    icon: <Hourglass className="h-5 w-5" />,
-  },
-  {
-    key: "reviewed",
-    label: "Reviewed",
-    subLabel: "Lesson Plan Review",
-    count: 3,
-    icon: <ClipboardCheck className="h-5 w-5" />,
-  },
-];
 
 const RAW_UNIT_DATA: Record<
   string,
@@ -342,7 +250,18 @@ const LessonPlan = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const course_id = searchParams.get("course_id");
-  console.log("course_id", course_id)
+  console.log("course_id", course_id);
+
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopPolling(), []);
 
   const [state, setState] = useSetState({
     search: "",
@@ -609,55 +528,103 @@ const LessonPlan = () => {
     },
   ];
 
+  const job_Data = async (id: string | number) => {
+    stopPolling();
+    if (!id) return;
+
+    let retries = 0;
+    const maxRetries = 40;
+    const pollInterval = 3000;
+
+    const fetchOnce = async () => {
+      try {
+        const res: any = await Models.job.detail(id);
+        console.log("job_Data response:", res);
+
+        const status = (
+          res?.status ||
+          res?.state?.live_redis_status ||
+          res?.result?.status ||
+          ""
+        ).toLowerCase();
+
+        if (
+          status === "complete" ||
+          status === "completed" ||
+          status === "finished" ||
+          status === "success"
+        ) {
+          stopPolling();
+          setState({
+            generateLoading: false,
+            generatedResponse: res,
+          });
+          setGenerateModal(true);
+        } else if (status === "failed" || status === "error") {
+          stopPolling();
+          setState({ generateLoading: false });
+          Failure(res?.message || res?.error || "Lesson plan generation job failed.");
+        } else {
+          console.log(`Job status: ${status}, continuing to poll...`);
+        }
+      } catch (error: any) {
+        console.log("job_Data error:", error);
+        const errorMsg = error?.message || error?.detail || String(error);
+        const isJobNotFound = errorMsg.includes("not found");
+
+        if (isJobNotFound && retries < maxRetries) {
+          console.log(`Job not found, retrying... (${retries + 1}/${maxRetries})`);
+          retries++;
+        } else {
+          stopPolling();
+          setState({ generateLoading: false });
+          if (!isJobNotFound) {
+            Failure(errorMsg || "Error checking job status.");
+          }
+        }
+      }
+    };
+
+    await fetchOnce();
+    pollRef.current = setInterval(fetchOnce, pollInterval);
+  };
+
   const generateLessionPlan = async () => {
     try {
       setState({ generateLoading: true });
-      
-      // Poll until status is "complete" (infinite polling until complete)
-      let pollAttempt = 0;
-      const pollInterval = 2000; // 2 seconds
-      
-      const pollJob = async () => {
-        try {
-          const res: any = await Models.lession_plan.generate_teating_timeline(
-            state.courseData?.latest_syllabus?.id
-          );
-          
-          console.log('Poll response:', res);
-          
-          // Check if status is "complete" in the response
-          const status = res?.status || res?.result?.status || "";
-          const isComplete = status.toLowerCase() === "complete";
-          
-          if (isComplete) {
-            // Job completed - store the response and show modal
-            console.log("Lesson plan generation completed!");
-            setState({ 
-              generatedResponse: res,
-              generateLoading: false,
-              recommendationsGenerated: false  // Keep accordion view until user reviews
-            });
-            setGenerateModal(true);
-          } else {
-            // Keep polling indefinitely until complete
-            pollAttempt++;
-            console.log(`Status: ${status}, polling... (attempt ${pollAttempt})`);
-            setTimeout(pollJob, pollInterval);
-          }
-        } catch (error) {
-          console.log("Poll error:", error);
-          // Retry even on error
-          pollAttempt++;
-          setTimeout(pollJob, pollInterval);
+      const syllabusId = state.courseData?.latest_syllabus?.id;
+      if (!syllabusId) {
+        Failure("Syllabus ID not found.");
+        setState({ generateLoading: false });
+        return;
+      }
+
+      // Post the generation job ONCE
+      const res: any = await Models.lession_plan.generate_teating_timeline(syllabusId);
+      console.log("generate_teating_timeline response:", res);
+
+      const jobId = res?.job_id || res?.jobId || res?.id || res?.result?.job_id;
+
+      if (jobId) {
+        // Poll job detail endpoint until complete or failed
+        job_Data(jobId);
+      } else {
+        const status = (res?.status || res?.result?.status || "").toLowerCase();
+        if (status === "complete" || status === "completed" || status === "success") {
+          setState({
+            generateLoading: false,
+            generatedResponse: res,
+          });
+          setGenerateModal(true);
+        } else {
+          setState({ generateLoading: false });
+          Failure("Failed to initiate lesson plan generation job.");
         }
-      };
-      
-      // Start polling
-      pollJob();
-      
-    } catch (error) {
+      }
+    } catch (error: any) {
       console.log("Generate error:", error);
       setState({ generateLoading: false });
+      Failure(error?.message || "Error generating lesson plan.");
     }
   };
 

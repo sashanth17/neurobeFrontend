@@ -368,7 +368,10 @@ export const getDefaultRouteByRole = (role) => {
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-
+    
+  if(normalized=="FACULTY" ||normalized=="STUDENT"){
+    return "/neurobe/my-assigned-courses";
+  }
   if (normalized === "COURSE_COORDINATOR" || normalized === "COORDINATOR") {
     return "/neurobe/my-assigned-courses";
   }

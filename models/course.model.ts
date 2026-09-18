@@ -195,6 +195,41 @@ const course = {
         return promise;
     },
 
+    faculty_dashboard_overview: (data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `faculties/dashboard-overview`;
+            const params = new URLSearchParams();
+            const facultyId = data.faculty_id || data.coordinator_id;
+            if (facultyId) {
+                params.append("faculty_id", String(facultyId));
+            }
+            if (data.semester) {
+                params.append("semester", String(data.semester));
+            }
+            if (data.search) {
+                params.append("search", String(data.search));
+            }
+
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            instance()
+                .get(url)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
+
 
 
 

@@ -205,6 +205,77 @@ const Syllabus = () => {
     setState({ keep_file: false, showKeepFilePrompt: false });
   };
 
+  const normalizeSyllabusData = (data: any) => {
+    if (!data) return null;
+
+    const source = data?.course_data || data?.result?.course_data || data?.result || data;
+
+    // 1. Outcomes
+    const rawOutcomes = source?.outcomes || source?.courseOutcomes || data?.outcomes || data?.courseOutcomes || [];
+    const outcomes = rawOutcomes.map((co: any, idx: number) => ({
+      id: co.id ?? idx + 1,
+      co_code: co.co_code || co.coCode || `CO${idx + 1}`,
+      description: co.description || co.statement || "",
+      knowledge_level: co.knowledge_level || co.knowledgeLevel || co.bloomLevel || "K2",
+      is_accepted: co.is_accepted ?? true,
+      reason_for_inferred_level: co.reason_for_inferred_level || co.reason || "",
+    }));
+
+    // 2. Units & Topics
+    const rawUnits = source?.units || data?.units || [];
+    const units = rawUnits.map((u: any, idx: number) => {
+      const rawTopics = u.topics || [];
+      const topics = rawTopics.map((t: any, tIdx: number) => ({
+        id: t.id ?? tIdx + 1,
+        topic_code: t.topic_code || t.topicId || `${u.unit_number || u.unitNumber || idx + 1}.${tIdx + 1}`,
+        topic_name: t.topic_name || t.title || "",
+        learning_sequence: t.learning_sequence || t.sequence || tIdx + 1,
+      }));
+
+      return {
+        id: u.id ?? idx + 1,
+        unit_number: u.unit_number ?? u.unitNumber ?? (idx + 1),
+        unit_title: u.unit_title || u.title || `UNIT ${idx + 1}`,
+        theory_hours: u.theory_hours ?? u.hours ?? 0,
+        lab_hours: u.lab_hours ?? 0,
+        syllabus_id: u.syllabus_id || data?.id || source?.syllabus_id,
+        topics,
+      };
+    });
+
+    // 3. Textbooks
+    const rawTextbooks = source?.textbooks || source?.textBooks || data?.textbooks || data?.textBooks || [];
+    const textbooks = rawTextbooks.map((b: any, idx: number) => ({
+      id: b.id ?? idx + 1,
+      title: b.title || "",
+      authors: Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || ""),
+      edition: b.edition || "",
+      publisher: b.publisher || "",
+      publication_year: b.publication_year ?? b.publicationYear ?? "",
+    }));
+
+    // 4. Reference Books
+    const rawReferences = source?.reference_books || source?.references || data?.reference_books || data?.references || [];
+    const reference_books = rawReferences.map((b: any, idx: number) => ({
+      id: b.id ?? idx + 1,
+      title: b.title || "",
+      authors: Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || ""),
+      edition: b.edition || "",
+      publisher: b.publisher || "",
+      publication_year: b.publication_year ?? b.publicationYear ?? "",
+    }));
+
+    return {
+      ...data,
+      ...source,
+      course_data: source,
+      outcomes,
+      units,
+      textbooks,
+      reference_books,
+    };
+  };
+
   const startAIExtraction = async () => {
     try {
       const body = {
@@ -230,10 +301,10 @@ const Syllabus = () => {
         try {
           sessionStorage.setItem(jobKey, String(res.job_id));
         } catch { }
-        // persist syllabus_id from the create response
-        if (res?.syllabus_id) {
+        const sId = res?.syllabus_id || res?.result?.syllabus_id;
+        if (sId) {
           try {
-            sessionStorage.setItem(syllabusKey, String(res.syllabus_id));
+            sessionStorage.setItem(syllabusKey, String(sId));
           } catch { }
         }
         job_Data(res.job_id);
@@ -244,7 +315,6 @@ const Syllabus = () => {
   };
 
   const job_Data = async (id: string | number) => {
-    // stop any existing poll before starting a new one
     stopPolling();
     setState({ isJobLoading: true });
 
@@ -264,45 +334,54 @@ const Syllabus = () => {
           status === "completed" ||
           status === "failed"
         ) {
-          // Save syllabus_id to sessionStorage for persistence
-          if (res?.syllabus_id) {
+          const syllabusId =
+            res?.result?.syllabus_id ||
+            res?.syllabus_id ||
+            res?.result?.course_data?.syllabus_id ||
+            getSavedSyllabusId();
+
+          if (syllabusId) {
             try {
-              sessionStorage.setItem(syllabusKey, String(res.syllabus_id));
+              sessionStorage.setItem(syllabusKey, String(syllabusId));
             } catch { }
           }
+
           setState({ isJobLoading: false });
-          syllabus_detail(res?.result?.syllabus_id);
+
+          // Populate jobData from extracted job result immediately
+          if (res?.result) {
+            const normalized = normalizeSyllabusData(res.result);
+            console.log("Normalized extracted job result:", normalized);
+            setState({ jobData: normalized });
+          }
+
+          if (syllabusId) {
+            syllabus_detail(syllabusId);
+          }
           stopPolling();
         } else {
-          // Job still processing, continue polling
           console.log(`Job status: ${status}, continuing to poll...`);
         }
       } catch (error: any) {
         console.log("job_Data error:", error);
         
-        // Check if error is "job not found" - this means job is not yet in queue
         const errorMsg = error?.message || error?.detail || String(error);
         const isJobNotFound = errorMsg.includes("not found");
         
         if (isJobNotFound && retries < maxRetries) {
-          // Job not yet in queue, keep retrying
           console.log(`Job not found, retrying... (${retries + 1}/${maxRetries})`);
           retries++;
-          // Continue polling in the interval
         } else if (retries >= maxRetries) {
-          // Max retries reached
           console.log("Max retries reached for job polling");
           setState({ isJobLoading: false });
           stopPolling();
         } else {
-          // Other error - stop polling
           setState({ isJobLoading: false });
           stopPolling();
         }
       }
     };
 
-    // call immediately, then every 3 seconds
     await fetchOnce();
     pollRef.current = setInterval(fetchOnce, pollInterval);
   };
@@ -312,12 +391,35 @@ const Syllabus = () => {
       const res: any = await Models.syllabus.detail(id);
       console.log("syllabus_detail →", res);
 
-      // Only load uploaded file if we have a syllabus_id and haven't loaded it yet
       if (res?.id && res?.id !== state.lastLoadedSyllabusId) {
         uploded_file(res?.id);
         setState({ lastLoadedSyllabusId: res?.id });
       }
-      setState({ jobData: res });
+
+      const normalizedDetail = normalizeSyllabusData(res);
+
+      setState((prev: any) => {
+        const existingData = prev.jobData;
+        const hasDbContent =
+          (normalizedDetail?.outcomes && normalizedDetail.outcomes.length > 0) ||
+          (normalizedDetail?.units && normalizedDetail.units.length > 0);
+
+        if (hasDbContent || !existingData) {
+          return { jobData: normalizedDetail };
+        } else {
+          // Keep existing extracted jobData but merge DB metadata like id, etc.
+          return {
+            jobData: {
+              ...existingData,
+              ...res,
+              outcomes: existingData.outcomes?.length > 0 ? existingData.outcomes : normalizedDetail.outcomes,
+              units: existingData.units?.length > 0 ? existingData.units : normalizedDetail.units,
+              textbooks: existingData.textbooks?.length > 0 ? existingData.textbooks : normalizedDetail.textbooks,
+              reference_books: existingData.reference_books?.length > 0 ? existingData.reference_books : normalizedDetail.reference_books,
+            },
+          };
+        }
+      });
     } catch (error) {
       console.log("syllabus_detail error", error);
     }

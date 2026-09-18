@@ -50,9 +50,9 @@ const attachInterceptors = (axiosInstance: AxiosInstance) => {
   axiosInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
       const accessToken = localStorage.getItem("token");
-      if (accessToken && config.headers) {
-        config.headers["Authorization"] = `Bearer ${accessToken}`;
-      }
+      // if (accessToken && config.headers) {
+      //   config.headers["Authorization"] = `Bearer ${accessToken}`;
+      // }
       return config;
     },
     (error: AxiosError) => Promise.reject(error),
