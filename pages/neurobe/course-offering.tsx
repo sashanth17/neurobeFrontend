@@ -48,7 +48,7 @@ const CourseOffering = () => {
     loading: false,
     showModal: false,
     editRow: null as any,
-    instanceList: null as any[] | null,
+    instanceList: [] as any[],
   });
 
   const openCreate = () => setState({ showModal: true, editRow: null });
@@ -76,7 +76,7 @@ const CourseOffering = () => {
   };
 
   // ── filtered records ───────────────────────────────────────────────────────
-  const rawList = state.instanceList && state.instanceList.length > 0 ? state.instanceList : MOCK_OFFERINGS;
+  const rawList = state.instanceList || [];
   const records = rawList.filter((r: any) => {
     const s = state.search.toLowerCase();
     const courseTitle = r.course_instance_name || r.course || r.course_title || "";
@@ -102,6 +102,12 @@ const CourseOffering = () => {
         subtitle="Overview of course offerings and section instances across programmes and terms."
         icon={<BookOpen className="h-5 w-5 text-color2" />}
         records={`${records.length} Records`}
+        actionBtn1={{
+          label: "Create Offering",
+          icon: <IconPlus className="h-4 w-4" />,
+          onClick: openCreate,
+          view: true,
+        }}
       />
 
       {/* Auto-instructor notice */}
@@ -132,6 +138,7 @@ const CourseOffering = () => {
       <CourseOfferingModal
         open={state.showModal}
         onClose={closeModal}
+        onSuccess={course_instance_list}
         initialData={state.editRow}
       />
 

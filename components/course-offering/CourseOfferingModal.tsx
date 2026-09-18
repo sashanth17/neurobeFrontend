@@ -28,9 +28,14 @@ const schema = Yup.object({
   course_id: Yup.mixed().required("Course is required"),
 });
 
-interface Props { open: boolean; onClose: () => void; initialData?: any; }
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  initialData?: any;
+  onSuccess?: () => void;
+}
 
-const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
+const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) => {
   const isEdit = !!initialData;
 
   const [state, setState] = useSetState({
@@ -141,6 +146,7 @@ const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
       const response = await Models.course_instance.create(values);
       console.log("response", response);
       setState({ errors: {} });
+      onSuccess?.();
       onClose();
     } catch (err: any) {
       const errors: Record<string, string> = {};

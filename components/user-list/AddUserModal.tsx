@@ -272,14 +272,14 @@ const AddUserModal = ({
                 rightIconOnlick={() => setShowPassword((prev) => !prev)}
               />
 
+              <CustomSelect title="Role"       required options={roleOpts}   value={form.role}       onChange={(v) => set("role",       v)} placeholder="Select role..." />
+
               <TextInput
                 title={form.role?.value === "Student" ? "Register Number" : "Employee Number"}
                 placeholder={form.role?.value === "Student" ? "e.g. 2026BE0101" : "e.g. FAC-CSE-038"}
                 value={form.regNo}
                 onChange={(e) => set("regNo", e.target.value)}
               />
-
-              <CustomSelect title="Role"       required options={roleOpts}   value={form.role}       onChange={(v) => set("role",       v)} placeholder="Select role..." />
               <CustomSelect title="Department" options={deptOpts}   value={form.department} onChange={(v) => set("department", v)} placeholder="Select department..." />
               <CustomSelect title="Programme"  options={progOpts}   value={form.programme}  onChange={(v) => set("programme",  v)} placeholder="Select programme..." />
               <CustomSelect title="Batch"      options={batchOpts}  value={form.batch}      onChange={(v) => set("batch",      v)} placeholder="Select batch..." />
