@@ -18,6 +18,7 @@ import COPOMap from "@/models/copo_map.models";
 import topics from "@/models/topics.models";
 import pedagogy from "@/models/pedagogy.models";
 import course_enrollment from "@/models/course_enrollment.model";
+import faculty from "@/models/faculty.model";
 
 export const Models = {
   test,
@@ -35,6 +36,8 @@ export const Models = {
   user_import,
   course_import,
   course_instructor,
+  faculty,
+  faculties: faculty,
   syllabus,
   job,
   lession_plan,

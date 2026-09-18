@@ -156,6 +156,8 @@ export interface CourseFormData {
   course_title: string;
   status: string;
   is_active: boolean;
+  coordinator_id?: number | null;
+  instructor_ids?: number[];
 }
 
 interface CourseModalProps {
@@ -180,25 +182,137 @@ export const CreateCourseModal = ({
     code: "",
     title: "",
     status: { value: "Active", label: "Active" } as any,
+    coordinator: null as any,
+    instructors: [] as any[],
+    facultyOptions: [] as any[],
+    selectedInstructorToAdd: null as any,
   });
 
   useEffect(() => {
-    if (open && initialData) {
-      setState({
-        code: initialData.course_code || initialData.code || "",
-        title: initialData.course_title || initialData.title || "",
-        status: initialData.status
-          ? { value: initialData.status, label: initialData.status }
-          : { value: "Active", label: "Active" },
-      });
-    } else if (open && !initialData) {
-      setState({
-        code: "",
-        title: "",
-        status: { value: "Active", label: "Active" },
-      });
+    if (open) {
+      // Load faculties for coordinator and instructor dropdowns using dedicated endpoint
+      Models.faculty
+        .dropdown()
+        .then((faculties: any[]) => {
+          const opts = (faculties || []).map((f: any) => {
+            const facultyId = f.id ?? f.faculty_id;
+            const name =
+              f.name ||
+              `${f.first_name || ""} ${f.last_name || ""}`.trim() ||
+              `Faculty #${facultyId}`;
+            const secondary = f.register_number || f.email;
+            const label = secondary ? `${name} (${secondary})` : name;
+            return {
+              value: facultyId,
+              label,
+              id: facultyId,
+              faculty_id: facultyId,
+              name,
+              email: f.email,
+              register_number: f.register_number,
+              department_id: f.department_id,
+              role: f.role,
+            };
+          });
+          setState({ facultyOptions: opts });
+        })
+        .catch((err) => console.error("Failed to load faculties dropdown", err));
+
+      if (initialData) {
+        setState({
+          code: initialData.course_code || initialData.code || "",
+          title: initialData.course_title || initialData.title || "",
+          status: initialData.status
+            ? { value: initialData.status, label: initialData.status }
+            : { value: "Active", label: "Active" },
+          coordinator: null,
+          instructors: [],
+          selectedInstructorToAdd: null,
+        });
+
+        if (initialData.id) {
+          Models.faculty
+            .getCourseAssignments(initialData.id)
+            .then((res: any) => {
+              if (res?.coordinator) {
+                const coord = res.coordinator;
+                const facultyId = coord.faculty_id ?? coord.id;
+                const name = coord.name || `Faculty #${facultyId}`;
+                const secondary = coord.register_number || coord.email;
+                const label = secondary ? `${name} (${secondary})` : name;
+                setState({
+                  coordinator: {
+                    value: facultyId,
+                    label,
+                    id: facultyId,
+                    faculty_id: facultyId,
+                    name,
+                    email: coord.email,
+                    register_number: coord.register_number,
+                    role: coord.role,
+                  },
+                });
+              }
+              if (Array.isArray(res?.instructors)) {
+                setState({
+                  instructors: res.instructors.map((ins: any) => {
+                    const facultyId = ins.faculty_id ?? ins.id;
+                    const name = ins.name || `Faculty #${facultyId}`;
+                    const secondary = ins.register_number || ins.email;
+                    const label = secondary ? `${name} (${secondary})` : name;
+                    return {
+                      value: facultyId,
+                      label,
+                      id: facultyId,
+                      faculty_id: facultyId,
+                      name,
+                      email: ins.email,
+                      register_number: ins.register_number,
+                      role: ins.role,
+                    };
+                  }),
+                });
+              }
+            })
+            .catch((err) =>
+              console.error("Failed to load assignments for course", err)
+            );
+        }
+      } else {
+        setState({
+          code: "",
+          title: "",
+          status: { value: "Active", label: "Active" },
+          coordinator: null,
+          instructors: [],
+          selectedInstructorToAdd: null,
+        });
+      }
     }
   }, [open, initialData]);
+
+  const handleAddInstructor = (opt: any) => {
+    if (!opt?.value) return;
+    const exists = state.instructors.some((i: any) => i.value === opt.value);
+    if (!exists) {
+      setState({
+        instructors: [...state.instructors, opt],
+        selectedInstructorToAdd: null,
+      });
+    } else {
+      setState({ selectedInstructorToAdd: null });
+    }
+  };
+
+  const handleRemoveInstructor = (val: number | string) => {
+    setState({
+      instructors: state.instructors.filter((i: any) => i.value !== val),
+    });
+  };
+
+  const handleClearCoordinator = () => {
+    setState({ coordinator: null });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,6 +330,12 @@ export const CreateCourseModal = ({
       course_title: state.title.trim(),
       status: state.status?.value || "Active",
       is_active: (state.status?.value || "Active").toLowerCase() === "active",
+      coordinator_id: state.coordinator?.value
+        ? Number(state.coordinator.value)
+        : null,
+      instructor_ids: state.instructors
+        .map((i: any) => Number(i.value))
+        .filter(Boolean),
     };
 
     onSubmit(payload);
@@ -235,31 +355,121 @@ export const CreateCourseModal = ({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-2 gap-4">
-          <TextInput
-            title="Course Code"
-            required
-            placeholder="e.g. CS301"
-            value={state.code}
-            onChange={(e) => setState({ code: e.target.value })}
-          />
-          <TextInput
-            title="Course Title"
-            required
-            placeholder="e.g. Data Structures"
-            value={state.title}
-            onChange={(e) => setState({ title: e.target.value })}
-          />
-        </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <TextInput
+              title="Course Code"
+              required
+              placeholder="e.g. CS301"
+              value={state.code}
+              onChange={(e) => setState({ code: e.target.value })}
+            />
+            <TextInput
+              title="Course Title"
+              required
+              placeholder="e.g. Data Structures"
+              value={state.title}
+              onChange={(e) => setState({ title: e.target.value })}
+            />
+          </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <CustomSelect
-            title="Status"
-            options={STATUS_OPTS}
-            value={state.status}
-            onChange={(v) => setState({ status: v })}
-            placeholder="Active"
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <CustomSelect
+              title="Status"
+              options={STATUS_OPTS}
+              value={state.status}
+              onChange={(v) => setState({ status: v })}
+            />
+          </div>
+
+          {/* ── COURSE COORDINATOR SECTION (Strictly 1 allowed) ── */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-bold text-[#000] dark:text-white">
+                Course Coordinator{" "}
+                <span className="text-xs font-normal text-gray-500">
+                  (Single coordinator)
+                </span>
+              </label>
+              {state.coordinator && (
+                <button
+                  type="button"
+                  onClick={handleClearCoordinator}
+                  className="text-xs font-semibold text-red-500 hover:underline"
+                >
+                  Remove Coordinator
+                </button>
+              )}
+            </div>
+            <CustomSelect
+              options={state.facultyOptions}
+              value={state.coordinator}
+              onChange={(v) => setState({ coordinator: v })}
+              isClearable
+            />
+            {state.coordinator && (
+              <div className="mt-2 flex items-center justify-between rounded-lg border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs dark:border-purple-800 dark:bg-purple-900/20">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-color2 text-[10px] font-bold text-white">
+                    {(state.coordinator.label || "C").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-color2">
+                      {state.coordinator.label}
+                    </span>
+                  </div>
+                </div>
+                <span className="rounded bg-color2 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  Coordinator
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── COURSE INSTRUCTORS SECTION (Multiple allowed) ── */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+            <label className="mb-2 block text-sm font-bold text-[#000] dark:text-white">
+              Course Instructors{" "}
+              <span className="text-xs font-normal text-gray-500">
+                (Multiple instructors allowed)
+              </span>
+            </label>
+            <CustomSelect
+              options={state.facultyOptions.filter(
+                (f: any) =>
+                  !state.instructors.some((i: any) => i.value === f.value)
+              )}
+              value={state.selectedInstructorToAdd}
+              onChange={handleAddInstructor}
+            />
+
+            {state.instructors.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {state.instructors.map((ins: any) => (
+                  <span
+                    key={ins.value}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                  >
+                    <Users className="h-3.5 w-3.5 text-blue-600" />
+                    <span>{ins.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveInstructor(ins.value)}
+                      className="ml-1 rounded p-0.5 text-blue-500 hover:bg-blue-100 hover:text-red-500"
+                      title="Remove instructor"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                No instructors assigned yet. Select faculty from the dropdown
+                above to assign instructors.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -277,9 +487,24 @@ export const CreateCourseModal = ({
             className="bg-color2 flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
             {submitting && (
-              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              <svg
+                className="h-3.5 w-3.5 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8z"
+                />
               </svg>
             )}
             {submitting ? "Saving…" : isEdit ? "Update Course" : "Create Course"}
@@ -379,7 +604,6 @@ export const CreateDepartmentModal = ({
               options={STATUS_OPTS}
               value={state.status}
               onChange={(v) => setState({ status: v })}
-              placeholder="Active"
             />
           </div>
         </div>
@@ -515,7 +739,6 @@ export const CreateProgrammeModal = ({
             options={TYPE_OPTS}
             value={state.degree_level}
             onChange={(v) => setState({ degree_level: v })}
-            placeholder="UG / PG"
           />
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -524,7 +747,6 @@ export const CreateProgrammeModal = ({
             options={STATUS_OPTS}
             value={state.status}
             onChange={(v) => setState({ status: v })}
-            placeholder="Active"
           />
         </div>
         <div className="mt-6 flex justify-end gap-3">
@@ -676,7 +898,6 @@ export const CreateBatchModal = ({
             options={BATCH_STATUS_OPTS}
             value={state.status}
             onChange={(v) => setState({ status: v })}
-            placeholder="Select Status"
           />
         </div>
         <div className="mt-6 flex justify-end gap-3">
@@ -781,7 +1002,6 @@ export const CreatePSOModal = ({
             options={PROG_OPTS}
             value={state.programme}
             onChange={(v) => setState({ programme: v })}
-            placeholder="Select Programme"
           />
         </div>
         <div className="mt-4">
@@ -807,7 +1027,6 @@ export const CreatePSOModal = ({
             options={STATUS_OPTS}
             value={state.status}
             onChange={(v) => setState({ status: v })}
-            placeholder="Active"
           />
         </div>
         <ModalFooter

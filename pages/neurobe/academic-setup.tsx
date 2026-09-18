@@ -244,8 +244,37 @@ const AcademicSetup = () => {
       const body = bodyData(searchVal !== undefined ? searchVal : debouncedSearch);
       const res: any = await Models.course.list(body, 1);
       const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+
+      const enrichedList = await Promise.all(
+        list.map(async (c: any) => {
+          try {
+            const assignRes: any = await Models.faculty.getCourseAssignments(c.id);
+            return {
+              ...c,
+              coordinator_name: assignRes?.coordinator?.name
+                ? `${assignRes.coordinator.name}${assignRes.coordinator.register_number ? ` (${assignRes.coordinator.register_number})` : ""}`
+                : c.coordinator_name || null,
+              coordinator_id: assignRes?.coordinator?.faculty_id || c.coordinator_id || null,
+              instructors:
+                Array.isArray(assignRes?.instructors) && assignRes.instructors.length > 0
+                  ? assignRes.instructors.map((ins: any) => ({
+                      ...ins,
+                      name: ins.name
+                        ? `${ins.name}${ins.register_number ? ` (${ins.register_number})` : ""}`
+                        : ins.email || `Faculty #${ins.faculty_id}`,
+                    }))
+                  : c.instructor_name
+                  ? [{ name: c.instructor_name }]
+                  : [],
+            };
+          } catch {
+            return c;
+          }
+        })
+      );
+
       setState({
-        courseList: list,
+        courseList: enrichedList,
         loading: false,
       });
     } catch (error) {
@@ -373,12 +402,27 @@ const AcademicSetup = () => {
         is_active: (formData.status || "Active").toLowerCase() === "active",
       };
 
-      if (state.editRow?.id) {
-        await Models.course.update(state.editRow.id, body);
+      let courseId = state.editRow?.id;
+      if (courseId) {
+        await Models.course.update(courseId, body);
         Success("Course updated successfully");
       } else {
-        await Models.course.create(body);
+        const createRes: any = await Models.course.create(body);
+        courseId = createRes?.id || createRes?.data?.id;
         Success("Course created successfully");
+      }
+
+      // Sync coordinator and instructors with the backend
+      if (courseId) {
+        try {
+          await Models.faculty.patchCourseAssignments(courseId, {
+            coordinator_id: formData.coordinator_id || null,
+            remove_coordinator: !formData.coordinator_id,
+            set_instructor_ids: formData.instructor_ids || [],
+          });
+        } catch (assignError) {
+          console.error("Failed to sync faculty assignments", assignError);
+        }
       }
 
       closeModal();
@@ -666,7 +710,6 @@ const AcademicSetup = () => {
             onChange={(e) =>
               setState({ statusFilter: e ?? { value: "all_status", label: "All Statuses" } })
             }
-            placeholder="All Status"
             className="filter-input"
           />
 
@@ -680,7 +723,6 @@ const AcademicSetup = () => {
               onChange={(e) =>
                 setState({ deptFilter: e?.label ?? e?.value ?? "All Departments" })
               }
-              placeholder="All Departments"
               className="filter-input"
             />
           )}

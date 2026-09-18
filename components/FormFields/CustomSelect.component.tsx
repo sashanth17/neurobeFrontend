@@ -37,7 +37,7 @@ const CustomSelect = (props: SelectProps) => {
     options,
     value,
     onChange,
-    placeholder = "Select...",
+    placeholder = "",
     title,
     isSearchable = true,
     className,
