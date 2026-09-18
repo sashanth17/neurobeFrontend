@@ -10,7 +10,7 @@ const Index = () => {
       router.replace("/auth/signin");
       return;
     }
-    const role = localStorage.getItem("role") || localStorage.getItem("group") || "";
+    const role =  localStorage.getItem("group") || "";
     router.replace(getDefaultRouteByRole(role));
   }, [router]);
   return null;

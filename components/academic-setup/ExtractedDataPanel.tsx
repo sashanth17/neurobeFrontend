@@ -129,7 +129,7 @@ const ExtractedDataPanel = (props) => {
                 Course Code:
               </label>
               <input
-                value={courseData?.course_code}
+                value={courseData?.course_code || data?.courseCode || data?.course_code || ""}
                 onChange={(e) => setCourseCode(e.target.value)}
                 disabled
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
@@ -141,7 +141,7 @@ const ExtractedDataPanel = (props) => {
               </label>
               <input
                 disabled
-                value={courseData?.course_title}
+                value={courseData?.course_title || data?.courseName || data?.course_title || ""}
                 onChange={(e) => setCourseTitle(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
@@ -150,10 +150,10 @@ const ExtractedDataPanel = (props) => {
 
           <div className="mb-4 grid grid-cols-4 gap-3">
             {[
-              ["Lecture (L):", courseData?.lecture_hours, setL],
-              ["Tutorial (T):", courseData?.tutorial_hours, setT],
-              ["Practical (P):", courseData?.practical_hours, setP],
-              ["Credits (C):", courseData?.credits, setC],
+              ["Lecture (L):", courseData?.lecture_hours ?? data?.lectureHours ?? data?.lecture_hours ?? 0, setL],
+              ["Tutorial (T):", courseData?.tutorial_hours ?? data?.tutorialHours ?? data?.tutorial_hours ?? 0, setT],
+              ["Practical (P):", courseData?.practical_hours ?? data?.practicalHours ?? data?.practical_hours ?? 0, setP],
+              ["Credits (C):", courseData?.credits ?? data?.credits ?? 0, setC],
             ].map(([label, val, setter]: any) => (
               <div key={label}>
                 <label className="text-pri mb-1 block text-xs">{label}</label>
@@ -171,15 +171,15 @@ const ExtractedDataPanel = (props) => {
             <span>
               Theory Hours:{" "}
               <strong className="text-[#000] dark:text-gray-200">
-                {courseData?.total_theory_hours} hrs
+                {courseData?.total_theory_hours ?? data?.totalHours ?? data?.total_theory_hours ?? 0} hrs
               </strong>
               &nbsp; Lab Hours:{" "}
               <strong className="text-[#000] dark:text-gray-200">
-                {courseData?.total_lab_hours} hrs
+                {courseData?.total_lab_hours ?? 0} hrs
               </strong>
             </span>
             <span className="text-md text-color2 font-bold">
-              Total Contact: {data?.course_data?.totalHours} hrs
+              Total Contact: {data?.course_data?.totalHours ?? data?.totalHours ?? data?.total_theory_hours ?? (courseData?.total_theory_hours || 0)} hrs
             </span>
           </div>
         </div>

@@ -70,7 +70,7 @@ export default function CourseBanner({
 
         <CustomSelect
           options={courseOptions}
-          value={ selectedCourse || null}
+          value={selectedCourse || null}
           onChange={onCourseChange}
           placeholder={`Course: ${selectedCourse || courseCode}`}
           isSearchable={false}
@@ -90,30 +90,6 @@ export default function CourseBanner({
             <p className=" text-sm text-white/60">{description}</p>
           )}
         </div>
-
-        {/* View Toggle */}
-        {toogle != "instructor" &&
-          <div className="flex shrink-0 items-center border-[0.5px] border-[#fff]/20 rounded-xl  p-1">
-            <button
-              onClick={() => handleViewChange("coordinator")}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${activeView === "coordinator"
-                  ? "bg-primary-custom text-white"
-                  : "text-white hover:text-white"
-                }`}
-            >
-              Coordinator View
-            </button>
-            <button
-              onClick={() => handleViewChange("instructor")}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${activeView === "instructor"
-                  ? "bg-primary-custom text-white"
-                  : "text-white hover:text-white"
-                }`}
-            >
-              Instructor View
-            </button>
-          </div>
-        }
       </div>
 
       {/* Meta Row */}
