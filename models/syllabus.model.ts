@@ -375,8 +375,44 @@ const syllabus = {
                     reject(error.response?.data?.message || error.response?.data || error);
                 });
         });
-    }
+    },
 
-};
+    // ─────────────────────────────────────────────────────────────────────────
+    // Versioned Syllabus File Upload APIs
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** List all versioned file uploads for a course */
+    listFileVersions: (courseId: string | number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/file-versions`)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    /** Upload a new versioned syllabus file for a course (does NOT trigger extraction) */
+    uploadFileVersion: (courseId: string | number, formData: FormData) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .post(`course/syllabi/courses/${courseId}/file-versions`, formData, {
+                    headers: { "Content-Type": "multipart/form-data" },
+                })
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    /** Trigger AI extraction from a specific file version */
+    extractFromFileVersion: (courseId: string | number, fileVersionId: string | number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .post(`course/syllabi/courses/${courseId}/extract-from-file/${fileVersionId}`)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+}
 
 export default syllabus;

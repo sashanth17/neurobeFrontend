@@ -22,6 +22,7 @@ import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import { useRouter } from "next/router";
 import PageHeader from "@/components/common-components/PageHeader";
+import Models from "@/imports/models.import";
 import QuestionBankFilter, {
   FilterValues,
 } from "@/components/question-bank/QuestionBankFilter";
@@ -1898,11 +1899,26 @@ const QuestionBank = () => {
     appliedFilters: null as FilterValues | null,
     isSyllabusOpen: false,
     selectedSetId: null as string | null,
+    courseData: null as any,
+    workflowStatus: null as any,
   });
 
   useEffect(() => {
     dispatch(setPageTitle("View Learning Material"));
   }, [dispatch]);
+
+  useEffect(() => {
+    const courseId = router?.query?.course_id || router?.query?.code;
+    if (courseId) {
+      Models.course.detail(courseId).then((res: any) => {
+        setState({ courseData: res });
+      }).catch(console.error);
+
+      Models.syllabus.get_workflow_status(courseId).then((res: any) => {
+        setState({ workflowStatus: res });
+      }).catch(console.error);
+    }
+  }, [router?.query?.course_id, router?.query?.code]);
 
   useEffect(() => {
     if (router?.query?.stage) {
@@ -2049,32 +2065,56 @@ const QuestionBank = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-8">
       <CourseBanner
-        courseCode="CS301"
-        courseTitle="Computer Networks"
-        description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
-        programme="B.Tech CSE"
-        batch="2025–2029"
-        academicYear="2026–2027 / Semester 3"
-        students="40 Students"
-        selectedCourse="CS309"
+        courseCode={state.courseData?.course_code || "CS309"}
+        courseTitle={state.courseData?.course_title || "Computer Networks"}
+        description="Instructor View — Access approved academic artifacts, active syllabus, outcomes mapping, topic hierarchy, pedagogy, and lesson plans."
+        programme={state.courseData?.programme || "B.Tech CSE"}
+        batch={state.courseData?.batch_name || "2025–2029"}
+        academicYear={state.courseData?.academic_year || "2026–2027"}
+        students={`${state.courseData?.students_count ?? 40} Students`}
+        selectedCourse={state.courseData?.course_code || "CS309"}
         toogle="instructor"
-        courseOptions={[
-          { value: "CS309", label: "Course: CS309" },
-          { value: "CS301", label: "Course: CS301" },
-        ]}
-        onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => router.push("/neurobe/ins-my-assigned-courses")}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 
+      {/* ── Course Instructor View Banner ── */}
+      <div className="mx-6 mt-4 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 p-4 shadow-xs dark:border-indigo-800/60 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-indigo-950/40">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Course Instructor View
+              </h3>
+              <span className="rounded-full border border-indigo-300 bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Active Approved Versions Only
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              Read-only view of the coordinator-approved curriculum and active academic artifacts for this course.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => router.push("/neurobe/ins-my-assigned-courses")}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-4 py-2 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 active:scale-95 dark:border-indigo-700 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
+        >
+          ← Back to My Courses
+        </button>
+      </div>
+
       <PageHeader
         title="Course Artifacts"
-        records="CS309  —  Computer Networks"
-        subtitle={`Access approved academic references prepared for this course.`}
+        records={`${state.courseData?.course_code || "CS309"} — ${state.courseData?.course_title || "Computer Networks"}`}
+        subtitle={`Access active approved academic references prepared for this course.`}
         icon={<Users className="h-5 w-5 text-color2" />}
         record2="Instructor View"
-        record3="Read Only"
+        record3="Active Version Only"
       />
 
       {/* Main Grid Layout: Left Course References Navigation + Right Artifact Details */}

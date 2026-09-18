@@ -26,6 +26,7 @@ import ReviewLessonItemModal, { ReviewLessonItemData } from "@/components/lesson
 import { useRouter } from "next/router";
 import { UNIT_TABS } from "@/utils/constant.utils";
 import PageHeader from "@/components/common-components/PageHeader";
+import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
 import { useSearchParams } from "next/navigation";
 import Models from "@/imports/models.import";
 import GenericTabsData from "@/components/common-components/GenericTabsData";
@@ -589,19 +590,25 @@ const LessonPlan = () => {
     pollRef.current = setInterval(fetchOnce, pollInterval);
   };
 
-  const generateLessionPlan = async () => {
+  const generateLessionPlan = async (parentParams?: {
+    hierarchy_version?: number;
+    pedagogy_version?: number;
+  }) => {
     try {
       setState({ generateLoading: true });
-      const syllabusId = state.courseData?.latest_syllabus?.id;
+      const syllabusId = state.courseData?.latest_syllabus?.id || course_id;
       if (!syllabusId) {
         Failure("Syllabus ID not found.");
         setState({ generateLoading: false });
         return;
       }
 
-      // Post the generation job ONCE
-      const res: any = await Models.lession_plan.generate_teating_timeline(syllabusId);
-      console.log("generate_teating_timeline response:", res);
+      // Post the generation job with parent versions
+      const res: any = await Models.lession_plan.generate_timeline(syllabusId, {
+        hierarchy_version: parentParams?.hierarchy_version,
+        pedagogy_version: parentParams?.pedagogy_version,
+      });
+      console.log("generate_timeline response:", res);
 
       const jobId = res?.job_id || res?.jobId || res?.id || res?.result?.job_id;
 
@@ -625,6 +632,13 @@ const LessonPlan = () => {
       console.log("Generate error:", error);
       setState({ generateLoading: false });
       Failure(error?.message || "Error generating lesson plan.");
+    }
+  };
+
+  const handleVersionActivated = async (newVer: number) => {
+    const syllabusId = state.courseData?.latest_syllabus?.id || course_id;
+    if (syllabusId) {
+      await lession_data(syllabusId, 1);
     }
   };
 
@@ -667,6 +681,17 @@ const LessonPlan = () => {
           />
         ))}
       </div>
+
+      {course_id && (
+        <StageVersionHistoryPanel
+          stage="schedule"
+          stageLabel="Lesson Plan & Schedules"
+          courseId={course_id}
+          onVersionActivated={handleVersionActivated}
+          onGenerateNew={generateLessionPlan}
+          isGenerating={state.generateLoading}
+        />
+      )}
 
       <TableTitle
         title="Approved topcis"

@@ -14,12 +14,27 @@ export type StageStatus =
 export interface StageWorkflowData {
   stage: string;
   status: StageStatus;
-  active_version: number;
+  active_version: number | null;
   job_id: string | null;
   total_versions: number;
+  available_versions?: number[];
   dependency: string | null;
   upstream_version_used?: number;
+  upstream_pedagogy_version_used?: number;
+  upstream_hierarchy_version_used?: number;
   can_generate: boolean;
+  dependency_message?: string | null;
+}
+
+export interface SyllabusFileVersion {
+  id: number;
+  version_number: number;
+  original_filename: string;
+  file_path: string;
+  is_active: boolean;
+  uploaded_by: string;
+  created_at: string | null;
+  label: string;
 }
 
 export interface CourseWorkflow {
@@ -34,11 +49,13 @@ export interface WorkflowStatusResponse {
   course_id: number;
   syllabus_id: number;
   course_code: string;
+  syllabus_files: SyllabusFileVersion[];
   workflow: CourseWorkflow;
 }
 
 export function useCourseWorkflowStatus(courseId?: number | string | null, pollIntervalMs: number = 3000) {
   const [workflowStatus, setWorkflowStatus] = useState<CourseWorkflow | null>(null);
+  const [syllabusFiles, setSyllabusFiles] = useState<SyllabusFileVersion[]>([]);
   const [courseDetails, setCourseDetails] = useState<{ course_id?: number; syllabus_id?: number; course_code?: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<any>(null);
@@ -58,6 +75,7 @@ export function useCourseWorkflowStatus(courseId?: number | string | null, pollI
           syllabus_id: res.syllabus_id,
           course_code: res.course_code,
         });
+        setSyllabusFiles(res.syllabus_files || []);
         const wf = res.workflow || res;
         setWorkflowStatus(wf);
         setError(null);
@@ -103,6 +121,7 @@ export function useCourseWorkflowStatus(courseId?: number | string | null, pollI
 
   return {
     workflowStatus,
+    syllabusFiles,
     courseDetails,
     loading,
     error,

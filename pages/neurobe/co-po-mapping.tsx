@@ -9,6 +9,9 @@ import {
   Info,
   ArrowRight,
   Cable,
+  Sparkles,
+  RotateCw,
+  Edit3,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Dropdown, Failure } from "@/utils/function.utils";
@@ -22,8 +25,46 @@ import PageFooter from "@/components/common-components/PageFooter";
 import KeepFilePrompt from "@/components/academic-setup/KeepFilePrompt";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/common-components/PageHeader";
+import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
 import Models from "@/imports/models.import";
-import { DEFAULT_COPO_MATRIX, COPOMatrixResponse } from "@/mock/copo_matrix.data";
+
+export interface ProgramOutcome {
+  code: string;
+  title: string;
+  description: string;
+}
+
+export interface CourseOutcome {
+  id: number;
+  co_code: string;
+  bloom_level: string;
+  description: string;
+}
+
+export interface MappingCell {
+  correlation_level: number;
+  strength_label: string;
+  is_ai_suggested: boolean;
+  justification: string | null;
+  status: string;
+  mapping_id: number | null;
+}
+
+export interface COPOMatrixResponse {
+  syllabus_id: number;
+  course_id: number;
+  po_version: string;
+  mapping_status: string;
+  summary: {
+    course_outcomes_count: number;
+    program_outcomes_count: number;
+    ai_suggestions_count: number;
+    mappings_need_review_count: number;
+  };
+  program_outcomes: ProgramOutcome[];
+  course_outcomes: CourseOutcome[];
+  matrix: Record<string, Record<string, MappingCell>>;
+}
 
 const getErrorMessage = (error: any, fallback: string) => {
   if (!error) return fallback;
@@ -44,10 +85,11 @@ const COPOMapping = () => {
     selectedCourse: null,
     activeCourse: null as any,
     loading: false,
+    generatingCopo: false,
     activeTab: "coordinator",
     approvedMappings: [] as string[],
     mappingApproved: false,
-    copoMatrix: [],
+    copoMatrix: null as any,
     courseDetail: null as any,
     courseList: [] as any[],
     organization_id: "",
@@ -125,19 +167,27 @@ const COPOMapping = () => {
         courseDetail: res,
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
-      const sid = res?.syllabus_id || res?.latest_syllabus?.id ;
-      getCOPOMatrix(sid);
+      const sid = res?.syllabus_id || res?.latest_syllabus?.id;
+      if (sid) {
+        getCOPOMatrix(sid);
+      } else {
+        setState({ loading: false, copoMatrix: null });
+      }
     } catch (error: any) {
       console.log("error fetching course detail", error);
       Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      getCOPOMatrix();
+      setState({ loading: false, copoMatrix: null });
     }
   };
 
   const getCOPOMatrix = async (syllabusId?: any) => {
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
+    if (!sid) {
+      setState({ loading: false, copoMatrix: null });
+      return;
+    }
     try {
       setState({ loading: true });
-      const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
       const res: any = await Models.COPOMap.copo_map(sid);
       if (res && (res.matrix || res.data?.matrix)) {
         const matrixObj = res.matrix ? res : res.data;
@@ -148,24 +198,113 @@ const COPOMapping = () => {
           loading: false,
         });
       } else {
-        setState({ loading: false });
+        setState({ copoMatrix: res?.data || null, loading: false });
       }
     } catch (error: any) {
       console.log("error fetching copo matrix", error);
       Failure(getErrorMessage(error, "Failed to fetch CO-PO matrix"));
-      setState({ loading: false });
+      setState({ loading: false, copoMatrix: null });
+    }
+  };
+
+  const handleGenerateCopo = async (parentParams?: { extraction_version?: number }) => {
+    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
+    if (!sid) {
+      Failure("No syllabus found for this course. Please upload a syllabus first.");
+      return;
+    }
+    try {
+      setState({ generatingCopo: true });
+      await Models.COPOMap.generate_copo(sid, {
+        extraction_version: parentParams?.extraction_version,
+      });
+      Success("CO-PO mapping generation started with NEURO AI!");
+      setTimeout(async () => {
+        await getCOPOMatrix(sid);
+        setState({ generatingCopo: false });
+      }, 2500);
+    } catch (error: any) {
+      console.error("Error generating CO-PO mapping:", error);
+      Failure(getErrorMessage(error, "Failed to generate CO-PO mapping"));
+      setState({ generatingCopo: false });
+    }
+  };
+
+  const handleVersionActivated = async (newVer: number) => {
+    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
+    if (sid) {
+      await getCOPOMatrix(sid);
     }
   };
 
   // Matrix data resolution
-  const matrixData: COPOMatrixResponse = state.copoMatrix;
+  const matrixData: COPOMatrixResponse = state.copoMatrix || {};
   const programOutcomes = matrixData?.program_outcomes || [];
   const courseOutcomes = matrixData?.course_outcomes || [];
   const matrix = matrixData?.matrix || {};
-  const summary = matrixData?.summary ;
+  const summary = matrixData?.summary;
 
   const isApproved = state.mappingApproved || matrixData?.mapping_status === "Approved";
   const allMapped = state.approvedMappings.length > 0;
+
+  // Direct cell cycle handler (0 -> 1 -> 2 -> 3 -> 0)
+  const handleDirectCellCycle = async (row: any, po: any) => {
+    const co_code = row.co_code;
+    const target_code = po.code;
+    const currentCell: any = matrix[co_code]?.[target_code] || {};
+    const currentScore = currentCell.correlation_level ?? 0;
+    const nextScore = (currentScore + 1) % 4; // Cycles: 0 -> 1 -> 2 -> 3 -> 0
+
+    const strengthMap: Record<number, string> = {
+      3: "3 – High",
+      2: "2 – Medium",
+      1: "1 – Low",
+      0: "– No Mapping",
+    };
+
+    // Optimistic UI update
+    const currentCoMap = matrix[co_code] || {};
+    const updatedMatrix = {
+      ...matrix,
+      [co_code]: {
+        ...currentCoMap,
+        [target_code]: {
+          ...currentCell,
+          correlation_level: nextScore,
+          strength_label: strengthMap[nextScore] || "– No Mapping",
+          status: "accepted",
+          is_ai_suggested: false,
+        },
+      },
+    };
+
+    const mappingKey = `${co_code}-${target_code}`;
+    const updatedApproved = state.approvedMappings.includes(mappingKey)
+      ? state.approvedMappings
+      : [...state.approvedMappings, mappingKey];
+
+    setState({
+      approvedMappings: updatedApproved,
+      copoMatrix: {
+        ...matrixData,
+        matrix: updatedMatrix,
+      },
+    });
+
+    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || state.copoMatrix?.syllabus_id || course_id;
+    try {
+      await Models.COPOMap.copo_update(sid, {
+        co_code,
+        target_code,
+        correlation_level: nextScore,
+        justification: currentCell.justification || `Updated correlation level to ${nextScore}`,
+        status: "accepted",
+      });
+    } catch (error: any) {
+      console.error("Error cycling cell score:", error);
+      Failure(getErrorMessage(error, `Failed to update ${co_code} × ${target_code}`));
+    }
+  };
 
   const handleCellClick = async (row: any, po: any) => {
     const co_code = row.co_code;
@@ -368,7 +507,7 @@ const COPOMapping = () => {
       const fullName =
         user?.first_name && user?.last_name
           ? `${user.first_name} ${user.last_name}`
-          : user?.name || user?.full_name || "Arun Kumar";
+          : user?.name || user?.full_name || "Faculty Member";
       const formattedName = fullName.toLowerCase().includes("dr") ? fullName : `${fullName}`;
       const roleName =
         user?.role === "course_coordinator" || !user?.role ? "Course Coordinator" : user.role;
@@ -468,7 +607,7 @@ const COPOMapping = () => {
   const verifiedCount = state.approvedMappings.length;
   const needReviewCount = Math.max(
     0,
-    (summary?.mappings_need_review_count ?? summary?.ai_suggestions_count ?? 56) - verifiedCount
+    (summary?.mappings_need_review_count ?? summary?.ai_suggestions_count ?? 0) - verifiedCount
   );
 
   const TABS = [
@@ -483,14 +622,14 @@ const COPOMapping = () => {
       key: "program_outcome",
       label: "Program Outcome",
       count: summary?.program_outcomes_count ?? programOutcomes.length,
-      subLabel: matrixData.po_version || "PO 2025 v1",
+      subLabel: matrixData?.po_version || "—",
       icon: <GraduationCap className="h-5 w-5" />,
     },
     {
       key: "ai_suggestions",
       label: "AI Generated Mapping Suggestions",
       subLabel: "Mappings Need Review",
-      count: summary?.ai_suggestions_count,
+      count: summary?.ai_suggestions_count ?? 0,
       icon: <GitCompare className="h-5 w-5" />,
     },
     {
@@ -510,7 +649,7 @@ const COPOMapping = () => {
         description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
         programme={state?.courseDetail?.programme}
         batch={state?.courseDetail?.batch_name}
-        academicYear={`${state?.courseDetail?.batch_name}`}
+        academicYear={state?.courseDetail?.batch_name || ""}
         students={state?.courseDetail?.students_count}
         selectedCourse={state.selectedCourse}
         courseOptions={state.courseList}
@@ -525,8 +664,8 @@ const COPOMapping = () => {
 
       <PageHeader
         title="CO–PO Mapping"
-        records={`PO Version: ${matrixData.po_version}`}
-        subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Review each suggested mapping and rationale before approval."
+        records={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : ""}
+        subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Hover over any cell to see strength & rationale, or click to cycle strength."
         icon={<Cable className="h-5 w-5 text-color2" />}
       />
 
@@ -546,101 +685,209 @@ const COPOMapping = () => {
 
       <KeepFilePrompt
         icon={<Info className="text-color2 h-4 w-4" />}
-        title="Select any cell in the matrix to review the suggested strength and NEURO AI rationale. Accept or edit the suggestion as needed."
-        actionBtn1={{
-          label: "Open Inspector Drawer",
-          onClick: () => {
-            const firstCo = courseOutcomes[0];
-            const firstPo = programOutcomes[0];
-            if (firstCo && firstPo) {
-              handleCellClick(firstCo, firstPo);
-            }
-          },
-        }}
+        title="Hover over any cell to inspect correlation strength, Bloom level, and NEURO AI rationale. Click any cell to cycle strength directly."
       />
+
+      {course_id && (
+        <StageVersionHistoryPanel
+          stage="copo"
+          stageLabel="CO-PO Mapping"
+          courseId={course_id}
+          onVersionActivated={handleVersionActivated}
+          onGenerateNew={handleGenerateCopo}
+          isGenerating={state.generatingCopo}
+        />
+      )}
 
       {/* CO-PO Mapping Matrix */}
       <div className="panel">
         <MappingMatrixHeader
-          title={`${courseOutcomes[0]?.co_code || "CO1"}–${courseOutcomes[courseOutcomes.length - 1]?.co_code || "CO6"} × ${programOutcomes[0]?.code || "PO1"}–${programOutcomes[programOutcomes.length - 1]?.code || "PO12"} Mapping Matrix`}
-          version={matrixData.po_version || "PO 2025 v1"}
-          status={isApproved ? "Approved" : matrixData.mapping_status || "Review Required"}
+          title={
+            courseOutcomes.length > 0 && programOutcomes.length > 0
+              ? `${courseOutcomes[0]?.co_code}–${courseOutcomes[courseOutcomes.length - 1]?.co_code} × ${programOutcomes[0]?.code}–${programOutcomes[programOutcomes.length - 1]?.code} Mapping Matrix`
+              : "CO–PO Mapping Matrix"
+          }
+          version={matrixData?.po_version || ""}
+          status={isApproved ? "Approved" : matrixData?.mapping_status || "Review Required"}
+          onGenerate={() => handleGenerateCopo()}
+          isGenerating={state.generatingCopo}
         />
 
-        <TableComponent
-          records={filteredRecords}
-          loading={state.loading}
-          noRecordsText="No CO-PO mappings found"
-          columns={[
-            {
-              accessor: "co_code",
-              title: "COURSE OUTCOME",
-              render: ({ co_code, bloom_level, description }: any) => (
-                <div className="min-w-[220px] max-w-[280px] py-1">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-color2-l text-color2 rounded-md px-2 py-0.5 text-xs font-bold">
-                      {co_code}
-                    </span>
-                    {bloom_level && (
-                      <span className="rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-color2 dark:bg-purple-900/30">
-                        {bloom_level}
+        {courseOutcomes.length === 0 && !state.loading ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+            <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
+            <h4 className="text-base font-bold text-gray-900 dark:text-white">
+              No CO-PO Mapping Generated Yet
+            </h4>
+            <p className="mt-1 text-sm text-gray-500 max-w-md">
+              Generate AI-assisted mapping between approved Course Outcomes and Program Outcomes with academic rationales.
+            </p>
+            <button
+              type="button"
+              onClick={() => handleGenerateCopo()}
+              disabled={state.generatingCopo}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {state.generatingCopo ? (
+                <>
+                  <RotateCw className="h-4 w-4 animate-spin" />
+                  <span>Generating Mapping with AI...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate CO-PO Mapping with AI</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <TableComponent
+            records={filteredRecords}
+            loading={state.loading}
+            noRecordsText="No CO-PO mappings found"
+            columns={[
+              {
+                accessor: "co_code",
+                title: "COURSE OUTCOME",
+                render: ({ co_code, bloom_level, description }: any) => (
+                  <div className="min-w-[220px] max-w-[280px] py-1">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-color2-l text-color2 rounded-md px-2 py-0.5 text-xs font-bold">
+                        {co_code}
                       </span>
-                    )}
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-[#000] dark:text-gray-300" title={description}>
-                    {description}
-                  </p>
-                </div>
-              ),
-            },
-            ...programOutcomes.map((po) => ({
-              accessor: po.code,
-              title: (
-                <div
-                  className="flex flex-col items-center justify-center text-center cursor-help"
-                  title={`${po.code}: ${po.title}\n${po.description}`}
-                >
-                  <span className="font-bold text-xs">{po.code}</span>
-                </div>
-              ),
-              render: (row: any) => {
-                const cell = matrix[row.co_code]?.[po.code] || {
-                  correlation_level: 0,
-                  strength_label: "- No Mapping",
-                  is_ai_suggested: false,
-                  justification: null,
-                  status: "suggested",
-                };
-                const mappingKey = `${row.co_code}-${po.code}`;
-                const isMappingApproved = state.approvedMappings.includes(mappingKey);
-                const score = cell.correlation_level ?? 0;
-
-                return (
-                  <div
-                    className="flex cursor-pointer justify-center py-1 group"
-                    onClick={() => handleCellClick(row, po)}
-                  >
-                    <div className="relative transition-transform group-hover:scale-110">
-                      {getScoreBadge(score)}
-                      {cell.is_ai_suggested && score > 0 && !isMappingApproved && (
-                        <div
-                          title="AI Suggested (Review Required)"
-                          className="bg-color2 absolute right-0.5 -top-0.5 inline-flex h-2 w-2 rounded-full ring-2 ring-white"
-                        />
-                      )}
-                      {(isMappingApproved && !isApproved ) && (
-                        <div
-                          title="Mapping Verified"
-                          className="bg-green-600 absolute right-0.5 -top-0.5 inline-flex h-2 w-2 rounded-full ring-2 ring-white"
-                        />
+                      {bloom_level && (
+                        <span className="rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-color2 dark:bg-purple-900/30">
+                          {bloom_level}
+                        </span>
                       )}
                     </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-[#000] dark:text-gray-300" title={description}>
+                      {description}
+                    </p>
                   </div>
-                );
+                ),
               },
-            })),
-          ]}
-        />
+              ...programOutcomes.map((po) => ({
+                accessor: po.code,
+                title: (
+                  <div
+                    className="flex flex-col items-center justify-center text-center cursor-help"
+                    title={`${po.code}: ${po.title}\n${po.description}`}
+                  >
+                    <span className="font-bold text-xs">{po.code}</span>
+                  </div>
+                ),
+                render: (row: any) => {
+                  const cell = matrix[row.co_code]?.[po.code] || {
+                    correlation_level: 0,
+                    strength_label: "– No Mapping",
+                    is_ai_suggested: false,
+                    justification: null,
+                    status: "suggested",
+                  };
+                  const mappingKey = `${row.co_code}-${po.code}`;
+                  const isMappingApproved = state.approvedMappings.includes(mappingKey);
+                  const score = cell.correlation_level ?? 0;
+
+                  return (
+                    <div className="relative group flex items-center justify-center py-1">
+                      {/* Clickable Badge: direct cycle 0 -> 1 -> 2 -> 3 -> 0 */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDirectCellCycle(row, po);
+                        }}
+                        className="relative p-1 rounded-lg transition-transform hover:scale-110 active:scale-95 focus:outline-none cursor-pointer"
+                        title="Click to cycle correlation strength (0 → 1 → 2 → 3)"
+                      >
+                        {getScoreBadge(score)}
+                        {cell.is_ai_suggested && score > 0 && !isMappingApproved && (
+                          <div
+                            title="AI Suggested (Review Required)"
+                            className="bg-color2 absolute right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white animate-pulse"
+                          />
+                        )}
+                        {isMappingApproved && !isApproved && (
+                          <div
+                            title="Mapping Verified"
+                            className="bg-green-600 absolute right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                          />
+                        )}
+                      </button>
+
+                      {/* Floating Hover Card on Cell (Strength, Bloom level, and Justification without opening any dropdown or modal!) */}
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl group-hover:block dark:border-slate-700 dark:bg-slate-900">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-slate-800 dark:text-slate-100">
+                              {row.co_code} × {po.code}
+                            </span>
+                            {row.bloom_level && (
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+                                {row.bloom_level}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              score === 3
+                                ? "bg-green-100 text-green-800"
+                                : score === 2
+                                ? "bg-blue-100 text-blue-800"
+                                : score === 1
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {score === 3
+                              ? "3 – High"
+                              : score === 2
+                              ? "2 – Medium"
+                              : score === 1
+                              ? "1 – Low"
+                              : "– No Mapping"}
+                          </span>
+                        </div>
+
+                        <div className="mt-2">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                            Target Program Outcome ({po.code})
+                          </p>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
+                            {po.title || po.code}
+                          </p>
+                          {po.description && (
+                            <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2">
+                              {po.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/60">
+                          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                            <Sparkles className="h-3 w-3" /> Academic Rationale
+                          </p>
+                          <p className="mt-1 max-h-24 overflow-y-auto text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                            {cell.justification || "No rationale provided yet. Click cell to cycle strength."}
+                          </p>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 dark:border-slate-800">
+                          <span>💡 Click cell to cycle: 0 → 1 → 2 → 3</span>
+                          {cell.is_ai_suggested && (
+                            <span className="font-medium text-indigo-500">NEURO AI</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              })),
+            ]}
+          />
+        )}
       </div>
 
       {state.mappingModal && (
@@ -671,11 +918,15 @@ const COPOMapping = () => {
         <PageFooter
           batch={!allMapped && !isApproved}
           status={{
-            label: isApproved ? "Approved" : (matrixData.mapping_status || "Review Required"),
+            label: isApproved ? "Approved" : (matrixData?.mapping_status || "Review Required"),
             color: isApproved ? "#16a34a" : "#ea580c",
           }}
-          content1={`Course: ${state.courseDetail?.course_code || "CS309"} – ${state.courseDetail?.course_title || "Computer Networks"}`}
-          content2={`PO Version: ${matrixData.po_version || "PO 2025 v1"}`}
+          content1={
+            state.courseDetail?.course_code
+              ? `Course: ${state.courseDetail?.course_code} – ${state.courseDetail?.course_title || ""}`
+              : ""
+          }
+          content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : ""}
           actionBtn1={
             isApproved
               ? {

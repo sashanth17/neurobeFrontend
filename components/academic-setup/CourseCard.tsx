@@ -10,10 +10,12 @@ import {
   Sparkles,
   Layers,
   ChevronDown,
+  Plus,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useCourseWorkflowStatus, StageWorkflowData } from "@/hook/useCourseWorkflowStatus";
 import Models from "@/imports/models.import";
+import { Success, Failure } from "@/utils/function.utils";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; cell: string }> = {
   not_started: {
@@ -74,7 +76,7 @@ export default function CourseCard(props: any) {
   const courseCode = data?.course_code || code || "";
 
   // Live master workflow status polling
-  const { workflowStatus, refetch } = useCourseWorkflowStatus(targetCourseId);
+  const { workflowStatus, syllabusFiles, refetch } = useCourseWorkflowStatus(targetCourseId);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -94,7 +96,7 @@ export default function CourseCard(props: any) {
 
   // Calculate live readiness percentage based on workflowStatus or data
   const calculateReadiness = () => {
-    if (!workflowStatus) return data?.readiness_percentage ?? 18;
+    if (!workflowStatus) return data?.readiness_percentage ?? 0;
     const stages = Object.values(workflowStatus) as StageWorkflowData[];
     let points = 0;
     stages.forEach((st) => {
@@ -114,8 +116,15 @@ export default function CourseCard(props: any) {
   ) => {
     const status = wfItem?.status || fallbackState || "not_started";
     const ver = wfItem?.active_version || 1;
-    const totalVers = wfItem?.total_versions || (ver > 1 ? ver : 1);
-    return { status, ver, totalVers, canGenerate: wfItem?.can_generate ?? true };
+    const totalVers = wfItem?.total_versions || 1;
+    // Derive real available versions: strictly what backend reports or 1..totalVers, never synthesize beyond totalVers
+    const availableVersions: number[] =
+      wfItem?.available_versions && wfItem.available_versions.length > 0
+        ? wfItem.available_versions
+        : totalVers > 1
+        ? Array.from({ length: totalVers }, (_, i) => i + 1)
+        : [ver];
+    return { status, ver, totalVers, availableVersions, canGenerate: wfItem?.can_generate ?? true };
   };
 
   const sSyllabus = getStageInfo("extraction", workflowStatus?.step_1_syllabus_extraction, data?.academic_preparation?.syllabus?.state);
@@ -131,6 +140,8 @@ export default function CourseCard(props: any) {
       status: sSyllabus.status,
       version: sSyllabus.ver,
       totalVersions: sSyllabus.totalVers,
+      availableVersions: sSyllabus.availableVersions,
+      extra: syllabusFiles && syllabusFiles.length > 0 ? `${syllabusFiles.length} file${syllabusFiles.length > 1 ? "s" : ""}` : undefined,
       route: `/neurobe/syllabus?course_id=${targetCourseId}`,
       artifactsTab: "syllabus",
     },
@@ -140,6 +151,7 @@ export default function CourseCard(props: any) {
       status: sCopo.status,
       version: sCopo.ver,
       totalVersions: sCopo.totalVers,
+      availableVersions: sCopo.availableVersions,
       route: `/neurobe/co-po-mapping?course_id=${targetCourseId}`,
       artifactsTab: "copo",
     },
@@ -149,6 +161,7 @@ export default function CourseCard(props: any) {
       status: sTopics.status,
       version: sTopics.ver,
       totalVersions: sTopics.totalVers,
+      availableVersions: sTopics.availableVersions,
       route: `/neurobe/topics?course_id=${targetCourseId}`,
       artifactsTab: "topics",
     },
@@ -158,6 +171,7 @@ export default function CourseCard(props: any) {
       status: sPedagogy.status,
       version: sPedagogy.ver,
       totalVersions: sPedagogy.totalVers,
+      availableVersions: sPedagogy.availableVersions,
       route: `/neurobe/pedagogy?course_id=${targetCourseId}`,
       artifactsTab: "pedagogy",
     },
@@ -167,6 +181,7 @@ export default function CourseCard(props: any) {
       status: sLesson.status,
       version: sLesson.ver,
       totalVersions: sLesson.totalVers,
+      availableVersions: sLesson.availableVersions,
       route: `/neurobe/lesson-plan?course_id=${targetCourseId}`,
       artifactsTab: "lesson-plan",
     },
@@ -208,8 +223,11 @@ export default function CourseCard(props: any) {
 
   // Navigation when touching a section
   const handleOpenSection = (item: typeof preparations[0]) => {
-    // Navigate directly into Course Artifacts with that stage tab preselected, or to its dedicated screen
-    router.push(`/neurobe/course-artifacts?code=${courseCode}&course_id=${targetCourseId}&stage=${item.stageKey}`);
+    if (item.stageKey === "extraction") {
+      router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+    } else {
+      router.push(`/neurobe/course-artifacts?code=${courseCode}&course_id=${targetCourseId}&stage=${item.stageKey}`);
+    }
   };
 
   // Version activation directly from card
@@ -218,10 +236,29 @@ export default function CourseCard(props: any) {
     try {
       setActionLoading(stageKey);
       await Models.syllabus.activate_version(targetCourseId, stageKey, newVer);
+      Success(`Activated Version ${newVer} for ${stageKey.toUpperCase()}`);
       await refetch();
       setActiveMenu(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to activate version:", err);
+      Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${newVer}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Extract from specific syllabus file version directly from card
+  const handleExtractFromFile = async (fileVersionId: number, versionNum: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setActionLoading("extraction");
+      await Models.syllabus.extractFromFileVersion(targetCourseId, fileVersionId);
+      Success(`Started extraction from syllabus v${versionNum}`);
+      setActiveMenu(null);
+      await refetch();
+      router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+    } catch (err: any) {
+      Failure(typeof err === "string" ? err : err?.message || "Failed to start extraction");
     } finally {
       setActionLoading(null);
     }
@@ -264,7 +301,7 @@ export default function CourseCard(props: any) {
             </span>
           )}
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            {data?.formatted_credits || credits || "4 Credits • L: 0 • T: 0 • P: 0"}
+            {data?.formatted_credits || credits || ""}
           </span>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -279,7 +316,7 @@ export default function CourseCard(props: any) {
             ))
           ) : (
             <span className="rounded-full border border-purple-300 px-3 py-1 text-xs font-medium text-purple-700">
-              {data?.role_badge || "Course Coordinator"}
+              {data?.role_badge || "—"}
             </span>
           )}
         </div>
@@ -298,12 +335,12 @@ export default function CourseCard(props: any) {
       {/* 3. Academic Metadata Grid */}
       <div className="grid grid-cols-4 gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
         {[
-          { label: "PROGRAMME", value: data?.programme || programme || "B.Tech CSE" },
-          { label: "BATCH", value: data?.batch_name || batch || "Batch 2023-2028" },
-          { label: "TERM", value: data?.term || term || "Semester 3" },
+          { label: "PROGRAMME", value: data?.programme || programme || "—" },
+          { label: "BATCH", value: data?.batch_name || batch || "—" },
+          { label: "TERM", value: data?.term || term || "—" },
           {
             label: "STUDENTS",
-            value: data?.students_count !== undefined ? `${data.students_count} Students` : students || "0 Students",
+            value: data?.students_count !== undefined ? `${data.students_count} Students` : students ? `${students} Students` : "—",
           },
         ].map((m) => (
           <div key={m.label}>
@@ -331,7 +368,6 @@ export default function CourseCard(props: any) {
             const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.not_started;
             const isMenuOpen = activeMenu === item.stageKey;
             const isLoading = actionLoading === item.stageKey;
-            const hasVersions = item.totalVersions && item.totalVersions > 1;
 
             return (
               <div
@@ -350,45 +386,135 @@ export default function CourseCard(props: any) {
                     </span>
 
                     {/* Version Selector Pill right on the card */}
-                    {item.version && (
+                    {item.stageKey === "extraction" ? (
                       <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenu(isMenuOpen ? null : item.stageKey);
-                          }}
-                          className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-indigo-100 hover:text-indigo-700 dark:bg-slate-700 dark:text-slate-300"
-                        >
-                          <span>v{item.version}</span>
-                          <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                        </button>
+                        {(!syllabusFiles || syllabusFiles.length === 0) ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+                            }}
+                            className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-indigo-400 bg-indigo-50/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                            title="Upload Syllabus PDF"
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                            <span>Upload</span>
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenu(isMenuOpen ? null : item.stageKey);
+                              }}
+                              className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-indigo-100 hover:text-indigo-700 dark:bg-slate-700 dark:text-slate-300"
+                              title="Click to view file versions"
+                            >
+                              <span>v{sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1}</span>
+                              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                            </button>
 
-                        {/* Version Dropdown Menu */}
-                        {isMenuOpen && (
-                          <div className="absolute left-0 top-full z-20 mt-1 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
-                            <div className="px-2 py-1 text-[9px] font-semibold text-slate-400">
-                              Switch Version
-                            </div>
-                            {Array.from({ length: Math.max(item.totalVersions || 1, 2) }, (_, i) => i + 1).map((v) => (
-                              <button
-                                key={v}
-                                type="button"
-                                onClick={(e) => handleToggleVersion(item.stageKey, v, e)}
-                                className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs ${
-                                  v === item.version
-                                    ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
-                                    : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
-                                }`}
-                              >
-                                <span>Version {v}</span>
-                                {v === item.version && <CheckCircle className="h-3 w-3" />}
-                              </button>
-                            ))}
-                          </div>
+                            {/* Syllabus File Version Dropdown */}
+                            {isMenuOpen && (
+                              <div className="absolute left-0 top-full z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                                <div className="mb-1.5 flex items-center justify-between px-1 text-[10px] font-bold text-slate-400">
+                                  <span>Syllabus Files ({syllabusFiles.length})</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+                                    }}
+                                    className="font-bold text-indigo-600 hover:underline dark:text-indigo-400"
+                                  >
+                                    + Upload New
+                                  </button>
+                                </div>
+                                <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                                  {syllabusFiles.map((fv) => (
+                                    <div
+                                      key={fv.id}
+                                      className="flex items-center justify-between rounded-lg p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/60"
+                                    >
+                                      <div className="min-w-0 flex-1 pr-1.5">
+                                        <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                          <span className="mr-1 rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                            v{fv.version_number}
+                                          </span>
+                                          {fv.original_filename}
+                                        </p>
+                                        <p className="text-[9px] text-slate-400">
+                                          {fv.uploaded_by}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={actionLoading === "extraction"}
+                                        onClick={(e) => handleExtractFromFile(fv.id, fv.version_number, e)}
+                                        className="flex shrink-0 items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm hover:bg-indigo-700 active:scale-95 disabled:opacity-60"
+                                        title={`Extract from v${fv.version_number}`}
+                                      >
+                                        <Sparkles className="h-2.5 w-2.5" />
+                                        <span>Extract</span>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
-                    )}
+                    ) : item.version ? (
+                      <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                        {item.availableVersions && item.availableVersions.length > 1 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenu(isMenuOpen ? null : item.stageKey);
+                              }}
+                              className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-indigo-100 hover:text-indigo-700 dark:bg-slate-700 dark:text-slate-300"
+                              title="Click to switch version"
+                            >
+                              <span>v{item.version}</span>
+                              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                            </button>
+
+                            {/* Version Dropdown Menu */}
+                            {isMenuOpen && (
+                              <div className="absolute left-0 top-full z-20 mt-1 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                                <div className="px-2 py-1 text-[9px] font-semibold text-slate-400">
+                                  Switch Version
+                                </div>
+                                {item.availableVersions.map((v: number) => (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    onClick={(e) => handleToggleVersion(item.stageKey, v, e)}
+                                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs ${
+                                      v === item.version
+                                        ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
+                                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    }`}
+                                  >
+                                    <span>Version {v}</span>
+                                    {v === item.version && <CheckCircle className="h-3 w-3 text-indigo-600" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                            v{item.version}
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -437,21 +563,17 @@ export default function CourseCard(props: any) {
           <span className="font-medium">Instructors: </span>
           {data?.instructors?.length > 0
             ? data.instructors.map((item: any) => `${item?.name || item?.first_name || ""} (${item?.role || "Instructor"})`).join(", ")
-            : instructors || "Gopinath S (Instructor)"}
+            : instructors || "—"}
         </p>
 
         <button
           type="button"
           onClick={() =>
-            onCoordinatorAction
-              ? onCoordinatorAction(data || props)
-              : onAction
-              ? onAction(data || props)
-              : router.push(`/neurobe/course-artifacts?code=${courseCode}&course_id=${targetCourseId}`)
+            router.push(`/neurobe/ins-course-artifacts?course_id=${targetCourseId}`)
           }
           className="rounded-xl border border-purple-600 bg-white px-4 py-2 text-xs font-bold text-purple-700 shadow-sm transition-all hover:bg-purple-50 active:scale-95 dark:bg-gray-800 dark:text-purple-300 dark:hover:bg-purple-900/30"
         >
-          Enter Course Workspace -&gt;
+          View as Course Instructor →
         </button>
       </div>
     </div>

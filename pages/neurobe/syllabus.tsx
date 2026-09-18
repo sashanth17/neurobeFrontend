@@ -1,29 +1,29 @@
 import { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Success, useSetState } from "@/utils/function.utils";
-import CustomSelect from "@/components/FormFields/CustomSelect.component";
+import { Dropdown, Success, Failure, useSetState } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import SyllabusStepper from "@/components/academic-setup/SyllabusStepper";
 import StepHeader from "@/components/academic-setup/StepHeader";
-import SyllabusUpload from "@/components/academic-setup/SyllabusUpload";
-import KeepFilePrompt from "@/components/academic-setup/KeepFilePrompt";
 import NeuroAIInfo from "@/components/academic-setup/NeuroAIInfo";
 import ExtractionComplete from "@/components/academic-setup/ExtractionComplete";
 import ReviewModeBar from "@/components/academic-setup/ReviewModeBar";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
 import ExtractedDataPanel from "@/components/academic-setup/ExtractedDataPanel";
-import SyllabusApprovedBanner from "@/components/academic-setup/SyllabusApprovedBanner";
-import SyllabusApprovedSummary from "@/components/academic-setup/SyllabusApprovedSummary";
-import IconEdit from "@/components/Icon/IconEdit";
-import IconTrash from "@/components/Icon/IconTrash";
-import TableComponent from "@/components/common-components/TableComponent";
-import PrimaryButton from "@/components/FormFields/PrimaryButton.component";
-import { Check, Sparkles } from "lucide-react";
-import CourseOutcomes from "@/components/academic-setup/CourseOutcomes";
 import { useRouter, useSearchParams } from "next/navigation";
 import Models from "@/imports/models.import";
+import {
+  Upload,
+  FileText,
+  Plus,
+  Sparkles,
+  Clock,
+  CheckCircle,
+  RotateCw,
+  ArrowRight,
+  Layers,
+} from "lucide-react";
 
 type ImportType = "user" | "course";
 
@@ -97,6 +97,11 @@ const Syllabus = () => {
     isJobLoading: false,
     pdfBlobUrl: null as string | null,
     lastLoadedSyllabusId: null as string | number | null,
+    // Versioned file upload state
+    fileVersions: [] as any[],
+    isUploadingFile: false,
+    pendingUploadFile: null as File | null,
+    extractingFileVersionId: null as number | null,
   });
 
   useEffect(() => {
@@ -107,18 +112,21 @@ const Syllabus = () => {
     if (course_id) {
       course_data(course_id);
       coordinator_course_data();
+      // Load file versions
+      loadFileVersions(course_id);
 
       // If job_id is passed from dashboard, use it directly
       if (job_id) {
-        try {
-          sessionStorage.setItem(jobKey, String(job_id));
-        } catch { }
+        try { sessionStorage.setItem(jobKey, String(job_id)); } catch { }
         job_Data(job_id);
       } else {
-        // Otherwise restore from sessionStorage
+        // Restore from sessionStorage or check workflow status for persistent state
         const savedJobId = getSavedJobId();
         if (savedJobId && getSavedStep() >= 3) {
           job_Data(savedJobId);
+        } else {
+          // Check workflow status to auto-restore step (persistent state across browser closes)
+          restoreStepFromWorkflow(course_id);
         }
       }
 
@@ -126,9 +134,6 @@ const Syllabus = () => {
       if (state.courseData?.latest_syllabus?.id && getSavedStep() >= 3) {
         syllabus_detail(state.courseData.latest_syllabus.id);
       }
-      console.log("syllabus_id →", state.courseData?.latest_syllabus?.id);
-
-
     }
   }, [course_id, job_id]);
 
@@ -173,11 +178,91 @@ const Syllabus = () => {
     try {
       const res = await Models.course.detail(id);
       setState({ courseData: res });
-      console.log("course detail →", res);
     } catch (error) {
       console.log("error", error);
     }
   };
+
+  /** Restore current step from live workflow status on cold-load (browser close/reopen) */
+  const restoreStepFromWorkflow = async (cid: string) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extraction = wfRes?.workflow?.step_1_syllabus_extraction;
+      if (!extraction) return;
+      const { status } = extraction;
+      if (status === "redis_queued" || status === "generating") {
+        // Extraction is in-progress — show loading step
+        setStep(3);
+        setState({ isJobLoading: true });
+        const jobId = extraction.job_id;
+        if (jobId) { try { sessionStorage.setItem(jobKey, jobId); } catch { } job_Data(jobId); }
+      } else if (status === "approved") {
+        // Extraction already approved — show Review with Approved state (step 4)
+        setStep(4);
+        setState({ isJobLoading: false, showReview: true });
+        if (wfRes?.syllabus_id) {
+          try { sessionStorage.setItem(syllabusKey, String(wfRes.syllabus_id)); } catch { }
+          syllabus_detail(wfRes.syllabus_id);
+        }
+      } else if (status === "draft") {
+        // Extraction in draft — jump to Review & Edit (step 3)
+        setStep(3);
+        setState({ isJobLoading: false, showReview: true });
+        if (wfRes?.syllabus_id) {
+          try { sessionStorage.setItem(syllabusKey, String(wfRes.syllabus_id)); } catch { }
+          syllabus_detail(wfRes.syllabus_id);
+        }
+      }
+    } catch { /* ignore — just stay on step 1 */ }
+  };
+
+  /** Load all versioned file uploads for the course */
+  const loadFileVersions = async (cid: string | number) => {
+    try {
+      const res: any = await Models.syllabus.listFileVersions(cid);
+      setState({ fileVersions: res?.file_versions || [] });
+    } catch {
+      setState({ fileVersions: [] });
+    }
+  };
+
+  /** Upload a new syllabus file version (no extraction triggered yet) */
+  const uploadAndSaveFileVersion = async (file: File) => {
+    if (!course_id) return;
+    try {
+      setState({ isUploadingFile: true });
+      const formData = new FormData();
+      formData.append("file", file);
+      const res: any = await Models.syllabus.uploadFileVersion(course_id, formData);
+      Success(`Syllabus v${res.version_number} uploaded — "${res.original_filename}"`);
+      await loadFileVersions(course_id);
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Upload failed");
+    } finally {
+      setState({ isUploadingFile: false, pendingUploadFile: null });
+    }
+  };
+
+  /** Trigger AI extraction from a specific file version */
+  const extractFromVersion = async (fileVersionId: number, versionNumber: number) => {
+    if (!course_id) return;
+    try {
+      setState({ extractingFileVersionId: fileVersionId });
+      const res: any = await Models.syllabus.extractFromFileVersion(course_id, fileVersionId);
+      Success(`Extraction started for v${versionNumber}`);
+      if (res?.job_id) {
+        try { sessionStorage.setItem(jobKey, String(res.job_id)); } catch { }
+        setStep(3);
+        setState({ isJobLoading: true });
+        job_Data(res.job_id);
+      }
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Extraction failed to start");
+    } finally {
+      setState({ extractingFileVersionId: null });
+    }
+  };
+
 
   const coordinator_course_data = async () => {
     try {
@@ -715,44 +800,91 @@ const Syllabus = () => {
         />
         <div className=" mx-6 border-t border-gray-200 dark:border-gray-700" />
         {state.currentStep === 1 && (
-          <div className=" py-3 pt-2">
+          <div className="py-3 pt-2 px-4 max-w-2xl mx-auto">
             <StepHeader
-              title="Upload Syllabus"
-              description="Upload the syllabus document for CS301— Computer Networks."
+              title="Syllabus File Versions"
+              description={`Upload one or more syllabus PDF versions, then press Extract on any version to start AI extraction.`}
             />
-            <SyllabusUpload
-              onFileSelect={(file) => setState({ selectedFile: file })}
-            />
-            {state.showKeepFilePrompt !== false && (
-              <KeepFilePrompt
-                title="Keep the source syllabus file permanently?"
-                subTitle=" Choose whether the uploaded source syllabus should be retained permanently."
-                actionBtn1={{
-                  label: "Yes, keep file",
-                  onClick: onKeep,
-                }}
-                actionBtn2={{
-                  label: "No, do not keep file",
-                  onClick: onDiscard,
-                }}
-              />
-            )}
-            <NeuroAIInfo />
-            <div className="mt-4 flex justify-end">
-              <PrimaryButton
-                type="button"
-                text="Start AI Extraction"
-                className="bg-color2 hover:bg-color2"
-                icon={<Sparkles className="h-4 w-4" />}
-                onClick={() => startAIExtraction()}
-              />
+
+            {/* File Version List */}
+            <div className="mt-4 flex flex-col gap-3">
+              {state.fileVersions.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/40 py-10 text-center dark:border-indigo-800/40 dark:bg-indigo-950/20">
+                  <Layers className="h-10 w-10 text-indigo-300" />
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">No syllabus files uploaded yet</p>
+                  <p className="text-xs text-slate-400">Upload a PDF to get started</p>
+                </div>
+              )}
+
+              {state.fileVersions.map((fv: any) => {
+                const isExtracting = state.extractingFileVersionId === fv.id;
+                return (
+                  <div
+                    key={fv.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/40">
+                        <FileText className="h-4 w-4 text-indigo-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                          <span className="mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                            v{fv.version_number}
+                          </span>
+                          {fv.original_filename}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {fv.uploaded_by} &bull; {fv.created_at ? new Date(fv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isExtracting}
+                      onClick={() => extractFromVersion(fv.id, fv.version_number)}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-60"
+                    >
+                      {isExtracting ? (
+                        <><RotateCw className="h-3 w-3 animate-spin" /> Extracting...</>
+                      ) : (
+                        <><Sparkles className="h-3 w-3" /> Extract</>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Upload New Version */}
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50/30 px-4 py-3 transition-all hover:border-indigo-400 hover:bg-indigo-50/60 dark:border-indigo-800/40 dark:bg-indigo-950/20">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadAndSaveFileVersion(file);
+                    e.target.value = "";
+                  }}
+                />
+                {state.isUploadingFile ? (
+                  <RotateCw className="h-5 w-5 animate-spin text-indigo-400" />
+                ) : (
+                  <Plus className="h-5 w-5 text-indigo-400" />
+                )}
+                <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                  {state.isUploadingFile ? "Uploading..." : state.fileVersions.length === 0 ? "Upload Syllabus PDF" : "Upload New Version"}
+                </span>
+              </label>
             </div>
+
+            <NeuroAIInfo />
           </div>
         )}
 
-        {state.currentStep === 3 && (
+        {(state.currentStep === 3 || state.currentStep === 4) && (
           <div className=" py-3 pt-2">
-            {!state.showReview ? (
+            {!state.showReview && state.currentStep !== 4 ? (
               <ExtractionComplete
                 fileName={state.selectedFile?.name}
                 isLoading={state.isJobLoading}
@@ -764,23 +896,59 @@ const Syllabus = () => {
               />
             ) : (
               <>
-                <ReviewModeBar
-                  onSaveDraft={() => handleSaveDraft()}
-                  onContinue={() => {
-                    syllabus_status()
-                  }}
-                />
+                {state.currentStep === 4 ? (
+                  <div className="mb-5 mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-5 py-4 dark:border-green-800 dark:bg-green-950/20">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white dark:bg-green-900">
+                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-green-900 dark:text-green-200">
+                            SYLLABUS EXTRACTION APPROVED
+                          </p>
+                          <span className="rounded-full border border-green-400 bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900 dark:text-green-300">
+                            Approved by BoS
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-green-700 dark:text-green-400">
+                          Extraction is verified and approved. You can now generate CO-PO Mapping and Topic Hierarchy.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
+                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 transition-all"
+                      >
+                        CO-PO Mapping <ArrowRight className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/neurobe/topics?course_id=${course_id}`)}
+                        className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-purple-700 transition-all"
+                      >
+                        Topic Hierarchy <ArrowRight className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <ReviewModeBar
+                    onSaveDraft={() => handleSaveDraft()}
+                    onContinue={() => syllabus_status()}
+                  />
+                )}
                 <div
                   className="grid gap-5"
                   style={{
-                    height: "80vh",
+                    height: "74vh",
                     overflow: "hidden",
                     gridTemplateColumns: "2fr 3fr",
                   }}
                 >
                   <div className="min-h-0 overflow-hidden">
                     {state.pdfBlobUrl ? (
-                      // Use iframe for blob URL or direct URL
                       <iframe
                         src={state.pdfBlobUrl}
                         className="h-full w-full rounded-xl border border-gray-200 dark:border-gray-700"
@@ -792,16 +960,13 @@ const Syllabus = () => {
                         fileName={state.selectedFile?.name}
                         fileSize={
                           state.selectedFile
-                            ? `${(
-                              state.selectedFile.size /
-                              (1024 * 1024)
-                            ).toFixed(1)} MB`
+                            ? `${(state.selectedFile.size / (1024 * 1024)).toFixed(1)} MB`
                             : ""
                         }
                       />
                     )}
                   </div>
-                  <div className="min-h-0 overflow-hidden">
+                  <div className="min-h-0 overflow-auto flex flex-col gap-3">
                     <ExtractedDataPanel
                       data={state.jobData}
                       courseData={state.courseData}
@@ -816,48 +981,29 @@ const Syllabus = () => {
                       handleKnowledgeLevelChange={handleKnowledgeLevelChange}
                       syllabusId={state.courseData?.latest_syllabus?.id}
                     />
+
+                    {/* Navigation buttons to downstream stages */}
+                    <div className="flex items-center gap-3 border-t border-slate-200 pt-4 mt-2 pb-4 dark:border-slate-700">
+                      <p className="text-xs font-semibold text-slate-500 flex-1">Approve this extraction, then proceed to:</p>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
+                        className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300"
+                      >
+                        CO-PO Mapping <ArrowRight className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/neurobe/topics?course_id=${course_id}`)}
+                        className="flex items-center gap-1.5 rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:bg-purple-950/30 dark:text-purple-300"
+                      >
+                        Topic Hierarchy <ArrowRight className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>
             )}
-          </div>
-        )}
-
-        {state.currentStep === 4 && (
-          <div className=" py-3 pt-4">
-            <SyllabusApprovedBanner
-              courseCode={state.courseData?.course_code}
-              onProceed={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
-            />
-            <SyllabusApprovedSummary
-            data={state.courseData?.latest_syllabus}
-              courseCode={state.courseData?.course_code}
-              courseTitle={state.courseData?.
-                course_title
-              }
-              theoryHours={Number(state.courseData?.total_theory_hours)}
-              labHours={state.courseData?.
-                total_lab_hours}
-              credits={state.courseData?.credits}
-              ltpc={`${state.courseData?.
-                lecture_hours}-${state.courseData?.
-                  tutorial_hours
-                }-${state.courseData?.
-
-                  practical_hours
-                }-${state.courseData?.
-
-                  credits
-                }
-                
-`}
-              onRevise={() => {
-                setStep(3);
-
-                setState({ showReview: true });
-              }}
-              onProceed={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
-            />
           </div>
         )}
       </div>
