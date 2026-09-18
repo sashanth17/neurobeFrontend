@@ -576,40 +576,67 @@ const Syllabus = () => {
   };
 
   const handleSaveOutcome = async (id: number, description: string, co_code: string) => {
+    setState((prev: any) => ({
+      ...prev,
+      jobData: {
+        ...prev.jobData,
+        outcomes: prev.jobData?.outcomes?.map((co: any) =>
+          co.id === id ? { ...co, description, co_code } : co
+        ),
+      },
+    }));
+
     try {
-      const res = await Models.syllabus.edit_unit_outcome(id, {
+      await Models.syllabus.edit_unit_outcome(id, {
         co_code: co_code,
         description: description.trim(),
       });
       Success("Outcome updated");
       if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
     } catch (error: any) {
-      console.log("edit_unit_outcome error", error);
-      throw error;
+      console.log("edit_unit_outcome error (preserved in draft):", error);
     }
   };
 
   const handleAcceptOutcome = async (id: number) => {
+    setState((prev: any) => ({
+      ...prev,
+      jobData: {
+        ...prev.jobData,
+        outcomes: prev.jobData?.outcomes?.map((co: any) =>
+          co.id === id ? { ...co, is_accepted: true } : co
+        ),
+      },
+    }));
+
     try {
-      const res = await Models.syllabus.accept_outcome(id);
+      await Models.syllabus.accept_outcome(id);
       Success("Outcome accepted");
       if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
     } catch (error: any) {
-      console.log("accept_outcome error", error);
-      throw error;
+      console.log("accept_outcome error (preserved in draft):", error);
     }
   };
 
   const handleKnowledgeLevelChange = async (id: number, value: string) => {
+    setState((prev: any) => ({
+      ...prev,
+      jobData: {
+        ...prev.jobData,
+        outcomes: prev.jobData?.outcomes?.map((co: any) =>
+          co.id === id ? { ...co, knowledge_level: value } : co
+        ),
+      },
+    }));
+
     try {
-      const res = await Models.syllabus.update_knw_level_outcome(id, {
+      await Models.syllabus.update_knw_level_outcome(id, {
         knowledge_level: value,
       });
       Success("Knowledge level updated");
       if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
     } catch (error: any) {
-      console.log("edit_unit_outcome error", error);
-      throw error;
+      console.log("update_knw_level_outcome error (preserved in draft):", error);
     }
   };
 

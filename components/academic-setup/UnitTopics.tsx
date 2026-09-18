@@ -44,7 +44,7 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
     if (data && data.length > 0) setUnits(data);
   }, [data]);
 
-  const totalHours = units.reduce((sum, u) => sum + (u.hours || 0), 0);
+  const totalHours = units.reduce((sum, u: any) => sum + Number(u.theory_hours ?? u.hours ?? 0), 0);
 
   const openModal = (unit: any) => {
     setTopicCode("");
@@ -236,9 +236,7 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
                   <input
                     disabled
                     type="number"
-                    value={
-                      unit.theory_hours + unit?.syllabus_id + unit?.lab_hours
-                    }
+                    value={Number(unit.theory_hours ?? unit.hours ?? 0)}
                     onChange={(e) =>
                       updateHours(unit.unitNumber, Number(e.target.value))
                     }
