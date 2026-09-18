@@ -137,11 +137,6 @@ export const makeBatchColumns = (onEdit: (r: any) => void, onDelete: (r: any) =>
     render: (row: any) => <span className="text-[#000] font-medium dark:text-gray-200">{row.name || row.batch || "-"}</span>,
   },
   {
-    accessor: "programme",
-    title: "PROGRAMME",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.programme_name || row.programme?.programme_name || row.programme || "-"}</span>,
-  },
-  {
     accessor: "startYear",
     title: "START YEAR",
     render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.start_year ?? row.startYear ?? "-"}</span>,

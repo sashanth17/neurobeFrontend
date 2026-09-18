@@ -558,7 +558,6 @@ export const CreateProgrammeModal = ({
 // ─── CREATE / EDIT BATCH MODAL ────────────────────────────────────────────────
 export interface BatchFormData {
   name: string;
-  programme_id: number;
   start_year: number;
   end_year: number;
   status: string;
@@ -580,14 +579,11 @@ export const CreateBatchModal = ({
   initialData,
   onSubmit,
   submitting = false,
-  programmeOptions,
 }: BatchModalProps) => {
   const isEdit = !!initialData;
-  const progOpts = programmeOptions ;
 
   const [state, setState] = useSetState({
     name: "",
-    programme: null as any,
     start_year: "",
     end_year: "",
     status: null as any,
@@ -595,15 +591,8 @@ export const CreateBatchModal = ({
 
   useEffect(() => {
     if (initialData) {
-      const foundProg = progOpts.find(
-        (p: any) =>
-          p.value === initialData.programme_id ||
-          p.label === initialData.programme_name ||
-          p.label === initialData.programme
-      );
       setState({
         name: initialData.name ?? initialData.batch ?? "",
-        programme: foundProg ?? toOpt(initialData.programme_name || initialData.programme),
         start_year: String(initialData.start_year ?? initialData.startYear ?? ""),
         end_year: String(initialData.end_year ?? initialData.endYear ?? ""),
         status: toOpt(initialData.status),
@@ -611,22 +600,17 @@ export const CreateBatchModal = ({
     } else {
       setState({
         name: "",
-        programme: null,
         start_year: "",
         end_year: "",
         status: null,
       });
     }
-  }, [initialData, open, progOpts]);
+  }, [initialData, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!state.name.trim()) {
       Failure("Please enter batch name");
-      return;
-    }
-    if (!state.programme?.value) {
-      Failure("Please select a programme");
       return;
     }
     if (!state.start_year) {
@@ -640,7 +624,6 @@ export const CreateBatchModal = ({
 
     onSubmit({
       name: state.name.trim(),
-      programme_id: Number(state.programme.value) || 0,
       start_year: Number(state.start_year) || 0,
       end_year: Number(state.end_year) || 0,
       status: state.status?.value || "Draft",
@@ -662,7 +645,7 @@ export const CreateBatchModal = ({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4">
           <TextInput
             title="Batch Name"
             required
@@ -670,39 +653,32 @@ export const CreateBatchModal = ({
             value={state.name}
             onChange={(e) => setState({ name: e.target.value })}
           />
+          <div className="grid grid-cols-2 gap-4">
+            <TextInput
+              title="Start Year"
+              required
+              type="number"
+              placeholder="e.g. 2024"
+              value={state.start_year}
+              onChange={(e) => setState({ start_year: e.target.value })}
+            />
+            <TextInput
+              title="End Year"
+              required
+              type="number"
+              placeholder="e.g. 2028"
+              value={state.end_year}
+              onChange={(e) => setState({ end_year: e.target.value })}
+            />
+          </div>
           <CustomSelect
-            title="Programme"
-            required
-            options={progOpts}
-            value={state.programme}
-            onChange={(v) => setState({ programme: v })}
-            placeholder="Select Programme"
-          />
-          <TextInput
-            title="Start Year"
-            required
-            type="number"
-            placeholder="e.g. 2024"
-            value={state.start_year}
-            onChange={(e) => setState({ start_year: e.target.value })}
-          />
-          <TextInput
-            title="End Year"
-            required
-            type="number"
-            placeholder="e.g. 2028"
-            value={state.end_year}
-            onChange={(e) => setState({ end_year: e.target.value })}
+            title="Status"
+            options={BATCH_STATUS_OPTS}
+            value={state.status}
+            onChange={(v) => setState({ status: v })}
+            placeholder="Select Status"
           />
         </div>
-        <CustomSelect
-          title="Status"
-          options={BATCH_STATUS_OPTS}
-          value={state.status}
-          onChange={(v) => setState({ status: v })}
-          placeholder="Select Status"
-          className="mt-4"
-        />
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"

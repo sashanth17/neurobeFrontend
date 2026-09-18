@@ -326,7 +326,6 @@ const AcademicSetup = () => {
 
   const handleSaveBatch = async (formData: {
     name: string;
-    programme_id: number;
     start_year: number;
     end_year: number;
     status: string;
@@ -338,7 +337,6 @@ const AcademicSetup = () => {
       const body = {
         name: formData.name,
         organization_id: getOrganizationId(),
-        programme_id: formData.programme_id,
         start_year: formData.start_year,
         end_year: formData.end_year,
         status: formData.status,
@@ -510,8 +508,6 @@ const AcademicSetup = () => {
             "code",
             "name",
             "batch",
-            "programme",
-            "programme_name",
           ]) && byStatus(r)
       ),
       columns: makeBatchColumns(openEdit, handleDeleteBatch),
@@ -595,7 +591,6 @@ const AcademicSetup = () => {
         initialData={state.editRow}
         onSubmit={handleSaveBatch}
         submitting={state.submitting}
-        programmeOptions={programmeOptions}
       />
       <CreatePSOModal
         open={state.showModal && state.activeTab === "psos"}
