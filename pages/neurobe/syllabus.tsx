@@ -324,16 +324,34 @@ const Syllabus = () => {
 
     const fetchOnce = async () => {
       try {
-        const res: any = await Models.job.detail(id);
-        console.log("job_Data response:", res);
+        let res: any = null;
+        try {
+          res = await Models.job.detail(id);
+          console.log("job_Data response:", res);
+        } catch (jobErr) {
+          console.log("Job detail error, will cross-check workflow status:", jobErr);
+        }
+
         setStep(3);
 
-        const status = res?.status;
-        if (
-          status === "complete" ||
-          status === "completed" ||
-          status === "failed"
-        ) {
+        // Cross-check master workflow status if course_id is present
+        let wfExtraction: any = null;
+        if (course_id) {
+          try {
+            const wfRes: any = await Models.syllabus.get_workflow_status(course_id);
+            wfExtraction = wfRes?.workflow?.step_1_syllabus_extraction;
+          } catch (wfErr) {
+            console.log("Workflow status check error:", wfErr);
+          }
+        }
+
+        const isCompleted =
+          res?.status === "complete" ||
+          res?.status === "completed" ||
+          wfExtraction?.status === "draft" ||
+          wfExtraction?.status === "approved";
+
+        if (isCompleted) {
           const syllabusId =
             res?.result?.syllabus_id ||
             res?.syllabus_id ||
@@ -359,8 +377,12 @@ const Syllabus = () => {
             syllabus_detail(syllabusId);
           }
           stopPolling();
+        } else if (res?.status === "failed" || wfExtraction?.status === "failed") {
+          console.log("Job marked as failed");
+          setState({ isJobLoading: false });
+          stopPolling();
         } else {
-          console.log(`Job status: ${status}, continuing to poll...`);
+          console.log(`Job status: ${res?.status || wfExtraction?.status || "processing"}, continuing to poll...`);
         }
       } catch (error: any) {
         console.log("job_Data error:", error);
@@ -376,8 +398,7 @@ const Syllabus = () => {
           setState({ isJobLoading: false });
           stopPolling();
         } else {
-          setState({ isJobLoading: false });
-          stopPolling();
+          retries++;
         }
       }
     };
