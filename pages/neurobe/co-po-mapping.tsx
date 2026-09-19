@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import {
   GraduationCap,
@@ -80,6 +80,17 @@ const COPOMapping = () => {
   const router = useRouter();
   const course_id = useSearchParams().get("course_id");
 
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopPolling(), []);
+
   const [state, setState] = useSetState({
     search: "",
     selectedCourse: null,
@@ -141,7 +152,7 @@ const COPOMapping = () => {
   useEffect(() => {
     if (course_id) {
       getCourseDetails();
-      // getCOPOMatrix();
+      restoreWorkflowState(course_id);
     }
   }, [course_id]);
 
@@ -207,6 +218,65 @@ const COPOMapping = () => {
     }
   };
 
+  const restoreWorkflowState = async (cid: string | number) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const copoStep = wfRes?.workflow?.step_2_copo_mapping;
+      if (!copoStep) return;
+
+      const { status, job_id } = copoStep;
+      if (status === "redis_queued" || status === "generating") {
+        setState({ generatingCopo: true });
+        startPolling(cid, job_id);
+      } else if (status === "approved") {
+        setState({ mappingApproved: true, generatingCopo: false });
+      } else {
+        setState({ generatingCopo: false });
+      }
+    } catch (err) {
+      console.warn("restoreWorkflowState warning:", err);
+    }
+  };
+
+  const startPolling = (cid: string | number, jobId?: string) => {
+    stopPolling();
+    setState({ generatingCopo: true });
+
+    let attempts = 0;
+    const maxAttempts = 40; // ~2 minutes with 3s interval
+
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+        const copoStep = wfRes?.workflow?.step_2_copo_mapping;
+        const currentStatus = copoStep?.status;
+
+        if (currentStatus === "draft" || currentStatus === "approved") {
+          stopPolling();
+          setState({
+            generatingCopo: false,
+            mappingApproved: currentStatus === "approved",
+          });
+          const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
+          await getCOPOMatrix(sid);
+          Success("CO-PO mapping generated successfully with NEURO AI!");
+        } else if (attempts >= maxAttempts) {
+          stopPolling();
+          setState({ generatingCopo: false });
+          const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
+          await getCOPOMatrix(sid);
+        }
+      } catch (pollErr) {
+        console.warn("COPO polling error:", pollErr);
+        if (attempts >= maxAttempts) {
+          stopPolling();
+          setState({ generatingCopo: false });
+        }
+      }
+    }, 3000);
+  };
+
   const handleGenerateCopo = async (parentParams?: { extraction_version?: number }) => {
     const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
     if (!sid) {
@@ -215,14 +285,11 @@ const COPOMapping = () => {
     }
     try {
       setState({ generatingCopo: true });
-      await Models.COPOMap.generate_copo(sid, {
+      const res: any = await Models.COPOMap.generate_copo(sid, {
         extraction_version: parentParams?.extraction_version,
       });
       Success("CO-PO mapping generation started with NEURO AI!");
-      setTimeout(async () => {
-        await getCOPOMatrix(sid);
-        setState({ generatingCopo: false });
-      }, 2500);
+      startPolling(course_id || sid, res?.job_id);
     } catch (error: any) {
       console.error("Error generating CO-PO mapping:", error);
       Failure(getErrorMessage(error, "Failed to generate CO-PO mapping"));
@@ -649,7 +716,7 @@ const COPOMapping = () => {
         description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
         programme={state?.courseDetail?.programme}
         batch={state?.courseDetail?.batch_name}
-        academicYear={state?.courseDetail?.batch_name || ""}
+        academicYear={state?.courseDetail?.academic_year || state?.courseDetail?.batch_name || ""}
         students={state?.courseDetail?.students_count}
         selectedCourse={state.selectedCourse}
         courseOptions={state.courseList}
@@ -664,7 +731,7 @@ const COPOMapping = () => {
 
       <PageHeader
         title="CO–PO Mapping"
-        records={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : ""}
+        records={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
         subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Hover over any cell to see strength & rationale, or click to cycle strength."
         icon={<Cable className="h-5 w-5 text-color2" />}
       />
@@ -707,8 +774,8 @@ const COPOMapping = () => {
               ? `${courseOutcomes[0]?.co_code}–${courseOutcomes[courseOutcomes.length - 1]?.co_code} × ${programOutcomes[0]?.code}–${programOutcomes[programOutcomes.length - 1]?.code} Mapping Matrix`
               : "CO–PO Mapping Matrix"
           }
-          version={matrixData?.po_version || ""}
-          status={isApproved ? "Approved" : matrixData?.mapping_status || "Review Required"}
+          version={matrixData?.po_version || "PO 2025 v1"}
+          status={isApproved ? "Approved" : matrixData?.mapping_status || "Draft"}
           onGenerate={() => handleGenerateCopo()}
           isGenerating={state.generatingCopo}
         />
@@ -918,7 +985,7 @@ const COPOMapping = () => {
         <PageFooter
           batch={!allMapped && !isApproved}
           status={{
-            label: isApproved ? "Approved" : (matrixData?.mapping_status || "Review Required"),
+            label: isApproved ? "Approved" : (matrixData?.mapping_status || "Draft"),
             color: isApproved ? "#16a34a" : "#ea580c",
           }}
           content1={
@@ -926,7 +993,7 @@ const COPOMapping = () => {
               ? `Course: ${state.courseDetail?.course_code} – ${state.courseDetail?.course_title || ""}`
               : ""
           }
-          content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : ""}
+          content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
           actionBtn1={
             isApproved
               ? {

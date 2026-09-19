@@ -135,6 +135,38 @@ export default function CourseCard(props: any) {
 
   const sSyllabus = getStageInfo("extraction", workflowStatus?.step_1_syllabus_extraction, data?.academic_preparation?.syllabus?.state);
   const sCopo = getStageInfo("copo", workflowStatus?.step_2_copo_mapping, data?.academic_preparation?.copo_mapping?.state);
+
+  const activeExtractionVer =
+    syllabusFiles?.find((f: any) => f.is_active)?.version_number ||
+    sSyllabus.ver ||
+    (syllabusFiles && syllabusFiles.length > 0 ? syllabusFiles[syllabusFiles.length - 1]?.version_number : 1);
+
+  // Filter CO-PO versions to only children of the currently active extraction version
+  const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed;
+  let copoStatus = sCopo.status;
+  let copoVer = sCopo.ver;
+  let copoTotalVers = sCopo.totalVers;
+  let copoAvailableVersions = sCopo.availableVersions;
+
+  if (Array.isArray(copoDetailed)) {
+    const matchingChildCopo = copoDetailed.filter(
+      (v: any) => (v.extraction_version_used ?? v.parent_version ?? 1) === activeExtractionVer
+    );
+    if (matchingChildCopo.length === 0) {
+      copoStatus = "not_started";
+      copoVer = undefined;
+      copoTotalVers = 0;
+      copoAvailableVersions = [];
+    } else {
+      const activeMatch =
+        matchingChildCopo.find((v: any) => v.is_active) || matchingChildCopo[matchingChildCopo.length - 1];
+      copoVer = activeMatch.version;
+      copoStatus = activeMatch.status === "approved" ? "approved" : "draft";
+      copoTotalVers = matchingChildCopo.length;
+      copoAvailableVersions = matchingChildCopo.map((v: any) => v.version);
+    }
+  }
+
   const sTopics = getStageInfo("hierarchy", workflowStatus?.step_3_topic_hierarchy, data?.academic_preparation?.topics?.state);
   const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
   const sLesson = getStageInfo("schedule", workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
@@ -154,10 +186,10 @@ export default function CourseCard(props: any) {
     {
       label: "CO-PO MAPPING",
       stageKey: "copo",
-      status: sCopo.status,
-      version: sCopo.ver,
-      totalVersions: sCopo.totalVers,
-      availableVersions: sCopo.availableVersions,
+      status: copoStatus,
+      version: copoVer,
+      totalVersions: copoTotalVers,
+      availableVersions: copoAvailableVersions,
       route: `/neurobe/co-po-mapping?course_id=${targetCourseId}`,
       artifactsTab: "copo",
     },
@@ -231,6 +263,10 @@ export default function CourseCard(props: any) {
   const handleOpenSection = (item: typeof preparations[0]) => {
     if (item.stageKey === "extraction") {
       router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+    } else if (item.stageKey === "copo") {
+      router.push(`/neurobe/co-po-mapping?course_id=${targetCourseId}`);
+    } else if (item.route) {
+      router.push(item.route);
     } else {
       router.push(`/neurobe/course-artifacts?code=${courseCode}&course_id=${targetCourseId}&stage=${item.stageKey}`);
     }
@@ -519,7 +555,7 @@ export default function CourseCard(props: any) {
                         <span>Add</span>
                       </button>
                     ) : (
-                      <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                      <div className="relative inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {item.availableVersions && item.availableVersions.length > 1 ? (
                           <>
                             <button
@@ -563,6 +599,20 @@ export default function CourseCard(props: any) {
                           <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                             v{item.version}
                           </span>
+                        )}
+
+                        {item.stageKey === "copo" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/neurobe/co-po-mapping?course_id=${targetCourseId}`);
+                            }}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-md border border-dashed border-indigo-400 bg-indigo-50/70 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 active:scale-95 transition-all dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                            title="Generate New CO-PO Version"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
                         )}
                       </div>
                     )}

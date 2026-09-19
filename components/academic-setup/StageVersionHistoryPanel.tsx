@@ -87,7 +87,12 @@ export default function StageVersionHistoryPanel({
           .filter((v: any) => v.status === "approved")
           .map((v: any) => v.version);
         setApprovedExtractionVersions(approved);
-        if (approved.length > 0) setSelectedExtractionVer(approved[approved.length - 1]);
+        const activeExtVer = extRes?.active_version || (approved.length > 0 ? approved[approved.length - 1] : 1);
+        if (approved.includes(activeExtVer)) {
+          setSelectedExtractionVer(activeExtVer);
+        } else if (approved.length > 0) {
+          setSelectedExtractionVer(approved[approved.length - 1]);
+        }
       } else if (stage === "pedagogy") {
         const hRes: any = await Models.syllabus.get_versions(courseId, "hierarchy");
         const approved = (hRes?.versions || [])
@@ -370,12 +375,12 @@ export default function StageVersionHistoryPanel({
                     <span>
                       H: v{ver.parent_hierarchy_version || 1} &bull; P: v{ver.parent_pedagogy_version || 1}
                     </span>
-                  ) : ver.parent_version ? (
+                  ) : (ver.parent_version || (ver as any).extraction_version_used) ? (
                     <span>
-                      Source: {stage === "pedagogy" ? "Topics" : "Extraction"} v{ver.parent_version}
+                      Source: {stage === "pedagogy" ? "Topics" : "Extraction"} v{ver.parent_version || (ver as any).extraction_version_used}
                     </span>
                   ) : (
-                    <span>Initial generation</span>
+                    <span>Source: Extraction v1</span>
                   )}
                 </div>
               </div>

@@ -35,7 +35,13 @@ const MappingMatrixHeader = ({
         </span>
       )}
       {status && (
-        <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
+            status.toLowerCase() === "approved"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+              : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"
+          }`}
+        >
           {status}
         </span>
       )}
