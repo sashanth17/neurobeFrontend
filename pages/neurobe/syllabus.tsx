@@ -115,18 +115,28 @@ const Syllabus = () => {
       // Load file versions
       loadFileVersions(course_id);
 
+      const explicitStep = searchParams.get("step");
+      const explicitView = searchParams.get("view");
+      const action = searchParams.get("action");
+
       // If job_id is explicitly passed in URL from an active action, poll it
       if (job_id) {
         try { sessionStorage.setItem(jobKey, String(job_id)); } catch { }
         setStep(3);
         job_Data(job_id);
-      } else if (searchParams.get("step") === "3" || searchParams.get("view") === "review") {
+      } else if (explicitStep === "3" || explicitView === "review") {
         setStep(3);
         const sid = searchParams.get("syllabus_id") || getSavedSyllabusId();
         if (sid) syllabus_detail(sid);
+      } else if (explicitStep === "1" || action === "upload") {
+        // Explicitly routed to upload screen (e.g. from '+' button)
+        setStep(1);
+      } else {
+        // Cold-load or navigation: dynamically restore last left state from live workflow
+        restoreStepFromWorkflow(course_id);
       }
     }
-  }, [course_id, job_id]);
+  }, [course_id, job_id, searchParams]);
 
   // When step 4 is reached, refresh course and syllabus data
   useEffect(() => {
@@ -148,37 +158,52 @@ const Syllabus = () => {
     }
   };
 
-  /** Restore current step from live workflow status on cold-load (browser close/reopen) */
+  /** Restore current step from live workflow status on navigation or cold-load */
   const restoreStepFromWorkflow = async (cid: string) => {
     try {
       const wfRes: any = await Models.syllabus.get_workflow_status(cid);
       const extraction = wfRes?.workflow?.step_1_syllabus_extraction;
-      if (!extraction) return;
+      if (!extraction) {
+        setStep(1);
+        return;
+      }
       const { status } = extraction;
       if (status === "redis_queued" || status === "generating") {
         // Extraction is in-progress — show loading step
         setStep(3);
         setState({ isJobLoading: true });
         const jobId = extraction.job_id;
-        if (jobId) { try { sessionStorage.setItem(jobKey, jobId); } catch { } job_Data(jobId); }
+        if (jobId) { 
+          try { sessionStorage.setItem(jobKey, jobId); } catch { } 
+          job_Data(jobId); 
+        }
       } else if (status === "approved") {
         // Extraction already approved — show Review with Approved state (step 4)
         setStep(4);
         setState({ isJobLoading: false, showReview: true });
-        if (wfRes?.syllabus_id) {
-          try { sessionStorage.setItem(syllabusKey, String(wfRes.syllabus_id)); } catch { }
-          syllabus_detail(wfRes.syllabus_id);
+        const sid = wfRes?.syllabus_id || getSavedSyllabusId();
+        if (sid) {
+          try { sessionStorage.setItem(syllabusKey, String(sid)); } catch { }
+          syllabus_detail(sid);
         }
       } else if (status === "draft") {
         // Extraction in draft — jump to Review & Edit (step 3)
         setStep(3);
         setState({ isJobLoading: false, showReview: true });
-        if (wfRes?.syllabus_id) {
-          try { sessionStorage.setItem(syllabusKey, String(wfRes.syllabus_id)); } catch { }
-          syllabus_detail(wfRes.syllabus_id);
+        const sid = wfRes?.syllabus_id || getSavedSyllabusId();
+        if (sid) {
+          try { sessionStorage.setItem(syllabusKey, String(sid)); } catch { }
+          syllabus_detail(sid);
         }
+      } else {
+        // Not started or only file uploaded without extraction — stay on Step 1
+        setStep(1);
+        setState({ isJobLoading: false });
       }
-    } catch { /* ignore — just stay on step 1 */ }
+    } catch (err) {
+      console.warn("restoreStepFromWorkflow error:", err);
+      setStep(1);
+    }
   };
 
   /** Load all versioned file uploads for the course */
@@ -421,7 +446,7 @@ const Syllabus = () => {
             } catch { }
           }
 
-          setState({ isJobLoading: false });
+          setState({ isJobLoading: false, showReview: true });
 
           // Populate jobData from extracted job result immediately
           if (res?.result) {

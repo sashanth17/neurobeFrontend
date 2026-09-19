@@ -161,7 +161,11 @@ const MyAssignedCourses = () => {
               {...card}
               onOpenCourse={() => onAction(card)}
               onTriggerStage={(stageKey) => {
-                router.push(`/neurobe/ins-course-artifacts?code=${card.code}&stage=${stageKey}`);
+                if (stageKey === "extraction") {
+                  router.push(`/neurobe/syllabus?course_id=${(card as any).id || (card as any).course_id || card.code}`);
+                } else {
+                  router.push(`/neurobe/ins-course-artifacts?code=${card.code}&stage=${stageKey}`);
+                }
               }}
             />
           ))}

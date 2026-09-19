@@ -413,6 +413,16 @@ const syllabus = {
         });
     },
 
+    /** Activate a specific syllabus file version */
+    activateFileVersion: (courseId: string | number, versionNumber: number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .post(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/activate`)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
 }
 
 export default syllabus;

@@ -253,6 +253,27 @@ export default function CourseCard(props: any) {
     }
   };
 
+  // Syllabus file version activation
+  const handleActivateSyllabusVersion = async (newVer: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setActionLoading("extraction");
+      try {
+        await (Models.syllabus as any).activateFileVersion(targetCourseId, newVer);
+      } catch {
+        await Models.syllabus.activate_version(targetCourseId, "extraction", newVer);
+      }
+      Success(`Activated Version ${newVer} for SYLLABUS`);
+      await refetch();
+      setActiveMenu(null);
+    } catch (err: any) {
+      console.error("Failed to activate syllabus version:", err);
+      Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${newVer}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // Extract from specific syllabus file version directly from card
   const handleExtractFromFile = async (fileVersionId: number, versionNum: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -393,80 +414,91 @@ export default function CourseCard(props: any) {
 
                     {/* Version Selector Pill right on the card */}
                     {item.stageKey === "extraction" ? (
-                      <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                      <div className="relative inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {(!syllabusFiles || syllabusFiles.length === 0) ? (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+                              router.push(`/neurobe/syllabus?course_id=${targetCourseId}&step=1`);
                             }}
-                            className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-indigo-400 bg-indigo-50/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
-                            title="Upload Syllabus PDF"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-indigo-400 bg-indigo-50/70 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 active:scale-95 transition-all dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                            title="Add Syllabus"
                           >
-                            <Plus className="h-2.5 w-2.5" />
-                            <span>Upload</span>
+                            <Plus className="h-3.5 w-3.5" />
                           </button>
                         ) : (
                           <>
+                            {/* Version Dropdown */}
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setActiveMenu(isMenuOpen ? null : item.stageKey);
                               }}
-                              className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-indigo-100 hover:text-indigo-700 dark:bg-slate-700 dark:text-slate-300"
-                              title="Click to view file versions"
+                              className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all dark:bg-slate-700 dark:text-slate-300"
+                              title="Click to toggle version"
                             >
-                              <span>v{sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1}</span>
-                              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                              <span>
+                                v{syllabusFiles.find((f: any) => f.is_active)?.version_number || sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1}
+                              </span>
+                              <ChevronDown className="h-3 w-3 opacity-60" />
                             </button>
 
-                            {/* Syllabus File Version Dropdown */}
+                            {/* Plus Button to add another version */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/neurobe/syllabus?course_id=${targetCourseId}&step=1`);
+                              }}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-indigo-400 bg-indigo-50/70 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 active:scale-95 transition-all dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                              title="Upload New Version"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+
+                            {/* Syllabus File Version Dropdown Menu */}
                             {isMenuOpen && (
-                              <div className="absolute left-0 top-full z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                                <div className="mb-1.5 flex items-center justify-between px-1 text-[10px] font-bold text-slate-400">
-                                  <span>Syllabus Files ({syllabusFiles.length})</span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
-                                    }}
-                                    className="font-bold text-indigo-600 hover:underline dark:text-indigo-400"
-                                  >
-                                    + Upload New
-                                  </button>
+                              <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                                <div className="mb-1 px-2 py-1 text-[10px] font-bold text-slate-400">
+                                  Select Active Version
                                 </div>
-                                <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
-                                  {syllabusFiles.map((fv) => (
-                                    <div
-                                      key={fv.id}
-                                      className="flex items-center justify-between rounded-lg p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/60"
-                                    >
-                                      <div className="min-w-0 flex-1 pr-1.5">
-                                        <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                          <span className="mr-1 rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                            v{fv.version_number}
-                                          </span>
-                                          {fv.original_filename}
-                                        </p>
-                                        <p className="text-[9px] text-slate-400">
-                                          {fv.uploaded_by}
-                                        </p>
-                                      </div>
+                                <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+                                  {syllabusFiles.map((fv: any) => {
+                                    const currentActiveVer = syllabusFiles.find((f: any) => f.is_active)?.version_number || sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1;
+                                    const isCurrent = fv.version_number === currentActiveVer;
+                                    return (
                                       <button
+                                        key={fv.id || fv.version_number}
                                         type="button"
                                         disabled={actionLoading === "extraction"}
-                                        onClick={(e) => handleExtractFromFile(fv.id, fv.version_number, e)}
-                                        className="flex shrink-0 items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm hover:bg-indigo-700 active:scale-95 disabled:opacity-60"
-                                        title={`Extract from v${fv.version_number}`}
+                                        onClick={(e) => handleActivateSyllabusVersion(fv.version_number, e)}
+                                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-all ${
+                                          isCurrent
+                                            ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
+                                            : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                                        }`}
                                       >
-                                        <Sparkles className="h-2.5 w-2.5" />
-                                        <span>Extract</span>
+                                        <div className="min-w-0 pr-1">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-bold">v{fv.version_number}</span>
+                                            {isCurrent && (
+                                              <span className="rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
+                                                Active
+                                              </span>
+                                            )}
+                                          </div>
+                                          {fv.original_filename && (
+                                            <span className="block truncate text-[10px] text-slate-400">
+                                              {fv.original_filename}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {isCurrent && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />}
                                       </button>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -567,7 +599,13 @@ export default function CourseCard(props: any) {
 
       {/* 5. Next Action Banner */}
       <div
-        onClick={() => router.push(`/neurobe/course-artifacts?code=${courseCode}&course_id=${targetCourseId}`)}
+        onClick={() => {
+          if (computedNextAction.toLowerCase().includes("syllabus")) {
+            router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
+          } else {
+            router.push(`/neurobe/course-artifacts?code=${courseCode}&course_id=${targetCourseId}`);
+          }
+        }}
         className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-800 transition-all hover:bg-amber-100/70 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300"
       >
         <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
