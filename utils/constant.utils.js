@@ -729,3 +729,45 @@ export const RECORDS_FOR_ADMIN = [
     label: "Not Own Records",
   },
 ];
+
+// ─── AI Generation Stage Status Constants ────────────────────────────────────
+// Mirrors backend GenerationTaskStatusEnum (shared/models/course/enums.py)
+export const AI_GENERATION_STATUS = {
+  NOT_STARTED: "not_started",
+  REDIS_QUEUED: "redis_queued",
+  GENERATING: "generating",
+  DRAFT: "draft",
+  APPROVED: "approved",
+  CANCELLED_BY_USER: "cancelled_by_user",
+  CANCELLED_BY_SERVER: "cancelled_by_server",
+  FAILED: "failed",
+};
+
+/** Statuses that mean a job is still running (should keep polling) */
+export const AI_ACTIVE_STATUSES = [
+  AI_GENERATION_STATUS.REDIS_QUEUED,
+  AI_GENERATION_STATUS.GENERATING,
+];
+
+/** Statuses that mean generation completed and output is available for review */
+export const AI_DONE_STATUSES = [
+  AI_GENERATION_STATUS.DRAFT,
+  AI_GENERATION_STATUS.APPROVED,
+];
+
+/** Statuses that mean something went wrong and the user can retry */
+export const AI_ERROR_STATUSES = [
+  AI_GENERATION_STATUS.FAILED,
+  AI_GENERATION_STATUS.CANCELLED_BY_USER,
+  AI_GENERATION_STATUS.CANCELLED_BY_SERVER,
+];
+
+/** Returns true if the given status represents an in-progress job */
+export const isAIStatusActive = (status) =>
+  AI_ACTIVE_STATUSES.includes(status);
+
+/** Returns true if generation is complete and reviewable */
+export const isAIStatusDone = (status) => AI_DONE_STATUSES.includes(status);
+
+/** Returns true if the job failed or was cancelled */
+export const isAIStatusError = (status) => AI_ERROR_STATUSES.includes(status);

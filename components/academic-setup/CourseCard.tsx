@@ -48,6 +48,22 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; cell
     icon: <Clock className="h-4 w-4 text-sky-500 animate-pulse" />,
     cell: "bg-sky-50/60 border border-sky-300 dark:bg-sky-950/30",
   },
+  // Error / terminal states
+  failed: {
+    label: "Failed",
+    icon: <AlertCircle className="h-4 w-4 text-red-500" />,
+    cell: "bg-red-50/60 border border-red-200 dark:bg-red-950/20 dark:border-red-800",
+  },
+  cancelled_by_user: {
+    label: "Cancelled",
+    icon: <AlertCircle className="h-4 w-4 text-slate-400" />,
+    cell: "bg-slate-50 border border-slate-200 dark:bg-slate-900/20 dark:border-slate-700",
+  },
+  cancelled_by_server: {
+    label: "Cancelled",
+    icon: <AlertCircle className="h-4 w-4 text-slate-400" />,
+    cell: "bg-slate-50 border border-slate-200 dark:bg-slate-900/20 dark:border-slate-700",
+  },
 };
 
 export default function CourseCard(props: any) {
@@ -625,7 +641,8 @@ export default function CourseCard(props: any) {
                     <RotateCw className="h-4 w-4 animate-spin text-indigo-500" />
                   ) : (
                     <>
-                      {/* Quick Regenerate button on supported AI stages */}
+                      {/* Quick Regenerate button on supported AI stages — visible on hover;
+                   also shown on failed/cancelled so users can retry inline */}
                       {["hierarchy", "copo", "pedagogy", "schedule"].includes(item.stageKey) &&
                         item.status !== "not_started" && (
                           <button

@@ -102,6 +102,8 @@ const Syllabus = () => {
     isUploadingFile: false,
     pendingUploadFile: null as File | null,
     extractingFileVersionId: null as number | null,
+    // Extraction error state — set when a job fails or is cancelled
+    extractionError: null as string | null,
   });
 
   useEffect(() => {
@@ -171,7 +173,7 @@ const Syllabus = () => {
       if (status === "redis_queued" || status === "generating") {
         // Extraction is in-progress — show loading step
         setStep(3);
-        setState({ isJobLoading: true });
+        setState({ isJobLoading: true, extractionError: null });
         const jobId = extraction.job_id;
         if (jobId) { 
           try { sessionStorage.setItem(jobKey, jobId); } catch { } 
@@ -180,7 +182,7 @@ const Syllabus = () => {
       } else if (status === "approved") {
         // Extraction already approved — show Review with Approved state (step 4)
         setStep(4);
-        setState({ isJobLoading: false, showReview: true });
+        setState({ isJobLoading: false, showReview: true, extractionError: null });
         const sid = wfRes?.syllabus_id || getSavedSyllabusId();
         if (sid) {
           try { sessionStorage.setItem(syllabusKey, String(sid)); } catch { }
@@ -189,16 +191,20 @@ const Syllabus = () => {
       } else if (status === "draft") {
         // Extraction in draft — jump to Review & Edit (step 3)
         setStep(3);
-        setState({ isJobLoading: false, showReview: true });
+        setState({ isJobLoading: false, showReview: true, extractionError: null });
         const sid = wfRes?.syllabus_id || getSavedSyllabusId();
         if (sid) {
           try { sessionStorage.setItem(syllabusKey, String(sid)); } catch { }
           syllabus_detail(sid);
         }
+      } else if (status === "failed" || status?.startsWith("cancelled")) {
+        // Extraction failed or was cancelled — stay on Step 1 with an error banner
+        setStep(1);
+        setState({ isJobLoading: false, extractionError: status });
       } else {
         // Not started or only file uploaded without extraction — stay on Step 1
         setStep(1);
-        setState({ isJobLoading: false });
+        setState({ isJobLoading: false, extractionError: null });
       }
     } catch (err) {
       console.warn("restoreStepFromWorkflow error:", err);
@@ -461,7 +467,13 @@ const Syllabus = () => {
           stopPolling();
         } else if (res?.status === "failed" || wfExtraction?.status === "failed") {
           console.log("Job marked as failed");
-          setState({ isJobLoading: false });
+          setState({ isJobLoading: false, extractionError: "failed" });
+          stopPolling();
+        } else if (
+          wfExtraction?.status?.startsWith("cancelled")
+        ) {
+          console.log("Job was cancelled:", wfExtraction.status);
+          setState({ isJobLoading: false, extractionError: wfExtraction.status });
           stopPolling();
         } else {
           console.log(`Job status: ${res?.status || wfExtraction?.status || "processing"}, continuing to poll...`);
@@ -884,7 +896,36 @@ const Syllabus = () => {
               description={`Upload one or more syllabus PDF versions, then press Extract on any version to start AI extraction.`}
             />
 
-            {state.courseData?.latest_syllabus?.id && (
+            {/* Extraction error / cancelled banner */}
+            {state.extractionError && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50/70 p-3.5 dark:border-red-800/50 dark:bg-red-950/30">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <RotateCw className="h-5 w-5 shrink-0 text-red-500" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-red-800 dark:text-red-200">
+                      {state.extractionError === "failed"
+                        ? "Extraction Failed"
+                        : "Extraction Cancelled"}
+                    </p>
+                    <p className="text-[11px] text-red-600 dark:text-red-400 truncate">
+                      {state.extractionError === "failed"
+                        ? "The AI extraction encountered an error. Please try again with the same or a new file."
+                        : "The extraction was cancelled. You can retry by clicking Extract on any file below."}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setState({ extractionError: null })}
+                  className="shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 shadow-sm hover:bg-red-50 active:scale-95 dark:border-red-700 dark:bg-red-950 dark:text-red-300"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {/* Previously extracted syllabus available banner */}
+            {state.courseData?.latest_syllabus?.id && !state.extractionError && (
               <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-800/50 dark:bg-emerald-950/30">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
