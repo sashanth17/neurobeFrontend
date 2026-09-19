@@ -22,9 +22,11 @@ interface UnitTopicsProps {
     body: { topic_code: string; topic_name: string ,learning_sequence:any}
   ) => Promise<void>;
   onDeleteTopic?: any;
+  onUpdateHours?: (unitId: number, hours: number) => Promise<void>;
+  onUpdateUnitTitle?: (unitId: number, title: string) => Promise<void>;
 }
 
-const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
+const UnitTopics = ({ data, onAddTopic, onDeleteTopic, onUpdateHours, onUpdateUnitTitle }: UnitTopicsProps) => {
   const [units, setUnits] = useState<Unit[]>(data || []);
   console.log("✌️data --->", data);
 
@@ -93,10 +95,30 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
     );
   };
 
-  const updateHours = (unitNumber: number, hours: number) => {
-    setUnits((prev) =>
-      prev.map((u) => (u.unitNumber === unitNumber ? { ...u, hours } : u))
+  const updateHours = (unit: any, hours: number) => {
+    setUnits((prev: any) =>
+      prev.map((u: any) =>
+        u.id === unit.id || (unit.unit_number && u.unit_number === unit.unit_number)
+          ? { ...u, theory_hours: hours, hours }
+          : u
+      )
     );
+    if (onUpdateHours && unit.id != null) {
+      onUpdateHours(unit.id, hours);
+    }
+  };
+
+  const updateTitle = (unit: any, title: string) => {
+    setUnits((prev: any) =>
+      prev.map((u: any) =>
+        u.id === unit.id || (unit.unit_number && u.unit_number === unit.unit_number)
+          ? { ...u, unit_title: title, title }
+          : u
+      )
+    );
+    if (onUpdateUnitTitle && unit.id != null) {
+      onUpdateUnitTitle(unit.id, title);
+    }
   };
 
   if (!units || units.length === 0) {
@@ -218,29 +240,21 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
                   Unit {String(unit.unit_number).padStart(2, "0")}
                 </span>
                 <input
-                  value={unit.unit_title}
-                  onChange={(e) =>
-                    setUnits((prev) =>
-                      prev.map((u: any) =>
-                        u.unit_number === unit.unit_number
-                          ? { ...u, title: e.target.value }
-                          : u
-                      )
-                    )
-                  }
-                  size={unit.unit_title?.length || 1}
+                  value={unit.unit_title ?? unit.title ?? ""}
+                  onChange={(e) => updateTitle(unit, e.target.value)}
+                  size={unit.unit_title?.length || unit.title?.length || 1}
                   className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-[#000] outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                 />
                 <div className="ml-auto flex shrink-0 items-center gap-2">
-                  <span className="text-pri text-sm">Hours:</span>
+                  <span className="text-pri text-sm font-semibold">Hours:</span>
                   <input
-                    disabled
                     type="number"
+                    min="0"
                     value={Number(unit.theory_hours ?? unit.hours ?? 0)}
                     onChange={(e) =>
-                      updateHours(unit.unitNumber, Number(e.target.value))
+                      updateHours(unit, Math.max(0, Number(e.target.value)))
                     }
-                    className="w-14 rounded-lg border border-gray-200 py-1.5 text-center text-sm font-bold tabular-nums text-[#000] [appearance:textfield] dark:border-gray-600 dark:bg-gray-800 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-center text-sm font-bold tabular-nums text-[#000] focus:border-color2 focus:ring-1 focus:ring-color2 outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
               </div>

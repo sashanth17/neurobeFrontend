@@ -226,6 +226,25 @@ const syllabus = {
         return promise;
     },
 
+    update_unit: (unit_id: string | number, data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/units/${unit_id}`;
+            commonInstance()
+                .put(url, data)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
+
     create_unit_outcome: (syllabus_id: string | number, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/outcomes`;

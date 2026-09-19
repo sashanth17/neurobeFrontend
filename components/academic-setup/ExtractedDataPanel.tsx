@@ -35,6 +35,8 @@ const ExtractedDataPanel = (props) => {
     handleSaveOutcome,
     handleAcceptOutcome,
     handleKnowledgeLevelChange,
+    onUpdateUnitHours,
+    onUpdateUnitTitle,
     syllabusId,
   } = props;
   console.log("data", data);
@@ -200,6 +202,8 @@ const ExtractedDataPanel = (props) => {
             data={data?.units}
             onAddTopic={onAddTopic}
             onDeleteTopic={onDeleteTopic}
+            onUpdateHours={onUpdateUnitHours}
+            onUpdateUnitTitle={onUpdateUnitTitle}
           />
         </div>
 

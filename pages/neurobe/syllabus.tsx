@@ -292,7 +292,7 @@ const Syllabus = () => {
       co_code: co.co_code || co.coCode || `CO${idx + 1}`,
       description: co.description || co.statement || "",
       knowledge_level: co.knowledge_level || co.knowledgeLevel || co.bloomLevel || "K2",
-      is_accepted: co.is_accepted ?? true,
+      is_accepted: co.is_accepted ?? false,
       reason_for_inferred_level: co.reason_for_inferred_level || co.reason || "",
     }));
 
@@ -710,6 +710,50 @@ const Syllabus = () => {
     }
   };
 
+  const handleUpdateUnitHours = async (unitId: number, hours: number) => {
+    setState((prev: any) => ({
+      ...prev,
+      jobData: {
+        ...prev.jobData,
+        units: prev.jobData?.units?.map((u: any) =>
+          u.id === unitId ? { ...u, theory_hours: hours, hours } : u
+        ),
+      },
+    }));
+
+    try {
+      await Models.syllabus.update_unit(unitId, { theory_hours: hours });
+      Success("Unit hours updated");
+      if (state.courseData?.latest_syllabus?.id) {
+        syllabus_detail(state.courseData.latest_syllabus.id);
+      }
+    } catch (error: any) {
+      console.log("update_unit hours error (preserved in draft):", error);
+    }
+  };
+
+  const handleUpdateUnitTitle = async (unitId: number, title: string) => {
+    setState((prev: any) => ({
+      ...prev,
+      jobData: {
+        ...prev.jobData,
+        units: prev.jobData?.units?.map((u: any) =>
+          u.id === unitId ? { ...u, unit_title: title, title } : u
+        ),
+      },
+    }));
+
+    try {
+      await Models.syllabus.update_unit(unitId, { unit_title: title });
+      Success("Unit title updated");
+      if (state.courseData?.latest_syllabus?.id) {
+        syllabus_detail(state.courseData.latest_syllabus.id);
+      }
+    } catch (error: any) {
+      console.log("update_unit title error (preserved in draft):", error);
+    }
+  };
+
   const syllabus_status = async () => {
     try {
       const body = {
@@ -990,6 +1034,8 @@ const Syllabus = () => {
                       handleSaveOutcome={handleSaveOutcome}
                       handleAcceptOutcome={handleAcceptOutcome}
                       handleKnowledgeLevelChange={handleKnowledgeLevelChange}
+                      onUpdateUnitHours={handleUpdateUnitHours}
+                      onUpdateUnitTitle={handleUpdateUnitTitle}
                       syllabusId={state.courseData?.latest_syllabus?.id}
                     />
 

@@ -116,11 +116,11 @@ export default function CourseCard(props: any) {
   ) => {
     const status = wfItem?.status || fallbackState || "not_started";
     const hasVersions =
-      status !== "not_started" &&
-      ((wfItem?.total_versions !== undefined && wfItem.total_versions > 0) ||
-        (wfItem?.active_version !== undefined && wfItem.active_version > 0));
+      (wfItem?.total_versions !== undefined && wfItem.total_versions > 0) ||
+      (wfItem?.available_versions && wfItem.available_versions.length > 0) ||
+      (wfItem?.active_version !== undefined && wfItem.active_version > 0 && status !== "not_started");
     const ver = hasVersions ? (wfItem?.active_version || 1) : null;
-    const totalVers = hasVersions ? (wfItem?.total_versions || 1) : 0;
+    const totalVers = hasVersions ? (wfItem?.total_versions || wfItem?.available_versions?.length || 1) : 0;
     // Derive real available versions: strictly what backend reports or 1..totalVers, never synthesize beyond totalVers
     const availableVersions: number[] =
       hasVersions
