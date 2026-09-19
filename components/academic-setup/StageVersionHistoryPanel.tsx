@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
   RotateCw,
@@ -36,6 +36,8 @@ interface StageVersionHistoryPanelProps {
     pedagogy_version?: number;
   }) => Promise<void> | void;
   isGenerating?: boolean;
+  refreshTrigger?: any;
+  onExtractionChange?: (ver: number | null) => void;
 }
 
 export default function StageVersionHistoryPanel({
@@ -45,6 +47,8 @@ export default function StageVersionHistoryPanel({
   onVersionActivated,
   onGenerateNew,
   isGenerating = false,
+  refreshTrigger,
+  onExtractionChange,
 }: StageVersionHistoryPanelProps) {
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [activeVersion, setActiveVersion] = useState<number>(1);
@@ -83,15 +87,23 @@ export default function StageVersionHistoryPanel({
     try {
       if (stage === "copo" || stage === "hierarchy") {
         const extRes: any = await Models.syllabus.get_versions(courseId, "extraction");
-        const approved = (extRes?.versions || [])
+        const approved: number[] = (extRes?.versions || [])
           .filter((v: any) => v.status === "approved")
-          .map((v: any) => v.version);
+          .map((v: any) => Number(v.version))
+          .sort((a: number, b: number) => a - b);
         setApprovedExtractionVersions(approved);
-        const activeExtVer = extRes?.active_version || (approved.length > 0 ? approved[approved.length - 1] : 1);
-        if (approved.includes(activeExtVer)) {
-          setSelectedExtractionVer(activeExtVer);
-        } else if (approved.length > 0) {
-          setSelectedExtractionVer(approved[approved.length - 1]);
+        if (approved.length === 0) {
+          // No approved extractions — clear selection; block is enforced by canGenerate()
+          setSelectedExtractionVer(null);
+          onExtractionChange?.(null);
+          return;
+        }
+        const activeExtVer = extRes?.active_version ? Number(extRes.active_version) : approved[0];
+        let chosenVer = selectedExtractionVer;
+        if (!chosenVer || !approved.includes(chosenVer)) {
+          chosenVer = approved.includes(activeExtVer) ? activeExtVer : approved[0];
+          setSelectedExtractionVer(chosenVer);
+          onExtractionChange?.(chosenVer);
         }
       } else if (stage === "pedagogy") {
         const hRes: any = await Models.syllabus.get_versions(courseId, "hierarchy");
@@ -126,6 +138,24 @@ export default function StageVersionHistoryPanel({
       loadUpstreamApproved();
     }
   }, [courseId, stage]);
+
+  // Auto-update this section as soon as generation completes
+  const prevGenerating = useRef(isGenerating);
+  useEffect(() => {
+    if (prevGenerating.current && !isGenerating && courseId) {
+      loadVersions();
+      loadUpstreamApproved();
+    }
+    prevGenerating.current = isGenerating;
+  }, [isGenerating, courseId]);
+
+  // Explicit refresh trigger from parent
+  useEffect(() => {
+    if (refreshTrigger !== undefined && courseId) {
+      loadVersions();
+      loadUpstreamApproved();
+    }
+  }, [refreshTrigger, courseId]);
 
   const handleActivate = async (ver: number) => {
     try {
@@ -202,6 +232,17 @@ export default function StageVersionHistoryPanel({
 
   const allowed = canGenerate();
 
+  // Filter versions by the selected extraction version (tactics identical to CourseCard)
+  const displayedVersions =
+    (stage === "copo" || stage === "hierarchy") && selectedExtractionVer
+      ? versions.filter(
+          (ver) => (ver.parent_version ?? (ver as any).extraction_version_used ?? 1) === selectedExtractionVer
+        )
+      : versions;
+
+  const activeChild = displayedVersions.find((v) => v.is_active) || displayedVersions.find((v) => v.version === activeVersion);
+  const effectiveActiveDisplayVer = activeChild?.version || activeVersion;
+
   return (
     <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       {/* Header */}
@@ -215,7 +256,17 @@ export default function StageVersionHistoryPanel({
               {stageLabel} Version Control & History
             </h4>
             <p className="text-[11px] text-slate-500">
-              Active version: <span className="font-bold text-indigo-600 dark:text-indigo-400">v{activeVersion}</span> &bull; {versions.length} total version{versions.length === 1 ? "" : "s"}
+              {displayedVersions.length > 0 ? (
+                <>
+                  Active version:{" "}
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                    v{effectiveActiveDisplayVer}
+                  </span>{" "}
+                  &bull; {displayedVersions.length} total version{displayedVersions.length === 1 ? "" : "s"}
+                </>
+              ) : (
+                <>{selectedExtractionVer ? `No versions for Extraction v${selectedExtractionVer} yet` : "No versions generated yet"}</>
+              )}
             </p>
           </div>
         </div>
@@ -235,7 +286,11 @@ export default function StageVersionHistoryPanel({
                   <span className="font-medium text-slate-500">Using Extraction:</span>
                   <select
                     value={selectedExtractionVer ?? ""}
-                    onChange={(e) => setSelectedExtractionVer(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setSelectedExtractionVer(v);
+                      onExtractionChange?.(v);
+                    }}
                     className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
                     {approvedExtractionVersions.map((v) => (
@@ -322,14 +377,14 @@ export default function StageVersionHistoryPanel({
 
       {/* Version Cards Carousel / Row */}
       <div className="mt-3 flex items-center gap-3 overflow-x-auto pb-1">
-        {versions.length === 0 && !loadingVersions && (
+        {displayedVersions.length === 0 && !loadingVersions && (
           <div className="flex w-full items-center justify-center py-4 text-xs text-slate-400">
-            No versions generated yet. Generate Version 1 above to begin.
+            No versions generated for Extraction v{selectedExtractionVer} yet. Click Generate v{versions.length + 1} above to begin.
           </div>
         )}
 
-        {versions.map((ver) => {
-          const isActive = ver.is_active || ver.version === activeVersion;
+        {displayedVersions.map((ver) => {
+          const isActive = ver.is_active || ver.version === effectiveActiveDisplayVer;
           const isApproved = ver.status === "approved";
           const isActivating = activatingVersion === ver.version;
 
@@ -375,12 +430,10 @@ export default function StageVersionHistoryPanel({
                     <span>
                       H: v{ver.parent_hierarchy_version || 1} &bull; P: v{ver.parent_pedagogy_version || 1}
                     </span>
-                  ) : (ver.parent_version || (ver as any).extraction_version_used) ? (
-                    <span>
-                      Source: {stage === "pedagogy" ? "Topics" : "Extraction"} v{ver.parent_version || (ver as any).extraction_version_used}
-                    </span>
                   ) : (
-                    <span>Source: Extraction v1</span>
+                    <span>
+                      Source: {stage === "pedagogy" ? "Topics" : "Extraction"} v{Number(ver.parent_version ?? (ver as any).extraction_version_used ?? selectedExtractionVer ?? 1)}
+                    </span>
                   )}
                 </div>
               </div>

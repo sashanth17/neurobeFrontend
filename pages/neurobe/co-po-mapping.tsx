@@ -125,6 +125,9 @@ const COPOMapping = () => {
     updatingCell: false,
     savingDraft: false,
     approvingMap: false,
+    versionRefreshKey: 0,
+    selectedExtractionVer: null as number | null,
+    copoVersionsDetailed: [] as any[],
   });
 
   useEffect(() => {
@@ -153,8 +156,20 @@ const COPOMapping = () => {
     if (course_id) {
       getCourseDetails();
       restoreWorkflowState(course_id);
+      loadCopoVersions(course_id);
     }
   }, [course_id]);
+
+  const loadCopoVersions = async (cid: string | number) => {
+    try {
+      const res: any = await Models.syllabus.get_versions(cid, "copo");
+      if (res?.versions) {
+        setState({ copoVersionsDetailed: res.versions });
+      }
+    } catch (e) {
+      console.warn("loadCopoVersions error:", e);
+    }
+  };
 
   // API integrations
   const getAllCourse = async (orgId?: any) => {
@@ -224,6 +239,10 @@ const COPOMapping = () => {
       const copoStep = wfRes?.workflow?.step_2_copo_mapping;
       if (!copoStep) return;
 
+      if (copoStep.versions_detailed) {
+        setState({ copoVersionsDetailed: copoStep.versions_detailed });
+      }
+
       const { status, job_id } = copoStep;
       if (status === "redis_queued" || status === "generating") {
         setState({ generatingCopo: true });
@@ -257,21 +276,26 @@ const COPOMapping = () => {
           setState({
             generatingCopo: false,
             mappingApproved: currentStatus === "approved",
+            versionRefreshKey: Date.now(),
           });
           const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
+          await loadCopoVersions(cid);
+          await getCourseDetails();
           await getCOPOMatrix(sid);
           Success("CO-PO mapping generated successfully with NEURO AI!");
         } else if (attempts >= maxAttempts) {
           stopPolling();
-          setState({ generatingCopo: false });
+          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
           const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
+          await loadCopoVersions(cid);
+          await getCourseDetails();
           await getCOPOMatrix(sid);
         }
       } catch (pollErr) {
         console.warn("COPO polling error:", pollErr);
         if (attempts >= maxAttempts) {
           stopPolling();
-          setState({ generatingCopo: false });
+          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
         }
       }
     }, 3000);
@@ -283,10 +307,11 @@ const COPOMapping = () => {
       Failure("No syllabus found for this course. Please upload a syllabus first.");
       return;
     }
+    const extVerToUse = parentParams?.extraction_version ?? state.selectedExtractionVer;
     try {
       setState({ generatingCopo: true });
       const res: any = await Models.COPOMap.generate_copo(sid, {
-        extraction_version: parentParams?.extraction_version,
+        extraction_version: extVerToUse,
       });
       Success("CO-PO mapping generation started with NEURO AI!");
       startPolling(course_id || sid, res?.job_id);
@@ -302,6 +327,10 @@ const COPOMapping = () => {
     if (sid) {
       await getCOPOMatrix(sid);
     }
+    if (course_id) {
+      await loadCopoVersions(course_id);
+      await restoreWorkflowState(course_id);
+    }
   };
 
   // Matrix data resolution
@@ -311,7 +340,21 @@ const COPOMapping = () => {
   const matrix = matrixData?.matrix || {};
   const summary = matrixData?.summary;
 
-  const isApproved = state.mappingApproved || matrixData?.mapping_status === "Approved";
+  // Filter CO-PO versions by selected extraction version (tactics identical to CourseCard)
+  const currentExtVer = state.selectedExtractionVer;
+  const matchingChildCopo = currentExtVer
+    ? (state.copoVersionsDetailed || []).filter(
+        (v: any) => Number(v.extraction_version_used ?? v.parent_version ?? 1) === Number(currentExtVer)
+      )
+    : state.copoVersionsDetailed || [];
+
+  const activeChild =
+    matchingChildCopo.find((v: any) => v.is_active) ||
+    (matchingChildCopo.length > 0 ? matchingChildCopo[matchingChildCopo.length - 1] : null);
+
+  const activeChildApproved = activeChild?.status === "approved";
+  const displayStatus = matchingChildCopo.length === 0 ? "Draft" : (activeChildApproved ? "Approved" : "Draft");
+  const isApproved = state.mappingApproved || activeChildApproved || matrixData?.mapping_status === "Approved";
   const allMapped = state.approvedMappings.length > 0;
 
   // Direct cell cycle handler (0 -> 1 -> 2 -> 3 -> 0)
@@ -586,9 +629,19 @@ const COPOMapping = () => {
 
       console.log("Calling approve_map with syllabus_id:", sid, "payload:", payload);
       await Models.COPOMap.approve_map(sid, payload);
+      try {
+        await Models.syllabus.approve_stage(course_id || sid, "copo");
+      } catch (e) {
+        console.warn("approve_stage warning:", e);
+      }
       Success("CO-PO mapping approved successfully");
-      setState({ mappingApproved: true, approvingMap: false });
-      getCOPOMatrix(sid);
+      setState({ mappingApproved: true, approvingMap: false, versionRefreshKey: Date.now() });
+      if (course_id) {
+        await loadCopoVersions(course_id);
+        await restoreWorkflowState(course_id);
+      }
+      await getCourseDetails();
+      await getCOPOMatrix(sid);
     } catch (error: any) {
       console.log("error approving map", error);
       setState({ approvingMap: false });
@@ -757,12 +810,15 @@ const COPOMapping = () => {
 
       {course_id && (
         <StageVersionHistoryPanel
+          key={state.versionRefreshKey}
           stage="copo"
           stageLabel="CO-PO Mapping"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
           onGenerateNew={handleGenerateCopo}
           isGenerating={state.generatingCopo}
+          refreshTrigger={state.versionRefreshKey}
+          onExtractionChange={(extVer) => setState({ selectedExtractionVer: extVer })}
         />
       )}
 
@@ -775,23 +831,25 @@ const COPOMapping = () => {
               : "CO–PO Mapping Matrix"
           }
           version={matrixData?.po_version || "PO 2025 v1"}
-          status={isApproved ? "Approved" : matrixData?.mapping_status || "Draft"}
+          status={displayStatus}
           onGenerate={() => handleGenerateCopo()}
           isGenerating={state.generatingCopo}
         />
 
-        {courseOutcomes.length === 0 && !state.loading ? (
+        {(courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0)) && !state.loading ? (
           <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
             <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
             <h4 className="text-base font-bold text-gray-900 dark:text-white">
-              No CO-PO Mapping Generated Yet
+              {state.selectedExtractionVer && matchingChildCopo.length === 0
+                ? `No CO-PO Mapping Generated Yet for Extraction v${state.selectedExtractionVer}`
+                : "No CO-PO Mapping Generated Yet"}
             </h4>
             <p className="mt-1 text-sm text-gray-500 max-w-md">
-              Generate AI-assisted mapping between approved Course Outcomes and Program Outcomes with academic rationales.
+              Generate AI-assisted mapping between approved Course Outcomes from Extraction v{state.selectedExtractionVer || 1} and Program Outcomes with academic rationales.
             </p>
             <button
               type="button"
-              onClick={() => handleGenerateCopo()}
+              onClick={() => handleGenerateCopo({ extraction_version: state.selectedExtractionVer || 1 })}
               disabled={state.generatingCopo}
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
             >
@@ -803,7 +861,7 @@ const COPOMapping = () => {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  <span>Generate CO-PO Mapping with AI</span>
+                  <span>Generate CO-PO Mapping (Extraction v{state.selectedExtractionVer || 1})</span>
                 </>
               )}
             </button>
@@ -983,10 +1041,10 @@ const COPOMapping = () => {
 
       <div className="mt-4">
         <PageFooter
-          batch={!allMapped && !isApproved}
+          batch={!allMapped && displayStatus !== "Approved"}
           status={{
-            label: isApproved ? "Approved" : (matrixData?.mapping_status || "Draft"),
-            color: isApproved ? "#16a34a" : "#ea580c",
+            label: displayStatus,
+            color: displayStatus === "Approved" ? "#16a34a" : "#ea580c",
           }}
           content1={
             state.courseDetail?.course_code
@@ -995,7 +1053,7 @@ const COPOMapping = () => {
           }
           content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
           actionBtn1={
-            isApproved
+            displayStatus === "Approved"
               ? {
                   label: "Next: Topic",
                   icon: <ArrowRight className="h-4 w-4" />,
@@ -1013,7 +1071,7 @@ const COPOMapping = () => {
                 }
           }
           actionBtn2={
-            isApproved
+            displayStatus === "Approved"
               ? {
                   label: "Mapping Approved",
                   icon: <Check className="h-4 w-4" />,
