@@ -754,24 +754,76 @@ const Syllabus = () => {
     }
   };
 
+  const getEffectiveSyllabusId = async (): Promise<string | number | null> => {
+    if (state.courseData?.latest_syllabus?.id) return state.courseData.latest_syllabus.id;
+    if (state.lastLoadedSyllabusId) return state.lastLoadedSyllabusId;
+    if (state.jobData?.syllabus_id) return state.jobData.syllabus_id;
+    if (state.jobData?.id) return state.jobData.id;
+    const saved = getSavedSyllabusId();
+    if (saved) return saved;
+    if (course_id) {
+      try {
+        const wf: any = await Models.syllabus.get_workflow_status(course_id);
+        if (wf?.syllabus_id) return wf.syllabus_id;
+      } catch {}
+    }
+    return null;
+  };
+
   const syllabus_status = async () => {
     try {
-      const body = {
-        approval_status: "approved_by_bos",
-      };
+      const sid = await getEffectiveSyllabusId();
 
-      const res: any = await Models.syllabus.status(state.courseData?.latest_syllabus?.id, body);
-      console.log("syllabus_status →", res);
-      setStep(4)
-    } catch (error) {
-      console.log("syllabus_detail error", error);
+      // 1. Update syllabus repository status if syllabus ID is present
+      if (sid) {
+        try {
+          const body = {
+            approval_status: "approved_by_bos",
+          };
+          await Models.syllabus.status(sid, body);
+        } catch (err) {
+          console.warn("Update syllabus status warning:", err);
+        }
+      }
+
+      // 2. Approve the workflow stage so downstream steps (CO-PO mapping, topics) unlock
+      if (course_id) {
+        try {
+          await (Models.syllabus as any).approve_stage(course_id, "extraction");
+        } catch (stgErr) {
+          console.warn("approve_stage warning:", stgErr);
+        }
+      } else if (sid) {
+        try {
+          await (Models.syllabus as any).approve_stage(sid, "extraction");
+        } catch (stgErr) {
+          console.warn("approve_stage warning:", stgErr);
+        }
+      }
+
+      Success("Syllabus extraction approved successfully!");
+      setStep(4);
+      if (course_id) {
+        course_data(course_id);
+      }
+      if (sid) {
+        syllabus_detail(sid);
+      }
+    } catch (error: any) {
+      console.log("syllabus approval error", error);
+      Failure(typeof error === "string" ? error : error?.message || "Failed to approve syllabus");
     }
   };
   console.log('✌️state.course_data --->', state.courseData);
 
-
   const handleSaveDraft = async () => {
     try {
+      const sid = await getEffectiveSyllabusId();
+      if (!sid) {
+        Failure("No syllabus ID found to save draft");
+        return;
+      }
+
       const body = {
         credits: state?.jobData?.credits,
         lecture_hours: state?.jobData?.lecture_hours,
@@ -781,14 +833,11 @@ const Syllabus = () => {
         programme: state?.jobData?.programme,
       };
 
-      const res: any = await Models.syllabus.update_syllabus(
-        state.courseData?.latest_syllabus?.id,
-        body
-      );
+      const res: any = await Models.syllabus.update_syllabus(sid, body);
       Success("Draft changes saved successfully.");
-      console.log("syllabus_status →", res);
+      console.log("syllabus draft saved →", res);
     } catch (error) {
-      console.log("syllabus_detail error", error);
+      console.log("handleSaveDraft error", error);
     }
   };
 
@@ -1036,7 +1085,7 @@ const Syllabus = () => {
                       handleKnowledgeLevelChange={handleKnowledgeLevelChange}
                       onUpdateUnitHours={handleUpdateUnitHours}
                       onUpdateUnitTitle={handleUpdateUnitTitle}
-                      syllabusId={state.courseData?.latest_syllabus?.id}
+                      syllabusId={state.courseData?.latest_syllabus?.id || state.lastLoadedSyllabusId || state.jobData?.syllabus_id || state.jobData?.id}
                     />
 
                     {/* Navigation buttons to downstream stages */}

@@ -384,6 +384,18 @@ const syllabus = {
         });
     },
 
+    approve_stage: (id: string | number, stage: string) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/stages/${stage}/approve`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
+
     cancel_stage: (id: string | number, stage: string) => {
         return new Promise((resolve, reject) => {
             let url = `course/courses/${id}/stages/${stage}/cancel?cancelled_by=user`;
