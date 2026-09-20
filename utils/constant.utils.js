@@ -4,7 +4,7 @@ export const CLIENT_ID =
 // export const BACKEND_URL = "http://31.97.206.165/api/";
 
 // export const BACKEND_URL = "http://88.222.213.249/api/";
-export const BACKEND_URL = "http://localhost:8080/";
+export const BACKEND_URL = "http://localhost:80/";
 export const FRONTEND_URL = "https://localhost:3000";
 
 export const CALENDAR_CLIENT_ID =
@@ -368,8 +368,8 @@ export const getDefaultRouteByRole = (role) => {
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-    
-  if(normalized=="FACULTY" ||normalized=="STUDENT"){
+
+  if (normalized == "FACULTY" || normalized == "STUDENT") {
     return "/neurobe/my-assigned-courses";
   }
   if (normalized === "COURSE_COORDINATOR" || normalized === "COORDINATOR") {

@@ -498,14 +498,35 @@ const AcademicSetup = () => {
 
       // Sync coordinator and instructors with the backend
       if (courseId) {
+        const userIdsToAssign = new Set<number>();
+        if (formData.coordinator_id) {
+          userIdsToAssign.add(Number(formData.coordinator_id));
+        }
+        if (Array.isArray(formData.instructor_ids)) {
+          formData.instructor_ids.forEach((id: number) => {
+            if (id) userIdsToAssign.add(Number(id));
+          });
+        }
+
+        for (const userId of Array.from(userIdsToAssign)) {
+          try {
+            await Models.faculty.assignCourseInstructor({
+              user_id: userId,
+              course_id: Number(courseId),
+            });
+          } catch (assignErr) {
+            console.warn(`Could not assign instructor ${userId} to course ${courseId}:`, assignErr);
+          }
+        }
+
         try {
           await Models.faculty.patchCourseAssignments(courseId, {
             coordinator_id: formData.coordinator_id || null,
             remove_coordinator: !formData.coordinator_id,
             set_instructor_ids: formData.instructor_ids || [],
           });
-        } catch (assignError) {
-          console.error("Failed to sync faculty assignments", assignError);
+        } catch {
+          // Ignored if patchCourseAssignments is not implemented
         }
       }
 

@@ -541,9 +541,10 @@ export const CreateCourseModal = ({
             const name =
               f.name ||
               `${f.first_name || ""} ${f.last_name || ""}`.trim() ||
+              f.email ||
               `Faculty #${facultyId}`;
-            const secondary = f.register_number || f.email;
-            const label = secondary ? `${name} (${secondary})` : name;
+            const secondary = f.email || f.register_number;
+            const label = secondary && secondary !== name ? `${name} (${secondary})` : name;
             return {
               value: facultyId,
               label,

@@ -33,13 +33,16 @@ export interface CourseAssignmentsResponse {
 const faculty = {
   dropdown: (body?: any) => {
     return new Promise<any[]>((resolve, reject) => {
-      let url = `faculties/dropdown`;
+      let url = `faculties/`;
       const params = new URLSearchParams();
 
       const orgId = body?.organization_id || getOrganizationId();
       if (orgId) {
         params.append("organization_id", String(orgId));
       }
+      params.append("skip", String(body?.skip ?? 0));
+      params.append("limit", String(body?.limit ?? 100));
+
       if (body?.department_id) {
         params.append("department_id", String(body.department_id));
       }
@@ -72,8 +75,14 @@ const faculty = {
       if (orgId) {
         params.append("organization_id", String(orgId));
       }
+      params.append("skip", String(body?.skip ?? 0));
+      params.append("limit", String(body?.limit ?? 100));
+
       if (body?.department_id) {
         params.append("department_id", String(body.department_id));
+      }
+      if (body?.search) {
+        params.append("search", String(body.search));
       }
 
       if (params.toString()) {
@@ -86,6 +95,49 @@ const faculty = {
           const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
           resolve(data);
         })
+        .catch((error) => {
+          reject(error.response?.data?.message || error.response?.data || error);
+        });
+    });
+  },
+
+  assignCourseInstructor: (data: { user_id: number; course_id: number }) => {
+    return new Promise<any>((resolve, reject) => {
+      const url = `faculties/assign-course-instructor`;
+      instance()
+        .post(url, {
+          user_id: Number(data.user_id),
+          course_id: Number(data.course_id),
+        })
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.message || error.response?.data || error);
+        });
+    });
+  },
+
+  dashboardOverview: (data: any) => {
+    return new Promise<any>((resolve, reject) => {
+      let url = `faculties/dashboard-overview`;
+      const params = new URLSearchParams();
+      const facultyId = data?.faculty_id || data?.coordinator_id;
+      if (facultyId) {
+        params.append("faculty_id", String(facultyId));
+      }
+      if (data?.semester) {
+        params.append("semester", String(data.semester));
+      }
+      if (data?.search) {
+        params.append("search", String(data.search));
+      }
+
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      instance()
+        .get(url)
+        .then((res) => resolve(res.data))
         .catch((error) => {
           reject(error.response?.data?.message || error.response?.data || error);
         });
