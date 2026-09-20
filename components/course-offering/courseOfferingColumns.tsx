@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import IconEdit from "@/components/Icon/IconEdit";
+import IconTrash from "@/components/Icon/IconTrash";
 
 // ─── Shared cells ─────────────────────────────────────────────────────────────
 export const StatusCell = ({ status }: { status: string }) => (
@@ -106,8 +107,11 @@ export const MOCK_OFFERINGS = [
   },
 ];
 
-// ─── Column factory — accepts onEdit callback ─────────────────────────────────
-export const makeCourseOfferingColumns = (onEdit?: (row: any) => void) => [
+// ─── Column factory — accepts onEdit and onDelete callbacks ──────────────────
+export const makeCourseOfferingColumns = (
+  onEdit?: (row: any) => void,
+  onDelete?: (row: any) => void
+) => [
   {
     accessor: "course",
     title: "COURSE OFFERING",
@@ -168,6 +172,30 @@ export const makeCourseOfferingColumns = (onEdit?: (row: any) => void) => [
     title: "STATUS",
     render: (row: any) => (
       <StatusCell status={row.status || (row.is_active !== false ? "Active" : "Inactive")} />
+    ),
+  },
+  {
+    accessor: "actions",
+    title: "ACTIONS",
+    render: (row: any) => (
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onEdit?.(row)}
+          className="text-gray-600 hover:text-color2 dark:text-gray-300 dark:hover:text-purple-400"
+          title="Edit Course Offering"
+        >
+          <IconEdit className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete?.(row)}
+          className="text-gray-600 hover:text-red-500 dark:text-gray-300 dark:hover:text-red-400"
+          title="Delete Course Offering"
+        >
+          <IconTrash className="h-4 w-4" />
+        </button>
+      </div>
     ),
   },
 ];

@@ -1,10 +1,16 @@
 import instance from '@/utils/axios.utils';
+import { getOrganizationId } from '@/utils/function.utils';
 
 const course_instance = {
     list: (body?: any, page?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course-instances/`;
             const params = new URLSearchParams();
+
+            const orgId = body?.organization_id || getOrganizationId();
+            if (orgId) {
+                params.append("organization_id", String(orgId));
+            }
 
             if (body?.search) {
                 params.append("search", body.search);
@@ -83,11 +89,9 @@ const course_instance = {
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course-instances/${id}`;
+            const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
             instance()
-                .patch(url, data,{
-                    headers: { "Content-Type": "multipart/form-data" },
-
-                })
+                .patch(url, data, config)
                 .then((res) => {
                     resolve(res.data);
                 })

@@ -137,11 +137,6 @@ export const makeBatchColumns = (onEdit: (r: any) => void, onDelete: (r: any) =>
     render: (row: any) => <span className="text-[#000] font-medium dark:text-gray-200">{row.name || row.batch || "-"}</span>,
   },
   {
-    accessor: "programme",
-    title: "PROGRAMME",
-    render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.programme_name || row.programme?.programme_name || row.programme || "-"}</span>,
-  },
-  {
     accessor: "startYear",
     title: "START YEAR",
     render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.start_year ?? row.startYear ?? "-"}</span>,
@@ -246,9 +241,9 @@ export const MOCK_PSOS = [
 ];
 
 export const makePSOColumns = (onEdit: (r: any) => void, onDelete: (r: any) => void) => [
-  { accessor: "code",        title: "PSO CODE",    render: ({ code }: any)        => <PurpleCode code={code} /> },
-  { accessor: "programme",   title: "PROGRAMME",   render: ({ programme }: any)   => <span className="text-[#000] dark:text-[#000]">{programme}</span> },
-  { accessor: "description", title: "DESCRIPTION", render: ({ description }: any) => <span className="max-w-md whitespace-normal text-[#000] dark:text-gray-200">{description}</span> },
-  { accessor: "status",      title: "STATUS",      render: ({ status }: any)      => <StatusCell status={status} /> },
-  { accessor: "actions",     title: "ACTIONS",     render: (row: any)             => <ActionCell onEdit={() => onEdit(row)} onDelete={() => onDelete(row)} /> },
+  { accessor: "pso_code",    title: "PSO CODE",    render: (row: any) => <PurpleCode code={row.pso_code || row.code || "-"} /> },
+  { accessor: "programme",   title: "PROGRAMME",   render: (row: any) => <span className="text-[#000] dark:text-[#000]">{row.programme_name || row.programme || "-"}</span> },
+  { accessor: "description", title: "DESCRIPTION", render: (row: any) => <span className="max-w-md whitespace-normal text-[#000] dark:text-gray-200">{row.description || "-"}</span> },
+  { accessor: "status",      title: "STATUS",      render: (row: any) => <StatusCell status={row.status || (row.is_active !== false ? "Active" : "Inactive")} /> },
+  { accessor: "actions",     title: "ACTIONS",     render: (row: any) => <ActionCell onEdit={() => onEdit(row)} onDelete={() => onDelete(row)} /> },
 ];

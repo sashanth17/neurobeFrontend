@@ -37,6 +37,7 @@ import EditTopicModal from "@/components/academic-setup/EditTopicModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UNIT_TABS } from "@/utils/constant.utils";
 import PageHeader from "@/components/common-components/PageHeader";
+import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
 import Models from "@/imports/models.import";
 
 // ─── Raw unit data ─────────────────────────────────────────────────────────────
@@ -1143,15 +1144,18 @@ const Topics = () => {
     }
   };
 
-  const handleGenerateTopics = async () => {
+  const handleGenerateTopics = async (parentParams?: { extraction_version?: number }) => {
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
       activeUnitDetail?.syllabus_id ||
+      course_id ||
       9;
     try {
       setState({ generatingTopics: true });
-      const res: any = await Models.topics.generate(sid, {});
+      const res: any = await Models.topics.generate_hierarchy(sid, {
+        extraction_version: parentParams?.extraction_version,
+      });
       console.log("generate response", res);
       Success(res?.message || "Topic hierarchy generation job enqueued");
       setState({
@@ -1159,13 +1163,26 @@ const Topics = () => {
         showGenerateModal: true,
         jobId: res.job_id,
       });
+      if (res?.job_id) {
+        job_Data(res.job_id);
+      }
     } catch (error: any) {
       console.log("generate error", error);
       Failure(getErrorMessage(error, "Failed to generate topics"));
       setState({
         generatingTopics: false,
-        showGenerateModal: true,
       });
+    }
+  };
+
+  const handleVersionActivated = async (newVer: number) => {
+    const sid =
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      course_id;
+    if (sid) {
+      await getUnits(sid);
+      await getUnitDetail(sid, state.activeUnitNumber || 1);
     }
   };
 
@@ -1466,6 +1483,17 @@ const Topics = () => {
           />
         ))}
       </div>
+
+      {course_id && (
+        <StageVersionHistoryPanel
+          stage="hierarchy"
+          stageLabel="Topic Hierarchy"
+          courseId={course_id}
+          onVersionActivated={handleVersionActivated}
+          onGenerateNew={handleGenerateTopics}
+          isGenerating={state.generatingTopics}
+        />
+      )}
 
 
       {/* ── Progress bar — shown after generation ── */}

@@ -351,13 +351,12 @@ const LearningMeterials = () => {
   console.log('✌️activeTab --->', state.activeTab);
 
   const course_data = async () => {
+    const targetCourseId = course_id || 1;
     try {
-      const res: any = await Models.course.detail(48);
+      const res: any = await Models.course.detail(targetCourseId);
       console.log('course_data --->', res);
 
-      // setState({ courseData: res });
       setState({ courseData: res, activeTab: `unit-${res?.latest_syllabus?.units?.[0]?.unit_number}` });
-
 
       material_data(res?.latest_syllabus?.id, res?.latest_syllabus?.units?.[0]?.unit_number);
 

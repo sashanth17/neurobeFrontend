@@ -1,30 +1,42 @@
-import { commonInstance } from '@/utils/axios.utils';
+import instance from '@/utils/axios.utils';
+import { getOrganizationId } from '@/utils/function.utils';
 
-const lession_plan = {
+const pso = {
+    list: (body?: any, page?: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `psos/`;
+            const params = new URLSearchParams();
 
-    generate_teating_timeline: (syllabus_id) => {
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/schedules/generate`;
-            commonInstance()
-                .post(url)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
-                });
-        });
-        return promise;
-    },
-    detail: (syllabus_id: string | number,unit: string | number,) => {
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/lesson-plan-workspace?unit_number=${unit}`;
-            
-            commonInstance()
+            const orgId = body?.organization_id || getOrganizationId();
+            if (orgId) {
+                params.append("organization_id", String(orgId));
+            }
+
+            if (body?.search) {
+                params.append("search", body.search);
+            }
+
+            if (body?.status && body.status !== "All Statuses" && body.status !== "all_status") {
+                params.append("status", body.status);
+            }
+
+            if (body?.programme_id) {
+                params.append("programme_id", String(body.programme_id));
+            }
+
+            if (body?.department_id) {
+                params.append("department_id", String(body.department_id));
+            }
+
+            if (page) {
+                params.append("page", String(page));
+            }
+
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            instance()
                 .get(url)
                 .then((res) => {
                     resolve(res.data);
@@ -40,94 +52,82 @@ const lession_plan = {
         return promise;
     },
 
-    draft: (syllabus_id: string | number) => {
+    detail: (id: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/lesson-plan/draft`;
-            
-            commonInstance()
-                .post(url)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
-                });
-        });
-        return promise;
-    },
-
-     approve: (syllabus_id: string | number) => {
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/lesson-plan/approve`;
-            commonInstance()
-                .post(url)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
-                });
-        });
-        return promise;
-    },
-
-    update_topics: (topic_id: string | number,data) => {
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/topics/${topic_id}/lesson-plan-item`;
-            commonInstance()
-                .put(url,data)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
-                });
-        });
-        return promise;
-    },
-
-    get_schedules: (id: string | number) => {
-        return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/schedules`;
-            commonInstance()
+            let url = `psos/${id}`;
+            instance()
                 .get(url)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
         });
+        return promise;
     },
 
-    generate_timeline: (id: string | number, body?: any) => {
-        return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/schedules/generate-timeline`;
-            commonInstance()
-                .post(url, body || {})
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+    create: (data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `psos/`;
+            instance()
+                .post(url, data)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
         });
+        return promise;
     },
 
-    approve_schedule: (id: string | number) => {
-        return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/approve-schedule`;
-            commonInstance()
-                .post(url)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+    update: (id: any, data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `psos/${id}`;
+            const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
+            instance()
+                .patch(url, data, config)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
         });
-    }
+        return promise;
+    },
 
+    delete: (id: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `psos/${id}`;
+            instance()
+                .delete(url)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
 };
 
-export default lession_plan;
+export default pso;

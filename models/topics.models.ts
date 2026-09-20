@@ -192,6 +192,35 @@ const topics = {
         return promise;
     },
 
+    generate_hierarchy: (id: string | number, body?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/generate-hierarchy`;
+            commonInstance()
+                .post(url, body || {})
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    update_topic: (id: string | number, topic_id: string | number, body: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/topics/${topic_id}`;
+            commonInstance()
+                .patch(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    approve_hierarchy: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/approve-hierarchy`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    }
 
 }
 

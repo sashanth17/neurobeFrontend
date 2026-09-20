@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { ArrowRight, BookOpen, Info, User, UserCheck } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState } from "@/utils/function.utils";
+import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
 import IconSearch from "@/components/Icon/IconSearch";
 import IconPlus from "@/components/Icon/IconPlus";
 import AcademicTable from "@/components/common-components/TableComponent";
@@ -48,7 +48,7 @@ const CourseOffering = () => {
     loading: false,
     showModal: false,
     editRow: null as any,
-    instanceList: null as any[] | null,
+    instanceList: [] as any[],
   });
 
   const openCreate = () => setState({ showModal: true, editRow: null });
@@ -75,8 +75,26 @@ const CourseOffering = () => {
     }
   };
 
+  const handleDelete = (row: any) => {
+    showDeleteAlert(
+      async () => {
+        try {
+          setState({ loading: true });
+          await Models.course_instance.delete(row.id);
+          Success("Course offering deleted successfully");
+          course_instance_list();
+        } catch (error: any) {
+          Failure(typeof error === "string" ? error : error?.message || "Failed to delete course offering");
+          setState({ loading: false });
+        }
+      },
+      () => { },
+      `Are you sure you want to delete ${row.course_instance_name || row.course || "this course offering"}?`
+    );
+  };
+
   // ── filtered records ───────────────────────────────────────────────────────
-  const rawList = state.instanceList && state.instanceList.length > 0 ? state.instanceList : MOCK_OFFERINGS;
+  const rawList = state.instanceList || [];
   const records = rawList.filter((r: any) => {
     const s = state.search.toLowerCase();
     const courseTitle = r.course_instance_name || r.course || r.course_title || "";
@@ -102,6 +120,12 @@ const CourseOffering = () => {
         subtitle="Overview of course offerings and section instances across programmes and terms."
         icon={<BookOpen className="h-5 w-5 text-color2" />}
         records={`${records.length} Records`}
+        actionBtn1={{
+          label: "Create Offering",
+          icon: <IconPlus className="h-4 w-4" />,
+          onClick: openCreate,
+          view: true,
+        }}
       />
 
       {/* Auto-instructor notice */}
@@ -132,6 +156,7 @@ const CourseOffering = () => {
       <CourseOfferingModal
         open={state.showModal}
         onClose={closeModal}
+        onSuccess={course_instance_list}
         initialData={state.editRow}
       />
 
@@ -139,14 +164,14 @@ const CourseOffering = () => {
       <div className=" mb-4 flex flex-wrap items-center justify-between gap-3  py-4">
         {/* Search */}
         <div className="relative max-w-[300px] flex-1">
-         
+
           <TextInput
-             placeholder="Search by code, title, faculty..."
-              type="text"
-              value={state.search}
-              onChange={(e) => setState({ search: e.target.value })}
-              icon={<IconSearch className="h-4 w-4" />}
-            />
+            placeholder="Search by code, title, faculty..."
+            type="text"
+            value={state.search}
+            onChange={(e) => setState({ search: e.target.value })}
+            icon={<IconSearch className="h-4 w-4" />}
+          />
         </div>
 
         <div className="flex gap-3">
@@ -191,7 +216,7 @@ const CourseOffering = () => {
       <div className="panel">
         <AcademicTable
           records={records}
-          columns={makeCourseOfferingColumns(openEdit)}
+          columns={makeCourseOfferingColumns(openEdit, handleDelete)}
           loading={state.loading}
           noRecordsText="No course offerings found"
         />

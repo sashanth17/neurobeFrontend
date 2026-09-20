@@ -20,24 +20,15 @@ export interface TheoryAndLabCardProps {
   className?: string;
 }
 
-const DEFAULT_EXPERIMENTS: LabExperiment[] = [
-  { id: "exp-1", title: "Study of network configuration and addressing" },
-  { id: "exp-2", title: "Packet capture and protocol analysis" },
-  { id: "exp-3", title: "IPv4 subnetting exercise" },
-  { id: "exp-4", title: "Static and dynamic routing configuration" },
-  { id: "exp-5", title: "TCP / UDP communication analysis" },
-  { id: "exp-6", title: "DNS and HTTP protocol observation" },
-];
-
 const TheoryAndLabCard: React.FC<TheoryAndLabCardProps> = ({
   title = "THEORY & LABORATORY",
   headerSubtitle = "Curriculum Allocation",
-  theoryHours = "45",
-  theoryWeeklyHours = "3 Hours / Week",
-  labHours = "30",
-  labWeeklyHours = "2 Hours / Week",
+  theoryHours = "0",
+  theoryWeeklyHours = "Hours / Week",
+  labHours = "0",
+  labWeeklyHours = "Hours / Week",
   labExperimentsTitle = "LAB EXPERIMENTS",
-  experiments = DEFAULT_EXPERIMENTS,
+  experiments = [],
   className = "",
 }) => {
   return (
@@ -58,9 +49,9 @@ const TheoryAndLabCard: React.FC<TheoryAndLabCardProps> = ({
 
       {/* 2-Column Theory & Laboratory Hours Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Theory Card */}
-        <div className="rounded-2xl border border-gray-200/60 bg-gray-50/50 p-5 dark:border-gray-800 dark:bg-gray-800/40">
-          <p className="text-xs font-bold uppercase tracking-wider text-pri dark:text-gray-400 mb-2">
+        {/* Theory Block */}
+        <div className="rounded-2xl border border-gray-200/60 bg-[#fbfbff] p-4 dark:border-gray-800 dark:bg-gray-800/80">
+          <p className="text-xs font-bold uppercase tracking-wide text-pri dark:text-gray-400 mb-1">
             THEORY
           </p>
           <p className="text-2xl font-bold text-[#000] dark:text-white">
@@ -74,9 +65,9 @@ const TheoryAndLabCard: React.FC<TheoryAndLabCardProps> = ({
           </p>
         </div>
 
-        {/* Laboratory Card */}
-        <div className="rounded-2xl border border-gray-200/60 bg-gray-50/50 p-5 dark:border-gray-800 dark:bg-gray-800/40">
-          <p className="text-xs font-bold uppercase tracking-wider text-pri dark:text-gray-400 mb-2">
+        {/* Laboratory Block */}
+        <div className="rounded-2xl border border-gray-200/60 bg-[#fbfbff] p-4 dark:border-gray-800 dark:bg-gray-800/80">
+          <p className="text-xs font-bold uppercase tracking-wide text-pri dark:text-gray-400 mb-1">
             LABORATORY
           </p>
           <p className="text-2xl font-bold text-[#000] dark:text-white">
@@ -92,23 +83,25 @@ const TheoryAndLabCard: React.FC<TheoryAndLabCardProps> = ({
       </div>
 
       {/* Lab Experiments Section */}
-      <div className="mt-5 rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-800/80">
-        <h4 className="text-sm font-bold uppercase tracking-wider text-[#000] dark:text-white mb-3">
-          {labExperimentsTitle}
-        </h4>
+      {experiments.length > 0 && (
+        <div className="mt-5 rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-800/80">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-[#000] dark:text-white mb-3">
+            {labExperimentsTitle}
+          </h4>
 
-        {/* List of Lab Experiments using LabExperimentRowItem inner component */}
-        <div>
-          {experiments.map((exp, idx) => (
-            <LabExperimentRowItem
-              key={exp.id || idx}
-              index={idx + 1}
-              title={exp.title}
-              isLast={idx === experiments.length - 1}
-            />
-          ))}
+          {/* List of Lab Experiments using LabExperimentRowItem inner component */}
+          <div>
+            {experiments.map((exp, idx) => (
+              <LabExperimentRowItem
+                key={exp.id || idx}
+                index={idx + 1}
+                title={exp.title}
+                isLast={idx === experiments.length - 1}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

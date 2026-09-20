@@ -174,7 +174,16 @@ const AddUserModal = ({
       return;
     }
 
-    const isStudent = form.role.value === "Student";
+    const roleVal = String(form.role.value).toLowerCase();
+    const isStudent = roleVal.includes("student");
+    const isErpAdmin = roleVal.includes("admin");
+    const isRegNoRequired = isStudent || isErpAdmin;
+
+    if (isRegNoRequired && !form.regNo?.trim()) {
+      Failure("Please enter register number");
+      return;
+    }
+
     const isActive = (form.status?.value ?? "Active").toLowerCase() === "active";
 
     const payload: any = {
@@ -201,6 +210,12 @@ const AddUserModal = ({
   useLockBodyScroll(visible);
 
   if (!visible) return null;
+
+  const currentRoleVal = form.role?.value ? String(form.role.value).toLowerCase() : "";
+  const isCurrentStudent = currentRoleVal.includes("student");
+  const isCurrentErpAdmin = currentRoleVal.includes("admin");
+  const isCurrentFaculty = currentRoleVal.includes("faculty");
+  const isCurrentRegNoRequired = isCurrentStudent || isCurrentErpAdmin;
 
   return (
     <>
@@ -272,14 +287,21 @@ const AddUserModal = ({
                 rightIconOnlick={() => setShowPassword((prev) => !prev)}
               />
 
+              <CustomSelect title="Role"       required options={roleOpts}   value={form.role}       onChange={(v) => set("role",       v)} placeholder="Select role..." />
+
               <TextInput
-                title={form.role?.value === "Student" ? "Register Number" : "Employee Number"}
-                placeholder={form.role?.value === "Student" ? "e.g. 2026BE0101" : "e.g. FAC-CSE-038"}
+                title={isCurrentFaculty ? "Employee Number" : "Register Number"}
+                required={isCurrentRegNoRequired}
+                placeholder={
+                  isCurrentStudent
+                    ? "e.g. 2026BE0101"
+                    : isCurrentErpAdmin
+                    ? "e.g. ADM-001"
+                    : "e.g. FAC-CSE-038"
+                }
                 value={form.regNo}
                 onChange={(e) => set("regNo", e.target.value)}
               />
-
-              <CustomSelect title="Role"       required options={roleOpts}   value={form.role}       onChange={(v) => set("role",       v)} placeholder="Select role..." />
               <CustomSelect title="Department" options={deptOpts}   value={form.department} onChange={(v) => set("department", v)} placeholder="Select department..." />
               <CustomSelect title="Programme"  options={progOpts}   value={form.programme}  onChange={(v) => set("programme",  v)} placeholder="Select programme..." />
               <CustomSelect title="Batch"      options={batchOpts}  value={form.batch}      onChange={(v) => set("batch",      v)} placeholder="Select batch..." />

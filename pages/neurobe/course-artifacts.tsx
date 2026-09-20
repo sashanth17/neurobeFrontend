@@ -1904,6 +1904,22 @@ const QuestionBank = () => {
     dispatch(setPageTitle("View Learning Material"));
   }, [dispatch]);
 
+  useEffect(() => {
+    if (router?.query?.stage) {
+      const stageMap: Record<string, string> = {
+        extraction: "syllabus",
+        copo: "copo",
+        hierarchy: "topics",
+        pedagogy: "pedagogy",
+        schedule: "lesson-plan",
+      };
+      const targetRef = stageMap[String(router.query.stage)];
+      if (targetRef) {
+        setState({ selectedReferenceId: targetRef });
+      }
+    }
+  }, [router?.query?.stage]);
+
   const referenceItems: ReferenceItem[] = [
     {
       id: "syllabus",

@@ -96,11 +96,17 @@ const MyAssignedCourses = () => {
       router.push(`/neurobe/pedagogy${buildQueryString()}`);
     } else if (nextAction.includes("lesson")) {
       router.push(`/neurobe/lesson-plan${buildQueryString()}`);
-    } else if (nextAction.includes("topics")) {
-      // Only syllabus gets job_id
-      router.push(`/neurobe/syllabus${buildQueryString(true)}`);
+    } else if (nextAction.includes("topics") || nextAction.includes("hierarchy")) {
+      // Topics / topic hierarchy page — NOT syllabus
+      router.push(`/neurobe/topics${buildQueryString()}`);
     } else if (nextAction.includes("learning")) {
       router.push(`/neurobe/learning-materials${buildQueryString()}`);
+    } else if (
+      nextAction.includes("syllabus") ||
+      nextAction.includes("extract") ||
+      nextAction.includes("upload")
+    ) {
+      router.push(`/neurobe/syllabus${buildQueryString(true)}`);
     } else {
       // Default: go to syllabus with job_id
       router.push(`/neurobe/syllabus${buildQueryString(true)}`);

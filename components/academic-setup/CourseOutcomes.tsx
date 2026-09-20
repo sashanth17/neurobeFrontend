@@ -43,53 +43,65 @@ const CourseOutcomes = (props: any) => {
       return;
     }
 
-    setLoading(true);
-    try {
-      await onSaveOutcome(id, editDescription, co_code);
-      
-      setEditingId(null);
-      setEditDescription("");
-    } catch (error: any) {
-      console.log("handleSave error", error);
-      Failure(error?.message || "Failed to update outcome");
-    } finally {
-      setLoading(false);
+    const updatedDesc = editDescription.trim();
+    // Optimistic local update
+    setCos((prev: any) =>
+      prev.map((c: any) =>
+        c.id === id ? { ...c, description: updatedDesc } : c
+      )
+    );
+    setEditingId(null);
+    setEditDescription("");
+
+    if (onSaveOutcome) {
+      try {
+        setLoading(true);
+        await onSaveOutcome(id, updatedDesc, co_code);
+      } catch (error: any) {
+        console.warn("handleSave backend call error, local state preserved:", error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   const handleAccept = async (id: number) => {
-    setLoading(true);
-    try {
-      await onAcceptOutcome(id);
-      
-      setCos((prev: any) =>
-        prev.map((c: any) =>
-          c.id === id ? { ...c, is_accepted: true } : c
-        )
-      );
-    } catch (error: any) {
-      console.log("handleAccept error", error);
-      Failure(error?.message || "Failed to accept outcome");
-    } finally {
-      setLoading(false);
+    // Optimistic local accept
+    setCos((prev: any) =>
+      prev.map((c: any) =>
+        c.id === id ? { ...c, is_accepted: true } : c
+      )
+    );
+
+    if (onAcceptOutcome) {
+      try {
+        setLoading(true);
+        await onAcceptOutcome(id);
+      } catch (error: any) {
+        console.warn("handleAccept backend call error, local state preserved:", error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   const handleKnowledgeChange = async (id: number, value: string) => {
-    setLoading(true);
-    try {
-      await onKnowledgeLevelChange(id, value);
-      
-      setCos((prev: any) =>
-        prev.map((c: any) =>
-          c.id === id ? { ...c, knowledge_level: value } : c
-        )
-      );
-    } catch (error: any) {
-      console.log("handleKnowledgeChange error", error);
-      Failure(error?.message || "Failed to update knowledge level");
-    } finally {
-      setLoading(false);
+    // Optimistic local update so dropdown updates immediately
+    setCos((prev: any) =>
+      prev.map((c: any) =>
+        c.id === id ? { ...c, knowledge_level: value } : c
+      )
+    );
+
+    if (onKnowledgeLevelChange) {
+      try {
+        setLoading(true);
+        await onKnowledgeLevelChange(id, value);
+      } catch (error: any) {
+        console.warn("handleKnowledgeChange backend call error, local state preserved:", error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 

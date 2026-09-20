@@ -4,20 +4,20 @@ import * as Yup from "yup";
 import { ModalShell } from "@/components/academic-setup/AddModals";
 import TextInput from "@/components/FormFields/TextInput.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
-import { useSetState, Dropdown, Failure } from "@/utils/function.utils";
+import { useSetState, Failure } from "@/utils/function.utils";
 import Models from "@/imports/models.import";
 
 type DropdownOption = { value: string | number; label: string };
 
 const TERM_OPTS: DropdownOption[] = [
-  { value: "1", label: "1" },
-  { value: "2", label: "2" },
-  { value: "3", label: "3" },
-  { value: "4", label: "4" },
-  { value: "5", label: "5" },
-  { value: "6", label: "6" },
-  { value: "7", label: "7" },
-  { value: "8", label: "8" },
+  { value: "1", label: "Semester 1" },
+  { value: "2", label: "Semester 2" },
+  { value: "3", label: "Semester 3" },
+  { value: "4", label: "Semester 4" },
+  { value: "5", label: "Semester 5" },
+  { value: "6", label: "Semester 6" },
+  { value: "7", label: "Semester 7" },
+  { value: "8", label: "Semester 8" },
 ];
 
 const schema = Yup.object({
@@ -28,9 +28,14 @@ const schema = Yup.object({
   course_id: Yup.mixed().required("Course is required"),
 });
 
-interface Props { open: boolean; onClose: () => void; initialData?: any; }
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  initialData?: any;
+  onSuccess?: () => void;
+}
 
-const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
+const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) => {
   const isEdit = !!initialData;
 
   const [state, setState] = useSetState({
@@ -50,32 +55,87 @@ const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
 
   useEffect(() => {
     if (open) {
-      departmentList();
-      programmeList();
-      courseList();
+      initModalData();
     }
-  }, [open]);
+  }, [open, initialData]);
 
-  // populate form when editing
-  useEffect(() => {
-    if (open && initialData) {
+  const fetchProgrammeList = async (): Promise<DropdownOption[]> => {
+    try {
+      const res: any = await Models.programme.list();
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      return list.map((item: any) => ({
+        value: item.id,
+        label: item.programme_name || item.name || item.short_name || item.code || `Programme #${item.id}`,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchDepartmentList = async (): Promise<DropdownOption[]> => {
+    try {
+      const res: any = await Models.department.list();
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      return list.map((item: any) => ({
+        value: item.id,
+        label: item.department_name || item.name || item.short_name || item.code || `Department #${item.id}`,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchCourseList = async (): Promise<DropdownOption[]> => {
+    try {
+      const res: any = await Models.course.list();
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      return list.map((item: any) => ({
+        value: item.id,
+        label: item.course_title || item.title || item.course_name || item.code || `Course #${item.id}`,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  const initModalData = async () => {
+    const [progs, depts, crses] = await Promise.all([
+      fetchProgrammeList(),
+      fetchDepartmentList(),
+      fetchCourseList(),
+    ]);
+
+    setState({
+      programmeList: progs,
+      departmentList: depts,
+      courseList: crses,
+    });
+
+    if (initialData) {
+      const progVal = initialData.programme_id ?? initialData.programme;
+      const deptVal = initialData.department_id ?? initialData.department;
+      const termVal = initialData.semester || initialData.term;
+      const crsVal = initialData.course_id ?? initialData.course;
+
+      const matchedProg = progs.find((p) => String(p.value) === String(progVal));
+      const matchedDept = depts.find((d) => String(d.value) === String(deptVal));
+      const matchedTerm = TERM_OPTS.find((t) => String(t.value) === String(termVal));
+      const matchedCrs = crses.find((c) => String(c.value) === String(crsVal));
+
+      const progLabel = matchedProg?.label || initialData.programme_name || (progVal ? `Programme #${progVal}` : "");
+      const deptLabel = matchedDept?.label || initialData.department_name || (deptVal ? `Department #${deptVal}` : "");
+      const termLabel = matchedTerm?.label || (termVal ? `Semester ${termVal}` : "");
+      const crsLabel = matchedCrs?.label || initialData.course_title || (crsVal ? `Course #${crsVal}` : "");
+
       setState({
-        course_instance_name: initialData.course_instance_name ?? "",
-        programme: initialData.programme_id
-          ? { value: initialData.programme_id, label: initialData.programme_name ?? String(initialData.programme_id) }
-          : null,
-        department: initialData.department_id
-          ? { value: initialData.department_id, label: initialData.department_name ?? String(initialData.department_id) }
-          : null,
-        term: initialData.semester || initialData.term
-          ? { value: String(initialData.semester || initialData.term), label: String(initialData.semester || initialData.term) }
-          : null,
-        course: initialData.course_id
-          ? { value: initialData.course_id, label: initialData.course_title ?? String(initialData.course_id) }
-          : null,
+        course_instance_name: (initialData.course_instance_name ?? initialData.course) || "",
+        programme: progVal ? { value: progVal, label: progLabel } : null,
+        department: deptVal ? { value: deptVal, label: deptLabel } : null,
+        term: termVal ? { value: String(termVal), label: termLabel } : null,
+        course: crsVal ? { value: crsVal, label: crsLabel } : null,
         errors: {},
       });
-    } else if (open && !initialData) {
+    } else {
       setState({
         course_instance_name: "",
         programme: null,
@@ -84,36 +144,6 @@ const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
         course: null,
         errors: {},
       });
-    }
-  }, [open, initialData]);
-
-  const programmeList = async () => {
-    try {
-      const res: any = await Models.programme.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
-      setState({ programmeList: Dropdown(list, "programme_name") });
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Failed to load programmes");
-    }
-  };
-
-  const departmentList = async () => {
-    try {
-      const res: any = await Models.department.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
-      setState({ departmentList: Dropdown(list, "department_name") });
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Failed to load departments");
-    }
-  };
-
-  const courseList = async () => {
-    try {
-      const res: any = await Models.course.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
-      setState({ courseList: Dropdown(list, "course_title") });
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Failed to load courses");
     }
   };
 
@@ -138,9 +168,15 @@ const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
 
     try {
       await schema.validate(values, { abortEarly: false });
-      const response = await Models.course_instance.create(values);
+      let response: any = null;
+      if (isEdit && initialData?.id) {
+        response = await Models.course_instance.update(initialData.id, values);
+      } else {
+        response = await Models.course_instance.create(values);
+      }
       console.log("response", response);
       setState({ errors: {} });
+      onSuccess?.();
       onClose();
     } catch (err: any) {
       const errors: Record<string, string> = {};
@@ -196,7 +232,7 @@ const CourseOfferingModal = ({ open, onClose, initialData }: Props) => {
               options={TERM_OPTS}
               value={state.term}
               onChange={(v) => setState({ term: v })}
-              placeholder="Semester 3"
+              placeholder="Select Semester"
               error={state.errors?.term}
             />
           </div>

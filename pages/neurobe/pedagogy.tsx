@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import TableTitle from "@/components/common-components/TableTitle";
 import { UNIT_TABS } from "@/utils/constant.utils";
 import PageHeader from "@/components/common-components/PageHeader";
+import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
 import Models from "@/imports/models.import";
 
 // ─── Static config ────────────────────────────────────────────────────────────
@@ -358,14 +359,17 @@ const Pedagogy = () => {
     getUnitDetail(sid, unitNum);
   };
 
-  const handleGenerateRecommendations = async () => {
+  const handleGenerateRecommendations = async (parentParams?: { hierarchy_version?: number }) => {
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
-      activeUnitDetail?.syllabus_id;
+      activeUnitDetail?.syllabus_id ||
+      course_id;
     try {
       setState({ generatingRecommendations: true });
-      const res: any = await Models.pedagogy.generate(sid, {});
+      const res: any = await Models.pedagogy.generate_pedagogies(sid, {
+        hierarchy_version: parentParams?.hierarchy_version,
+      });
       const jobId = res?.job_id;
       if (jobId) {
         setState({ pollingJob: true });
@@ -399,6 +403,17 @@ const Pedagogy = () => {
       console.log("error generating recommendations", error);
       setState({ generatingRecommendations: false });
       Failure(getErrorMessage(error, "Failed to generate pedagogy recommendations"));
+    }
+  };
+
+  const handleVersionActivated = async (newVer: number) => {
+    const sid =
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      course_id;
+    if (sid) {
+      await getUnits(sid);
+      await getUnitDetail(sid, state.activeUnitNumber || 1);
     }
   };
   
@@ -540,8 +555,18 @@ const Pedagogy = () => {
         records={state.courseDetail ? `${state.courseDetail.course_code} — ${state.courseDetail.course_title}` : ""}
         subtitle={`Choose suitable teaching methods for the approved topics.`}
         icon={<Lightbulb className="h-5 w-5 text-color2" />}
-        
       />
+
+      {course_id && (
+        <StageVersionHistoryPanel
+          stage="pedagogy"
+          stageLabel="Pedagogy Suggestions"
+          courseId={course_id}
+          onVersionActivated={handleVersionActivated}
+          onGenerateNew={handleGenerateRecommendations}
+          isGenerating={state.generatingRecommendations}
+        />
+      )}
 
       {/* ── Stat tabs — shown only before recommendations are generated ── */}
       {!state.recommendationsGenerated && (
