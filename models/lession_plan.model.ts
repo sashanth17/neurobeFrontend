@@ -110,7 +110,7 @@ const lession_plan = {
 
     generate_timeline: (id: string | number, body?: any) => {
         return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/generate-timeline`;
+            let url = `course/syllabi/${id}/schedules/generate-timeline`;
             commonInstance()
                 .post(url, body || {})
                 .then((res) => resolve(res.data))
