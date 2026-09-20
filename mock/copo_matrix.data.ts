@@ -36,6 +36,8 @@ export interface COPOMatrixResponse {
   matrix: Record<string, Record<string, MappingCell>>;
 }
 
+
+
 export const DEFAULT_COPO_MATRIX: COPOMatrixResponse = {
   syllabus_id: 1,
   course_id: 59,
