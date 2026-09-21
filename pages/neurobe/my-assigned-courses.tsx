@@ -45,6 +45,22 @@ const MyAssignedCourses = () => {
     dashboard_view(state.type?.id || state.type, debouncedSearch);
   }, [debouncedSearch, state.type]);
 
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("user");
+      const user = userStr ? JSON.parse(userStr) : null;
+      const role = localStorage.getItem("role") || user?.role || "";
+      const isCoordinatorRole = String(role).toLowerCase().includes("coordinator");
+      if (
+        isCoordinatorRole ||
+        router.query.view === "coordinator" ||
+        router.query.toggle === "coordinator"
+      ) {
+        setState({ activeToggle: "coordinator" });
+      }
+    } catch {}
+  }, [router.query.view, router.query.toggle]);
+
   const dashboard_view = async (semesterId?: any, searchQuery?: string) => {
     try {
       setState({ loading: true });
@@ -64,7 +80,28 @@ const MyAssignedCourses = () => {
       };
       const res: any = await Models.course.faculty_dashboard_overview(body);
       console.log("faculties dashboard overview res", res);
-      setState({ data: res, loading: false });
+      const courses = res?.courses || [];
+      const hasCoord = courses.some((c: any) => {
+        const roleType =
+          c.role_type ||
+          ((c.faculty_role || c.role || "").toLowerCase().includes("coordinator")
+            ? "coordinator"
+            : "instructor");
+        return roleType === "coordinator";
+      });
+      const hasIns = courses.some((c: any) => {
+        const roleType =
+          c.role_type ||
+          ((c.faculty_role || c.role || "").toLowerCase().includes("coordinator")
+            ? "coordinator"
+            : "instructor");
+        return roleType === "instructor";
+      });
+      setState({
+        data: res,
+        loading: false,
+        ...(hasCoord && !hasIns ? { activeToggle: "coordinator" } : {}),
+      });
     } catch (error) {
       console.log("error fetching faculty dashboard overview", error);
       setState({ loading: false });
