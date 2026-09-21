@@ -950,10 +950,10 @@ const LessonPlan = () => {
               textbook: updated.textbook,
               reference_book: updated.reference,
               pedagogy: updated.pedagogy,
-            });
+            }, loadedVersion);
             Success("Lesson plan item updated successfully!");
             // Refresh the data
-            lession_data(state?.courseData?.latest_syllabus?.id, parseInt(state.activeTab.split('-')[1], 10));
+            lession_data(state?.courseData?.latest_syllabus?.id, parseInt(state.activeTab.split('-')[1], 10), loadedVersion ?? undefined);
           } catch (error) {
             console.log("Update topic error:", error);
           }

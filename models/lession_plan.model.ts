@@ -82,11 +82,14 @@ const lession_plan = {
         return promise;
     },
 
-    update_topics: (topic_id: string | number,data) => {
+    update_topics: (topic_id: string | number, data: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}/lesson-plan-item`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
-                .put(url,data)
+                .put(url, data)
                 .then((res) => {
                     resolve(res.data);
                 })

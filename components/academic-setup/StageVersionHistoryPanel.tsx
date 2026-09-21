@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ShieldAlert,
   GitBranch,
+  Trash2,
 } from "lucide-react";
 import Models from "@/imports/models.import";
 import { Success, Failure } from "@/utils/function.utils";
@@ -58,6 +59,7 @@ export default function StageVersionHistoryPanel({
   const [loadingVersions, setLoadingVersions] = useState<boolean>(false);
   const [loadingVersionId, setLoadingVersionId] = useState<number | null>(null);
   const [activatingVersion, setActivatingVersion] = useState<number | null>(null);
+  const [deletingVersionId, setDeletingVersionId] = useState<number | null>(null);
 
   // Upstream approved versions
   const [approvedExtractionVersions, setApprovedExtractionVersions] = useState<number[]>([]);
@@ -195,6 +197,27 @@ export default function StageVersionHistoryPanel({
       Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${ver}`);
     } finally {
       setActivatingVersion(null);
+    }
+  };
+
+  const handleDelete = async (ver: number) => {
+    if (deletingVersionId !== null || activatingVersion !== null || loadingVersionId !== null) return;
+    if (!window.confirm(`Are you sure you want to delete Version ${ver} of ${stageLabel}?`)) return;
+    try {
+      setDeletingVersionId(ver);
+      await Models.syllabus.delete_version(courseId, stage, ver);
+      Success(`Deleted Version ${ver} for ${stageLabel}`);
+      if (loadedVersion === ver) {
+        setLoadedVersion(null);
+      }
+      if (activeVersion === ver) {
+        setActiveVersion(0);
+      }
+      await loadVersions();
+    } catch (err: any) {
+      Failure(typeof err === "string" ? err : err?.message || `Failed to delete Version ${ver}`);
+    } finally {
+      setDeletingVersionId(null);
     }
   };
 
@@ -482,12 +505,12 @@ export default function StageVersionHistoryPanel({
                 </div>
               </div>
 
-              {/* Two buttons: Load & Set Active */}
+              {/* Action buttons: Load, Set Active, Delete */}
               <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                 {/* Button 1: Load */}
                 <button
                   type="button"
-                  disabled={isCurrentLoaded || isLoadingThis || isActivating}
+                  disabled={isCurrentLoaded || isLoadingThis || isActivating || deletingVersionId !== null}
                   title={isCurrentLoaded ? `v${ver.version} is currently loaded` : `Load v${ver.version}`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -520,7 +543,7 @@ export default function StageVersionHistoryPanel({
                 ) : (
                   <button
                     type="button"
-                    disabled={isActivating || isLoadingThis}
+                    disabled={isActivating || isLoadingThis || deletingVersionId !== null}
                     title={`Activate v${ver.version} for instructors`}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -537,6 +560,24 @@ export default function StageVersionHistoryPanel({
                     )}
                   </button>
                 )}
+
+                {/* Button 3: Delete Version */}
+                <button
+                  type="button"
+                  disabled={deletingVersionId !== null || isActivating || isLoadingThis}
+                  title={`Delete Version ${ver.version}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(ver.version);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-400 shadow-xs transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  {deletingVersionId === ver.version ? (
+                    <RotateCw className="h-3 w-3 animate-spin text-red-500" />
+                  ) : (
+                    <Trash2 className="h-3 w-3" />
+                  )}
+                </button>
               </div>
             </div>
           );

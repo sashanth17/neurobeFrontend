@@ -458,7 +458,7 @@ const COPOMapping = () => {
       const res: any = await Models.COPOMap.get_cell_detail(sid, {
         co_code,
         target_code,
-      });
+      }, loadedVersion);
       const data = res?.data || res;
       if (data) {
         const newScore =
@@ -512,8 +512,8 @@ const COPOMapping = () => {
       setState({ updatingCell: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
 
-      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.copo_update(sid, payload);
+      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
+      await Models.COPOMap.copo_update(sid, payload, loadedVersion);
 
       const { co_code, target_code, correlation_level, justification, status } = payload;
       const strengthMap: Record<number, string> = {
@@ -572,8 +572,8 @@ const COPOMapping = () => {
       setState({ updatingCell: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
 
-      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.accept_map(sid, payload);
+      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
+      await Models.COPOMap.accept_map(sid, payload, loadedVersion);
 
       const { co_code, target_code } = payload;
       const currentCoMatrix = matrix[co_code] || {};

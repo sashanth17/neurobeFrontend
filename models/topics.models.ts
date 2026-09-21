@@ -95,9 +95,12 @@ const topics = {
         return promise;
     },
 
-    update: (topic_id?: any, body?: any) => { 
+    update: (topic_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .put(url, body)
@@ -115,9 +118,12 @@ const topics = {
         return promise;
     },
 
-    subTopics_update: (topic_id?: any, body?: any) => { 
+    subTopics_update: (topic_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}/subtopics`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .post(url, body)
@@ -225,9 +231,12 @@ const topics = {
         });
     },
 
-    delete_topic: (topic_id: string | number) => {
+    delete_topic: (topic_id: string | number, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .delete(url)
                 .then((res) => resolve(res.data))
@@ -235,9 +244,12 @@ const topics = {
         });
     },
 
-    delete_subtopic: (topic_id: string | number, subtopic_id: string | number) => {
+    delete_subtopic: (topic_id: string | number, subtopic_id: string | number, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}/subtopics/${subtopic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .delete(url)
                 .then((res) => resolve(res.data))
@@ -245,9 +257,12 @@ const topics = {
         });
     },
 
-    add_subtopic: (topic_id: string | number, body: any) => {
+    add_subtopic: (topic_id: string | number, body: any, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}/subtopics`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .post(url, body)
                 .then((res) => resolve(res.data))

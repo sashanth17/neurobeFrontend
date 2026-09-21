@@ -237,7 +237,7 @@ const Pedagogy = () => {
     }
 
     try {
-      await Models.pedagogy.update_selection(sid, pedagogyId, { is_selected: nextSelected });
+      await Models.pedagogy.update_selection(sid, pedagogyId, { is_selected: nextSelected }, loadedVersion);
 
       // Update in-memory topic suggested_pedagogies in unitDetailsMap
       setState((prev: any) => {
@@ -300,7 +300,7 @@ const Pedagogy = () => {
 
     try {
       if (typeof pedagogyId === "number" || (typeof pedagogyId === "string" && /^\d+$/.test(pedagogyId))) {
-        await Models.pedagogy.delete(sid, pedagogyId);
+        await Models.pedagogy.delete(sid, pedagogyId, loadedVersion);
       }
 
       setAcceptedIds((prev) => {

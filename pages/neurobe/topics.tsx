@@ -1028,10 +1028,10 @@ const Topics = () => {
       let res: any;
       if (isSub) {
         console.log("Calling Models.topics.subTopics_update with topicId:", targetTopicId, "body:", subtopicBody);
-        res = await Models.topics.subTopics_update(targetTopicId, subtopicBody);
+        res = await Models.topics.subTopics_update(targetTopicId, subtopicBody, loadedVersion);
       } else {
         console.log("Calling Models.topics.update with topicId:", targetTopicId, "body:", topicBody);
-        res = await Models.topics.update(targetTopicId, topicBody);
+        res = await Models.topics.update(targetTopicId, topicBody, loadedVersion);
       }
 
       if (res && (res.status === false || res.success === false)) {
@@ -1159,7 +1159,7 @@ const Topics = () => {
     }
     try {
       setState({ topicsLoading: true });
-      await Models.topics.delete_topic(topicId);
+      await Models.topics.delete_topic(topicId, loadedVersion);
       Success("Topic deleted successfully");
       const sid =
         activeUnitDetail?.syllabus_id ||
@@ -1186,7 +1186,7 @@ const Topics = () => {
     }
     try {
       setState({ topicsLoading: true });
-      await Models.topics.delete_subtopic(parentTopicId, subtopicId);
+      await Models.topics.delete_subtopic(parentTopicId, subtopicId, loadedVersion);
       Success("Subtopic deleted successfully");
       const sid =
         activeUnitDetail?.syllabus_id ||
@@ -1218,7 +1218,7 @@ const Topics = () => {
     }
     try {
       setAddingSubtopic(true);
-      const res: any = await Models.topics.add_subtopic(parentTopicId, payload);
+      const res: any = await Models.topics.add_subtopic(parentTopicId, payload, loadedVersion);
       Success(res?.message || "Subtopic added successfully");
       const sid =
         activeUnitDetail?.syllabus_id ||

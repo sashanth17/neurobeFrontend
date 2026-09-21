@@ -197,9 +197,12 @@ const pedagogy = {
         });
     },
 
-    update_selection: (id: string | number, pedagogy_id: string | number, body: any) => {
+    update_selection: (id: string | number, pedagogy_id: string | number, body: any, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .put(url, body)
                 .then((res) => resolve(res.data))
@@ -207,9 +210,12 @@ const pedagogy = {
         });
     },
 
-    delete: (id: string | number, pedagogy_id: string | number) => {
+    delete: (id: string | number, pedagogy_id: string | number, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .delete(url)
                 .then((res) => resolve(res.data))
