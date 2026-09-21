@@ -158,6 +158,11 @@ export default function StageVersionHistoryPanel({
   }, [refreshTrigger, courseId]);
 
   const handleActivate = async (ver: number) => {
+    const targetVerObj = versions.find((v) => v.version === ver);
+    if (targetVerObj && targetVerObj.status !== "approved") {
+      Failure(`Version ${ver} cannot be set active because it has status "${targetVerObj.status || "draft"}". Only approved versions can be set active.`);
+      return;
+    }
     try {
       setActivatingVersion(ver);
       await Models.syllabus.activate_version(courseId, stage, ver);
@@ -446,9 +451,14 @@ export default function StageVersionHistoryPanel({
                 ) : (
                   <button
                     type="button"
-                    disabled={isActivating}
+                    disabled={isActivating || !isApproved}
+                    title={!isApproved ? "Draft versions cannot be set active. Approve this version first." : `Set v${ver.version} as active`}
                     onClick={() => handleActivate(ver.version)}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 shadow-sm transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    className={`rounded-lg border px-2 py-1 text-[10px] font-bold shadow-sm transition-all active:scale-95 ${
+                      !isApproved
+                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 opacity-60 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-500"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    }`}
                   >
                     {isActivating ? (
                       <RotateCw className="h-3 w-3 animate-spin" />

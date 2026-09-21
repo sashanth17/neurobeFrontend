@@ -33,6 +33,7 @@ const Syllabus = () => {
   const searchParams = useSearchParams();
   const course_id = searchParams.get("course_id");
   const job_id = searchParams.get("job_id");
+  const fromParam = searchParams.get("from");
 
   const stepKey = `syllabus_step_${course_id ?? "default"}`;
   const jobKey = `syllabus_job_${course_id ?? "default"}`;
@@ -867,7 +868,13 @@ const Syllabus = () => {
         courseOptions={state.course_list}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
       <div className="">

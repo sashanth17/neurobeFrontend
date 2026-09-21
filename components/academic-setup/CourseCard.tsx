@@ -320,6 +320,23 @@ export default function CourseCard(props: any) {
   // Version activation directly from card
   const handleToggleVersion = async (stageKey: string, newVer: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    const stepKeyMap: Record<string, string> = {
+      extraction: "step_1_syllabus_extraction",
+      copo: "step_2_copo_mapping",
+      hierarchy: "step_3_topic_hierarchy",
+      pedagogy: "step_4_pedagogy_generation",
+      schedule: "step_5_lesson_plan_schedules",
+    };
+    const stepObj = workflowStatus?.[stepKeyMap[stageKey] as keyof typeof workflowStatus] as any;
+    const detailed = stepObj?.versions_detailed;
+    if (Array.isArray(detailed)) {
+      const match = detailed.find((v: any) => v.version === newVer);
+      if (match && match.status !== "approved") {
+        Failure(`Version ${newVer} cannot be activated because it is in "${match.status || "draft"}" status. Only approved versions can be activated.`);
+        return;
+      }
+    }
+
     try {
       setActionLoading(stageKey);
       setOptimisticVersions((prev) => ({ ...prev, [stageKey]: newVer }));
@@ -753,7 +770,7 @@ export default function CourseCard(props: any) {
         <button
           type="button"
           onClick={() =>
-            router.push(`/neurobe/ins-course-artifacts?course_id=${targetCourseId}`)
+            router.push(`/neurobe/ins-course-artifacts?course_id=${targetCourseId}&from=my-courses`)
           }
           className="rounded-xl border border-purple-600 bg-white px-4 py-2 text-xs font-bold text-purple-700 shadow-sm transition-all hover:bg-purple-50 active:scale-95 dark:bg-gray-800 dark:text-purple-300 dark:hover:bg-purple-900/30"
         >

@@ -252,6 +252,7 @@ const LessonPlan = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
   console.log("course_id", course_id);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -746,7 +747,13 @@ const LessonPlan = () => {
         courseOptions={state.course_list}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 

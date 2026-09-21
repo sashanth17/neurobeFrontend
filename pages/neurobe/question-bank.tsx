@@ -277,7 +277,13 @@ const QuestionBank = () => {
         ]}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeBannerTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router?.query?.from === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeBannerTab: view })}
       />
 

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Save,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Failure, Dropdown } from "@/utils/function.utils";
@@ -33,6 +34,7 @@ import GenericTabs from "@/components/common-components/GenericTabs";
 import AccordiansStyle from "@/components/common-components/AccordiansStyle";
 import PageFooter from "@/components/common-components/PageFooter";
 import AddTopicModal from "@/components/academic-setup/AddTopicModal";
+import AddSubtopicModal from "@/components/academic-setup/AddSubtopicModal";
 import EditTopicModal from "@/components/academic-setup/EditTopicModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UNIT_TABS } from "@/utils/constant.utils";
@@ -274,6 +276,8 @@ const fallbackTotalSubtopics = Object.values(RAW_UNIT_DATA).reduce(
 const Topics = () => {
   const dispatch = useDispatch();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromParam = searchParams?.get("from");
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
 
@@ -319,6 +323,9 @@ const Topics = () => {
   );
 
   const [addTopicModal, setAddTopicModal] = useState(false);
+  const [addSubtopicModal, setAddSubtopicModal] = useState(false);
+  const [selectedTopicForSubtopic, setSelectedTopicForSubtopic] = useState<any>(null);
+  const [addingSubtopic, setAddingSubtopic] = useState(false);
   const [editTopicModal, setEditTopicModal] = useState(false);
   const [selectedTopicToEdit, setSelectedTopicToEdit] = useState<any>(null);
   const [updatingTopic, setUpdatingTopic] = useState(false);
@@ -328,6 +335,11 @@ const Topics = () => {
     setSelectedTopicToEdit(topic);
     setEditModalInitialStatus(initialStatus);
     setEditTopicModal(true);
+  };
+
+  const openAddSubtopicModal = (topic: any) => {
+    setSelectedTopicForSubtopic(topic);
+    setAddSubtopicModal(true);
   };
 
   useEffect(() => {
@@ -590,6 +602,7 @@ const Topics = () => {
           setState({
             topicsLoading: false,
             topicsGenerated: true,
+            topicsApproved: false,
           });
         } else if (status === "failed" || status === "error") {
           stopPolling();
@@ -1131,6 +1144,95 @@ const Topics = () => {
     }
   };
 
+  const handleDeleteTopic = async (topicObj: any) => {
+    const topicId = topicObj?.id || topicObj?.topic_id;
+    if (!topicId) {
+      Failure("Cannot identify topic to delete");
+      return;
+    }
+    const topicTitle = topicObj?.topic_name || topicObj?.title || "this topic";
+    if (!window.confirm(`Are you sure you want to delete topic "${topicTitle}"?`)) {
+      return;
+    }
+    try {
+      setState({ topicsLoading: true });
+      await Models.topics.delete_topic(topicId);
+      Success("Topic deleted successfully");
+      const sid =
+        activeUnitDetail?.syllabus_id ||
+        state.courseDetail?.latest_syllabus?.id ||
+        state.unitsList?.[0]?.syllabus_id ||
+        course_id ||
+        9;
+      await getUnitDetail(sid, activeUnitNum);
+    } catch (error: any) {
+      console.log("delete topic error:", error);
+      Failure(getErrorMessage(error, "Failed to delete topic"));
+    } finally {
+      setState({ topicsLoading: false });
+    }
+  };
+
+  const handleDeleteSubtopic = async (parentTopicId: any, subtopicId: any) => {
+    if (!parentTopicId || !subtopicId) {
+      Failure("Cannot identify subtopic to delete");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this subtopic?")) {
+      return;
+    }
+    try {
+      setState({ topicsLoading: true });
+      await Models.topics.delete_subtopic(parentTopicId, subtopicId);
+      Success("Subtopic deleted successfully");
+      const sid =
+        activeUnitDetail?.syllabus_id ||
+        state.courseDetail?.latest_syllabus?.id ||
+        state.unitsList?.[0]?.syllabus_id ||
+        course_id ||
+        9;
+      await getUnitDetail(sid, activeUnitNum);
+    } catch (error: any) {
+      console.log("delete subtopic error:", error);
+      Failure(getErrorMessage(error, "Failed to delete subtopic"));
+    } finally {
+      setState({ topicsLoading: false });
+    }
+  };
+
+  const handleAddSubtopic = async (payload: {
+    subtopic_code: string;
+    subtopic_name: string;
+    hours: number;
+    knowledge_level: string;
+    status: string;
+    micro_topics: { micro_topic_name: string }[];
+  }) => {
+    const parentTopicId = selectedTopicForSubtopic?.id || selectedTopicForSubtopic?.topic_id;
+    if (!parentTopicId) {
+      Failure("Parent topic ID not found");
+      return;
+    }
+    try {
+      setAddingSubtopic(true);
+      const res: any = await Models.topics.add_subtopic(parentTopicId, payload);
+      Success(res?.message || "Subtopic added successfully");
+      const sid =
+        activeUnitDetail?.syllabus_id ||
+        state.courseDetail?.latest_syllabus?.id ||
+        state.unitsList?.[0]?.syllabus_id ||
+        course_id ||
+        9;
+      await getUnitDetail(sid, activeUnitNum);
+    } catch (error: any) {
+      console.log("add subtopic error:", error);
+      Failure(getErrorMessage(error, "Failed to add subtopic"));
+      throw error;
+    } finally {
+      setAddingSubtopic(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     const sid =
       activeUnitDetail?.syllabus_id ||
@@ -1208,6 +1310,7 @@ const Topics = () => {
         generatingTopics: false,
         showGenerateModal: true,
         jobId: res.job_id,
+        topicsApproved: false,
       });
       if (res?.job_id) {
         job_Data(res.job_id);
@@ -1229,6 +1332,9 @@ const Topics = () => {
     if (sid) {
       await getUnits(sid);
       await getUnitDetail(sid, state.activeUnitNumber || 1);
+    }
+    if (course_id) {
+      await restoreWorkflowState(course_id);
     }
   };
 
@@ -1280,7 +1386,24 @@ const Topics = () => {
           collapsedBadge: [
             { label: levelBadge, className: "bg-color2-l text-color2 font-bold" },
             { label: hoursBadge, className: "bg-gray-200 text-pri font-bold" },
-            // statusBadge,
+          ],
+          actions: [
+            {
+              key: "edit",
+              label: "",
+              icon: <EditIcon className="h-3.5 w-3.5" />,
+              className:
+                "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
+              onClick: () => openEditTopicModal(topic, "Approved"),
+            },
+            {
+              key: "delete",
+              label: "",
+              icon: <Trash2 className="h-3.5 w-3.5 text-red-500" />,
+              className:
+                "flex items-center rounded border border-red-200 bg-red-50/60 p-1 text-red-500 hover:border-red-400 hover:bg-red-100 cursor-pointer shadow-xs",
+              onClick: () => handleDeleteTopic(topic),
+            },
           ],
           items: [],
         };
@@ -1372,12 +1495,28 @@ const Topics = () => {
               onClick: () => openEditTopicModal(topicObj, "Approved"),
             },
         {
+          key: "add-subtopic",
+          label: "Add Subtopic",
+          icon: <Plus className="h-3.5 w-3.5" />,
+          className:
+            "flex items-center gap-1 rounded-md border border-dashed border-indigo-400 bg-indigo-50/70 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-500 cursor-pointer shadow-xs transition-all",
+          onClick: () => openAddSubtopicModal(topicObj),
+        },
+        {
           key: "edit",
           label: "",
           icon: <EditIcon className="h-3.5 w-3.5" />,
           className:
             "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
           onClick: () => openEditTopicModal(topicObj, isTopicApproved ? "Approved" : "Needs Review"),
+        },
+        {
+          key: "delete",
+          label: "",
+          icon: <Trash2 className="h-3.5 w-3.5 text-red-500" />,
+          className:
+            "flex items-center rounded border border-red-200 bg-red-50/50 p-1 text-red-500 hover:border-red-400 hover:bg-red-100 cursor-pointer shadow-xs transition-all",
+          onClick: () => handleDeleteTopic(topicObj),
         },
       ];
 
@@ -1440,6 +1579,14 @@ const Topics = () => {
               "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
             onClick: () => openEditTopicModal(subtopicObj, isApproved ? "Approved" : "Needs Review"),
           },
+          {
+            key: "delete",
+            label: "",
+            icon: <Trash2 className="h-3.5 w-3.5 text-red-500" />,
+            className:
+              "flex items-center rounded border border-red-200 bg-red-50/50 p-1 text-red-500 hover:border-red-400 hover:bg-red-100 cursor-pointer shadow-xs transition-all",
+            onClick: () => handleDeleteSubtopic(topic.id || topic.topic_id || topicId, sub.id || subId),
+          },
         ];
 
         return {
@@ -1497,7 +1644,13 @@ const Topics = () => {
           router.push(`/neurobe/topics?course_id=${val.value}`);
         }}
         activeView={state.activeBannerTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeBannerTab: view })}
       />
 
@@ -1706,6 +1859,15 @@ const Topics = () => {
         initialStatus={editModalInitialStatus}
         loading={updatingTopic}
         onUpdate={handleUpdateTopic}
+      />
+
+      {/* ── Add Subtopic modal ── */}
+      <AddSubtopicModal
+        open={addSubtopicModal}
+        onClose={() => setAddSubtopicModal(false)}
+        parentTopic={selectedTopicForSubtopic}
+        loading={addingSubtopic}
+        onAdd={handleAddSubtopic}
       />
 
       {/* ── Generate Topics modal ── */}

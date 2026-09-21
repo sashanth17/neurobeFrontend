@@ -115,7 +115,9 @@ const getErrorMessage = (error: any, fallback: string) => {
 const Pedagogy = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const course_id = useSearchParams().get("course_id");
+  const searchParams = useSearchParams();
+  const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
 
   const [state, setState] = useSetState({
     activeTab: "unit-1",
@@ -398,7 +400,7 @@ const Pedagogy = () => {
         const status = jobRes?.status ?? jobRes?.state?.live_redis_status ?? jobRes?.result?.status;
         if (status === "complete" || status === "completed" || status === "success" || status === "finished") {
           stopPolling();
-          setState({ generatingRecommendations: false, pollingJob: false, recommendationsGenerated: true });
+          setState({ generatingRecommendations: false, pollingJob: false, recommendationsGenerated: true, pedagogyApproved: false });
           Success("Pedagogy recommendations generated successfully");
           if (targetSid) getUnitDetail(targetSid, activeUnitNum);
         } else if (status === "failed" || status === "error") {
@@ -421,7 +423,7 @@ const Pedagogy = () => {
       activeUnitDetail?.syllabus_id ||
       course_id;
     try {
-      setState({ generatingRecommendations: true });
+      setState({ generatingRecommendations: true, pedagogyApproved: false });
       const res: any = await Models.pedagogy.generate_pedagogies(sid, {
         hierarchy_version: parentParams?.hierarchy_version,
       });
@@ -430,7 +432,7 @@ const Pedagogy = () => {
         startPollingJob(jobId, sid);
       } else {
         // no job_id — treat as immediate success
-        setState({ generatingRecommendations: false, recommendationsGenerated: true });
+        setState({ generatingRecommendations: false, recommendationsGenerated: true, pedagogyApproved: false });
         Success(res?.message || "Pedagogy recommendations generated successfully");
         getUnitDetail(sid, activeUnitNum);
       }
@@ -486,6 +488,9 @@ const Pedagogy = () => {
     if (sid) {
       await getUnits(sid);
       await getUnitDetail(sid, state.activeUnitNumber || 1);
+    }
+    if (course_id) {
+      await restoreWorkflowState(course_id);
     }
   };
   
@@ -617,7 +622,13 @@ const Pedagogy = () => {
           router.push(`/neurobe/pedagogy?course_id=${val.value}`);
         }}
         activeView={state.activeBannerTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeBannerTab: view })}
       />
 

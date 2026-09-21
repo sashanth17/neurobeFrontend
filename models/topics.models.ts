@@ -220,6 +220,36 @@ const topics = {
                 .then((res) => resolve(res.data))
                 .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
         });
+    },
+
+    delete_topic: (topic_id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}`;
+            commonInstance()
+                .delete(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
+    },
+
+    delete_subtopic: (topic_id: string | number, subtopic_id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/subtopics/${subtopic_id}`;
+            commonInstance()
+                .delete(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
+    },
+
+    add_subtopic: (topic_id: string | number, body: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/subtopics`;
+            commonInstance()
+                .post(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
     }
 
 }

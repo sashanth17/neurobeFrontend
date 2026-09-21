@@ -78,7 +78,9 @@ const getErrorMessage = (error: any, fallback: string) => {
 const COPOMapping = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const course_id = useSearchParams().get("course_id");
+  const searchParams = useSearchParams();
+  const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -787,7 +789,13 @@ const COPOMapping = () => {
           router.push(`/neurobe/co-po-mapping?course_id=${val.value}`);
         }}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 

@@ -9,6 +9,7 @@ import {
   resetApplicationCount,
 } from "../../store/notificationSlice";
 import { OwnmenuConfig, getMenuByRole } from "@/utils/constant.utils";
+import { setCourseView } from "@/store/courseViewSlice";
 
 const Icons: Record<string, () => JSX.Element> = {
   "Academic Setup": () => (
@@ -537,10 +538,6 @@ const SidebarDynamic = () => {
   let currentSection: "coordinator" | "instructor" | null = null;
 
   const isItemDisabled = () => {
-    if (currentSection === "coordinator" && activeView === "instructor")
-      return true;
-    if (currentSection === "instructor" && activeView === "coordinator")
-      return true;
     return false;
   };
 
@@ -695,6 +692,11 @@ const SidebarDynamic = () => {
                     if (disabled) {
                       e.preventDefault();
                       return;
+                    }
+                    if (currentSection === "coordinator") {
+                      dispatch(setCourseView("coordinator"));
+                    } else if (currentSection === "instructor") {
+                      dispatch(setCourseView("instructor"));
                     }
                     if (item.notifyKey === "new_applications") {
                       dispatch(clearApplicationCount());

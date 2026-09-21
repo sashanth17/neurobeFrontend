@@ -256,7 +256,7 @@ const AccordiansStyle = ({
                 </div>
 
                 {/* ───────────────── EXPANDED ITEMS ───────────────── */}
-                {topic.items.length > 0 && expandable && isOpen && (
+                {expandable && isOpen && (
                   <div className="mx-4 mb-3 rounded-xl border bg-violet-50 p-3">
                     {/* Expanded Section Label */}
                     {expandedSectionLabel && (
@@ -265,85 +265,91 @@ const AccordiansStyle = ({
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      {topic.items?.map((item: any) => (
-                        <div
-                          key={item.id}
-                          className={`flex items-center justify-between gap-4 rounded-xl px-3 py-3 ${
-                            item.highlighted
-                              ? "border border-green-200 bg-green-100/50"
-                              : "border border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          {/* Index Circle */}
-                          <span
-                            className={`flex h-fit shrink-0 items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${
+                    {(!topic.items || topic.items.length === 0) ? (
+                      <div className="rounded-xl border border-dashed border-gray-300 bg-white/70 py-4 text-center text-xs text-gray-500">
+                        No subtopics found for this topic yet. Click &quot;Add Subtopic&quot; on the topic above to create one.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {topic.items?.map((item: any) => (
+                          <div
+                            key={item.id}
+                            className={`flex items-center justify-between gap-4 rounded-xl px-3 py-3 ${
                               item.highlighted
-                                ? "bg-green-700 text-white"
-                                : "bg-gray-200"
+                                ? "border border-green-200 bg-green-100/50"
+                                : "border border-gray-200 bg-white hover:bg-gray-50"
                             }`}
                           >
-                            {item.index}
-                          </span>
+                            {/* Index Circle */}
+                            <span
+                              className={`flex h-fit shrink-0 items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${
+                                item.highlighted
+                                  ? "bg-green-700 text-white"
+                                  : "bg-gray-200"
+                              }`}
+                            >
+                              {item.index}
+                            </span>
 
-                          {/* Title + Badge + Description */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <p className="text-sm font-semibold">
-                                {item.title}
-                              </p>
+                            {/* Title + Badge + Description */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="text-sm font-semibold">
+                                  {item.title}
+                                </p>
 
-                              {item.badge && (
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${
-                                    item.badge.className ??
-                                    "bg-green-500"
-                                  }`}
-                                >
-                                  {item.badge.label}
-                                </span>
+                                {item.badge && (
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${
+                                      item.badge.className ??
+                                      "bg-green-500"
+                                    }`}
+                                  >
+                                    {item.badge.label}
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.description && (
+                                <p className="text-pri text-xs">
+                                  {item.description}
+                                </p>
                               )}
                             </div>
 
-                            {item.description && (
-                              <p className="text-pri text-xs">
-                                {item.description}
-                              </p>
-                            )}
+                            {/* Actions */}
+                            <div className="flex shrink-0 items-center gap-2">
+                              {item.actions?.map((action: any) =>
+                                action.asTag ? (
+                                  <span
+                                    key={action.key}
+                                    className={action.className}
+                                  >
+                                    {action.icon}
+                                    {action.label}
+                                  </span>
+                                ) : (
+                                  <button
+                                    key={action.key}
+                                    type="button"
+                                    className={
+                                      action.className ??
+                                      "text-pri flex items-center gap-1.5 rounded-full border border-gray-400 px-3 py-1 text-xs font-semibold hover:border-[#000] hover:text-[#000]"
+                                    }
+                                    onClick={() =>
+                                      action.onClick?.(item, topic)
+                                    }
+                                  >
+                                    {action.icon}
+                                    {action.label}
+                                  </button>
+                                )
+                              )}
+                            </div>
                           </div>
-
-                          {/* Actions */}
-                          <div className="flex shrink-0 items-center gap-2">
-                            {item.actions?.map((action: any) =>
-                              action.asTag ? (
-                                <span
-                                  key={action.key}
-                                  className={action.className}
-                                >
-                                  {action.icon}
-                                  {action.label}
-                                </span>
-                              ) : (
-                                <button
-                                  key={action.key}
-                                  type="button"
-                                  className={
-                                    action.className ??
-                                    "text-pri flex items-center gap-1.5 rounded-full border border-gray-400 px-3 py-1 text-xs font-semibold hover:border-[#000] hover:text-[#000]"
-                                  }
-                                  onClick={() =>
-                                    action.onClick?.(item, topic)
-                                  }
-                                >
-                                  {action.icon}
-                                  {action.label}
-                                </button>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trash2, Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { capitalizeFLetter } from "@/utils/function.utils";
 
 interface Topic {
@@ -259,20 +259,14 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic, onUpdateHours, onUpdateUn
                 </div>
               </div>
 
-              {/* Topics header */}
+              {/* Topics header — read-only in Syllabus units view */}
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-md text-color1 py-1 font-extrabold uppercase tracking-wide dark:text-gray-300">
                   Topics ({unit.topics?.length ?? 0})
                 </span>
-                <button
-                  onClick={() => openModal( unit)}
-                  className="text-green flex items-center gap-1 text-sm font-semibold hover:text-green-700"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Topic
-                </button>
               </div>
 
-              {/* Topic list */}
+              {/* Topic list — display only */}
               <div className="space-y-2">
                 {unit.topics?.map((topic, index) => (
                   <div
@@ -285,12 +279,6 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic, onUpdateHours, onUpdateUn
                     <span className="flex-1 text-sm text-[#000] dark:text-gray-300">
                       {topic.topic_name}
                     </span>
-                    <button
-                      onClick={() => deleteTopic(unit.unitNumber, topic.id)}
-                      className="text-color1 hover:text-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </div>
                 ))}
               </div>

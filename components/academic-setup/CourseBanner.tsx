@@ -45,12 +45,16 @@ export default function CourseBanner({
 
   // Reset to coordinator only once per app session (not on every page navigation)
   useEffect(() => {
+    if (toogle === "instructor" || toogle === "coordinator") {
+      dispatch(setCourseView(toogle));
+      return;
+    }
     const alreadySet = sessionStorage.getItem("courseViewInitialized");
     if (!alreadySet) {
       dispatch(setCourseView("coordinator"));
       sessionStorage.setItem("courseViewInitialized", "1");
     }
-  }, []);
+  }, [toogle, dispatch]);
 
   const handleViewChange = (view: "coordinator" | "instructor") => {
     dispatch(setCourseView(view));

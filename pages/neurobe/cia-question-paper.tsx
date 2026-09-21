@@ -180,9 +180,15 @@ const CIAQuestionPaper = () => {
         ]}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() =>
-          state.isEditing ? setState({ isEditing: false }) : console.log("back")
-        }
+        onBack={() => {
+          if (state.isEditing) {
+            setState({ isEditing: false });
+          } else if (router?.query?.from === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 

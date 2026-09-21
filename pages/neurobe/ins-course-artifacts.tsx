@@ -1906,6 +1906,7 @@ const QuestionBank = () => {
     topicsUnits: [] as any[],
     pedagogyUnits: [] as any[],
     lessonUnits: [] as any[],
+    allCourses: [] as any[],
     loadingArtifacts: false,
   });
 
@@ -1914,15 +1915,47 @@ const QuestionBank = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    const courseId = router?.query?.course_id || router?.query?.code;
-    if (!courseId) return;
+    if (!router.isReady) return;
 
     const loadAllArtifacts = async () => {
       setState({ loadingArtifacts: true });
       try {
+        let targetId = router?.query?.course_id;
+        let allCoursesList: any[] = [];
+
+        try {
+          const user = localStorage.getItem("user");
+          const u = user ? JSON.parse(user) : null;
+          const body = { faculty_id: u?.id || 1, coordinator_id: u?.id || 1 };
+          const fRes: any = await Models.course.faculty_dashboard_overview(body).catch(() => null);
+          allCoursesList = fRes?.courses || [];
+        } catch {}
+
+        if (!targetId) {
+          if (router?.query?.code) {
+            const found = allCoursesList.find(
+              (c: any) =>
+                (c.course_code || c.code)?.toLowerCase() ===
+                String(router.query.code).toLowerCase()
+            );
+            if (found?.id) targetId = found.id;
+          }
+          if (!targetId && allCoursesList.length > 0) {
+            targetId = allCoursesList[0].id;
+          }
+          if (!targetId && router?.query?.code) {
+            targetId = router.query.code;
+          }
+        }
+
+        if (!targetId) {
+          setState({ loadingArtifacts: false, allCourses: allCoursesList });
+          return;
+        }
+
         const [cData, wfRes]: [any, any] = await Promise.all([
-          Models.course.detail(courseId).catch(() => null),
-          Models.syllabus.get_workflow_status(courseId).catch(() => null),
+          Models.course.detail(targetId).catch(() => null),
+          Models.syllabus.get_workflow_status(targetId).catch(() => null),
         ]);
 
         const sid = wfRes?.syllabus_id || cData?.latest_syllabus?.id || cData?.syllabus_id;
@@ -1961,6 +1994,7 @@ const QuestionBank = () => {
           topicsUnits: Array.isArray(tUnits) ? tUnits : [],
           pedagogyUnits: pUnits,
           lessonUnits: lUnits,
+          allCourses: allCoursesList,
           loadingArtifacts: false,
         });
       } catch (err) {
@@ -1970,7 +2004,7 @@ const QuestionBank = () => {
     };
 
     loadAllArtifacts();
-  }, [router?.query?.course_id, router?.query?.code]);
+  }, [router?.query?.course_id, router?.query?.code, router.isReady]);
 
   useEffect(() => {
     if (router?.query?.stage) {
@@ -2271,18 +2305,44 @@ const QuestionBank = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-8">
       <CourseBanner
-        courseCode={activeCourseCode}
-        courseTitle={activeCourseTitle}
+        courseCode={activeCourseCode || "Course"}
+        courseTitle={activeCourseTitle || "Course Artifacts"}
         description="Instructor View — Access approved academic artifacts, active syllabus, outcomes mapping, topic hierarchy, pedagogy, and lesson plans."
         programme={activeProgramme}
         batch={activeBatch}
         academicYear={state.courseData?.academic_year || ""}
         students={`${state.courseData?.students_count ?? 0} Students`}
         selectedCourse={activeCourseCode}
+        courseOptions={(state.allCourses || []).map((c: any) => ({
+          value: String(c.id),
+          label: `${c.course_code || c.code} — ${c.course_title || c.title}`,
+        }))}
+        onCourseChange={(val) => {
+          const targetId = typeof val === "object" ? val?.value : val;
+          const selected = (state.allCourses || []).find((c: any) => String(c.id) === String(targetId));
+          if (selected) {
+            router.push(
+              `/neurobe/ins-course-artifacts?course_id=${selected.id}&code=${selected.course_code || selected.code}`
+            );
+          }
+        }}
         toogle="instructor"
         activeView={state.activeTab}
-        onBack={() => router.push("/neurobe/ins-my-assigned-courses")}
-        onViewChange={(view) => setState({ activeTab: view })}
+        onBack={() => {
+          if (router?.query?.from === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
+        onViewChange={(view) => {
+          setState({ activeTab: view });
+          if (view === "coordinator") {
+            router.push(
+              `/neurobe/course-artifacts?course_id=${state.courseData?.id || router?.query?.course_id || ""}&code=${activeCourseCode}`
+            );
+          }
+        }}
       />
 
       {/* ── Course Instructor View Banner ── */}
@@ -2307,16 +2367,26 @@ const QuestionBank = () => {
         </div>
         <button
           type="button"
-          onClick={() => router.push("/neurobe/ins-my-assigned-courses")}
+          onClick={() => {
+            if (router?.query?.from === "my-courses") {
+              router.push("/neurobe/my-assigned-courses");
+            } else {
+              router.back();
+            }
+          }}
           className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-4 py-2 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 active:scale-95 dark:border-indigo-700 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
         >
-          ← Back to My Courses
+          ← Back
         </button>
       </div>
 
       <PageHeader
         title="Course Artifacts"
-        records={`${state.courseData?.course_code || "CS309"} — ${state.courseData?.course_title || "Computer Networks"}`}
+        records={
+          activeCourseCode && activeCourseTitle
+            ? `${activeCourseCode} — ${activeCourseTitle}`
+            : activeCourseCode || "Course Artifacts"
+        }
         subtitle={`Access active approved academic references prepared for this course.`}
         icon={<Users className="h-5 w-5 text-color2" />}
         record2="Instructor View"
