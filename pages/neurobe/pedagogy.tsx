@@ -179,8 +179,9 @@ const Pedagogy = () => {
   const currentTopics: any[] = apiTopics || [];
 
   const isTopicReviewed = (topic: any) => {
-    const peds = topic.suggested_pedagogies || [];
-    return peds.length > 0 && peds.every((p: any) => acceptedIds.has(p.id) || p.is_selected);
+    if (topic?.pedagogy_status === "Reviewed" || topic?.status === "Reviewed" || topic?.status === "Approved") return true;
+    const peds = topic?.suggested_pedagogies || [];
+    return peds.length > 0 && peds.some((p: any) => acceptedIds.has(p.id) || p.is_selected);
   };
 
   const isEveryUnitReviewed =
@@ -221,7 +222,9 @@ const Pedagogy = () => {
   const allAccepted = Boolean(isEveryUnitReviewed && totalCourseTopics > 0);
 
   const toggleAccept = async (pedagogyId: number | string, topic?: any) => {
-    const isCurrentlyAccepted = acceptedIds.has(pedagogyId);
+    const isCurrentlyAccepted =
+      acceptedIds.has(pedagogyId) ||
+      Boolean(topic?.suggested_pedagogies?.find((p: any) => String(p.id) === String(pedagogyId))?.is_selected);
     const nextSelected = !isCurrentlyAccepted;
 
     // Optimistically update UI
@@ -867,7 +870,11 @@ const Pedagogy = () => {
       const hours = topic.theory_hours ?? topic.hours ?? 2;
 
       const peds: any[] = Array.isArray(topic.suggested_pedagogies) ? topic.suggested_pedagogies : [];
-      const topicHasSelection = peds.length > 0 && peds.every((p: any) => acceptedIds.has(p.id) || p.is_selected);
+      const topicHasSelection =
+        topic.pedagogy_status === "Reviewed" ||
+        topic.status === "Reviewed" ||
+        topic.status === "Approved" ||
+        (peds.length > 0 && peds.some((p: any) => acceptedIds.has(p.id) || p.is_selected));
 
       const items = peds.map((rec: any, idx: number) => {
         const recId = rec.id || `${topicId}-rec-${idx + 1}`;

@@ -562,6 +562,26 @@ const Topics = () => {
           },
         };
       });
+
+      const loadedTopics = data?.selected_unit?.topics || data?.topics || [];
+      const targetUnitNum = data?.selected_unit?.unit_number ?? uNum;
+      const uKey = `unit-${targetUnitNum}`;
+      setApprovedMap((prev: any) => {
+        const nextSet = new Set(prev[uKey] || []);
+        loadedTopics.forEach((t: any) => {
+          if (t.status === "Approved" || t.status?.toLowerCase() === "approved") {
+            nextSet.add(String(t.id));
+            if (t.topic_code) nextSet.add(String(t.topic_code));
+          }
+          (t.subtopics || []).forEach((s: any) => {
+            if (s.status === "Approved" || s.status?.toLowerCase() === "approved") {
+              nextSet.add(String(s.id));
+              if (s.subtopic_code) nextSet.add(String(s.subtopic_code));
+            }
+          });
+        });
+        return { ...prev, [uKey]: nextSet };
+      });
     } catch (error: any) {
       console.log("error fetching unit detail", error);
       setState({ loadingUnitDetail: false });
@@ -790,22 +810,42 @@ const Topics = () => {
   unitsList.forEach((u: any) => {
     const uDetail = state.unitDetailsMap?.[u.unit_number];
     const topicsArr = uDetail?.selected_unit?.topics || uDetail?.topics;
+    const uKey = `unit-${u.unit_number}`;
+    const uApprovedSet = approvedMap[uKey] || new Set<string>();
     if (Array.isArray(topicsArr) && topicsArr.length > 0) {
       topicsArr.forEach((t: any) => {
-        const topicId = String(t.id || t.topic_code);
-        const isAppr =
-          approvedInUnit.has(topicId) ||
-          approvedInUnit.has(String(t.id)) ||
-          t.status === "Approved" ||
-          t.status_badge === "success";
-        if (isAppr) {
-          computedApprovedCount++;
+        const subList = Array.isArray(t.subtopics) ? t.subtopics : [];
+        if (subList.length > 0) {
+          subList.forEach((s: any) => {
+            const subId = String(s.id);
+            const subCode = String(s.subtopic_code || "");
+            const isSubAppr =
+              uApprovedSet.has(subId) ||
+              (subCode && uApprovedSet.has(subCode)) ||
+              s.status === "Approved" ||
+              s.status?.toLowerCase() === "approved" ||
+              s.status_badge === "success";
+            if (isSubAppr) {
+              computedApprovedCount++;
+            }
+          });
+        } else {
+          const topicId = String(t.id || t.topic_code);
+          const isAppr =
+            uApprovedSet.has(topicId) ||
+            uApprovedSet.has(String(t.id)) ||
+            t.status === "Approved" ||
+            t.status?.toLowerCase() === "approved" ||
+            t.status_badge === "success";
+          if (isAppr) {
+            computedApprovedCount++;
+          }
         }
       });
     }
   });
 
-  const totalApproved = Object.values(approvedMap).reduce((s, set) => s + set.size, 0) || computedApprovedCount;
+  const totalApproved = computedApprovedCount || Object.values(approvedMap).reduce((s, set) => s + set.size, 0);
   const allApproved = totalApproved >= computedTotalSubtopics;
 
   const displayNeedsReview = Math.max(0, totalTopics - totalApproved);
@@ -1054,17 +1094,25 @@ const Topics = () => {
       setEditTopicModal(false);
 
       const trackedId = String(isSub ? subtopicId : targetTopicId);
-      if (payload.status === "Approved") {
+      const isApprStatus = payload.status === "Approved" || payload.status?.toLowerCase() === "approved";
+      const uKey = `unit-${matchedUnitNum}`;
+      if (isApprStatus) {
         setApprovedMap((prev: any) => {
-          const next = new Set(prev[state.activeTab] || []);
-          next.add(trackedId);
-          return { ...prev, [state.activeTab]: next };
+          const nextActive = new Set(prev[state.activeTab] || []);
+          nextActive.add(trackedId);
+          if (payload.subtopic_code) nextActive.add(String(payload.subtopic_code));
+          const nextUnit = new Set(prev[uKey] || []);
+          nextUnit.add(trackedId);
+          if (payload.subtopic_code) nextUnit.add(String(payload.subtopic_code));
+          return { ...prev, [state.activeTab]: nextActive, [uKey]: nextUnit };
         });
       } else {
         setApprovedMap((prev: any) => {
-          const next = new Set(prev[state.activeTab] || []);
-          next.delete(trackedId);
-          return { ...prev, [state.activeTab]: next };
+          const nextActive = new Set(prev[state.activeTab] || []);
+          nextActive.delete(trackedId);
+          const nextUnit = new Set(prev[uKey] || []);
+          nextUnit.delete(trackedId);
+          return { ...prev, [state.activeTab]: nextActive, [uKey]: nextUnit };
         });
       }
 
@@ -1386,6 +1434,7 @@ const Topics = () => {
           approvedInUnit.has(String(topicId)) ||
           approvedInUnit.has(String(topic.id)) ||
           topic.status === "Approved" ||
+          topic.status?.toLowerCase() === "approved" ||
           topic.status_badge === "success";
 
         // const statusBadge = {
@@ -1479,7 +1528,11 @@ const Topics = () => {
           ? String(rawKLevel).split(" ")[0]
           : `K${rawKLevel}`;
 
-      const isTopicApproved = topic.status === "Approved" ||
+      const isTopicApproved =
+        approvedInUnit.has(String(topic.id)) ||
+        approvedInUnit.has(String(topicId)) ||
+        topic.status === "Approved" ||
+        topic.status?.toLowerCase() === "approved" ||
         topic.status_badge === "success";
 
       const topicActions = [
@@ -1542,8 +1595,14 @@ const Topics = () => {
 
       const items = subtopicsList.map((sub: any, idx: number) => {
         const subId = String(sub.id || `${topicId}.${idx + 1}`);
-        const isApproved = sub.status === "Approved" || sub.status_badge === "success";
         const subCode = sub.subtopic_code || sub.code || `${topic.topic_code || topicId}.${idx + 1}`;
+        const isApproved =
+          approvedInUnit.has(String(sub.id)) ||
+          approvedInUnit.has(subId) ||
+          (subCode && approvedInUnit.has(String(subCode))) ||
+          sub.status === "Approved" ||
+          sub.status?.toLowerCase() === "approved" ||
+          sub.status_badge === "success";
         const subtopicObj = {
           ...sub,
           is_subtopic: true,
@@ -1615,7 +1674,10 @@ const Topics = () => {
       });
 
       const approvedCount = subtopicsList.filter((s: any) =>
-        approvedInUnit.has(String(s.id)) || s.status === "Approved"
+        approvedInUnit.has(String(s.id)) ||
+        (s.subtopic_code && approvedInUnit.has(String(s.subtopic_code))) ||
+        s.status === "Approved" ||
+        s.status?.toLowerCase() === "approved"
       ).length;
 
       return {
