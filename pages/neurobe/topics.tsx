@@ -291,6 +291,9 @@ const Topics = () => {
     showGenerateModal: false,
     generatingTopics: false,
     topicsLoading: false,
+    jobStatus: "idle" as "idle" | "processing" | "complete" | "failed",
+    jobId: "" as string | number,
+    jobData: null as any,
     activeBannerTab: "coordinator",
     selectedCourse: null,
     courseDetail: null as any,
@@ -386,14 +389,14 @@ const Topics = () => {
 
       const { status, job_id } = topicStep;
       if (status === "redis_queued" || status === "generating") {
-        setState({ generatingTopics: true });
+        setState({ generatingTopics: true, jobStatus: "processing", jobId: job_id });
         if (job_id) {
           job_Data(job_id);
         }
       } else if (status === "approved") {
-        setState({ topicsApproved: true, topicsGenerated: true, generatingTopics: false });
+        setState({ topicsApproved: true, topicsGenerated: true, generatingTopics: false, jobStatus: "complete" });
       } else if (status === "draft") {
-        setState({ topicsGenerated: true, generatingTopics: false });
+        setState({ topicsGenerated: true, generatingTopics: false, jobStatus: "complete" });
       }
     } catch (err) {
       console.warn("restoreWorkflowState in topics error:", err);
@@ -600,62 +603,80 @@ const Topics = () => {
       return;
     }
 
+    const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes (120,000 ms)
     const startTime = Date.now();
-    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+    setState({
+      jobStatus: "processing",
+      topicsLoading: true,
+      jobId: targetId,
+    });
 
     const fetchOnce = async () => {
       try {
         if (Date.now() - startTime > MAX_DURATION_MS) {
           stopPolling();
-          setState({ topicsLoading: false });
-          Failure("Topic generation timed out after 10 minutes. Please try again.");
+          setState({ topicsLoading: false, jobStatus: "failed" });
+          Failure("Topic generation timed out after 15 minutes. Please try again or check status manually.");
           return;
         }
 
-        setState({
-          topicsLoading: true,
-        });
         const res: any = await Models.job.detail(targetId);
-        console.log("job_Data", res);
+        console.log("job_Data response:", res);
         setState({ jobData: res });
 
-        const status = res?.status ?? res?.state?.live_redis_status ?? res?.result?.status;
+        const rawStatus = (res?.status ?? res?.state?.live_redis_status ?? res?.result?.status ?? "").toLowerCase();
         const syllabusId = res?.result?.syllabus_id || res?.syllabus_id;
 
-        if (status === "complete" || status === "completed" || status === "finished" || status === "success" || syllabusId) {
+        const isComplete =
+          rawStatus === "complete" ||
+          rawStatus === "completed" ||
+          rawStatus === "finished" ||
+          rawStatus === "success" ||
+          (Boolean(syllabusId) && rawStatus !== "processing" && rawStatus !== "running" && rawStatus !== "redis_queued");
+
+        if (isComplete) {
           stopPolling();
           console.log("job_Data complete, syllabus_id:", syllabusId);
 
           const targetSid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id;
           const currentUnitNum = state.activeUnitNumber || 1;
 
-          await getUnits(targetSid);
-          await getUnitDetail(targetSid, currentUnitNum);
+          if (targetSid) {
+            await getUnits(targetSid);
+            await getUnitDetail(targetSid, currentUnitNum);
+          }
 
           setState({
+            jobStatus: "complete",
             topicsLoading: false,
             topicsGenerated: true,
             topicsApproved: false,
           });
-        } else if (status === "failed" || status === "error") {
+          Success("Topic hierarchy generated successfully!");
+        } else if (rawStatus === "failed" || rawStatus === "error") {
           stopPolling();
           setState({
+            jobStatus: "failed",
             topicsLoading: false,
           });
           Failure(res?.message || res?.error || "Topic generation job failed");
+        } else {
+          // Still processing in Redis/background
+          setState({
+            jobStatus: "processing",
+            topicsLoading: true,
+          });
         }
       } catch (error) {
         console.log("job_Data error", error);
-        stopPolling();
-        setState({
-          topicsLoading: false,
-        });
       }
     };
 
-    // call immediately, then every 3 seconds
+    // call immediately, then every 2 minutes
     await fetchOnce();
-    pollRef.current = setInterval(fetchOnce, 3000);
+    pollRef.current = setInterval(fetchOnce, POLL_INTERVAL_MS);
   };
 
 
@@ -1373,6 +1394,8 @@ const Topics = () => {
         generatingTopics: false,
         showGenerateModal: true,
         jobId: res.job_id,
+        jobStatus: "processing",
+        topicsLoading: true,
         topicsApproved: false,
       });
       if (res?.job_id) {
@@ -1819,7 +1842,7 @@ const Topics = () => {
 
         <AccordiansStyle
           loading={state.topicsLoading || (state.loadingUnitDetail && !activeUnitDetail)}
-          loadingMessage={state.topicsLoading ? "Applying with NEURO AI..." : "Loading unit details..."}
+          loadingMessage={state.topicsLoading ? "Processing topic hierarchy with NEURO AI... (Status: Processing · Polling every 2m)" : "Loading unit details..."}
           expandable={state.topicsGenerated}
           topics={state.topicsGenerated ? buildGeneratedTopics() : buildInitialTopics()}
           title={currentUnitTitle}
@@ -1950,83 +1973,171 @@ const Topics = () => {
       />
 
       {/* ── Generate Topics modal ── */}
-      {state.showGenerateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style={{ animation: "fadeIn 0.22s ease" }}
-        >
-          <div className="absolute inset-0 bg-black/40" onClick={() => setState({ showGenerateModal: false })} />
+      {state.showGenerateModal && (() => {
+        const isJobComplete = state.jobStatus === "complete" || (state.topicsGenerated && state.jobStatus !== "processing");
+
+        return (
           <div
-            className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
-            style={{ animation: "slideUp 0.22s ease" }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ animation: "fadeIn 0.22s ease" }}
           >
-            {/* Modal header */}
-            <div className="flex items-center gap-3 bg-[#111238] px-5 py-4">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-color2">
-                <Sparkles className="h-4 w-4 text-white" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-white">Generate Topics with NEURO AI</p>
-                <p className="text-xs text-white/60">
-                  {state.courseDetail
-                    ? `${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
-                    : "CS309 — Computer Networks"}
-                </p>
-              </div>
-            </div>
-
-            {/* Modal body */}
-            <div className="px-6 py-5">
-              {/* Progress */}
-              <div className="mb-5">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-bold text-color2">Topics Generated Successfully</span>
-                  <span className="text-sm font-bold text-color2">100%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                  <div className="h-2 w-full rounded-full bg-color2 transition-all" />
+            <div className="absolute inset-0 bg-black/40" onClick={() => setState({ showGenerateModal: false })} />
+            <div
+              className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
+              style={{ animation: "slideUp 0.22s ease" }}
+            >
+              {/* Modal header */}
+              <div className="flex items-center gap-3 bg-[#111238] px-5 py-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-color2">
+                  <Sparkles className="h-4 w-4 text-white" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    {isJobComplete ? "Topics Generated Successfully" : "Generating Topics with NEURO AI"}
+                  </p>
+                  <p className="text-xs text-white/60">
+                    {state.courseDetail
+                      ? `${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
+                      : "CS309 — Computer Networks"}
+                  </p>
                 </div>
               </div>
 
-              {/* Steps */}
-              <div className="space-y-3">
-                {GENERATE_STEPS.map((step, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500">
-                      <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-[#000] dark:text-white">{step.title}</p>
-                      <p className="text-xs text-pri">{step.description}</p>
+              {/* Modal body */}
+              <div className="px-6 py-5">
+                {isJobComplete ? (
+                  <>
+                    {/* Progress 100% */}
+                    <div className="mb-5">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-bold text-color2">Topics Generated Successfully</span>
+                        <span className="text-sm font-bold text-color2">100%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                        <div className="h-2 w-full rounded-full bg-color2 transition-all" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Modal footer */}
-            <div className="flex justify-end gap-3 border-t px-6 py-4 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => setState({ showGenerateModal: false })}
-                className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-[#000] hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setState({ showGenerateModal: false, topicsGenerated: true });
-                  job_Data(state.jobId);
-                }}
-                className="bg-color2 flex items-center gap-1.5 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <Check className="h-3.5 w-3.5" /> Apply Topics
-              </button>
+                    {/* Steps complete */}
+                    <div className="space-y-3">
+                      {GENERATE_STEPS.map((step, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500">
+                            <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-[#000] dark:text-white">{step.title}</p>
+                            <p className="text-xs text-pri">{step.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Processing Status screen */}
+                    <div className="mb-5">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm font-semibold text-color2">
+                          <RefreshCw className="h-4 w-4 animate-spin text-color2" />
+                          AI Generating Hierarchy...
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-color2 dark:bg-blue-950/50">
+                          Polling every 2m
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div className="h-2 w-2/3 rounded-full bg-color2 animate-pulse transition-all" />
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        NEURO AI is structuring your syllabus into detailed units, topics, and subtopics. Status automatically checks every 2 minutes.
+                      </p>
+                    </div>
+
+                    {/* Steps during processing */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500">
+                          <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">Syllabus Analysis</p>
+                          <p className="text-xs text-gray-500">Course structure and unit requirements identified</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-color2">
+                          <RefreshCw className="h-3.5 w-3.5 text-white animate-spin" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-color2">Generating Topic Hierarchy</p>
+                          <p className="text-xs text-gray-500">Creating topics, subtopics, Bloom's levels & hours...</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 opacity-60">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gray-300 dark:border-gray-600">
+                          <Clock className="h-3.5 w-3.5 text-gray-400" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Final Verification</p>
+                          <p className="text-xs text-gray-400">Validating learning outcomes and taxonomy</p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div className="flex justify-end gap-3 border-t px-6 py-4 dark:border-gray-700">
+                {isJobComplete ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setState({ showGenerateModal: false })}
+                      className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-[#000] hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setState({ showGenerateModal: false, topicsGenerated: true });
+                      }}
+                      className="bg-color2 flex items-center gap-1.5 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90"
+                    >
+                      <Check className="h-3.5 w-3.5" /> View Topics
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setState({ showGenerateModal: false })}
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+                    >
+                      Run in Background
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (state.jobId) {
+                          job_Data(state.jobId);
+                        }
+                      }}
+                      className="bg-color2 flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
+                    >
+                      <RefreshCw className="h-3 w-3" /> Check Status Now
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

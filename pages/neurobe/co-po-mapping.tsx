@@ -272,9 +272,10 @@ const COPOMapping = () => {
     setState({ generatingCopo: true });
 
     let attempts = 0;
-    const maxAttempts = 40; // ~2 minutes with 3s interval
+    const maxAttempts = 15; // 15 attempts with 2-minute interval
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
 
-    pollRef.current = setInterval(async () => {
+    const checkCopoStatus = async () => {
       attempts++;
       try {
         const wfRes: any = await Models.syllabus.get_workflow_status(cid);
@@ -308,7 +309,10 @@ const COPOMapping = () => {
           setState({ generatingCopo: false, versionRefreshKey: Date.now() });
         }
       }
-    }, 3000);
+    };
+
+    checkCopoStatus();
+    pollRef.current = setInterval(checkCopoStatus, pollInterval);
   };
 
   const handleGenerateCopo = async (parentParams?: { extraction_version?: number }) => {

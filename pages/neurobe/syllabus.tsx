@@ -401,10 +401,10 @@ const Syllabus = () => {
     setState({ isJobLoading: true });
 
     let retries = 0;
-    const maxRetries = 30; // Max 30 retries (about 1.5 minutes with 3s interval)
-    const pollInterval = 3000; // 3 seconds
+    const maxRetries = 15; // Max 15 retries (about 30 minutes with 2-minute interval)
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
     const startTime = Date.now();
-    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
     const fetchOnce = async () => {
       try {

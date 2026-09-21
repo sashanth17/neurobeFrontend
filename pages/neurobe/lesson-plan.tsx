@@ -628,10 +628,10 @@ const LessonPlan = () => {
     if (!id) return;
 
     let retries = 0;
-    const maxRetries = 40;
-    const pollInterval = 3000;
+    const maxRetries = 15;
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
     const startTime = Date.now();
-    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes timeout
+    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes timeout
 
     const fetchOnce = async () => {
       try {
