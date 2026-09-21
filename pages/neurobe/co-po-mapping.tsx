@@ -128,6 +128,7 @@ const COPOMapping = () => {
     versionRefreshKey: 0,
     selectedExtractionVer: null as number | null,
     copoVersionsDetailed: [] as any[],
+    extractionNotApproved: false,
   });
 
   useEffect(() => {
@@ -236,6 +237,10 @@ const COPOMapping = () => {
   const restoreWorkflowState = async (cid: string | number) => {
     try {
       const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
+      const isExtractionApproved = extractionStep?.status === "approved";
+      setState({ extractionNotApproved: !isExtractionApproved });
+
       const copoStep = wfRes?.workflow?.step_2_copo_mapping;
       if (!copoStep) return;
 
@@ -608,6 +613,10 @@ const COPOMapping = () => {
   };
 
   const handleApproveMapping = async () => {
+    if (state.extractionNotApproved) {
+      Failure("Cannot approve CO-PO mapping: Syllabus extraction must be approved first.");
+      return;
+    }
     try {
       setState({ approvingMap: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
@@ -1064,10 +1073,14 @@ const COPOMapping = () => {
                   className: "create-btn",
                 }
               : {
-                  label: state.approvingMap ? "Approving..." : "Approve Mapping",
+                  label: state.approvingMap
+                    ? "Approving..."
+                    : state.extractionNotApproved
+                    ? "Requires Syllabus Approval"
+                    : "Approve Mapping",
                   icon: <Check className="h-4 w-4" />,
                   onClick: handleApproveMapping,
-                  disabled: state.approvingMap,
+                  disabled: state.approvingMap || state.extractionNotApproved,
                 }
           }
           actionBtn2={

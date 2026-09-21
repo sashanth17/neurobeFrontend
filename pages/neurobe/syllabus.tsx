@@ -1033,6 +1033,7 @@ const Syllabus = () => {
               <ExtractionComplete
                 fileName={state.selectedFile?.name}
                 isLoading={state.isJobLoading}
+                isApproved={state.currentStep === 4 || state.syllabusData?.status === "approved" || state.syllabusData?.is_approved}
                 onReview={() => {
                   if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
                   setState({ showReview: true });
@@ -1080,6 +1081,8 @@ const Syllabus = () => {
                   </div>
                 ) : (
                   <ReviewModeBar
+                    isApproved={state.currentStep === 4 || state.syllabusData?.status === "approved" || state.syllabusData?.is_approved}
+                    status={state.syllabusData?.status}
                     onSaveDraft={() => handleSaveDraft()}
                     onContinue={() => syllabus_status()}
                   />

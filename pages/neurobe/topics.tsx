@@ -298,6 +298,8 @@ const Topics = () => {
     unitDetailsMap: {} as Record<number, any>,
     loadingUnits: false,
     loadingUnitDetail: false,
+    upstreamNotApproved: false,
+    approvingTopics: false,
   });
 
   const course_id = useSearchParams().get("course_id");
@@ -353,10 +355,37 @@ const Topics = () => {
   useEffect(() => {
     if (course_id) {
       getCourseDetails();
+      restoreWorkflowState(course_id);
     } else {
       getUnits(1);
     }
   }, [course_id]);
+
+  const restoreWorkflowState = async (cid: string | number) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
+      const isExtractionApproved = extractionStep?.status === "approved";
+      setState({ upstreamNotApproved: !isExtractionApproved });
+
+      const topicStep = wfRes?.workflow?.step_3_topic_hierarchy;
+      if (!topicStep) return;
+
+      const { status, job_id } = topicStep;
+      if (status === "redis_queued" || status === "generating") {
+        setState({ generatingTopics: true });
+        if (job_id) {
+          job_Data(job_id);
+        }
+      } else if (status === "approved") {
+        setState({ topicsApproved: true, topicsGenerated: true, generatingTopics: false });
+      } else if (status === "draft") {
+        setState({ topicsGenerated: true, generatingTopics: false });
+      }
+    } catch (err) {
+      console.warn("restoreWorkflowState in topics error:", err);
+    }
+  };
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -1124,21 +1153,38 @@ const Topics = () => {
 
   const handleApproveTopics = async () => {
     const sid =
-      activeUnitDetail?.syllabus_id ||
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
+      activeUnitDetail?.syllabus_id ||
+      course_id ||
       9;
+
+    if (state.upstreamNotApproved) {
+      Failure("Cannot approve topics: Syllabus extraction must be approved first.");
+      return;
+    }
 
     try {
       setState({ approvingTopics: true });
-      const res: any = await Models.topics.approve_topics(sid, {});
-      console.log("approve_topics response:", res);
-      Success(res?.message || "Topics approved successfully");
+      try {
+        await Models.topics.approve_hierarchy(sid);
+      } catch (hierErr) {
+        console.warn("approve_hierarchy fallback to approve_topics:", hierErr);
+        await Models.topics.approve_topics(sid, {});
+      }
+      try {
+        await Models.syllabus.approve_stage(course_id || sid, "hierarchy");
+      } catch (e) {
+        console.warn("approve_stage hierarchy warning:", e);
+      }
+      Success("Topics approved successfully");
       setState({ topicsApproved: true });
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
     } catch (error: any) {
       console.log("approve_topics error:", error);
       Failure(getErrorMessage(error, "Failed to approve topics"));
-      setState({ topicsApproved: true });
     } finally {
       setState({ approvingTopics: false });
     }
@@ -1590,10 +1636,14 @@ const Topics = () => {
                   className: "create-btn",
                 }
                 : {
-                  label: state.approvingTopics ? "Approving..." : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
+                  label: state.approvingTopics
+                    ? "Approving..."
+                    : state.upstreamNotApproved
+                    ? "Requires Syllabus Approval"
+                    : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
                   icon: state.approvingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
                   onClick: handleApproveTopics,
-                  disabled: state.approvingTopics,
+                  disabled: state.approvingTopics || state.upstreamNotApproved,
                 }
             }
             actionBtn2={{

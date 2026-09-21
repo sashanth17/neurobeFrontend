@@ -136,6 +136,8 @@ const Pedagogy = () => {
     loadingUnitDetail: false,
     generatingRecommendations: false,
     pollingJob: false,
+    upstreamNotApproved: false,
+    approvingPedagogy: false,
   });
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -187,10 +189,37 @@ const Pedagogy = () => {
   useEffect(() => {
     if (course_id) {
       getCourseDetails();
+      restoreWorkflowState(course_id);
     } else {
       getUnits(1);
     }
   }, [course_id]);
+
+  const restoreWorkflowState = async (cid: string | number) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const topicStep = wfRes?.workflow?.step_3_topic_hierarchy;
+      const isTopicApproved = topicStep?.status === "approved";
+      setState({ upstreamNotApproved: !isTopicApproved });
+
+      const pedStep = wfRes?.workflow?.step_4_pedagogy_generation;
+      if (!pedStep) return;
+
+      const { status, job_id } = pedStep;
+      if (status === "redis_queued" || status === "generating") {
+        setState({ generatingRecommendations: true });
+        if (job_id) {
+          startPollingJob(job_id, cid);
+        }
+      } else if (status === "approved") {
+        setState({ pedagogyApproved: true, recommendationsGenerated: true, generatingRecommendations: false, pollingJob: false });
+      } else if (status === "draft") {
+        setState({ recommendationsGenerated: true, generatingRecommendations: false, pollingJob: false });
+      }
+    } catch (err) {
+      console.warn("restoreWorkflowState in pedagogy error:", err);
+    }
+  };
 
   const activeUnitNum =
     state.activeUnitNumber ||
@@ -359,6 +388,32 @@ const Pedagogy = () => {
     getUnitDetail(sid, unitNum);
   };
 
+  const startPollingJob = (jobId: string, sid?: any) => {
+    stopPolling();
+    const targetSid = sid || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id || activeUnitDetail?.syllabus_id || course_id;
+    setState({ pollingJob: true, generatingRecommendations: true });
+    pollRef.current = setInterval(async () => {
+      try {
+        const jobRes: any = await Models.pedagogy.jobStatus(jobId);
+        const status = jobRes?.status ?? jobRes?.state?.live_redis_status ?? jobRes?.result?.status;
+        if (status === "complete" || status === "completed" || status === "success" || status === "finished") {
+          stopPolling();
+          setState({ generatingRecommendations: false, pollingJob: false, recommendationsGenerated: true });
+          Success("Pedagogy recommendations generated successfully");
+          if (targetSid) getUnitDetail(targetSid, activeUnitNum);
+        } else if (status === "failed" || status === "error") {
+          stopPolling();
+          setState({ generatingRecommendations: false, pollingJob: false });
+          Failure(jobRes?.message || "Pedagogy generation job failed");
+        }
+      } catch (pollError: any) {
+        stopPolling();
+        setState({ generatingRecommendations: false, pollingJob: false });
+        Failure(getErrorMessage(pollError, "Failed to check job status"));
+      }
+    }, 3000);
+  };
+
   const handleGenerateRecommendations = async (parentParams?: { hierarchy_version?: number }) => {
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
@@ -372,27 +427,7 @@ const Pedagogy = () => {
       });
       const jobId = res?.job_id;
       if (jobId) {
-        setState({ pollingJob: true });
-        pollRef.current = setInterval(async () => {
-          try {
-            const jobRes: any = await Models.pedagogy.jobStatus(jobId);
-            const status = jobRes?.status ?? jobRes?.state?.live_redis_status ?? jobRes?.result?.status;
-            if (status === "complete" || status === "completed" || status === "success" || status === "finished") {
-              stopPolling();
-              setState({ generatingRecommendations: false, pollingJob: false, recommendationsGenerated: true });
-              Success(res?.message || "Pedagogy recommendations generated successfully");
-              getUnitDetail(sid, activeUnitNum);
-            } else if (status === "failed" || status === "error") {
-              stopPolling();
-              setState({ generatingRecommendations: false, pollingJob: false });
-              Failure(jobRes?.message || "Pedagogy generation job failed");
-            }
-          } catch (pollError: any) {
-            stopPolling();
-            setState({ generatingRecommendations: false, pollingJob: false });
-            Failure(getErrorMessage(pollError, "Failed to check job status"));
-          }
-        }, 3000);
+        startPollingJob(jobId, sid);
       } else {
         // no job_id — treat as immediate success
         setState({ generatingRecommendations: false, recommendationsGenerated: true });
@@ -403,6 +438,43 @@ const Pedagogy = () => {
       console.log("error generating recommendations", error);
       setState({ generatingRecommendations: false });
       Failure(getErrorMessage(error, "Failed to generate pedagogy recommendations"));
+    }
+  };
+
+  const handleApprovePedagogy = async () => {
+    const sid =
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      activeUnitDetail?.syllabus_id ||
+      course_id;
+
+    if (state.upstreamNotApproved) {
+      Failure("Cannot approve pedagogy: Topic hierarchy must be approved first.");
+      return;
+    }
+
+    try {
+      setState({ approvingPedagogy: true });
+      try {
+        await Models.pedagogy.approve_pedagogy(sid);
+      } catch (appErr) {
+        console.warn("approve_pedagogy fallback:", appErr);
+      }
+      try {
+        await Models.syllabus.approve_stage(course_id || sid, "pedagogy");
+      } catch (e) {
+        console.warn("approve_stage pedagogy warning:", e);
+      }
+      Success("Pedagogy approved successfully");
+      setState({ pedagogyApproved: true });
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
+    } catch (error: any) {
+      console.log("approve_pedagogy error:", error);
+      Failure(getErrorMessage(error, "Failed to approve pedagogy"));
+    } finally {
+      setState({ approvingPedagogy: false });
     }
   };
 
@@ -678,10 +750,14 @@ const Pedagogy = () => {
                     className: "create-btn",
                   }
                 : {
-                    label: activeUnitDetail?.bottom_bar?.actions?.approve?.label || "Complete Pedagogy Review",
-                    icon: <Check className="h-4 w-4" />,
-                    onClick: () => { Success("Pedagogy approved successfully"); setState({ pedagogyApproved: true }); },
-                    disabled: !allAccepted,
+                    label: state.approvingPedagogy
+                      ? "Approving..."
+                      : state.upstreamNotApproved
+                      ? "Requires Topics Approval"
+                      : (activeUnitDetail?.bottom_bar?.actions?.approve?.label || "Complete Pedagogy Review"),
+                    icon: state.approvingPedagogy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
+                    onClick: handleApprovePedagogy,
+                    disabled: !allAccepted || state.approvingPedagogy || state.upstreamNotApproved,
                   }
             }
             actionBtn2={{
