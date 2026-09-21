@@ -880,7 +880,14 @@ const Topics = () => {
     const knowledgeLevel = newTopic.level;
     const status = newTopic.status;
 
+    const sid =
+      activeUnitDetail?.syllabus_id ||
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      9;
+
     const body = {
+      syllabus_id: sid,
       topic_name: topicName,
       estimated_hours: estimatedHours,
       knowledge_level: knowledgeLevel,
@@ -895,11 +902,6 @@ const Topics = () => {
       console.log("create topic response:", res);
       Success(res?.message || "Topic created successfully");
 
-      const sid =
-        activeUnitDetail?.syllabus_id ||
-        state.courseDetail?.latest_syllabus?.id ||
-        state.unitsList?.[0]?.syllabus_id ||
-        9;
       await getUnitDetail(sid, matchedUnitNum);
     } catch (error: any) {
       console.log("create topic error:", error);
@@ -1037,8 +1039,8 @@ const Topics = () => {
       setUpdatingTopic(true);
       let res: any;
       if (isSub) {
-        console.log("Calling Models.topics.subTopics_update with topicId:", targetTopicId, "body:", subtopicBody);
-        res = await Models.topics.subTopics_update(targetTopicId, subtopicBody, loadedVersion);
+        console.log("Calling Models.topics.update_subtopic with topicId:", targetTopicId, "subtopicId:", subtopicId, "body:", subtopicBody);
+        res = await (Models.topics as any).update_subtopic(targetTopicId, subtopicId, subtopicBody, loadedVersion);
       } else {
         console.log("Calling Models.topics.update with topicId:", targetTopicId, "body:", topicBody);
         res = await Models.topics.update(targetTopicId, topicBody, loadedVersion);

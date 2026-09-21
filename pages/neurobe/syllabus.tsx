@@ -839,6 +839,25 @@ const Syllabus = () => {
   };
   console.log('✌️state.course_data --->', state.courseData);
 
+  const handleUpdateLTPC = (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number }) => {
+    setState((prev: any) => ({
+      jobData: {
+        ...(prev.jobData || {}),
+        ...hours,
+        lectureHours: hours.lecture_hours,
+        tutorialHours: hours.tutorial_hours,
+        practicalHours: hours.practical_hours,
+      },
+      courseData: {
+        ...(prev.courseData || {}),
+        latest_syllabus: {
+          ...(prev.courseData?.latest_syllabus || {}),
+          ...hours,
+        },
+      },
+    }));
+  };
+
   const handleSaveDraft = async () => {
     try {
       const sid = await getEffectiveSyllabusId();
@@ -1146,6 +1165,7 @@ const Syllabus = () => {
                       handleKnowledgeLevelChange={handleKnowledgeLevelChange}
                       onUpdateUnitHours={handleUpdateUnitHours}
                       onUpdateUnitTitle={handleUpdateUnitTitle}
+                      onUpdateLTPC={handleUpdateLTPC}
                       syllabusId={state.courseData?.latest_syllabus?.id || state.lastLoadedSyllabusId || state.jobData?.syllabus_id || state.jobData?.id}
                     />
 

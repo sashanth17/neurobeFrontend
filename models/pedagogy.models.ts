@@ -26,9 +26,9 @@ const pedagogy = {
         return promise;
     },
 
-    create : (unit_id?: any, body?: any) => { 
+    add_pedagogy: (topic_id?: any, body?: any) => { 
         let promise = new Promise((resolve, reject) => {
-            let url = `course/units/${unit_id}/topics`;
+            let url = `course/topics/${topic_id}/pedagogies`;
 
             const config: any = {};
             if (body instanceof FormData) {
@@ -37,6 +37,26 @@ const pedagogy = {
 
             commonInstance()
                  .post(url, body || {}, config)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
+                    } else {
+                        reject(error?.message || error);
+                    }
+                });
+        });
+        return promise;
+    },
+
+    create: (topic_id?: any, body?: any) => { 
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/pedagogies`;
+
+            commonInstance()
+                 .post(url, body || {})
                 .then((res) => {
                     resolve(res.data);
                 })

@@ -14,6 +14,7 @@ interface AccordiansStyleProps {
   loading?: boolean;
   loadingMessage?: string;
   onAddTopic?: () => void;
+  onAddTopicLabel?: string;
   renderModals?: () => React.ReactNode;
 }
 
@@ -30,6 +31,7 @@ const AccordiansStyle = ({
   loading = false,
   loadingMessage = "Generating with NEURO AI...",
   onAddTopic,
+  onAddTopicLabel,
   renderModals,
 }: AccordiansStyleProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -71,7 +73,7 @@ const AccordiansStyle = ({
                 className="flex items-center gap-1.5 rounded-lg bg-color2 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Add Topic
+                {onAddTopicLabel || "Add Topic"}
               </button>
             )}
           </div>
@@ -259,15 +261,40 @@ const AccordiansStyle = ({
                 {expandable && isOpen && (
                   <div className="mx-4 mb-3 rounded-xl border bg-violet-50 p-3">
                     {/* Expanded Section Label */}
-                    {expandedSectionLabel && (
-                      <div className="text-color2 mb-2 flex items-center gap-1 text-sm font-bold tracking-wide">
-                        {expandedSectionLabel}
-                      </div>
-                    )}
+                    <div className="mb-2 flex items-center justify-between">
+                      {expandedSectionLabel && (
+                        <div className="text-color2 flex items-center gap-1 text-sm font-bold tracking-wide">
+                          {expandedSectionLabel}
+                        </div>
+                      )}
+                      {topic.onAddItem && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            topic.onAddItem(topic);
+                          }}
+                          className="ml-auto flex items-center gap-1 rounded-lg bg-color2 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-95 cursor-pointer"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          {topic.addItemLabel || "Add Item"}
+                        </button>
+                      )}
+                    </div>
 
                     {(!topic.items || topic.items.length === 0) ? (
                       <div className="rounded-xl border border-dashed border-gray-300 bg-white/70 py-4 text-center text-xs text-gray-500">
-                        No subtopics found for this topic yet. Click &quot;Add Subtopic&quot; on the topic above to create one.
+                        <p>{topic.emptyMessage || "No subtopics found for this topic yet."}</p>
+                        {topic.onAddItem && (
+                          <button
+                            type="button"
+                            onClick={() => topic.onAddItem(topic)}
+                            className="mt-2 inline-flex items-center gap-1 rounded-lg bg-color2 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-95 cursor-pointer"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            {topic.addItemLabel || "Add Item"}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-2">

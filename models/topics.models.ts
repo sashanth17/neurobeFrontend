@@ -141,6 +141,19 @@ const topics = {
         return promise;
     },
 
+    update_subtopic: (topic_id: string | number, subtopic_id: string | number, body: any, version_number?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/subtopics/${subtopic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
+            commonInstance()
+                .put(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
+    },
+
     save_draft: (syllabus_id?: any, body?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/topics/draft`;

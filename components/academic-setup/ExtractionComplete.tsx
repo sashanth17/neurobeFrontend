@@ -6,7 +6,6 @@ const EXTRACTION_TASKS = [
   "Extract course code, title, L/T/P/S/C, theory hours and lab hours",
   "Extract course outcomes and knowledge levels",
   "Extract units, topics and unit hours",
-  "Extract lab experiments",
   "Extract textbooks and reference books",
 ];
 
