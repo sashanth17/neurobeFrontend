@@ -530,8 +530,18 @@ const Pedagogy = () => {
     stopPolling();
     const targetSid = sid || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id || activeUnitDetail?.syllabus_id || course_id;
     setState({ pollingJob: true, generatingRecommendations: true });
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+
     pollRef.current = setInterval(async () => {
       try {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          stopPolling();
+          setState({ generatingRecommendations: false, pollingJob: false });
+          Failure("Pedagogy generation timed out after 10 minutes. Please try again.");
+          return;
+        }
+
         const jobRes: any = await Models.pedagogy.jobStatus(jobId);
         const status = jobRes?.status ?? jobRes?.state?.live_redis_status ?? jobRes?.result?.status;
         if (status === "complete" || status === "completed" || status === "success" || status === "finished") {

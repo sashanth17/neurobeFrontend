@@ -326,6 +326,8 @@ const LessonPlan = () => {
         setState({ lessonApproved: true, recommendationsGenerated: true, generateLoading: false });
       } else if (status === "draft") {
         setState({ recommendationsGenerated: true, generateLoading: false });
+      } else if (status === "failed") {
+        setState({ generateLoading: false });
       }
     } catch (err) {
       console.warn("restoreWorkflowState in lesson-plan error:", err);
@@ -628,9 +630,18 @@ const LessonPlan = () => {
     let retries = 0;
     const maxRetries = 40;
     const pollInterval = 3000;
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes timeout
 
     const fetchOnce = async () => {
       try {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          stopPolling();
+          setState({ generateLoading: false });
+          Failure("Lesson plan generation timed out after 10 minutes. Please try again.");
+          return;
+        }
+
         const res: any = await Models.job.detail(id);
         console.log("job_Data response:", res);
 

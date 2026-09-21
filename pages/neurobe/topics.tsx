@@ -580,8 +580,18 @@ const Topics = () => {
       return;
     }
 
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+
     const fetchOnce = async () => {
       try {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          stopPolling();
+          setState({ topicsLoading: false });
+          Failure("Topic generation timed out after 10 minutes. Please try again.");
+          return;
+        }
+
         setState({
           topicsLoading: true,
         });

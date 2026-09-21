@@ -403,9 +403,19 @@ const Syllabus = () => {
     let retries = 0;
     const maxRetries = 30; // Max 30 retries (about 1.5 minutes with 3s interval)
     const pollInterval = 3000; // 3 seconds
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
     const fetchOnce = async () => {
       try {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          console.log("Extraction job polling timed out after 10 minutes");
+          stopPolling();
+          setState({ isJobLoading: false, extractionError: "Extraction timed out after 10 minutes. Please try again." });
+          Failure("Extraction timed out after 10 minutes. Please try again.");
+          return;
+        }
+
         let res: any = null;
         try {
           res = await Models.job.detail(id);
