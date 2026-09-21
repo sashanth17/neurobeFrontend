@@ -282,6 +282,7 @@ const LessonPlan = () => {
     approvingLesson: false,
     savingDraft: false,
   });
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(setPageTitle("Lesson Plan"));
@@ -377,10 +378,10 @@ const LessonPlan = () => {
     }
   };
 
-  const lession_data = async (syllabus_id,unit) => {
+  const lession_data = async (syllabus_id: any, unit: any, verNum?: number) => {
     try {
-
-      const res: any = await Models.lession_plan.detail(syllabus_id, unit);
+      const vToUse = verNum !== undefined ? verNum : loadedVersion;
+      const res: any = await Models.lession_plan.detail(syllabus_id, unit, vToUse);
       const data = [{
         key: "total-topics",
         label: " Total Topics",
@@ -727,9 +728,14 @@ const LessonPlan = () => {
   };
 
   const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
     const syllabusId = state.courseData?.latest_syllabus?.id || course_id;
     if (syllabusId) {
-      await lession_data(syllabusId, 1);
+      const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+      await lession_data(syllabusId, activeUnitNum, newVer);
+    }
+    if (course_id) {
+      await restoreWorkflowState(course_id);
     }
   };
 
@@ -785,6 +791,7 @@ const LessonPlan = () => {
           stageLabel="Lesson Plan & Schedules"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
           onGenerateNew={generateLessionPlan}
           isGenerating={state.generateLoading}
         />

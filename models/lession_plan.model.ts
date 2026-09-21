@@ -20,9 +20,12 @@ const lession_plan = {
         });
         return promise;
     },
-    detail: (syllabus_id: string | number,unit: string | number,) => {
+    detail: (syllabus_id: string | number, unit: string | number, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/lesson-plan-workspace?unit_number=${unit}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `&version_number=${version_number}`;
+            }
             
             commonInstance()
                 .get(url)

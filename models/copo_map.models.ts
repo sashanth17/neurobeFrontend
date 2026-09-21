@@ -1,9 +1,12 @@
 import  { commonInstance } from '@/utils/axios.utils';
 
 const COPOMap = {
-copo_map: (syllabus_id?: any) => {
+copo_map: (syllabus_id?: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/copo-matrix`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .get(url)

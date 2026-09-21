@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
   GraduationCap,
@@ -133,6 +133,8 @@ const COPOMapping = () => {
     extractionNotApproved: false,
   });
 
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
+
   useEffect(() => {
     dispatch(setPageTitle("CO-PO Mapping"));
   }, [dispatch]);
@@ -209,15 +211,16 @@ const COPOMapping = () => {
     }
   };
 
-  const getCOPOMatrix = async (syllabusId?: any) => {
+  const getCOPOMatrix = async (syllabusId?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
     if (!sid) {
       setState({ loading: false, copoMatrix: null });
       return;
     }
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loading: true });
-      const res: any = await Models.COPOMap.copo_map(sid);
+      const res: any = await Models.COPOMap.copo_map(sid, vToUse);
       if (res && (res.matrix || res.data?.matrix)) {
         const matrixObj = res.matrix ? res : res.data;
         const isApprovedStatus = matrixObj?.mapping_status === "Approved";
@@ -330,9 +333,10 @@ const COPOMapping = () => {
   };
 
   const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
     const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
     if (sid) {
-      await getCOPOMatrix(sid);
+      await getCOPOMatrix(sid, newVer);
     }
     if (course_id) {
       await loadCopoVersions(course_id);
@@ -832,6 +836,7 @@ const COPOMapping = () => {
           stageLabel="CO-PO Mapping"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
           onGenerateNew={handleGenerateCopo}
           isGenerating={state.generatingCopo}
           refreshTrigger={state.versionRefreshKey}

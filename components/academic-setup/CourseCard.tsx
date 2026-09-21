@@ -327,16 +327,6 @@ export default function CourseCard(props: any) {
       pedagogy: "step_4_pedagogy_generation",
       schedule: "step_5_lesson_plan_schedules",
     };
-    const stepObj = workflowStatus?.[stepKeyMap[stageKey] as keyof typeof workflowStatus] as any;
-    const detailed = stepObj?.versions_detailed;
-    if (Array.isArray(detailed)) {
-      const match = detailed.find((v: any) => v.version === newVer);
-      if (match && match.status !== "approved") {
-        Failure(`Version ${newVer} cannot be activated because it is in "${match.status || "draft"}" status. Only approved versions can be activated.`);
-        return;
-      }
-    }
-
     try {
       setActionLoading(stageKey);
       setOptimisticVersions((prev) => ({ ...prev, [stageKey]: newVer }));

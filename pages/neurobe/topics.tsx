@@ -323,6 +323,7 @@ const Topics = () => {
   );
 
   const [addTopicModal, setAddTopicModal] = useState(false);
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
   const [addSubtopicModal, setAddSubtopicModal] = useState(false);
   const [selectedTopicForSubtopic, setSelectedTopicForSubtopic] = useState<any>(null);
   const [addingSubtopic, setAddingSubtopic] = useState(false);
@@ -446,8 +447,9 @@ const Topics = () => {
     }
   };
 
-  const getUnits = async (syllabusId?: any) => {
+  const getUnits = async (syllabusId?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loadingUnits: true });
       const res: any = await Models.topics.units(sid);
@@ -475,10 +477,10 @@ const Topics = () => {
           loadingUnits: false,
         });
 
-        getUnitDetail(sid, initialUnitNum);
+        getUnitDetail(sid, initialUnitNum, vToUse);
       } else {
         setState({ loadingUnits: false });
-        getUnitDetail(sid, 1);
+        getUnitDetail(sid, 1, vToUse);
       }
     } catch (error: any) {
       console.log("error fetching units", error);
@@ -487,12 +489,13 @@ const Topics = () => {
     }
   };
 
-  const getUnitDetail = async (syllabusId?: any, unitNumber?: any) => {
+  const getUnitDetail = async (syllabusId?: any, unitNumber?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id;
     const uNum = unitNumber ?? state.activeUnitNumber ;
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loadingUnitDetail: true }); 
-      const res: any = await Models.topics.unit_detail(sid, uNum);
+      const res: any = await Models.topics.unit_detail(sid, uNum, vToUse);
       const data = res?.data || res;
 
       setState((prev: any) => {
@@ -1325,13 +1328,14 @@ const Topics = () => {
   };
 
   const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
       course_id;
     if (sid) {
-      await getUnits(sid);
-      await getUnitDetail(sid, state.activeUnitNumber || 1);
+      await getUnits(sid, newVer);
+      await getUnitDetail(sid, state.activeUnitNumber || 1, newVer);
     }
     if (course_id) {
       await restoreWorkflowState(course_id);
@@ -1689,6 +1693,7 @@ const Topics = () => {
           stageLabel="Topic Hierarchy"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
           onGenerateNew={handleGenerateTopics}
           isGenerating={state.generatingTopics}
         />

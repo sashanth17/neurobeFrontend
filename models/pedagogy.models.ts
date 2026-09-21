@@ -3,9 +3,12 @@ import { commonInstance } from '@/utils/axios.utils';
 const pedagogy = {
     
 
-     unit_detail : (syllabus_id?: any,unit_number?: any) => {
+     unit_detail : (syllabus_id?: any, unit_number?: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${ syllabus_id }/pedagogy-workspace?unit_number=${unit_number}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `&version_number=${version_number}`;
+            }
 
             commonInstance()
                 .get(url)
@@ -199,6 +202,16 @@ const pedagogy = {
             let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
             commonInstance()
                 .put(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    delete: (id: string | number, pedagogy_id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
+            commonInstance()
+                .delete(url)
                 .then((res) => resolve(res.data))
                 .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
         });

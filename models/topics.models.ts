@@ -21,9 +21,12 @@ const topics = {
         return promise;
     },
 
-     unit_detail : (syllabus_id?: any,unit_number?: any) => {
+     unit_detail : (syllabus_id?: any, unit_number?: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${ syllabus_id}/topics-workspace?unit_number=${unit_number}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `&version_number=${version_number}`;
+            }
 
             commonInstance()
                 .get(url)
