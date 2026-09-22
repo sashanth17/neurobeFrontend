@@ -318,6 +318,23 @@ const Icons: Record<string, () => JSX.Element> = {
       <line x1="22" y1="11" x2="16" y2="11" />
     </svg>
   ),
+  "MCQ Generation": () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M9 15l2 2 4-4" />
+      <path d="M19 2v4M21 4h-4" />
+    </svg>
+  ),
   "MCQ Test Execution": () => (
     <svg
       width="18"

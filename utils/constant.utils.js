@@ -168,6 +168,12 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
+      label: "MCQ Generation",
+      href: "/neurobe/mcq-generation",
+    },
+    {
+      type: "link",
+      icon: "IconMenuNotes",
       label: "MCQ Test Execution",
       href: "/neurobe/mcq-test-execution",
     },
@@ -231,6 +237,12 @@ export const OwnmenuConfig = {
       label: "Student Enrollment",
       href: "/neurobe/ins-student-enrollment",
     },
+    {
+      type: "link",
+      icon: "IconMenuNotes",
+      label: "MCQ Generation",
+      href: "/neurobe/mcq-generation",
+    },
 
     {
       type: "link",
@@ -279,6 +291,12 @@ OwnmenuConfig.FACULTY = [
     icon: "IconMenuNotes",
     label: "Student Enrollment",
     href: "/neurobe/ins-student-enrollment",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "MCQ Generation",
+    href: "/neurobe/mcq-generation",
   },
   {
     type: "link",
