@@ -11,6 +11,7 @@ import {
   Layers,
   ChevronDown,
   Plus,
+  Lock,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useCourseWorkflowStatus, StageWorkflowData } from "@/hook/useCourseWorkflowStatus";
@@ -95,6 +96,7 @@ export default function CourseCard(props: any) {
   const { workflowStatus, syllabusFiles, refetch } = useCourseWorkflowStatus(targetCourseId);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [optimisticVersions, setOptimisticVersions] = useState<Record<string, number>>({});
 
   const getRolesList = (roleData: any): string[] => {
     if (!roleData) return [];
@@ -153,6 +155,7 @@ export default function CourseCard(props: any) {
   const sCopo = getStageInfo("copo", workflowStatus?.step_2_copo_mapping, data?.academic_preparation?.copo_mapping?.state);
 
   const activeExtractionVer =
+    optimisticVersions.extraction ||
     syllabusFiles?.find((f: any) => f.is_active)?.version_number ||
     sSyllabus.ver ||
     (syllabusFiles && syllabusFiles.length > 0 ? syllabusFiles[syllabusFiles.length - 1]?.version_number : 1);
@@ -160,7 +163,7 @@ export default function CourseCard(props: any) {
   // Filter CO-PO versions to only children of the currently active extraction version
   const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed;
   let copoStatus = sCopo.status;
-  let copoVer = sCopo.ver;
+  let copoVer = optimisticVersions.copo || sCopo.ver;
   let copoTotalVers = sCopo.totalVers;
   let copoAvailableVersions = sCopo.availableVersions;
 
@@ -176,7 +179,7 @@ export default function CourseCard(props: any) {
     } else {
       const activeMatch =
         matchingChildCopo.find((v: any) => v.is_active) || matchingChildCopo[matchingChildCopo.length - 1];
-      copoVer = activeMatch.version;
+      copoVer = optimisticVersions.copo || activeMatch.version;
       copoStatus = activeMatch.status === "approved" ? "approved" : "draft";
       copoTotalVers = matchingChildCopo.length;
       copoAvailableVersions = matchingChildCopo.map((v: any) => v.version);
@@ -187,17 +190,25 @@ export default function CourseCard(props: any) {
   const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
   const sLesson = getStageInfo("schedule", workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
 
+  // Approval status indicators for topological gating
+  const isSyllabusApproved = sSyllabus.status === "approved";
+  const isTopicsApproved = sTopics.status === "approved";
+  const isPedagogyApproved = sPedagogy.status === "approved";
+  const isLessonApproved = sLesson.status === "approved";
+
   const preparations = [
     {
       label: "SYLLABUS",
       stageKey: "extraction",
       status: sSyllabus.status,
-      version: sSyllabus.ver,
+      version: optimisticVersions.extraction || sSyllabus.ver,
       totalVersions: sSyllabus.totalVers,
       availableVersions: sSyllabus.availableVersions,
       extra: syllabusFiles && syllabusFiles.length > 0 ? `${syllabusFiles.length} file${syllabusFiles.length > 1 ? "s" : ""}` : undefined,
       route: `/neurobe/syllabus?course_id=${targetCourseId}`,
       artifactsTab: "syllabus",
+      isUnlocked: true,
+      unlockMessage: "",
     },
     {
       label: "CO-PO MAPPING",
@@ -208,36 +219,44 @@ export default function CourseCard(props: any) {
       availableVersions: copoAvailableVersions,
       route: `/neurobe/co-po-mapping?course_id=${targetCourseId}`,
       artifactsTab: "copo",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
       label: "TOPICS",
       stageKey: "hierarchy",
       status: sTopics.status,
-      version: sTopics.ver,
+      version: optimisticVersions.hierarchy || sTopics.ver,
       totalVersions: sTopics.totalVers,
       availableVersions: sTopics.availableVersions,
       route: `/neurobe/topics?course_id=${targetCourseId}`,
       artifactsTab: "topics",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
       label: "PEDAGOGY",
       stageKey: "pedagogy",
       status: sPedagogy.status,
-      version: sPedagogy.ver,
+      version: optimisticVersions.pedagogy || sPedagogy.ver,
       totalVersions: sPedagogy.totalVers,
       availableVersions: sPedagogy.availableVersions,
       route: `/neurobe/pedagogy?course_id=${targetCourseId}`,
       artifactsTab: "pedagogy",
+      isUnlocked: isTopicsApproved,
+      unlockMessage: "Requires Topic Hierarchy to be approved first.",
     },
     {
       label: "LESSON PLAN",
       stageKey: "schedule",
       status: sLesson.status,
-      version: sLesson.ver,
+      version: optimisticVersions.schedule || sLesson.ver,
       totalVersions: sLesson.totalVers,
       availableVersions: sLesson.availableVersions,
       route: `/neurobe/lesson-plan?course_id=${targetCourseId}`,
       artifactsTab: "lesson-plan",
+      isUnlocked: isPedagogyApproved,
+      unlockMessage: "Requires Pedagogy Recommendations to be approved first.",
     },
     {
       label: "LEARNING MATERIALS",
@@ -245,6 +264,8 @@ export default function CourseCard(props: any) {
       status: data?.academic_preparation?.learning_materials?.state || "not_started",
       route: `/neurobe/learning-materials?course_id=${targetCourseId}`,
       artifactsTab: "learning-materials",
+      isUnlocked: isLessonApproved,
+      unlockMessage: "Requires Lesson Plan to be approved first.",
     },
     {
       label: "QUESTION BANK",
@@ -253,6 +274,8 @@ export default function CourseCard(props: any) {
       extra: data?.academic_preparation?.question_bank?.count !== undefined ? `${data?.academic_preparation?.question_bank?.count} Questions` : undefined,
       route: `/neurobe/question-bank?course_id=${targetCourseId}`,
       artifactsTab: "question-bank",
+      isUnlocked: isTopicsApproved,
+      unlockMessage: "Requires Topic Hierarchy to be approved first.",
     },
     {
       label: "CIA QUESTION PAPER",
@@ -260,6 +283,8 @@ export default function CourseCard(props: any) {
       status: data?.academic_preparation?.cia_question_paper?.state || "not_started",
       route: `/neurobe/cia-question-paper?course_id=${targetCourseId}`,
       artifactsTab: "cia-papers",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
   ];
 
@@ -277,6 +302,10 @@ export default function CourseCard(props: any) {
 
   // Navigation when touching a section
   const handleOpenSection = (item: typeof preparations[0]) => {
+    if (!item.isUnlocked) {
+      Failure(item.unlockMessage || "This stage is locked.");
+      return;
+    }
     if (item.stageKey === "extraction") {
       router.push(`/neurobe/syllabus?course_id=${targetCourseId}`);
     } else if (item.stageKey === "copo") {
@@ -291,14 +320,27 @@ export default function CourseCard(props: any) {
   // Version activation directly from card
   const handleToggleVersion = async (stageKey: string, newVer: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    const stepKeyMap: Record<string, string> = {
+      extraction: "step_1_syllabus_extraction",
+      copo: "step_2_copo_mapping",
+      hierarchy: "step_3_topic_hierarchy",
+      pedagogy: "step_4_pedagogy_generation",
+      schedule: "step_5_lesson_plan_schedules",
+    };
     try {
       setActionLoading(stageKey);
+      setOptimisticVersions((prev) => ({ ...prev, [stageKey]: newVer }));
       await Models.syllabus.activate_version(targetCourseId, stageKey, newVer);
       Success(`Activated Version ${newVer} for ${stageKey.toUpperCase()}`);
       await refetch();
       setActiveMenu(null);
     } catch (err: any) {
       console.error("Failed to activate version:", err);
+      setOptimisticVersions((prev) => {
+        const next = { ...prev };
+        delete next[stageKey];
+        return next;
+      });
       Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${newVer}`);
     } finally {
       setActionLoading(null);
@@ -310,6 +352,7 @@ export default function CourseCard(props: any) {
     e.stopPropagation();
     try {
       setActionLoading("extraction");
+      setOptimisticVersions((prev) => ({ ...prev, extraction: newVer }));
       try {
         await (Models.syllabus as any).activateFileVersion(targetCourseId, newVer);
       } catch {
@@ -320,6 +363,11 @@ export default function CourseCard(props: any) {
       setActiveMenu(null);
     } catch (err: any) {
       console.error("Failed to activate syllabus version:", err);
+      setOptimisticVersions((prev) => {
+        const next = { ...prev };
+        delete next.extraction;
+        return next;
+      });
       Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${newVer}`);
     } finally {
       setActionLoading(null);
@@ -447,21 +495,30 @@ export default function CourseCard(props: any) {
             const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.not_started;
             const isMenuOpen = activeMenu === item.stageKey;
             const isLoading = actionLoading === item.stageKey;
+            const isUnlocked = item.isUnlocked;
 
             return (
               <div
                 key={item.label}
                 onClick={() => handleOpenSection(item)}
-                className={`group relative flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-150 hover:border-indigo-400 hover:shadow-sm ${cfg.cell}`}
+                className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-150 ${
+                  isUnlocked
+                    ? `cursor-pointer hover:border-indigo-400 hover:shadow-sm ${cfg.cell}`
+                    : "cursor-not-allowed opacity-60 border border-gray-200 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/40"
+                }`}
+                title={!isUnlocked ? item.unlockMessage : undefined}
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-                    {item.label}
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 truncate">
+                      {item.label}
+                    </p>
+                    {!isUnlocked && <Lock className="h-3 w-3 text-slate-400 shrink-0" />}
+                  </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-sm font-bold text-[#000] dark:text-gray-200">
-                      {cfg.label}
-                      {item.extra && <span className="ml-1 text-xs text-slate-500">{item.extra}</span>}
+                      {!isUnlocked ? "Locked" : cfg.label}
+                      {isUnlocked && item.extra && <span className="ml-1 text-xs text-slate-500">{item.extra}</span>}
                     </span>
 
                     {/* Version Selector Pill right on the card */}
@@ -558,18 +615,25 @@ export default function CourseCard(props: any) {
                         )}
                       </div>
                     ) : (!item.version || item.status === "not_started") ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenSection(item);
-                        }}
-                        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-indigo-400 bg-indigo-50/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
-                        title={`Create ${item.label}`}
-                      >
-                        <Plus className="h-2.5 w-2.5" />
-                        <span>Add</span>
-                      </button>
+                      isUnlocked ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenSection(item);
+                          }}
+                          className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-indigo-400 bg-indigo-50/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                          title={`Create ${item.label}`}
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                          <span>Add</span>
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-400">
+                          <Lock className="h-2.5 w-2.5" />
+                          <span>Locked</span>
+                        </span>
+                      )
                     ) : (
                       <div className="relative inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {item.availableVersions && item.availableVersions.length > 1 ? (
@@ -617,15 +681,16 @@ export default function CourseCard(props: any) {
                           </span>
                         )}
 
-                        {item.stageKey === "copo" && (
+                        {/* Plus button for all AI stages when unlocked */}
+                        {["copo", "hierarchy", "pedagogy", "schedule"].includes(item.stageKey) && isUnlocked && (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/neurobe/co-po-mapping?course_id=${targetCourseId}`);
+                              handleOpenSection(item);
                             }}
                             className="inline-flex h-5 w-5 items-center justify-center rounded-md border border-dashed border-indigo-400 bg-indigo-50/70 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-500 active:scale-95 transition-all dark:border-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
-                            title="Generate New CO-PO Version"
+                            title={`Add / Generate New ${item.label} Version`}
                           >
                             <Plus className="h-3 w-3" />
                           </button>
@@ -639,6 +704,8 @@ export default function CourseCard(props: any) {
                 <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {isLoading ? (
                     <RotateCw className="h-4 w-4 animate-spin text-indigo-500" />
+                  ) : !isUnlocked ? (
+                    <Lock className="h-4 w-4 text-slate-400" />
                   ) : (
                     <>
                       {/* Quick Regenerate button on supported AI stages — visible on hover;
@@ -693,7 +760,7 @@ export default function CourseCard(props: any) {
         <button
           type="button"
           onClick={() =>
-            router.push(`/neurobe/ins-course-artifacts?course_id=${targetCourseId}`)
+            router.push(`/neurobe/ins-course-artifacts?course_id=${targetCourseId}&from=my-courses`)
           }
           className="rounded-xl border border-purple-600 bg-white px-4 py-2 text-xs font-bold text-purple-700 shadow-sm transition-all hover:bg-purple-50 active:scale-95 dark:bg-gray-800 dark:text-purple-300 dark:hover:bg-purple-900/30"
         >

@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ShieldAlert,
   GitBranch,
+  Trash2,
 } from "lucide-react";
 import Models from "@/imports/models.import";
 import { Success, Failure } from "@/utils/function.utils";
@@ -30,6 +31,7 @@ interface StageVersionHistoryPanelProps {
   stageLabel: string;
   courseId: string | number;
   onVersionActivated: (newVer: number) => Promise<void> | void;
+  onVersionLoad?: (newVer: number) => Promise<void> | void;
   onGenerateNew: (parentParams: {
     extraction_version?: number;
     hierarchy_version?: number;
@@ -45,6 +47,7 @@ export default function StageVersionHistoryPanel({
   stageLabel,
   courseId,
   onVersionActivated,
+  onVersionLoad,
   onGenerateNew,
   isGenerating = false,
   refreshTrigger,
@@ -52,8 +55,11 @@ export default function StageVersionHistoryPanel({
 }: StageVersionHistoryPanelProps) {
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [activeVersion, setActiveVersion] = useState<number>(1);
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
   const [loadingVersions, setLoadingVersions] = useState<boolean>(false);
+  const [loadingVersionId, setLoadingVersionId] = useState<number | null>(null);
   const [activatingVersion, setActivatingVersion] = useState<number | null>(null);
+  const [deletingVersionId, setDeletingVersionId] = useState<number | null>(null);
 
   // Upstream approved versions
   const [approvedExtractionVersions, setApprovedExtractionVersions] = useState<number[]>([]);
@@ -73,7 +79,9 @@ export default function StageVersionHistoryPanel({
       const res: any = await Models.syllabus.get_versions(courseId, stage);
       const vList: VersionInfo[] = res?.versions || [];
       setVersions(vList);
-      setActiveVersion(res?.active_version || 1);
+      const actVer = res?.active_version || 1;
+      setActiveVersion(actVer);
+      setLoadedVersion((prev) => (prev !== null ? prev : actVer));
     } catch (err) {
       console.error(`Failed to load versions for ${stage}:`, err);
     } finally {
@@ -157,17 +165,59 @@ export default function StageVersionHistoryPanel({
     }
   }, [refreshTrigger, courseId]);
 
+  const handleLoad = async (ver: number) => {
+    if (loadingVersionId !== null || activatingVersion !== null) return;
+    try {
+      setLoadingVersionId(ver);
+      setLoadedVersion(ver);
+      if (onVersionLoad) {
+        await onVersionLoad(ver);
+      } else {
+        await onVersionActivated(ver);
+      }
+      Success(`Loaded Version ${ver} for ${stageLabel}`);
+    } catch (err: any) {
+      Failure(typeof err === "string" ? err : err?.message || `Failed to load Version ${ver}`);
+    } finally {
+      setLoadingVersionId(null);
+    }
+  };
+
   const handleActivate = async (ver: number) => {
+    if (activatingVersion !== null) return;
     try {
       setActivatingVersion(ver);
       await Models.syllabus.activate_version(courseId, stage, ver);
-      Success(`Activated Version ${ver} for ${stageLabel}`);
+      Success(`Activated Version ${ver} for ${stageLabel} (Active for instructors)`);
+      setActiveVersion(ver);
+      setLoadedVersion(ver);
       await loadVersions();
       await onVersionActivated(ver);
     } catch (err: any) {
       Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${ver}`);
     } finally {
       setActivatingVersion(null);
+    }
+  };
+
+  const handleDelete = async (ver: number) => {
+    if (deletingVersionId !== null || activatingVersion !== null || loadingVersionId !== null) return;
+    if (!window.confirm(`Are you sure you want to delete Version ${ver} of ${stageLabel}?`)) return;
+    try {
+      setDeletingVersionId(ver);
+      await Models.syllabus.delete_version(courseId, stage, ver);
+      Success(`Deleted Version ${ver} for ${stageLabel}`);
+      if (loadedVersion === ver) {
+        setLoadedVersion(null);
+      }
+      if (activeVersion === ver) {
+        setActiveVersion(0);
+      }
+      await loadVersions();
+    } catch (err: any) {
+      Failure(typeof err === "string" ? err : err?.message || `Failed to delete Version ${ver}`);
+    } finally {
+      setDeletingVersionId(null);
     }
   };
 
@@ -387,14 +437,26 @@ export default function StageVersionHistoryPanel({
           const isActive = ver.is_active || ver.version === effectiveActiveDisplayVer;
           const isApproved = ver.status === "approved";
           const isActivating = activatingVersion === ver.version;
+          const isCurrentLoaded = (loadedVersion ?? effectiveActiveDisplayVer) === ver.version;
+          const isLoadingThis = loadingVersionId === ver.version;
 
           return (
             <div
               key={ver.version}
-              className={`flex shrink-0 min-w-[210px] items-center justify-between gap-2 rounded-xl border p-2.5 transition-all ${
+              onClick={() => {
+                if (!isCurrentLoaded && !isLoadingThis && !isActivating) {
+                  handleLoad(ver.version);
+                }
+              }}
+              title={
                 isActive
-                  ? "border-indigo-400 bg-indigo-50/50 shadow-sm dark:border-indigo-600 dark:bg-indigo-950/20"
-                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40"
+                  ? `v${ver.version} is active for instructors. Click section to load into view.`
+                  : `Click section or Load button to preview v${ver.version}`
+              }
+              className={`flex shrink-0 min-w-[260px] items-center justify-between gap-3 rounded-xl border p-2.5 transition-all cursor-pointer ${
+                isCurrentLoaded
+                  ? "border-indigo-500 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-400 dark:border-indigo-500 dark:bg-indigo-950/30"
+                  : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50/70 hover:shadow-xs dark:border-slate-800 dark:bg-slate-800/40 dark:hover:border-indigo-700"
               }`}
             >
               <div className="min-w-0">
@@ -418,8 +480,13 @@ export default function StageVersionHistoryPanel({
                     {isApproved ? "Approved" : "Draft"}
                   </span>
                   {isActive && (
-                    <span className="rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                    <span className="rounded bg-emerald-100 px-1 py-0.2 text-[9px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                       Active
+                    </span>
+                  )}
+                  {isCurrentLoaded && !isActive && (
+                    <span className="rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                      Loaded
                     </span>
                   )}
                 </div>
@@ -438,25 +505,79 @@ export default function StageVersionHistoryPanel({
                 </div>
               </div>
 
-              <div>
+              {/* Action buttons: Load, Set Active, Delete */}
+              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                {/* Button 1: Load */}
+                <button
+                  type="button"
+                  disabled={isCurrentLoaded || isLoadingThis || isActivating || deletingVersionId !== null}
+                  title={isCurrentLoaded ? `v${ver.version} is currently loaded` : `Load v${ver.version}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLoad(ver.version);
+                  }}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+                    isCurrentLoaded
+                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 cursor-default"
+                      : "border border-slate-200 bg-white text-slate-700 shadow-xs hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-600"
+                  }`}
+                >
+                  {isLoadingThis ? (
+                    <RotateCw className="h-3 w-3 animate-spin" />
+                  ) : isCurrentLoaded ? (
+                    "Loaded ✓"
+                  ) : (
+                    "Load"
+                  )}
+                </button>
+
+                {/* Button 2: Set Active */}
                 {isActive ? (
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-                    <CheckCircle className="h-3.5 w-3.5" />
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+                    title={`v${ver.version} is active for instructors`}
+                  >
+                    <CheckCircle className="h-3 w-3" />
+                    Active
                   </span>
                 ) : (
                   <button
                     type="button"
-                    disabled={isActivating}
-                    onClick={() => handleActivate(ver.version)}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 shadow-sm transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    disabled={isActivating || isLoadingThis || deletingVersionId !== null}
+                    title={`Activate v${ver.version} for instructors`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleActivate(ver.version);
+                    }}
+                    className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-500"
                   >
                     {isActivating ? (
-                      <RotateCw className="h-3 w-3 animate-spin" />
+                      <span className="flex items-center gap-1">
+                        <RotateCw className="h-3 w-3 animate-spin" />
+                      </span>
                     ) : (
                       "Set Active"
                     )}
                   </button>
                 )}
+
+                {/* Button 3: Delete Version */}
+                <button
+                  type="button"
+                  disabled={deletingVersionId !== null || isActivating || isLoadingThis}
+                  title={`Delete Version ${ver.version}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(ver.version);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-400 shadow-xs transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  {deletingVersionId === ver.version ? (
+                    <RotateCw className="h-3 w-3 animate-spin text-red-500" />
+                  ) : (
+                    <Trash2 className="h-3 w-3" />
+                  )}
+                </button>
               </div>
             </div>
           );

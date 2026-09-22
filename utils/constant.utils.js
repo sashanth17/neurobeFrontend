@@ -150,67 +150,6 @@ export const OwnmenuConfig = {
     },
     {
       type: "heading",
-      label: "COURSE PREPARATION",
-      className: "pb-2",
-    },
-    {
-      type: "link",
-      icon: "IconMenuForms",
-      label: "Syllabus",
-      href: "/neurobe/syllabus",
-    },
-    {
-      type: "link",
-      icon: "IconMenuUsers",
-      label: "CO-PO Mapping",
-      href: "/neurobe/co-po-mapping",
-    },
-    {
-      type: "link",
-      icon: "IconMenuTables",
-      label: "Topics",
-      href: "/neurobe/topics",
-      notifyKey: "new_application_count",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Pedagogy",
-      href: "/neurobe/pedagogy",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Lesson Plan",
-      href: "/neurobe/lesson-plan",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Learning Materials",
-      href: "/neurobe/learning-materials",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Question Bank",
-      href: "/neurobe/question-bank",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "MCQ Test Preperation",
-      href: "/neurobe/mcq-test-preparation",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "CIA Question Paper",
-      href: "/neurobe/cia-question-paper",
-    },
-
-    {
-      type: "heading",
       label: "INSTRUCTOR FUNCTIONS",
       className: "pb-2 pt-2",
     },
@@ -278,7 +217,7 @@ export const OwnmenuConfig = {
       type: "link",
       icon: "IconMenuDashboard",
       label: "My Assigned Courses",
-      href: "/neurobe/ins-my-assigned-courses",
+      href: "/neurobe/my-assigned-courses",
     },
     {
       type: "link",
@@ -311,19 +250,66 @@ export const OwnmenuConfig = {
       type: "link",
       icon: "IconMenuNotes",
       label: "Marks Extraction & Verification",
-      href: "/neurobe/audit-trial",
+      href: "/neurobe/ins-marks-extraction",
     },
   ],
 };
+
+OwnmenuConfig.FACULTY = [
+  {
+    type: "link",
+    icon: "IconMenuDashboard",
+    label: "My Assigned Courses",
+    href: "/neurobe/my-assigned-courses",
+    className: "pb-2",
+  },
+  {
+    type: "heading",
+    label: "INSTRUCTOR FUNCTIONS",
+    className: "pb-2 pt-2",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Course Artifacts",
+    href: "/neurobe/ins-course-artifacts",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Student Enrollment",
+    href: "/neurobe/ins-student-enrollment",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "MCQ Test Execution",
+    href: "/neurobe/ins-mcq-test-execution",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Results & Analysis",
+    href: "/neurobe/ins-result-analysis",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Marks Extraction & Verification",
+    href: "/neurobe/ins-marks-extraction",
+  },
+];
 
 // Aliases for role lookup consistency
 OwnmenuConfig["ERP Admin"] = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig["Course Coordinator"] = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig["Course Instructor"] = OwnmenuConfig.COURSE_INSTRUCTOR;
+OwnmenuConfig["Faculty"] = OwnmenuConfig.FACULTY;
 OwnmenuConfig["Super Admin"] = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig.erp = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig.hr = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig.instructor = OwnmenuConfig.COURSE_INSTRUCTOR;
+OwnmenuConfig.faculty = OwnmenuConfig.FACULTY;
 
 /**
  * Returns the respective menu items based on the user's role
@@ -347,10 +333,12 @@ export const getMenuByRole = (role) => {
   ) {
     return OwnmenuConfig.COURSE_COORDINATOR;
   }
+  if (normalized === "FACULTY") {
+    return OwnmenuConfig.FACULTY;
+  }
   if (
     normalized === "COURSE_INSTRUCTOR" ||
-    normalized === "INSTRUCTOR" ||
-    normalized === "FACULTY"
+    normalized === "INSTRUCTOR"
   ) {
     return OwnmenuConfig.COURSE_INSTRUCTOR;
   }
@@ -369,14 +357,15 @@ export const getDefaultRouteByRole = (role) => {
     .toUpperCase()
     .replace(/\s+/g, "_");
 
-  if (normalized == "FACULTY" || normalized == "STUDENT") {
+  if (
+    normalized === "FACULTY" ||
+    normalized === "STUDENT" ||
+    normalized === "COURSE_COORDINATOR" ||
+    normalized === "COORDINATOR" ||
+    normalized === "COURSE_INSTRUCTOR" ||
+    normalized === "INSTRUCTOR"
+  ) {
     return "/neurobe/my-assigned-courses";
-  }
-  if (normalized === "COURSE_COORDINATOR" || normalized === "COORDINATOR") {
-    return "/neurobe/my-assigned-courses";
-  }
-  if (normalized === "COURSE_INSTRUCTOR" || normalized === "INSTRUCTOR") {
-    return "/neurobe/ins-my-assigned-courses";
   }
 
   // Default for ERP Admin and Super Admin

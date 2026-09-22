@@ -3,9 +3,12 @@ import { commonInstance } from '@/utils/axios.utils';
 const pedagogy = {
     
 
-     unit_detail : (syllabus_id?: any,unit_number?: any) => {
+     unit_detail : (syllabus_id?: any, unit_number?: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${ syllabus_id }/pedagogy-workspace?unit_number=${unit_number}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `&version_number=${version_number}`;
+            }
 
             commonInstance()
                 .get(url)
@@ -23,9 +26,9 @@ const pedagogy = {
         return promise;
     },
 
-    create : (unit_id?: any, body?: any) => { 
+    add_pedagogy: (topic_id?: any, body?: any) => { 
         let promise = new Promise((resolve, reject) => {
-            let url = `course/units/${unit_id}/topics`;
+            let url = `course/topics/${topic_id}/pedagogies`;
 
             const config: any = {};
             if (body instanceof FormData) {
@@ -34,6 +37,26 @@ const pedagogy = {
 
             commonInstance()
                  .post(url, body || {}, config)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
+                    } else {
+                        reject(error?.message || error);
+                    }
+                });
+        });
+        return promise;
+    },
+
+    create: (topic_id?: any, body?: any) => { 
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/pedagogies`;
+
+            commonInstance()
+                 .post(url, body || {})
                 .then((res) => {
                     resolve(res.data);
                 })
@@ -194,11 +217,27 @@ const pedagogy = {
         });
     },
 
-    update_selection: (id: string | number, pedagogy_id: string | number, body: any) => {
+    update_selection: (id: string | number, pedagogy_id: string | number, body: any, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .put(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    delete: (id: string | number, pedagogy_id: string | number, version_number?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/pedagogies/${pedagogy_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
+            commonInstance()
+                .delete(url)
                 .then((res) => resolve(res.data))
                 .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
         });

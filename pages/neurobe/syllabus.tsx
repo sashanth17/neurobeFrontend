@@ -33,6 +33,7 @@ const Syllabus = () => {
   const searchParams = useSearchParams();
   const course_id = searchParams.get("course_id");
   const job_id = searchParams.get("job_id");
+  const fromParam = searchParams.get("from");
 
   const stepKey = `syllabus_step_${course_id ?? "default"}`;
   const jobKey = `syllabus_job_${course_id ?? "default"}`;
@@ -400,11 +401,21 @@ const Syllabus = () => {
     setState({ isJobLoading: true });
 
     let retries = 0;
-    const maxRetries = 30; // Max 30 retries (about 1.5 minutes with 3s interval)
-    const pollInterval = 3000; // 3 seconds
+    const maxRetries = 15; // Max 15 retries (about 30 minutes with 2-minute interval)
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
     const fetchOnce = async () => {
       try {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          console.log("Extraction job polling timed out after 10 minutes");
+          stopPolling();
+          setState({ isJobLoading: false, extractionError: "Extraction timed out after 10 minutes. Please try again." });
+          Failure("Extraction timed out after 10 minutes. Please try again.");
+          return;
+        }
+
         let res: any = null;
         try {
           res = await Models.job.detail(id);
@@ -828,6 +839,25 @@ const Syllabus = () => {
   };
   console.log('✌️state.course_data --->', state.courseData);
 
+  const handleUpdateLTPC = (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number }) => {
+    setState((prev: any) => ({
+      jobData: {
+        ...(prev.jobData || {}),
+        ...hours,
+        lectureHours: hours.lecture_hours,
+        tutorialHours: hours.tutorial_hours,
+        practicalHours: hours.practical_hours,
+      },
+      courseData: {
+        ...(prev.courseData || {}),
+        latest_syllabus: {
+          ...(prev.courseData?.latest_syllabus || {}),
+          ...hours,
+        },
+      },
+    }));
+  };
+
   const handleSaveDraft = async () => {
     try {
       const sid = await getEffectiveSyllabusId();
@@ -867,7 +897,13 @@ const Syllabus = () => {
         courseOptions={state.course_list}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
       <div className="">
@@ -1033,6 +1069,7 @@ const Syllabus = () => {
               <ExtractionComplete
                 fileName={state.selectedFile?.name}
                 isLoading={state.isJobLoading}
+                isApproved={state.currentStep === 4 || state.syllabusData?.status === "approved" || state.syllabusData?.is_approved}
                 onReview={() => {
                   if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
                   setState({ showReview: true });
@@ -1080,6 +1117,8 @@ const Syllabus = () => {
                   </div>
                 ) : (
                   <ReviewModeBar
+                    isApproved={state.currentStep === 4 || state.syllabusData?.status === "approved" || state.syllabusData?.is_approved}
+                    status={state.syllabusData?.status}
                     onSaveDraft={() => handleSaveDraft()}
                     onContinue={() => syllabus_status()}
                   />
@@ -1126,6 +1165,7 @@ const Syllabus = () => {
                       handleKnowledgeLevelChange={handleKnowledgeLevelChange}
                       onUpdateUnitHours={handleUpdateUnitHours}
                       onUpdateUnitTitle={handleUpdateUnitTitle}
+                      onUpdateLTPC={handleUpdateLTPC}
                       syllabusId={state.courseData?.latest_syllabus?.id || state.lastLoadedSyllabusId || state.jobData?.syllabus_id || state.jobData?.id}
                     />
 

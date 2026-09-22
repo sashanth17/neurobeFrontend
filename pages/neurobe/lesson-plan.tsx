@@ -8,6 +8,7 @@ import {
   Save,
   EditIcon,
   ClipboardList,
+  RotateCw,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { Dropdown, Success, Failure, useSetState } from "@/utils/function.utils";
@@ -251,6 +252,7 @@ const LessonPlan = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
   console.log("course_id", course_id);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -275,21 +277,113 @@ const LessonPlan = () => {
     matrix: [],
     generateLoading: false,
     generatedResponse: null,
+    lessonApproved: false,
+    upstreamNotApproved: false,
+    approvingLesson: false,
+    savingDraft: false,
   });
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(setPageTitle("Lesson Plan"));
   }, [dispatch]);
 
   useEffect(() => {
-    course_data()
-    coordinator_course_data()
+    if (course_id) {
+      course_data();
+      coordinator_course_data();
+      restoreWorkflowState(course_id);
+    }
   }, [course_id]);
 
-  const lession_data = async (syllabus_id,unit) => {
-    try {
+  const getSyllabusId = () => {
+    return (
+      state.courseData?.latest_syllabus?.id ||
+      state.courseData?.syllabus_id ||
+      state.lession_data?.syllabus_id ||
+      state.lession_data?.selected_unit?.syllabus_id ||
+      course_id
+    );
+  };
 
-      const res: any = await Models.lession_plan.detail(syllabus_id, unit);
+  const restoreWorkflowState = async (cid: string | number) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const pedStep = wfRes?.workflow?.step_4_pedagogy_generation;
+      const isPedagogyApproved = pedStep?.status === "approved";
+      setState({ upstreamNotApproved: !isPedagogyApproved });
+
+      const lpStep = wfRes?.workflow?.step_5_lesson_plan_schedules;
+      if (!lpStep) return;
+
+      const { status, job_id } = lpStep;
+      if (status === "redis_queued" || status === "generating") {
+        setState({ generateLoading: true });
+        if (job_id) {
+          job_Data(job_id);
+        }
+      } else if (status === "approved") {
+        setState({ lessonApproved: true, recommendationsGenerated: true, generateLoading: false });
+      } else if (status === "draft") {
+        setState({ recommendationsGenerated: true, generateLoading: false });
+      } else if (status === "failed") {
+        setState({ generateLoading: false });
+      }
+    } catch (err) {
+      console.warn("restoreWorkflowState in lesson-plan error:", err);
+    }
+  };
+
+  const handleApproveLessonPlan = async () => {
+    const sid = getSyllabusId();
+    if (state.upstreamNotApproved) {
+      Failure("Cannot approve lesson plan: Pedagogy recommendations must be approved first.");
+      return;
+    }
+    try {
+      setState({ approvingLesson: true });
+      try {
+        await Models.lession_plan.approve_schedule(sid);
+      } catch (err) {
+        console.warn("approve_schedule fallback:", err);
+        await Models.lession_plan.approve(sid);
+      }
+      try {
+        await Models.syllabus.approve_stage(course_id || sid, "schedule");
+      } catch (e) {
+        console.warn("approve_stage schedule warning:", e);
+      }
+      Success("Lesson plan review completed successfully");
+      setState({ lessonApproved: true });
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
+    } catch (error: any) {
+      console.log("Approve error:", error);
+      Failure(typeof error === "string" ? error : error?.message || "Failed to approve lesson plan");
+    } finally {
+      setState({ approvingLesson: false });
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    const sid = getSyllabusId();
+    try {
+      setState({ savingDraft: true });
+      const res: any = await Models.lession_plan.draft(sid);
+      Success(res?.message || "Draft saved successfully");
+    } catch (error: any) {
+      console.log("Draft save error:", error);
+      Failure(typeof error === "string" ? error : error?.message || "Failed to save draft");
+    } finally {
+      setState({ savingDraft: false });
+    }
+  };
+
+  const lession_data = async (syllabus_id: any, unit: any, verNum?: number) => {
+    try {
+      const vToUse = verNum !== undefined ? verNum : loadedVersion;
+      const res: any = await Models.lession_plan.detail(syllabus_id, unit, vToUse);
       const data = [{
         key: "total-topics",
         label: " Total Topics",
@@ -534,11 +628,20 @@ const LessonPlan = () => {
     if (!id) return;
 
     let retries = 0;
-    const maxRetries = 40;
-    const pollInterval = 3000;
+    const maxRetries = 15;
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes timeout
 
     const fetchOnce = async () => {
       try {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          stopPolling();
+          setState({ generateLoading: false });
+          Failure("Lesson plan generation timed out after 10 minutes. Please try again.");
+          return;
+        }
+
         const res: any = await Models.job.detail(id);
         console.log("job_Data response:", res);
 
@@ -636,9 +739,14 @@ const LessonPlan = () => {
   };
 
   const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
     const syllabusId = state.courseData?.latest_syllabus?.id || course_id;
     if (syllabusId) {
-      await lession_data(syllabusId, 1);
+      const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+      await lession_data(syllabusId, activeUnitNum, newVer);
+    }
+    if (course_id) {
+      await restoreWorkflowState(course_id);
     }
   };
 
@@ -656,7 +764,13 @@ const LessonPlan = () => {
         courseOptions={state.course_list}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 
@@ -688,6 +802,7 @@ const LessonPlan = () => {
           stageLabel="Lesson Plan & Schedules"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
           onGenerateNew={generateLessionPlan}
           isGenerating={state.generateLoading}
         />
@@ -784,32 +899,21 @@ const LessonPlan = () => {
                 className: "create-btn",
               }
               : {
-                label: "Approve Lesson Plan Review",
-                icon: <Check className="h-4 w-4" />,
-                onClick: async () => {
-                  try {
-                    await Models.lession_plan.approve(state.courseData?.latest_syllabus?.id);
-                    Success("Lesson plan review completed successfully");
-                    setState({ lessonApproved: true });
-                  } catch (error) {
-                    console.log("Approve error:", error);
-                  }
-                },
-                // disabled: !allReviewed,
+                label: state.approvingLesson
+                  ? "Approving..."
+                  : state.upstreamNotApproved
+                  ? "Requires Pedagogy Approval"
+                  : "Approve Lesson Plan Review",
+                icon: state.approvingLesson ? <RotateCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
+                onClick: handleApproveLessonPlan,
+                disabled: state.approvingLesson || state.upstreamNotApproved,
               }
           }
           actionBtn2={{
-            label: "Save Draft",
+            label: state.savingDraft ? "Saving..." : "Save Draft",
             icon: <Save className="h-4 w-4" />,
-            onClick: async () => {
-              try {
-                const res:any=await Models.lession_plan.draft(state.courseData?.latest_syllabus?.id);
-                console.log("res",res)
-                Success(res?.message);
-              } catch (error) {
-                console.log("Draft save error:", error);
-              }
-            },
+            onClick: handleSaveDraft,
+            disabled: state.savingDraft,
           }}
         />
       ) : (
@@ -857,10 +961,10 @@ const LessonPlan = () => {
               textbook: updated.textbook,
               reference_book: updated.reference,
               pedagogy: updated.pedagogy,
-            });
+            }, loadedVersion);
             Success("Lesson plan item updated successfully!");
             // Refresh the data
-            lession_data(state?.courseData?.latest_syllabus?.id, parseInt(state.activeTab.split('-')[1], 10));
+            lession_data(state?.courseData?.latest_syllabus?.id, parseInt(state.activeTab.split('-')[1], 10), loadedVersion ?? undefined);
           } catch (error) {
             console.log("Update topic error:", error);
           }

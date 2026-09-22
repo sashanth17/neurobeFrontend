@@ -1,7 +1,6 @@
 import { BookOpen, Pencil, ArrowRight } from "lucide-react";
 import CourseOutcomesSummary from "@/components/academic-setup/CourseOutcomesSummary";
 import UnitTopicsSummary from "@/components/academic-setup/UnitTopicsSummary";
-import LabExperimentsSummary from "@/components/academic-setup/LabExperimentsSummary";
 import TextbooksSummary from "@/components/academic-setup/TextbooksSummary";
 
 interface SyllabusApprovedSummaryProps {
@@ -90,7 +89,6 @@ const SyllabusApprovedSummary = ({
 
     <CourseOutcomesSummary outcomes={data?.outcomes} />
     <UnitTopicsSummary units={data?.units} />
-    <LabExperimentsSummary />
     <TextbooksSummary textbook={data?.textbooks} reference={data?.reference_books} />
   </div>
 );

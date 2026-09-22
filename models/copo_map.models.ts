@@ -1,9 +1,12 @@
 import  { commonInstance } from '@/utils/axios.utils';
 
 const COPOMap = {
-copo_map: (syllabus_id?: any) => {
+copo_map: (syllabus_id?: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/copo-matrix`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .get(url)
@@ -20,9 +23,12 @@ copo_map: (syllabus_id?: any) => {
         });
         return promise;
     },
-    copo_update: (syllabus_id?: any, body?: any) => { 
+    copo_update: (syllabus_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/copo-matrix/cell`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .put(url, body)
@@ -40,12 +46,16 @@ copo_map: (syllabus_id?: any) => {
         return promise;
     },
 
-    get_cell_detail : (syllabus_id?: any, body?: any) => { 
+    get_cell_detail : (syllabus_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/copo-matrix/cell`;
+            const params = { ...(body || {}) };
+            if (version_number !== undefined && version_number !== null) {
+                params.version_number = version_number;
+            }
 
             commonInstance()
-                .get(url, { params: body })
+                .get(url, { params })
                 .then((res) => {
                     resolve(res.data);
                 })
@@ -60,9 +70,12 @@ copo_map: (syllabus_id?: any) => {
         return promise;
     },
 
-    accept_map : (syllabus_id?: any, body?: any) => { 
+    accept_map : (syllabus_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/copo-matrix/cell/accept`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             const config: any = {};
             if (body instanceof FormData) {
@@ -85,9 +98,12 @@ copo_map: (syllabus_id?: any) => {
         return promise;
     },
 
-    save_draft: (syllabus_id?: any, body?: any) => { 
+    save_draft: (syllabus_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/copo-matrix/draft`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .put(url, body)

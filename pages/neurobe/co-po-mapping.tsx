@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
   GraduationCap,
@@ -78,7 +78,9 @@ const getErrorMessage = (error: any, fallback: string) => {
 const COPOMapping = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const course_id = useSearchParams().get("course_id");
+  const searchParams = useSearchParams();
+  const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -128,7 +130,10 @@ const COPOMapping = () => {
     versionRefreshKey: 0,
     selectedExtractionVer: null as number | null,
     copoVersionsDetailed: [] as any[],
+    extractionNotApproved: false,
   });
+
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(setPageTitle("CO-PO Mapping"));
@@ -206,15 +211,16 @@ const COPOMapping = () => {
     }
   };
 
-  const getCOPOMatrix = async (syllabusId?: any) => {
+  const getCOPOMatrix = async (syllabusId?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
     if (!sid) {
       setState({ loading: false, copoMatrix: null });
       return;
     }
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loading: true });
-      const res: any = await Models.COPOMap.copo_map(sid);
+      const res: any = await Models.COPOMap.copo_map(sid, vToUse);
       if (res && (res.matrix || res.data?.matrix)) {
         const matrixObj = res.matrix ? res : res.data;
         const isApprovedStatus = matrixObj?.mapping_status === "Approved";
@@ -236,6 +242,10 @@ const COPOMapping = () => {
   const restoreWorkflowState = async (cid: string | number) => {
     try {
       const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
+      const isExtractionApproved = extractionStep?.status === "approved";
+      setState({ extractionNotApproved: !isExtractionApproved });
+
       const copoStep = wfRes?.workflow?.step_2_copo_mapping;
       if (!copoStep) return;
 
@@ -262,9 +272,10 @@ const COPOMapping = () => {
     setState({ generatingCopo: true });
 
     let attempts = 0;
-    const maxAttempts = 40; // ~2 minutes with 3s interval
+    const maxAttempts = 15; // 15 attempts with 2-minute interval
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
 
-    pollRef.current = setInterval(async () => {
+    const checkCopoStatus = async () => {
       attempts++;
       try {
         const wfRes: any = await Models.syllabus.get_workflow_status(cid);
@@ -298,7 +309,10 @@ const COPOMapping = () => {
           setState({ generatingCopo: false, versionRefreshKey: Date.now() });
         }
       }
-    }, 3000);
+    };
+
+    checkCopoStatus();
+    pollRef.current = setInterval(checkCopoStatus, pollInterval);
   };
 
   const handleGenerateCopo = async (parentParams?: { extraction_version?: number }) => {
@@ -323,9 +337,10 @@ const COPOMapping = () => {
   };
 
   const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
     const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
     if (sid) {
-      await getCOPOMatrix(sid);
+      await getCOPOMatrix(sid, newVer);
     }
     if (course_id) {
       await loadCopoVersions(course_id);
@@ -447,7 +462,7 @@ const COPOMapping = () => {
       const res: any = await Models.COPOMap.get_cell_detail(sid, {
         co_code,
         target_code,
-      });
+      }, loadedVersion);
       const data = res?.data || res;
       if (data) {
         const newScore =
@@ -501,8 +516,8 @@ const COPOMapping = () => {
       setState({ updatingCell: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
 
-      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.copo_update(sid, payload);
+      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
+      await Models.COPOMap.copo_update(sid, payload, loadedVersion);
 
       const { co_code, target_code, correlation_level, justification, status } = payload;
       const strengthMap: Record<number, string> = {
@@ -561,8 +576,8 @@ const COPOMapping = () => {
       setState({ updatingCell: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
 
-      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.accept_map(sid, payload);
+      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
+      await Models.COPOMap.accept_map(sid, payload, loadedVersion);
 
       const { co_code, target_code } = payload;
       const currentCoMatrix = matrix[co_code] || {};
@@ -608,6 +623,10 @@ const COPOMapping = () => {
   };
 
   const handleApproveMapping = async () => {
+    if (state.extractionNotApproved) {
+      Failure("Cannot approve CO-PO mapping: Syllabus extraction must be approved first.");
+      return;
+    }
     try {
       setState({ approvingMap: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
@@ -778,7 +797,13 @@ const COPOMapping = () => {
           router.push(`/neurobe/co-po-mapping?course_id=${val.value}`);
         }}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 
@@ -815,6 +840,7 @@ const COPOMapping = () => {
           stageLabel="CO-PO Mapping"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
           onGenerateNew={handleGenerateCopo}
           isGenerating={state.generatingCopo}
           refreshTrigger={state.versionRefreshKey}
@@ -1064,10 +1090,14 @@ const COPOMapping = () => {
                   className: "create-btn",
                 }
               : {
-                  label: state.approvingMap ? "Approving..." : "Approve Mapping",
+                  label: state.approvingMap
+                    ? "Approving..."
+                    : state.extractionNotApproved
+                    ? "Requires Syllabus Approval"
+                    : "Approve Mapping",
                   icon: <Check className="h-4 w-4" />,
                   onClick: handleApproveMapping,
-                  disabled: state.approvingMap,
+                  disabled: state.approvingMap || state.extractionNotApproved,
                 }
           }
           actionBtn2={

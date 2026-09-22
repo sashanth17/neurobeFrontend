@@ -9,6 +9,7 @@ import {
   resetApplicationCount,
 } from "../../store/notificationSlice";
 import { OwnmenuConfig, getMenuByRole } from "@/utils/constant.utils";
+import { setCourseView } from "@/store/courseViewSlice";
 
 const Icons: Record<string, () => JSX.Element> = {
   "Academic Setup": () => (
@@ -579,7 +580,7 @@ const SidebarDynamic = () => {
             onClick={() => dispatch(toggleSidebar())}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -635,17 +636,16 @@ const SidebarDynamic = () => {
               const anchorId = label.includes("COURSE PREPARATION")
                 ? "sidebar-section-coordinator"
                 : label.includes("INSTRUCTOR FUNCTIONS")
-                ? "sidebar-section-instructor"
-                : undefined;
+                  ? "sidebar-section-instructor"
+                  : undefined;
 
               if (showLabels) {
                 return (
                   <p
                     key={idx}
                     id={anchorId}
-                    className={`whitespace-nowrap px-[14px] pb-1 pt-4 text-[10px] uppercase tracking-[1.8px] ${
-                      disabled ? "select-none opacity-30" : ""
-                    }`}
+                    className={`whitespace-nowrap px-[14px] pb-1 pt-4 text-[10px] uppercase tracking-[1.8px] ${disabled ? "select-none opacity-30" : ""
+                      }`}
                     style={{ color: "rgba(191,208,244,0.6)" }}
                   >
                     {item.label}
@@ -692,6 +692,11 @@ const SidebarDynamic = () => {
                     if (disabled) {
                       e.preventDefault();
                       return;
+                    }
+                    if (currentSection === "coordinator") {
+                      dispatch(setCourseView("coordinator"));
+                    } else if (currentSection === "instructor") {
+                      dispatch(setCourseView("instructor"));
                     }
                     if (item.notifyKey === "new_applications") {
                       dispatch(clearApplicationCount());
@@ -813,7 +818,7 @@ const SidebarDynamic = () => {
                           href={child.href || "#"}
                           className="rounded-full px-3 py-[7px] text-[14px] transition-colors duration-150"
                           style={{
-                            color:  "#fff",
+                            color: "#fff",
                             background: isActive(child.href)
                               ? "rgba(255, 255, 255, 0.18)"
                               : "transparent",
