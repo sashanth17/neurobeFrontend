@@ -537,10 +537,7 @@ const SidebarDynamic = () => {
   let currentSection: "coordinator" | "instructor" | null = null;
 
   const isItemDisabled = () => {
-    if (currentSection === "coordinator" && activeView === "instructor")
-      return true;
-    if (currentSection === "instructor" && activeView === "coordinator")
-      return true;
+    // All items remain active and accessible for staff members
     return false;
   };
 
