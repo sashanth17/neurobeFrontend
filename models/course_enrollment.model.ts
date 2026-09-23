@@ -41,7 +41,7 @@ const course_enrollment = {
     });
   },
 
-  getAvailableStudents: (params?: { department_id?: number | string; batch_id?: number | string }) => {
+  getAvailableStudents: (params?: { department_id?: number | string; batch_id?: number | string; exclude_course_id?: number | string }) => {
     return new Promise((resolve, reject) => {
       let url = `students/`;
       const queryParams = new URLSearchParams();
@@ -51,6 +51,9 @@ const course_enrollment = {
       }
       if (params?.batch_id && params.batch_id !== "all") {
         queryParams.append("batch_id", String(params.batch_id));
+      }
+      if (params?.exclude_course_id && params.exclude_course_id !== "all") {
+        queryParams.append("exclude_course_id", String(params.exclude_course_id));
       }
 
       if (queryParams.toString()) {
@@ -75,6 +78,24 @@ const course_enrollment = {
       const url = `course-enrollments/`;
       instance()
         .post(url, data)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          if (error.response) {
+            reject(error.response.data?.message || error.response.data?.detail || error.response.data);
+          } else {
+            reject(error);
+          }
+        });
+    });
+  },
+
+  validateBulkUpload: (formData: FormData) => {
+    return new Promise((resolve, reject) => {
+      const url = `course-enrollments/bulk-upload/validate`;
+      instance()
+        .post(url, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
         .then((res) => resolve(res.data))
         .catch((error) => {
           if (error.response) {

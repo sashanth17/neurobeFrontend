@@ -181,7 +181,7 @@ const Pedagogy = () => {
   const isTopicReviewed = (topic: any) => {
     if (topic?.pedagogy_status === "Reviewed" || topic?.status === "Reviewed" || topic?.status === "Approved") return true;
     const peds = topic?.suggested_pedagogies || [];
-    return peds.length > 0 && peds.some((p: any) => acceptedIds.has(p.id) || p.is_selected);
+    return peds.length > 0;
   };
 
   const isEveryUnitReviewed =
@@ -898,37 +898,22 @@ const Pedagogy = () => {
           }),
         });
 
-        if (isAccepted) {
-          actions.push({
-            key: "replace",
-            label: "Replace",
-            icon: <ReplaceAll className="h-3.5 w-3.5" />,
-            className: "flex items-center gap-1.5 rounded-full border border-gray-400 px-3 py-1 text-xs font-semibold text-pri hover:border-[#000] hover:text-[#000]",
-            onClick: () => setReplaceModal({
-              open: true,
-              pedagogyId: rec.id,
-              currentTitle: title,
-              topicLabel: displayTitle,
-              options: peds.map((r: any) => ({
-                title: r.pedagogy_name || r.strategy_name || r.title,
-                description: r.methodology || r.description,
-              })),
-            }),
-          });
-          actions.push({
-            key: "selected",
-            label: "Selected ✓",
-            className: "rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white cursor-pointer hover:bg-green-700 transition",
-            onClick: () => toggleAccept(rec.id, topic),
-          });
-        } else {
-          actions.push({
-            key: "accept",
-            label: "Accept",
-            className: "rounded-full border border-color2 px-3 py-1 text-xs font-semibold text-color2 hover:bg-color2-l cursor-pointer transition",
-            onClick: () => toggleAccept(rec.id, topic),
-          });
-        }
+        actions.push({
+          key: "replace",
+          label: "Replace",
+          icon: <ReplaceAll className="h-3.5 w-3.5" />,
+          className: "flex items-center gap-1.5 rounded-full border border-gray-400 px-3 py-1 text-xs font-semibold text-pri hover:border-[#000] hover:text-[#000]",
+          onClick: () => setReplaceModal({
+            open: true,
+            pedagogyId: rec.id,
+            currentTitle: title,
+            topicLabel: displayTitle,
+            options: peds.map((r: any) => ({
+              title: r.pedagogy_name || r.strategy_name || r.title,
+              description: r.methodology || r.description,
+            })),
+          }),
+        });
 
         actions.push({
           key: "delete",
@@ -944,7 +929,7 @@ const Pedagogy = () => {
           title: title,
           description: description,
           badge: rec.badge ? { label: rec.badge, className: "bg-green-500" } : undefined,
-          highlighted: isAccepted,
+          highlighted: false,
           actions,
         };
       });

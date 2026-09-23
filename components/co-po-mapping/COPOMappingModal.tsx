@@ -98,7 +98,7 @@ interface COPOMappingModalProps {
     justification: string;
     status: string;
   }) => void;
-  onAccept: (data: {
+  onAccept?: (data: {
     co_code: string;
     target_code: string;
   }) => void;
@@ -367,7 +367,7 @@ const COPOMappingModal = ({
             >
               Cancel Edit
             </button>
-          ) : !isAccepted ? (
+          ) : (
             <button
               onClick={() => setIsEditing(true)}
               className="create-btn-sec text-xs"
@@ -376,9 +376,9 @@ const COPOMappingModal = ({
               <Pencil className="h-3.5 w-3.5" />
               Edit Mapping
             </button>
-          ) : null}
+          )}
 
-          {isEditing ? (
+          {isEditing && (
             <button
               onClick={handleUpdate}
               disabled={loading}
@@ -391,29 +391,6 @@ const COPOMappingModal = ({
                 <CheckCircle className="h-3.5 w-3.5" />
               )}
               Update mapping
-            </button>
-          ) : isAccepted ? (
-            <button
-              disabled
-              className="create-btn text-xs !bg-green-600 cursor-default opacity-95"
-              type="button"
-            >
-              <CheckCircle className="h-3.5 w-3.5" />
-              Accepted
-            </button>
-          ) : (
-            <button
-              onClick={handleAccept}
-              disabled={loading}
-              className="create-btn text-xs disabled:opacity-50"
-              type="button"
-            >
-              {loading ? (
-                <span className="inline-block h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <CheckCircle className="h-3.5 w-3.5" />
-              )}
-              Accept Mapping
             </button>
           )}
         </div>

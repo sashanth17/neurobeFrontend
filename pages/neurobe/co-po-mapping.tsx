@@ -1061,7 +1061,6 @@ const COPOMapping = () => {
           fetching={state.fetchingCell}
           loading={state.updatingCell}
           onUpdate={handleUpdateMapping}
-          onAccept={handleAcceptMapping}
         />
       )}
 

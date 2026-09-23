@@ -134,13 +134,6 @@ const ExtractedDataPanel = (props: any) => {
         ))}
       </div>
 
-      {/* Textbooks accept row */}
-      <div className="text-pri mb-3 flex items-center gap-2 text-sm">
-        <span>Textbooks:</span>
-        <button className="bg-primary2 text-color2 hover:bg-color2/20 flex items-center gap-1 rounded-md px-3 py-1 font-semibold">
-          <CheckCircle2 className="h-4 w-4" /> Accept All Inferred Levels
-        </button>
-      </div>
 
       {/* Scrollable content */}
       <div

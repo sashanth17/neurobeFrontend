@@ -45,6 +45,8 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
     department: null as any,
     term: null as any,
     course: null as any,
+    term_visibility: true,
+    is_archived: false,
     // validation errors
     errors: {} as Record<string, string>,
     // dropdown options
@@ -133,6 +135,8 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
         department: deptVal ? { value: deptVal, label: deptLabel } : null,
         term: termVal ? { value: String(termVal), label: termLabel } : null,
         course: crsVal ? { value: crsVal, label: crsLabel } : null,
+        term_visibility: initialData.term_visibility !== undefined ? Boolean(initialData.term_visibility) : true,
+        is_archived: initialData.is_archived !== undefined ? Boolean(initialData.is_archived) : false,
         errors: {},
       });
     } else {
@@ -142,6 +146,8 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
         department: null,
         term: null,
         course: null,
+        term_visibility: true,
+        is_archived: false,
         errors: {},
       });
     }
@@ -160,8 +166,8 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
       department_id: state.department?.value,
       semester: Number(state.term?.value),
       is_active: true,
-      term_visibility: true,
-      is_archived: false,
+      term_visibility: Boolean(state.term_visibility),
+      is_archived: Boolean(state.is_archived),
       created_by_id: user?.id || 0,
       created_on: new Date().toISOString(),
     };
@@ -246,6 +252,41 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
             placeholder="Select Course"
             error={state.errors?.course}
           />
+
+          {/* Visibility and Archive Settings */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 space-y-3 dark:border-gray-700 dark:bg-gray-800/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#000] dark:text-white">Student Visibility</p>
+                <p className="text-xs text-pri">Allow enrolled students to view course materials in their dashboard</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={state.term_visibility}
+                  onChange={(e) => setState({ term_visibility: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-color2"></div>
+              </label>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#000] dark:text-white">Archive Offering</p>
+                <p className="text-xs text-pri">Hide from active dashboard and place in Archived section</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={state.is_archived}
+                  onChange={(e) => setState({ is_archived: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">

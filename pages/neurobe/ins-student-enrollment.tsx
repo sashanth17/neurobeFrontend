@@ -1,192 +1,317 @@
-import CourseBanner from "@/components/academic-setup/CourseBanner";
-import PageHeader from "@/components/common-components/PageHeader";
-import TableComponent from "@/components/common-components/TableComponent";
-import IconPlus from "@/components/Icon/IconPlus";
-import IconSearch from "@/components/Icon/IconSearch";
-import CustomSelect from "@/components/FormFields/CustomSelect.component";
-import TextInput from "@/components/FormFields/TextInput.component";
-import { useSetState } from "@/utils/function.utils";
-import { Users } from "lucide-react";
-import PrivateRouter from "@/hook/privateRouter";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useRouter } from "next/router";
+import { Users, Upload, Trash2, CheckCircle2 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
+import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
+import IconPlus from "@/components/Icon/IconPlus";
+import IconSearch from "@/components/Icon/IconSearch";
+import PageHeader from "@/components/common-components/PageHeader";
+import TableComponent from "@/components/common-components/TableComponent";
+import CustomSelect from "@/components/FormFields/CustomSelect.component";
+import TextInput from "@/components/FormFields/TextInput.component";
+import PrivateRouter from "@/hook/privateRouter";
 import { EnrollStudentsModal, EnrollableStudent } from "@/components/academic-setup/AddModals";
-
-const AVAILABLE_STUDENTS: EnrollableStudent[] = [
-  { id: "24CS1041", regNo: "24CS1041", name: "Jaganathan R",  programme: "B.Tech CSE", batch: "2025-2029", email: "jaganathan.r@karpagam.ac.in" },
-  { id: "24CS1042", regNo: "24CS1042", name: "Kavin Raj",     programme: "B.Tech CSE", batch: "2025-2029", email: "kavin.raj@karpagam.ac.in" },
-  { id: "24CS1043", regNo: "24CS1043", name: "Nisha Kumar",   programme: "B.Tech CSE", batch: "2025-2029", email: "nisha.k@karpagam.ac.in" },
-  { id: "24CS1044", regNo: "24CS1044", name: "Pradeep S",     programme: "B.Tech CSE", batch: "2025-2029", email: "pradeep.s@karpagam.ac.in" },
-  { id: "24CS1045", regNo: "24CS1045", name: "Ranjitha M",    programme: "B.Tech CSE", batch: "2025-2029", email: "ranjitha.m@karpagam.ac.in" },
-];
-
-const MOCK_ENROLLED_STUDENTS = [
-  { id: 1,  regNo: "24CS001", name: "Aaron Swaminathan",  email: "aaron.s@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 2,  regNo: "24CS002", name: "Abinaya Sundaram",   email: "abinaya.s@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 3,  regNo: "24CS003", name: "Aditya Narayanan",   email: "aditya.n@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 4,  regNo: "24CS004", name: "Ananya Ramesh",      email: "ananya.r@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 5,  regNo: "24CS005", name: "Bala Chandran",      email: "bala.c@karpagam.ac.in",      enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 6,  regNo: "24CS006", name: "Deepa Muthukumar",   email: "deepa.m@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 7,  regNo: "24CS007", name: "Dharun Karthik",     email: "dharun.k@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 8,  regNo: "24CS008", name: "Divya Bharathi",     email: "divya.b@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 9,  regNo: "24CS009", name: "Gokul Prasanth",     email: "gokul.p@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 10, regNo: "24CS010", name: "Harini Venkatesan",  email: "harini.v@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 11, regNo: "24CS011", name: "Ishwarya Mohan",     email: "ishwarya.m@karpagam.ac.in",  enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 12, regNo: "24CS012", name: "Jayakumar Selvam",   email: "jayakumar.s@karpagam.ac.in", enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 13, regNo: "24CS013", name: "Karthikeyan Raja",   email: "karthik.r@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 14, regNo: "24CS014", name: "Kavitha Suresh",     email: "kavitha.s@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 15, regNo: "24CS015", name: "Logesh Babu",        email: "logesh.b@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 16, regNo: "24CS016", name: "Madhumitha Raj",     email: "madhu.r@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 17, regNo: "24CS017", name: "Naveen Kumar",       email: "naveen.k@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 18, regNo: "24CS018", name: "Nithya Devi",        email: "nithya.d@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 19, regNo: "24CS019", name: "Oviya Krishnan",     email: "oviya.k@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 20, regNo: "24CS020", name: "Praveen Anand",      email: "praveen.a@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 21, regNo: "24CS021", name: "Priya Lakshmi",      email: "priya.l@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 22, regNo: "24CS022", name: "Rahul Shankar",      email: "rahul.s@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 23, regNo: "24CS023", name: "Ramya Priya",        email: "ramya.p@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 24, regNo: "24CS024", name: "Santhosh Kumar",     email: "santhosh.k@karpagam.ac.in",  enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 25, regNo: "24CS025", name: "Saranya Devi",       email: "saranya.d@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 26, regNo: "24CS026", name: "Senthil Nathan",     email: "senthil.n@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 27, regNo: "24CS027", name: "Shobana Ravi",       email: "shobana.r@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 28, regNo: "24CS028", name: "Sivakami Arjun",     email: "sivakami.a@karpagam.ac.in",  enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 29, regNo: "24CS029", name: "Suresh Babu",        email: "suresh.b@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 30, regNo: "24CS030", name: "Swetha Murugan",     email: "swetha.m@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 31, regNo: "24CS031", name: "Tamil Selvan",       email: "tamil.s@karpagam.ac.in",     enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 32, regNo: "24CS032", name: "Tharani Priya",      email: "tharani.p@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 33, regNo: "24CS033", name: "Udhaya Kumar",       email: "udhaya.k@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 34, regNo: "24CS034", name: "Uma Devi",           email: "uma.d@karpagam.ac.in",       enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 35, regNo: "24CS035", name: "Vaishnavi Raj",      email: "vaishnavi.r@karpagam.ac.in", enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 36, regNo: "24CS036", name: "Vasanth Kumar",      email: "vasanth.k@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 37, regNo: "24CS037", name: "Vijaya Lakshmi",     email: "vijaya.l@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 38, regNo: "24CS038", name: "Vinoth Raj",         email: "vinoth.r@karpagam.ac.in",    enrolledOn: "26 Aug 2026", section: "Section B", status: "Enrolled" },
-  { id: 39, regNo: "24CS039", name: "Yazhini Murugan",    email: "yazhini.m@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-  { id: 40, regNo: "24CS040", name: "Yuvaraj Pandian",    email: "yuvaraj.p@karpagam.ac.in",   enrolledOn: "26 Aug 2026", section: "Section A", status: "Enrolled" },
-];
-
-const SECTION_OPTIONS = [
-  { value: "all", label: "All Sections" },
-  { value: "Section A", label: "Section A" },
-  { value: "Section B", label: "Section B" },
-];
+import { BulkEnrollmentUploadModal } from "@/components/course-offering/BulkEnrollmentUploadModal";
+import Models from "@/imports/models.import";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
-  { value: "Enrolled", label: "Enrolled" },
-  { value: "Not Enrolled", label: "Not Enrolled" },
+  { value: "Active", label: "Active" },
+  { value: "Dropped", label: "Dropped" },
 ];
 
-const COLUMNS = [
-  {
-    accessor: "regNo",
-    title: "REGISTER NUMBER",
-    render: ({ regNo }: any) => (
-      <span className="font-bold text-[#000] dark:text-white">{regNo}</span>
-    ),
-  },
-  {
-    accessor: "name",
-    title: "STUDENT NAME",
-    render: ({ name }: any) => (
-      <span className="font-semibold text-[#000] dark:text-white">{name}</span>
-    ),
-  },
-  {
-    accessor: "email",
-    title: "EMAIL",
-    render: ({ email }: any) => (
-      <span className="text-sm text-pri">{email}</span>
-    ),
-  },
-  {
-    accessor: "enrolledOn",
-    title: "ENROLLED ON",
-    render: ({ enrolledOn }: any) => (
-      <span className="text-sm text-[#000] dark:text-white">{enrolledOn}</span>
-    ),
-  },
-  {
-    accessor: "status",
-    title: "ENROLLMENT STATUS",
-    render: ({ status }: any) => (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-        {status}
-      </span>
-    ),
-  },
-];
-
-const StudentEnrollment = () => {
+const InsStudentEnrollment = () => {
   const dispatch = useDispatch();
+  const router = useRouter();
 
   const [state, setState] = useSetState({
-    activeTab: "",
     search: "",
-    sectionFilter: "all",
     statusFilter: "all",
     loading: false,
+    courseInstances: [] as any[],
+    selectedInstance: null as any,
+    enrolledStudents: [] as any[],
+    availableStudents: [] as EnrollableStudent[],
   });
 
   const [enrollModal, setEnrollModal] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   useEffect(() => {
-    dispatch(setPageTitle("Student Enrollment"));
+    dispatch(setPageTitle("Instructor - Student Enrollment"));
+    fetchCourseInstances();
   }, [dispatch]);
 
-  const filteredRecords = MOCK_ENROLLED_STUDENTS.filter((row) => {
+  useEffect(() => {
+    if (state.selectedInstance?.value) {
+      fetchEnrolledStudents(state.selectedInstance.value);
+      fetchAvailableStudents();
+    }
+  }, [state.selectedInstance]);
+
+  // 1. Fetch active course instances
+  const fetchCourseInstances = async () => {
+    try {
+      setState({ loading: true });
+      const res: any = await Models.course_instance.list();
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      const options = list.map((item: any) => ({
+        value: item.id,
+        label: item.course_instance_name || `${item.course_code || "Course"} - Sec ${item.section || "A"} (Sem ${item.semester || 1})`,
+        data: item,
+      }));
+
+      const queryInstanceId = router.query.instance_id;
+      let matched = null;
+      if (queryInstanceId) {
+        matched = options.find((o: any) => String(o.value) === String(queryInstanceId));
+      }
+
+      setState({
+        courseInstances: options,
+        selectedInstance: matched || (options.length > 0 ? options[0] : null),
+        loading: false,
+      });
+    } catch (error) {
+      console.log("Error loading course instances:", error);
+      setState({ loading: false });
+    }
+  };
+
+  // 2. Fetch enrolled students for selected course offering
+  const fetchEnrolledStudents = async (instanceId: number) => {
+    try {
+      setState({ loading: true });
+      const res: any = await Models.course_enrollment.list({ course_instance_id: instanceId });
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      setState({ enrolledStudents: list, loading: false });
+    } catch (error) {
+      console.log("Error loading enrolled students:", error);
+      setState({ enrolledStudents: [], loading: false });
+    }
+  };
+
+  // 3. Fetch available students for manual enrollment
+  const fetchAvailableStudents = async () => {
+    try {
+      const activeOffering = state.selectedInstance?.data;
+      const params: any = {};
+      if (activeOffering?.department_id) params.department_id = activeOffering.department_id;
+      if (activeOffering?.course_id) params.exclude_course_id = activeOffering.course_id;
+
+      const res: any = await Models.course_enrollment.getAvailableStudents(params);
+      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+
+      const enrolledIds = new Set(
+        state.enrolledStudents.map((s: any) => String(s.student_id || s.register_number))
+      );
+
+      const formatted: EnrollableStudent[] = list
+        .filter((s: any) => !enrolledIds.has(String(s.id || s.register_number)))
+        .map((s: any) => ({
+          id: String(s.id || s.register_number || s.regNo),
+          regNo: String(s.register_number || s.regNo || s.id),
+          name: s.name || `${s.first_name || ""} ${s.last_name || ""}`.trim() || "Student",
+          programme: s.programme_name || s.programme || "Engineering",
+          batch: s.batch_name || s.batch || "Active",
+          email: s.email || "-",
+        }));
+
+      setState({ availableStudents: formatted });
+    } catch (error) {
+      console.log("Error loading available students:", error);
+    }
+  };
+
+  // 4. Batch Multi-Select Enrollment
+  const handleBatchEnroll = async (selected: EnrollableStudent[]) => {
+    if (!state.selectedInstance?.value) {
+      Failure("Please select a course offering first.");
+      return;
+    }
+
+    try {
+      const studentIds = selected.map((s) => String(s.regNo || s.id));
+      const payload = {
+        course_instance_id: state.selectedInstance.value,
+        student_ids: studentIds,
+        enrollment_status: "Active" as const,
+      };
+
+      const res: any = await Models.course_enrollment.enroll(payload);
+      Success(res?.message || `Enrolled ${studentIds.length} student(s) successfully`);
+      fetchEnrolledStudents(state.selectedInstance.value);
+      fetchAvailableStudents();
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Failed to enroll students");
+    }
+  };
+
+  // 5. Toggle Status
+  const handleToggleStatus = async (row: any) => {
+    const currentStatus = row.enrollment_status || row.status || "Active";
+    const nextStatus = currentStatus === "Active" ? "Dropped" : "Active";
+
+    try {
+      await Models.course_enrollment.updateStatus(row.id, nextStatus);
+      Success(`Status updated to ${nextStatus}`);
+      fetchEnrolledStudents(state.selectedInstance.value);
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Failed to update enrollment status");
+    }
+  };
+
+  // 6. Delete Enrollment
+  const handleDeleteEnrollment = (row: any) => {
+    showDeleteAlert(
+      async () => {
+        try {
+          await Models.course_enrollment.delete(row.id);
+          Success("Student enrollment removed");
+          fetchEnrolledStudents(state.selectedInstance.value);
+          fetchAvailableStudents();
+        } catch (error: any) {
+          Failure(typeof error === "string" ? error : error?.message || "Failed to remove enrollment");
+        }
+      },
+      () => {},
+      `Remove ${row.student_name || row.name || row.student_id || "Student"} from this course offering?`
+    );
+  };
+
+  const COLUMNS = [
+    {
+      accessor: "regNo",
+      title: "REGISTER NUMBER",
+      render: (row: any) => (
+        <span className="font-bold text-[#000] dark:text-white">
+          {row.student_id || row.register_number || row.regNo || "-"}
+        </span>
+      ),
+    },
+    {
+      accessor: "name",
+      title: "STUDENT NAME",
+      render: (row: any) => (
+        <span className="font-semibold text-[#000] dark:text-white">
+          {row.student_name || row.name || "-"}
+        </span>
+      ),
+    },
+    {
+      accessor: "email",
+      title: "EMAIL",
+      render: (row: any) => (
+        <span className="text-sm text-pri">{row.email || "-"}</span>
+      ),
+    },
+    {
+      accessor: "enrolledOn",
+      title: "ENROLLED ON",
+      render: (row: any) => {
+        const val = row.enrolled_on || row.enrolledOn;
+        return (
+          <span className="text-sm text-[#000] dark:text-white">
+            {val ? new Date(val).toLocaleDateString() : "-"}
+          </span>
+        );
+      },
+    },
+    {
+      accessor: "status",
+      title: "ENROLLMENT STATUS",
+      render: (row: any) => {
+        const status = row.enrollment_status || row.status || "Active";
+        const isActive = status === "Active";
+        return (
+          <button
+            type="button"
+            onClick={() => handleToggleStatus(row)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition ${
+              isActive
+                ? "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300"
+                : "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-green-500" : "bg-red-500"}`} />
+            {status}
+          </button>
+        );
+      },
+    },
+    {
+      accessor: "actions",
+      title: "ACTIONS",
+      render: (row: any) => (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleDeleteEnrollment(row)}
+            className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/20"
+            title="Remove from course offering"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const filteredRecords = state.enrolledStudents.filter((row: any) => {
     const s = state.search.toLowerCase();
-    const matchSearch =
-      !s ||
-      row.regNo.toLowerCase().includes(s) ||
-      row.name.toLowerCase().includes(s) ||
-      row.email.toLowerCase().includes(s);
-    const matchSection =
-      state.sectionFilter === "all" || row.section === state.sectionFilter;
+    const name = String(row.student_name || row.name || "").toLowerCase();
+    const regNo = String(row.student_id || row.register_number || row.regNo || "").toLowerCase();
+    const email = String(row.email || "").toLowerCase();
+
+    const matchSearch = !s || name.includes(s) || regNo.includes(s) || email.includes(s);
+    const status = String(row.enrollment_status || row.status || "Active");
     const matchStatus =
-      state.statusFilter === "all" || row.status === state.statusFilter;
-    return matchSearch && matchSection && matchStatus;
+      state.statusFilter === "all" || status.toLowerCase() === state.statusFilter.toLowerCase();
+
+    return matchSearch && matchStatus;
   });
 
   return (
     <div className="min-h-screen">
-      <CourseBanner
-        courseCode="CS301"
-        courseTitle="Computer Networks"
-        description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
-        programme="B.Tech CSE"
-        batch="2025–2029"
-        academicYear="2026–2027 / Semester 3"
-        students="40 Students"
-        selectedCourse="CS309"
-        courseOptions={[
-          { value: "CS309", label: "Course: CS309" },
-          { value: "CS301", label: "Course: CS301" },
-        ]}
-        onCourseChange={(val) => console.log("course", val)}
-        activeView={state.activeTab}
-        toogle="instructor"
-        onBack={() => console.log("back")}
-        onViewChange={(view) => setState({ activeTab: view })}
-      />
-
       {/* Header */}
       <PageHeader
-        title="Enrolled Students"
-        subtitle="Students currently enrolled in this course."
+        title="Student Enrollment (Instructor View)"
+        subtitle="View and manage enrolled students for your assigned course instances."
         icon={<Users className="h-5 w-5 text-color2" />}
-        records={`${MOCK_ENROLLED_STUDENTS.length} Students`}
+        records={`${filteredRecords.length} Students`}
         actionBtn1={{
-          label: "Enroll Student",
+          label: "Enroll Students",
           icon: <IconPlus className="h-4 w-4" />,
           onClick: () => setEnrollModal(true),
         }}
-        program={[
-          { title: "Programme", value: "B.Tech CSE" },
-          { title: "Batch", value: "2025–2029" },
-          { title: "Semester", value: "3" },
-        ]}
       />
+
+      {/* Offering Selector & Controls */}
+      <div className="panel mb-5 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-[280px] flex-1">
+            <CustomSelect
+              title="Select Course Offering (Section)"
+              options={state.courseInstances}
+              value={state.selectedInstance}
+              onChange={(v) => setState({ selectedInstance: v })}
+              placeholder="Select Course Offering..."
+            />
+          </div>
+          <div className="flex items-center gap-2 pt-5">
+            <button
+              type="button"
+              onClick={() => setBulkModalOpen(true)}
+              disabled={!state.selectedInstance?.value}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-[#000] hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <Upload className="h-4 w-4 text-color2" />
+              Import Excel / CSV
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 py-2">
@@ -200,14 +325,6 @@ const StudentEnrollment = () => {
           />
         </div>
         <div className="flex gap-3">
-          <CustomSelect
-            options={SECTION_OPTIONS}
-            value={SECTION_OPTIONS.find((o) => o.value === state.sectionFilter) ?? null}
-            onChange={(e) => setState({ sectionFilter: e?.value ?? "all" })}
-            placeholder="All Sections"
-            className="filter-input"
-            isClearable
-          />
           <CustomSelect
             options={STATUS_OPTIONS}
             value={STATUS_OPTIONS.find((o) => o.value === state.statusFilter) ?? null}
@@ -225,22 +342,43 @@ const StudentEnrollment = () => {
           records={filteredRecords}
           columns={COLUMNS}
           loading={state.loading}
-          noRecordsText="No students found"
+          noRecordsText={
+            state.selectedInstance
+              ? "No students enrolled in this offering yet."
+              : "Please select a course offering above."
+          }
           showPagination
           pageSize={10}
           paginationLabel="students"
         />
       </div>
+
+      {/* Manual Enroll Modal */}
       <EnrollStudentsModal
         open={enrollModal}
         onClose={() => setEnrollModal(false)}
-        courseCode="CS309"
-        courseTitle="Computer Networks"
-        availableStudents={AVAILABLE_STUDENTS}
-        onEnroll={(selected) => console.log("Enrolling:", selected)}
+        courseCode={state.selectedInstance?.data?.course_code || "Course"}
+        courseTitle={state.selectedInstance?.data?.course_instance_name || state.selectedInstance?.label || "Offering"}
+        availableStudents={state.availableStudents}
+        onEnroll={handleBatchEnroll}
+      />
+
+      {/* Bulk Upload with Validation Modal */}
+      <BulkEnrollmentUploadModal
+        open={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        courseInstanceId={state.selectedInstance?.value}
+        courseId={state.selectedInstance?.data?.course_id}
+        courseName={state.selectedInstance?.label}
+        onSuccess={() => {
+          if (state.selectedInstance?.value) {
+            fetchEnrolledStudents(state.selectedInstance.value);
+            fetchAvailableStudents();
+          }
+        }}
       />
     </div>
   );
 };
 
-export default PrivateRouter(StudentEnrollment);
+export default PrivateRouter(InsStudentEnrollment);

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
+import { useRouter } from "next/router";
 import { ArrowRight, BookOpen, Info, User, UserCheck } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
@@ -37,14 +38,22 @@ const STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive" },
 ];
 
+const ARCHIVE_OPTIONS = [
+  { value: "all", label: "All Offerings" },
+  { value: "active", label: "Active Offerings" },
+  { value: "archived", label: "Archived Offerings" },
+];
+
 const CourseOffering = () => {
   const dispatch = useDispatch();
+  const router = useRouter();
 
   const [state, setState] = useSetState({
     search: "",
     programmeFilter: "all",
     batchFilter: "all",
     statusFilter: "all",
+    archiveFilter: "active",
     loading: false,
     showModal: false,
     editRow: null as any,
@@ -54,6 +63,26 @@ const CourseOffering = () => {
   const openCreate = () => setState({ showModal: true, editRow: null });
   const openEdit = (row: any) => setState({ showModal: true, editRow: row });
   const closeModal = () => setState({ showModal: false, editRow: null });
+
+  const handleManageStudents = (row: any) => {
+    router.push(`/neurobe/student-enrollment?instance_id=${row.id}&course_id=${row.course_id || ""}`);
+  };
+
+  const handleToggleArchive = async (row: any) => {
+    try {
+      setState({ loading: true });
+      const nextArchived = !row.is_archived;
+      await Models.course_instance.update(row.id, {
+        ...row,
+        is_archived: nextArchived,
+      });
+      Success(nextArchived ? "Course instance archived" : "Course instance unarchived");
+      course_instance_list();
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Failed to update archive status");
+      setState({ loading: false });
+    }
+  };
 
   useEffect(() => {
     dispatch(setPageTitle("Course Offerings"));
@@ -109,7 +138,11 @@ const CourseOffering = () => {
       !state.statusFilter ||
       state.statusFilter === "all" ||
       String(r.status || (r.is_active ? "active" : "inactive")).toLowerCase() === state.statusFilter.toLowerCase();
-    return matchSearch && matchStatus;
+    const matchArchive =
+      !state.archiveFilter ||
+      state.archiveFilter === "all" ||
+      (state.archiveFilter === "archived" ? Boolean(r.is_archived) : !r.is_archived);
+    return matchSearch && matchStatus && matchArchive;
   });
 
   return (
@@ -209,6 +242,17 @@ const CourseOffering = () => {
             className="filter-input"
             isClearable
           />
+
+          <CustomSelect
+            options={ARCHIVE_OPTIONS}
+            value={
+              ARCHIVE_OPTIONS.find((o) => o.value === state.archiveFilter) ?? null
+            }
+            onChange={(e) => setState({ archiveFilter: e?.value ?? "all" })}
+            placeholder="Active Offerings"
+            className="filter-input"
+            isClearable={false}
+          />
         </div>
       </div>
 
@@ -216,7 +260,7 @@ const CourseOffering = () => {
       <div className="panel">
         <AcademicTable
           records={records}
-          columns={makeCourseOfferingColumns(openEdit, handleDelete)}
+          columns={makeCourseOfferingColumns(openEdit, handleDelete, handleManageStudents, handleToggleArchive)}
           loading={state.loading}
           noRecordsText="No course offerings found"
         />
