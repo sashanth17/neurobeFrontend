@@ -30,6 +30,10 @@ import {
   CourseSelectorView,
   MCQStatsBanner,
   MCQStudioWorkspace,
+  ScopeMode,
+  DistributionMode,
+  KnowledgeLevelBreakdown,
+  PEDAGOGICAL_PRESETS,
 } from "@/components/mcq-generation";
 
 const MCQGenerationIndexPage = () => {
@@ -45,17 +49,44 @@ const MCQGenerationIndexPage = () => {
     activeTab: "generator" as "generator" | "bank",
     courseUnits: [] as any[],
 
+    /* Scope & Granularity */
+    scopeMode: "all_units" as ScopeMode,
+    selectedUnitIds: [1, 2, 3, 4, 5] as (string | number)[],
+    selectedSingleUnitId: 1 as string | number,
+    microTopics: [] as string[],
+
     /* Dynamic builder state */
     topicRows: [newRow()] as TopicRow[],
 
+    /* Distribution Mode & Blueprint */
+    distributionMode: "none" as DistributionMode,
+    targetQuestionCount: 5 as number,
+    knowledgeBreakdown: {
+      K1: 2,
+      K2: 2,
+      K3: 1,
+      K4: 0,
+      K5: 0,
+      K6: 0,
+    } as KnowledgeLevelBreakdown,
+
     /* 2D breakdown: K-level × difficulty */
     breakdown: {
-      K1: { easy: 0, medium: 1, hard: 0 },
-      K2: { easy: 0, medium: 2, hard: 0 },
+      K1: { easy: 1, medium: 0, hard: 0 },
+      K2: { easy: 1, medium: 1, hard: 0 },
       K3: { easy: 0, medium: 1, hard: 0 },
-      K4: { easy: 0, medium: 1, hard: 0 },
+      K4: { easy: 0, medium: 0, hard: 1 },
+      K5: { easy: 0, medium: 0, hard: 0 },
+      K6: { easy: 0, medium: 0, hard: 0 },
     } as Record<string, Record<string, number>>,
 
+    /* Pedagogical Focus */
+    description: "",
+    activePresetId: null as string | null,
+
+    /* Output Specifications */
+    includeExplanation: true,
+    shuffleOptions: true,
     marksPerQuestion: "2",
 
     /* Questions pool */
@@ -135,12 +166,24 @@ const MCQGenerationIndexPage = () => {
           title: u.unit_title || u.title || u.name || `Unit ${idx + 1}`,
           topics: u.topics ? u.topics.map((t: any) => t.topic_name || t.title || t.name || t) : ["General Topic"],
         }));
-        setState({ courseUnits: mapped });
+        setState({
+          courseUnits: mapped,
+          selectedUnitIds: mapped.map((u: any) => u.unitId),
+          selectedSingleUnitId: mapped[0]?.unitId || 1,
+        });
       } else {
-        setState({ courseUnits: UNITS_CONFIG });
+        setState({
+          courseUnits: UNITS_CONFIG,
+          selectedUnitIds: UNITS_CONFIG.map((u) => u.unitId),
+          selectedSingleUnitId: UNITS_CONFIG[0]?.unitId || 1,
+        });
       }
     } catch {
-      setState({ courseUnits: UNITS_CONFIG });
+      setState({
+        courseUnits: UNITS_CONFIG,
+        selectedUnitIds: UNITS_CONFIG.map((u) => u.unitId),
+        selectedSingleUnitId: UNITS_CONFIG[0]?.unitId || 1,
+      });
     }
   };
 
@@ -230,14 +273,36 @@ const MCQGenerationIndexPage = () => {
 
   const activeUnits = state.courseUnits.length > 0 ? state.courseUnits : UNITS_CONFIG;
 
-  const totalBreakdown: number = Object.values(state.breakdown || {}).reduce<number>(
+  /* ── Validation & Calculations ─────────────────────────────────────── */
+  const totalTopicQuestions = state.topicRows.reduce((s, r) => s + (Number(r.questionCount) || 0), 0);
+
+  const total1D = Object.values(state.knowledgeBreakdown || {}).reduce(
+    (acc: number, val: any) => acc + (Number(val) || 0),
+    0
+  );
+
+  const total2D: number = Object.values(state.breakdown || {}).reduce<number>(
     (sum: number, diffObj: any) =>
       sum +
       Object.values(diffObj || {}).reduce<number>((s: number, v: any) => s + (Number(v) || 0), 0),
     0
   );
-  const totalTopicQuestions = state.topicRows.reduce((s, r) => s + (Number(r.questionCount) || 0), 0);
-  const breakdownValid = totalBreakdown === totalTopicQuestions;
+
+  // Dynamic validation error
+  let validationError: string | null = null;
+  if (state.distributionMode === "knowledge_level" && total1D !== state.targetQuestionCount) {
+    validationError = `Bloom's 1D total (${total1D}) must equal target questions (${state.targetQuestionCount}). Click a preset or adjust counts.`;
+  } else if (state.distributionMode === "knowledge_and_difficulty" && total2D !== state.targetQuestionCount) {
+    validationError = `2D Matrix total (${total2D}) must equal target questions (${state.targetQuestionCount}). Click Auto-Balance or adjust cells.`;
+  } else if (state.scopeMode === "all_units" && state.selectedUnitIds.length === 0) {
+    validationError = "Please select at least one syllabus unit to include.";
+  } else if (state.scopeMode === "dynamic_topics" && state.topicRows.some((r) => !r.topicName)) {
+    validationError = "Please select a topic for every row in Dynamic Topic Selection.";
+  } else if (state.scopeMode === "micro_topics" && state.microTopics.length === 0) {
+    validationError = "Please enter at least one micro-topic tag or concept.";
+  }
+
+  const canGenerate = !validationError && state.targetQuestionCount >= 1;
 
   /* ── Handlers ─────────────────────────────────────────────────────── */
   const handleManageQuestions = (course: CourseItem) => {
@@ -250,6 +315,25 @@ const MCQGenerationIndexPage = () => {
   const handleBackToCourses = () => {
     setState({ selectedCourse: null });
     router.replace({ pathname: router.pathname, query: {} }, undefined, { shallow: true });
+  };
+
+  // Scope handlers
+  const handleToggleUnitSelection = (unitId: string | number) => {
+    const exists = state.selectedUnitIds.some((id) => String(id) === String(unitId));
+    if (exists) {
+      if (state.selectedUnitIds.length === 1) return;
+      setState({ selectedUnitIds: state.selectedUnitIds.filter((id) => String(id) !== String(unitId)) });
+    } else {
+      setState({ selectedUnitIds: [...state.selectedUnitIds, unitId] });
+    }
+  };
+
+  const handleSelectAllUnits = () => {
+    if (state.selectedUnitIds.length === activeUnits.length) {
+      setState({ selectedUnitIds: [activeUnits[0]?.unitId || 1] });
+    } else {
+      setState({ selectedUnitIds: activeUnits.map((u) => u.unitId) });
+    }
   };
 
   const addTopicRow = () => setState({ topicRows: [...state.topicRows, newRow()] });
@@ -273,13 +357,104 @@ const MCQGenerationIndexPage = () => {
     });
   };
 
-  const updateBreakdown = (kLevel: string, diff: string, value: number) => {
+  const handleAddMicroTopic = (topic: string) => {
+    if (!state.microTopics.includes(topic)) {
+      setState({ microTopics: [...state.microTopics, topic] });
+    }
+  };
+
+  const handleRemoveMicroTopic = (topic: string) => {
+    setState({ microTopics: state.microTopics.filter((t) => t !== topic) });
+  };
+
+  // Distribution handlers
+  const updateBreakdown2D = (kLevel: string, diff: string, value: number) => {
     setState({
       breakdown: {
         ...state.breakdown,
         [kLevel]: { ...state.breakdown[kLevel], [diff]: Math.max(0, value) },
       },
     });
+  };
+
+  const updateKnowledgeBreakdown1D = (kLevel: string, count: number) => {
+    setState({
+      knowledgeBreakdown: {
+        ...state.knowledgeBreakdown,
+        [kLevel]: Math.max(0, count),
+      },
+    });
+  };
+
+  const handleApplyKnowledgePreset = (preset: "balanced" | "foundational" | "advanced") => {
+    const total = state.targetQuestionCount || 5;
+    const res: Record<string, number> = { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 };
+    if (preset === "foundational") {
+      const k1 = Math.ceil(total * 0.5);
+      res.K1 = k1;
+      res.K2 = total - k1;
+    } else if (preset === "advanced") {
+      const k3 = Math.floor(total * 0.35);
+      const k4 = Math.floor(total * 0.35);
+      const k5 = Math.floor(total * 0.15);
+      res.K3 = k3;
+      res.K4 = k4;
+      res.K5 = k5;
+      res.K6 = total - (k3 + k4 + k5);
+    } else {
+      const k1 = Math.floor(total * 0.25);
+      const k2 = Math.floor(total * 0.35);
+      const k3 = Math.floor(total * 0.25);
+      res.K1 = k1;
+      res.K2 = k2;
+      res.K3 = k3;
+      res.K4 = total - (k1 + k2 + k3);
+    }
+    setState({ knowledgeBreakdown: res });
+  };
+
+  const handleAutoBalance2D = () => {
+    const total = state.targetQuestionCount || 5;
+    const base: Record<string, Record<string, number>> = {
+      K1: { easy: 0, medium: 0, hard: 0 },
+      K2: { easy: 0, medium: 0, hard: 0 },
+      K3: { easy: 0, medium: 0, hard: 0 },
+      K4: { easy: 0, medium: 0, hard: 0 },
+      K5: { easy: 0, medium: 0, hard: 0 },
+      K6: { easy: 0, medium: 0, hard: 0 },
+    };
+    const slots: Array<[string, "easy" | "medium" | "hard"]> = [
+      ["K2", "medium"],
+      ["K1", "easy"],
+      ["K2", "easy"],
+      ["K3", "medium"],
+      ["K1", "medium"],
+      ["K3", "hard"],
+      ["K4", "medium"],
+      ["K4", "hard"],
+      ["K2", "hard"],
+      ["K5", "hard"],
+    ];
+    let rem = total;
+    let slotIdx = 0;
+    while (rem > 0) {
+      const [k, d] = slots[slotIdx % slots.length];
+      base[k][d] += 1;
+      rem -= 1;
+      slotIdx += 1;
+    }
+    setState({ breakdown: base });
+  };
+
+  // Pedagogical preset selection
+  const handleSelectPedagogicalPreset = (presetId: string) => {
+    const preset = PEDAGOGICAL_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    if (state.activePresetId === presetId) {
+      setState({ activePresetId: null, description: "" });
+    } else {
+      setState({ activePresetId: presetId, description: preset.description });
+    }
   };
 
   const showToast = (type: "success" | "error", msg: string) => {
@@ -310,7 +485,7 @@ const MCQGenerationIndexPage = () => {
             const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
             const newlyCreated = fetched.filter((q) => !existingIds.has(q.id)).map((q) => q.id);
             const recentIds =
-              newlyCreated.length > 0 ? newlyCreated : fetched.slice(0, totalTopicQuestions).map((q) => q.id);
+              newlyCreated.length > 0 ? newlyCreated : fetched.slice(0, state.targetQuestionCount).map((q) => q.id);
             setState({
               courseQuestions: { ...state.courseQuestions, [courseKey]: fetched },
               recentQuestionIds: recentIds,
@@ -334,20 +509,37 @@ const MCQGenerationIndexPage = () => {
     }, 5000);
   };
 
-  const handleGenerateQuestions = async () => {
-    if (!state.selectedCourse) return;
-    if (!breakdownValid) {
-      alert(`Bloom's taxonomy total (${totalBreakdown}) must equal total topic questions (${totalTopicQuestions}).`);
-      return;
-    }
-    if (state.topicRows.some((r) => !r.topicName)) {
-      alert("Please select a topic for every row.");
-      return;
-    }
-
-    setState({ isGeneratingAI: true });
-
-    try {
+  /* ── Payload Builder across all 4 Dimensions ───────────────────────── */
+  const buildGeneratePayload = () => {
+    // 1. Build syllabus based on scope mode
+    let units: any[] = [];
+    if (state.scopeMode === "all_units") {
+      units = activeUnits
+        .filter((u) => state.selectedUnitIds.some((id) => String(id) === String(u.unitId)))
+        .map((u) => ({
+          unit_number: Number(u.unitId) || 1,
+          unit_title: u.title || `Unit ${u.unitId}`,
+          topics: (u.topics || []).map((t: string, idx: number) => ({
+            topic_id: String(idx + 1),
+            topic_name: t,
+            subtopics: [],
+          })),
+        }));
+    } else if (state.scopeMode === "single_unit") {
+      const unit =
+        activeUnits.find((u) => String(u.unitId) === String(state.selectedSingleUnitId)) || activeUnits[0];
+      units = [
+        {
+          unit_number: Number(unit.unitId) || 1,
+          unit_title: unit.title || `Unit ${unit.unitId}`,
+          topics: (unit.topics || []).map((t: string, idx: number) => ({
+            topic_id: String(idx + 1),
+            topic_name: t,
+            subtopics: [],
+          })),
+        },
+      ];
+    } else if (state.scopeMode === "dynamic_topics") {
       const unitMap: Record<string, { unit_number: number; unit_title: string; topics: any[] }> = {};
       state.topicRows.forEach((row) => {
         const uid = String(row.unitId);
@@ -365,27 +557,80 @@ const MCQGenerationIndexPage = () => {
           subtopics: [],
         });
       });
+      units = Object.values(unitMap);
+    } else if (state.scopeMode === "micro_topics") {
+      units = [
+        {
+          unit_number: 1,
+          unit_title: "Micro-Topic Laser Focus",
+          topics: state.microTopics.map((mt, idx) => ({
+            topic_id: String(idx + 1),
+            topic_name: mt,
+            subtopics: [],
+          })),
+        },
+      ];
+    }
 
+    if (units.length === 0) {
+      units = [
+        {
+          unit_number: 1,
+          unit_title: activeUnits[0]?.title || "Unit 1",
+          topics: (activeUnits[0]?.topics || ["General Topic"]).map((t: string, idx: number) => ({
+            topic_id: String(idx + 1),
+            topic_name: t,
+            subtopics: [],
+          })),
+        },
+      ];
+    }
+
+    // 2. Base payload
+    const payload: any = {
+      syllabus: {
+        course_id: String(state.selectedCourse?.code || currentCourseKey),
+        units,
+      },
+      question_count: state.targetQuestionCount,
+      type: "mcq",
+      language: "en", // Explicitly fixed to "en", language option hidden as instructed
+      include_explanation: state.includeExplanation,
+      shuffle_options: state.shuffleOptions,
+      distribution_mode: state.distributionMode,
+    };
+
+    // 3. Distribution mode specific fields
+    if (state.distributionMode === "knowledge_level") {
+      payload.knowledge_level_breakdown = state.knowledgeBreakdown;
+    } else if (state.distributionMode === "knowledge_and_difficulty") {
       const filteredBreakdown: Record<string, Record<string, number>> = {};
       Object.entries(state.breakdown).forEach(([k, diffObj]) => {
         const nonZero = Object.entries(diffObj).filter(([, v]) => (Number(v) || 0) > 0);
         if (nonZero.length > 0) filteredBreakdown[k] = Object.fromEntries(nonZero);
       });
+      payload.knowledge_difficulty_breakdown = filteredBreakdown;
+    }
 
-      const payload = {
-        syllabus: {
-          course_id: String(state.selectedCourse?.code || currentCourseKey),
-          units: Object.values(unitMap),
-        },
-        question_count: totalTopicQuestions,
-        type: "mcq",
-        language: "en",
-        include_explanation: true,
-        shuffle_options: true,
-        distribution_mode: "knowledge_and_difficulty",
-        knowledge_difficulty_breakdown: filteredBreakdown,
-      };
+    // 4. Description / Pedagogical focus
+    if (state.description.trim()) {
+      payload.description = state.description.trim();
+    }
 
+    return payload;
+  };
+
+  const handleGenerateQuestions = async () => {
+    if (!state.selectedCourse) return;
+    if (!canGenerate) {
+      alert(validationError || "Please check your configuration before generating.");
+      return;
+    }
+
+    setState({ isGeneratingAI: true });
+
+    try {
+      const payload = buildGeneratePayload();
       const res: any = await Models.mcq.generate(payload).catch((err) => {
         console.error("Generate API Error:", err);
         showToast("error", `Error from server: ${err?.message || "Unknown Error"}`);
@@ -403,6 +648,53 @@ const MCQGenerationIndexPage = () => {
       console.error("Generate error:", err);
       setState({ isGeneratingAI: false });
       showToast("error", "Unexpected error during generation.");
+    }
+  };
+
+  const handleGenerateBackground = async () => {
+    if (!state.selectedCourse) return;
+    if (!canGenerate) {
+      alert(validationError || "Please check your configuration before generating.");
+      return;
+    }
+
+    try {
+      const payload = buildGeneratePayload();
+      const res: any = await Models.mcq.generate(payload).catch((err) => {
+        showToast("error", `Failed to start background job: ${err?.message || "Unknown Error"}`);
+        return null;
+      });
+
+      const jobId = res?.job_id || res?.data?.job_id || res?.id;
+      if (jobId) {
+        showToast(
+          "success",
+          `✓ AI generation started in background (Job: ${String(jobId).slice(0, 8)}...). You can continue working.`
+        );
+
+        // Quiet background watcher
+        let checks = 0;
+        const bgTimer = setInterval(async () => {
+          checks += 1;
+          if (checks > 35) {
+            clearInterval(bgTimer);
+            return;
+          }
+          const checkRes: any = await Models.mcq.status(jobId).catch(() => null);
+          if (checkRes?.status === "completed" || checkRes?.status === "complete") {
+            clearInterval(bgTimer);
+            showToast("success", "🎉 Background MCQ Generation completed! Question bank updated.");
+            if (state.selectedCourse) {
+              fetchQuestions(state.selectedCourse.code || state.selectedCourse.id);
+            }
+          } else if (checkRes?.status === "failed") {
+            clearInterval(bgTimer);
+            showToast("error", "Background generation job failed.");
+          }
+        }, 8000);
+      }
+    } catch {
+      showToast("error", "Failed to start background generation.");
     }
   };
 
@@ -592,20 +884,52 @@ const MCQGenerationIndexPage = () => {
           {/* TAB 1: AI GENERATION STUDIO */}
           {state.activeTab === "generator" && (
             <MCQStudioWorkspace
-              topicRows={state.topicRows}
+              scopeMode={state.scopeMode}
+              onScopeModeChange={(scopeMode) => setState({ scopeMode })}
               activeUnits={activeUnits}
-              onAddRow={addTopicRow}
-              onRemoveRow={removeTopicRow}
-              onUpdateRow={updateRow}
+              selectedUnitIds={state.selectedUnitIds}
+              onToggleUnitSelection={handleToggleUnitSelection}
+              onSelectAllUnits={handleSelectAllUnits}
+              selectedSingleUnitId={state.selectedSingleUnitId}
+              onSingleUnitChange={(selectedSingleUnitId) => setState({ selectedSingleUnitId })}
+              topicRows={state.topicRows}
+              onAddTopicRow={addTopicRow}
+              onRemoveTopicRow={removeTopicRow}
+              onUpdateTopicRow={updateRow}
               totalTopicQuestions={totalTopicQuestions}
-              breakdown={state.breakdown}
-              onUpdateBreakdown={updateBreakdown}
-              totalBreakdown={totalBreakdown}
-              breakdownValid={breakdownValid}
+              microTopics={state.microTopics}
+              onAddMicroTopic={handleAddMicroTopic}
+              onRemoveMicroTopic={handleRemoveMicroTopic}
+
+              distributionMode={state.distributionMode}
+              onDistributionModeChange={(distributionMode) => setState({ distributionMode })}
+              targetQuestionCount={state.targetQuestionCount}
+              onTargetQuestionCountChange={(targetQuestionCount) => setState({ targetQuestionCount })}
+              knowledgeBreakdown={state.knowledgeBreakdown}
+              onUpdateKnowledgeBreakdown={updateKnowledgeBreakdown1D}
+              onApplyKnowledgePreset={handleApplyKnowledgePreset}
+              breakdown2D={state.breakdown}
+              onUpdateBreakdown2D={updateBreakdown2D}
+              onAutoBalance2D={handleAutoBalance2D}
+
+              description={state.description}
+              onDescriptionChange={(description) => setState({ description, activePresetId: null })}
+              activePresetId={state.activePresetId}
+              onSelectPreset={handleSelectPedagogicalPreset}
+
+              includeExplanation={state.includeExplanation}
+              onToggleExplanation={() => setState({ includeExplanation: !state.includeExplanation })}
+              shuffleOptions={state.shuffleOptions}
+              onToggleShuffle={() => setState({ shuffleOptions: !state.shuffleOptions })}
               marksPerQuestion={state.marksPerQuestion}
               onMarksChange={(marksPerQuestion) => setState({ marksPerQuestion })}
+
               isGeneratingAI={state.isGeneratingAI}
-              onGenerateQuestions={handleGenerateQuestions}
+              canGenerate={canGenerate}
+              validationError={validationError}
+              onGenerateForeground={handleGenerateQuestions}
+              onGenerateBackground={handleGenerateBackground}
+
               currentQuestions={currentQuestions}
               displayedQuestions={displayedQuestions}
               selectedBannerFilter={state.selectedBannerFilter}

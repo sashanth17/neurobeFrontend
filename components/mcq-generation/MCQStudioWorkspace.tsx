@@ -1,29 +1,70 @@
 import React from "react";
-import { Sparkles, RefreshCw } from "lucide-react";
-import { TopicRowsBuilder } from "./TopicRowsBuilder";
-import { BloomsMatrixTable } from "./BloomsMatrixTable";
+import {
+  ScopeMode,
+  DistributionMode,
+  KnowledgeLevelBreakdown,
+  MCQQuestion,
+  TopicRow,
+} from "./types";
+import { GenerationScopeSelector } from "./GenerationScopeSelector";
+import { DistributionModeSelector } from "./DistributionModeSelector";
+import { PedagogicalFocusCard } from "./PedagogicalFocusCard";
+import { OutputConfigCard } from "./OutputConfigCard";
 import { QuestionReviewPool } from "./QuestionReviewPool";
-import { MCQQuestion, TopicRow } from "./types";
 
-interface MCQStudioWorkspaceProps {
-  topicRows: TopicRow[];
+export interface MCQStudioWorkspaceProps {
+  // ── 1. Scope props
+  scopeMode: ScopeMode;
+  onScopeModeChange: (mode: ScopeMode) => void;
   activeUnits: any[];
-  onAddRow: () => void;
-  onRemoveRow: (id: string) => void;
-  onUpdateRow: (id: string, patch: Partial<TopicRow>) => void;
+  selectedUnitIds: (string | number)[];
+  onToggleUnitSelection: (unitId: string | number) => void;
+  onSelectAllUnits: () => void;
+  selectedSingleUnitId: string | number;
+  onSingleUnitChange: (unitId: string | number) => void;
+  topicRows: TopicRow[];
+  onAddTopicRow: () => void;
+  onRemoveTopicRow: (id: string) => void;
+  onUpdateTopicRow: (id: string, patch: Partial<TopicRow>) => void;
   totalTopicQuestions: number;
+  microTopics: string[];
+  onAddMicroTopic: (topic: string) => void;
+  onRemoveMicroTopic: (topic: string) => void;
 
-  breakdown: Record<string, Record<string, number>>;
-  onUpdateBreakdown: (kLevel: string, diff: string, val: number) => void;
-  totalBreakdown: number;
-  breakdownValid: boolean;
+  // ── 2. Distribution Mode props
+  distributionMode: DistributionMode;
+  onDistributionModeChange: (mode: DistributionMode) => void;
+  targetQuestionCount: number;
+  onTargetQuestionCountChange: (count: number) => void;
+  knowledgeBreakdown: KnowledgeLevelBreakdown;
+  onUpdateKnowledgeBreakdown: (kLevel: string, count: number) => void;
+  onApplyKnowledgePreset: (preset: "balanced" | "foundational" | "advanced") => void;
+  breakdown2D: Record<string, Record<string, number>>;
+  onUpdateBreakdown2D: (kLevel: string, diff: string, val: number) => void;
+  onAutoBalance2D: () => void;
 
+  // ── 3. Pedagogical Steering props
+  description: string;
+  onDescriptionChange: (desc: string) => void;
+  activePresetId: string | null;
+  onSelectPreset: (presetId: string) => void;
+
+  // ── 4. Output Configuration props
+  includeExplanation: boolean;
+  onToggleExplanation: () => void;
+  shuffleOptions: boolean;
+  onToggleShuffle: () => void;
   marksPerQuestion: string;
   onMarksChange: (marks: string) => void;
 
+  // ── 5. Generation Execution Actions
   isGeneratingAI: boolean;
-  onGenerateQuestions: () => void;
+  canGenerate: boolean;
+  validationError?: string | null;
+  onGenerateForeground: () => void;
+  onGenerateBackground: () => void;
 
+  // ── 6. Review Pool props
   currentQuestions: MCQQuestion[];
   displayedQuestions: MCQQuestion[];
   selectedBannerFilter: string;
@@ -42,24 +83,58 @@ interface MCQStudioWorkspaceProps {
 }
 
 export const MCQStudioWorkspace: React.FC<MCQStudioWorkspaceProps> = ({
-  topicRows,
+  // Scope
+  scopeMode,
+  onScopeModeChange,
   activeUnits,
-  onAddRow,
-  onRemoveRow,
-  onUpdateRow,
+  selectedUnitIds,
+  onToggleUnitSelection,
+  onSelectAllUnits,
+  selectedSingleUnitId,
+  onSingleUnitChange,
+  topicRows,
+  onAddTopicRow,
+  onRemoveTopicRow,
+  onUpdateTopicRow,
   totalTopicQuestions,
+  microTopics,
+  onAddMicroTopic,
+  onRemoveMicroTopic,
 
-  breakdown,
-  onUpdateBreakdown,
-  totalBreakdown,
-  breakdownValid,
+  // Distribution
+  distributionMode,
+  onDistributionModeChange,
+  targetQuestionCount,
+  onTargetQuestionCountChange,
+  knowledgeBreakdown,
+  onUpdateKnowledgeBreakdown,
+  onApplyKnowledgePreset,
+  breakdown2D,
+  onUpdateBreakdown2D,
+  onAutoBalance2D,
 
+  // Pedagogical
+  description,
+  onDescriptionChange,
+  activePresetId,
+  onSelectPreset,
+
+  // Output
+  includeExplanation,
+  onToggleExplanation,
+  shuffleOptions,
+  onToggleShuffle,
   marksPerQuestion,
   onMarksChange,
 
+  // Actions
   isGeneratingAI,
-  onGenerateQuestions,
+  canGenerate,
+  validationError,
+  onGenerateForeground,
+  onGenerateBackground,
 
+  // Pool
   currentQuestions,
   displayedQuestions,
   selectedBannerFilter,
@@ -77,81 +152,66 @@ export const MCQStudioWorkspace: React.FC<MCQStudioWorkspaceProps> = ({
   onCreateQuestionSet,
 }) => {
   return (
-    <div className="space-y-5">
-      {/* ── CARD 1: Dynamic Topic Builder ── */}
-      <TopicRowsBuilder
-        topicRows={topicRows}
+    <div className="space-y-6">
+      {/* ── STEP 1: Syllabus Granularity & Scope Selection ── */}
+      <GenerationScopeSelector
+        scopeMode={scopeMode}
+        onScopeModeChange={onScopeModeChange}
         activeUnits={activeUnits}
-        onAddRow={onAddRow}
-        onRemoveRow={onRemoveRow}
-        onUpdateRow={onUpdateRow}
+        selectedUnitIds={selectedUnitIds}
+        onToggleUnitSelection={onToggleUnitSelection}
+        onSelectAllUnits={onSelectAllUnits}
+        selectedSingleUnitId={selectedSingleUnitId}
+        onSingleUnitChange={onSingleUnitChange}
+        topicRows={topicRows}
+        onAddTopicRow={onAddTopicRow}
+        onRemoveTopicRow={onRemoveTopicRow}
+        onUpdateTopicRow={onUpdateTopicRow}
         totalTopicQuestions={totalTopicQuestions}
+        microTopics={microTopics}
+        onAddMicroTopic={onAddMicroTopic}
+        onRemoveMicroTopic={onRemoveMicroTopic}
       />
 
-      {/* ── CARD 2: Bloom's × Difficulty 2D Matrix ── */}
-      <BloomsMatrixTable
-        breakdown={breakdown}
-        onUpdateBreakdown={onUpdateBreakdown}
-        totalTopicQuestions={totalTopicQuestions}
-        totalBreakdown={totalBreakdown}
-        breakdownValid={breakdownValid}
+      {/* ── STEP 2: Cognitive Blueprint & Distribution Mode ── */}
+      <DistributionModeSelector
+        distributionMode={distributionMode}
+        onDistributionModeChange={onDistributionModeChange}
+        targetQuestionCount={targetQuestionCount}
+        knowledgeBreakdown={knowledgeBreakdown}
+        onUpdateKnowledgeBreakdown={onUpdateKnowledgeBreakdown}
+        onApplyKnowledgePreset={onApplyKnowledgePreset}
+        breakdown2D={breakdown2D}
+        onUpdateBreakdown2D={onUpdateBreakdown2D}
+        onAutoBalance2D={onAutoBalance2D}
       />
 
-      {/* ── CARD 3: Marks + Generate Button ── */}
-      <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white px-6 py-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center gap-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Marks per Question
-            </label>
-            <select
-              value={marksPerQuestion}
-              onChange={(e) => onMarksChange(e.target.value)}
-              className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="0.5">0.5 Mark</option>
-              <option value="1">1 Mark</option>
-              <option value="2">2 Marks</option>
-              <option value="4">4 Marks</option>
-            </select>
-          </div>
-          <div className="h-10 w-px bg-gray-200 dark:bg-gray-700" />
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            <p>
-              <strong className="text-gray-800 dark:text-gray-200">{topicRows.length}</strong> topic rows
-            </p>
-            <p>
-              <strong className="text-gray-800 dark:text-gray-200">{totalTopicQuestions}</strong> total questions
-            </p>
-          </div>
-          {!breakdownValid && totalTopicQuestions > 0 && (
-            <p className="text-xs font-semibold text-red-500">
-              ⚠ Matrix total ({totalBreakdown}) ≠ question total ({totalTopicQuestions})
-            </p>
-          )}
-        </div>
+      {/* ── STEP 3: Pedagogical Steering & Custom AI Prompt (Optional) ── */}
+      <PedagogicalFocusCard
+        description={description}
+        onDescriptionChange={onDescriptionChange}
+        activePresetId={activePresetId}
+        onSelectPreset={onSelectPreset}
+      />
 
-        <button
-          type="button"
-          disabled={isGeneratingAI || !breakdownValid || totalTopicQuestions === 0}
-          onClick={onGenerateQuestions}
-          className="flex items-center gap-2 rounded-xl bg-color1 px-7 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-color1/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isGeneratingAI ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Generating with AI...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4" />
-              <span>Generate Questions Now</span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* ── STEP 4: Output Specifications & Execution ── */}
+      <OutputConfigCard
+        questionCount={targetQuestionCount}
+        onQuestionCountChange={onTargetQuestionCountChange}
+        includeExplanation={includeExplanation}
+        onToggleExplanation={onToggleExplanation}
+        shuffleOptions={shuffleOptions}
+        onToggleShuffle={onToggleShuffle}
+        marksPerQuestion={marksPerQuestion}
+        onMarksChange={onMarksChange}
+        isGeneratingAI={isGeneratingAI}
+        canGenerate={canGenerate}
+        validationError={validationError}
+        onGenerateForeground={onGenerateForeground}
+        onGenerateBackground={onGenerateBackground}
+      />
 
-      {/* ── CARD 4: Generated Question Pool & Review ── */}
+      {/* ── STEP 5: Generated Question Pool & Review ── */}
       <QuestionReviewPool
         currentQuestions={currentQuestions}
         displayedQuestions={displayedQuestions}

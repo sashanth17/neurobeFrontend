@@ -146,3 +146,52 @@ export const normalizeMCQ = (q: any, idx = 0): MCQQuestion => {
     explanation: q.explanation || "",
   };
 };
+
+export type ScopeMode = "all_units" | "single_unit" | "dynamic_topics" | "micro_topics";
+
+export type DistributionMode = "none" | "knowledge_level" | "knowledge_and_difficulty";
+
+export type KnowledgeLevelBreakdown = Record<string, number>;
+
+export interface PedagogicalPreset {
+  id: string;
+  label: string;
+  iconName: string;
+  description: string;
+}
+
+export const BLOOM_DEFINITIONS: Record<string, { name: string; verbs: string; color: string }> = {
+  K1: { name: "Remember", verbs: "Recall, Define, List, State", color: "indigo" },
+  K2: { name: "Understand", verbs: "Explain, Describe, Classify", color: "blue" },
+  K3: { name: "Apply", verbs: "Calculate, Solve, Demonstrate", color: "emerald" },
+  K4: { name: "Analyze", verbs: "Differentiate, Compare, Contrast", color: "amber" },
+  K5: { name: "Evaluate", verbs: "Assess, Justify, Critique", color: "orange" },
+  K6: { name: "Create", verbs: "Design, Formulate, Construct", color: "purple" },
+};
+
+export const PEDAGOGICAL_PRESETS: PedagogicalPreset[] = [
+  {
+    id: "numerical",
+    label: "Numerical / Calculation",
+    iconName: "Calculator",
+    description: "Generate scenario-based calculation problems with realistic parameter values and step-by-step mathematical reasoning.",
+  },
+  {
+    id: "case_study",
+    label: "Case-Study / Real-World",
+    iconName: "Briefcase",
+    description: "Focus on practical industrial applications, system trade-offs, architecture decisions, and realistic problem scenarios.",
+  },
+  {
+    id: "code_tracing",
+    label: "Code / State Tracing",
+    iconName: "Code2",
+    description: "Include code snippets, algorithm traces, or state transition diagrams, asking for final output or time/space complexities.",
+  },
+  {
+    id: "theory",
+    label: "Conceptual & Theory",
+    iconName: "BookOpen",
+    description: "Focus on foundational theorems, edge cases, core definitions, and distinguishing subtleties between related concepts.",
+  },
+];

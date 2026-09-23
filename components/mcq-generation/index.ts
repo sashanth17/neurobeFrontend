@@ -4,4 +4,8 @@ export * from "./MCQStatsBanner";
 export * from "./TopicRowsBuilder";
 export * from "./BloomsMatrixTable";
 export * from "./QuestionReviewPool";
+export * from "./GenerationScopeSelector";
+export * from "./DistributionModeSelector";
+export * from "./PedagogicalFocusCard";
+export * from "./OutputConfigCard";
 export * from "./MCQStudioWorkspace";
