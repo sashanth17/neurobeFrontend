@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
-import { ArrowRight, BookOpen, Info, User, UserCheck } from "lucide-react";
+import { ArrowRight, BookOpen, Info, User, UserCheck, Users } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
 import IconSearch from "@/components/Icon/IconSearch";
@@ -149,15 +149,21 @@ const CourseOffering = () => {
     <div className="min-h-screen">
       {/* Info banner */}
       <PageHeader
-        title="Course Offerings"
+        title="Course Offerings & Instance Management"
         subtitle="Overview of course offerings and section instances across programmes and terms."
         icon={<BookOpen className="h-5 w-5 text-color2" />}
         records={`${records.length} Records`}
+        actionBtn2={{
+          label: "Enroll Students",
+          icon: <Users className="h-4 w-4" />,
+          onClick: () => router.push("/neurobe/student-enrollment"),
+          outline: true,
+        }}
         actionBtn1={{
           label: "Create Offering",
           icon: <IconPlus className="h-4 w-4" />,
           onClick: openCreate,
-          view: true,
+          view: false,
         }}
       />
 

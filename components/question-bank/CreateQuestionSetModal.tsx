@@ -14,6 +14,7 @@ import {
   Zap,
   Sparkles,
 } from "lucide-react";
+import { useRouter } from "next/router";
 import Models from "@/imports/models.import";
 import { Success, Failure } from "@/utils/function.utils";
 
@@ -38,6 +39,7 @@ export const CreateQuestionSetModal: React.FC<CreateQuestionSetModalProps> = ({
   units = [],
   onCreated,
 }) => {
+  const router = useRouter();
   const [setName, setSetName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedUnit, setSelectedUnit] = useState<string>("all");
@@ -226,6 +228,19 @@ export const CreateQuestionSetModal: React.FC<CreateQuestionSetModalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Redirect to MCQ Generation Page */}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                router.push(courseId ? `/neurobe/mcq-generation?course_id=${courseId}` : "/neurobe/mcq-generation");
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-xs dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+              <span>Generate MCQs with AI</span>
+            </button>
+
             {/* Live Selected Counter Badge */}
             <div className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200/80 px-3 py-1.5 text-xs font-black text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300">
               <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />

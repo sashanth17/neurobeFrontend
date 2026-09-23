@@ -381,32 +381,45 @@ const LessonPlan = () => {
   };
 
   const lession_data = async (syllabus_id: any, unit: any, verNum?: number) => {
+    if (!syllabus_id) return;
     try {
       const vToUse = verNum !== undefined ? verNum : loadedVersion;
       const res: any = await Models.lession_plan.detail(syllabus_id, unit, vToUse);
+      const isApproved = res?.overall_approval_status === "Approved" || res?.workspace_status === "Approved";
+      const isGen = Boolean(
+        isApproved ||
+        res?.workspace_status === "Ready" ||
+        res?.workspace_status === "Review Required" ||
+        (res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0)
+      );
+      if (isGen) {
+        setState({ recommendationsGenerated: true });
+      }
+      if (isApproved) {
+        setState({ lessonApproved: true });
+      }
+
       const data = [{
         key: "total-topics",
-        label: " Total Topics",
-        count: res?.metrics?.topics?.value,
-        subLabel: "Approved curriculum count",
+        label: "Total Topics",
+        count: res?.metrics?.topics?.value ?? res?.total_topics ?? 0,
+        subLabel: "Curriculum topic count",
         icon: <Check className="h-5 w-5" />,
       },
       {
         key: "total-hours",
         label: "Total Hours",
         subLabel: "Allocated semester teaching time",
-        count: res?.metrics?.contact_hours?.value,
-
+        count: res?.metrics?.contact_hours?.value ?? 45,
         icon: <Hourglass className="h-5 w-5" />,
       },
       {
-        key: "reviewed",
-        label: "Reviewed",
-        subLabel: "Lesson Plan Review",
-        count: res?.metrics?.lesson_plan_review?.reviewed_count,
-
+        key: "status",
+        label: "Schedule Status",
+        subLabel: "Milestone status",
+        count: isApproved ? "Approved" : (isGen ? "Ready" : "Draft"),
         icon: <ClipboardCheck className="h-5 w-5" />,
-      }]
+      }];
       setState({ lession_data: res, matrix: data });
 
     } catch (error) {
@@ -415,11 +428,15 @@ const LessonPlan = () => {
   };
 
   const course_data = async () => {
+    if (!course_id) return;
     try {
       const res: any = await Models.course.detail(course_id);
       setState({ courseData: res });
       console.log("course detail →", res);
-      lession_data(res?.latest_syllabus?.id,1)
+      const sid = res?.latest_syllabus?.id || res?.syllabus_id;
+      if (sid) {
+        lession_data(sid, 1);
+      }
 
     } catch (error) {
       console.log("error", error);
@@ -571,32 +588,21 @@ const LessonPlan = () => {
     {
       accessor: "status",
       title: "STATUS",
-      render: ({ status, id, seq, title, level, hours, textbook, reference, pedagogy }: any) => {
-        const isReviewed =
-          status === "Reviewed" || (reviewedMap[state.activeTab]?.has(id) ?? false);
+      render: ({ status, status_display }: any) => {
+        const isApproved =
+          state.lessonApproved ||
+          status === "Approved" ||
+          status === "Reviewed" ||
+          (status_display && status_display.includes("Approved"));
 
-        return isReviewed ? (
+        return isApproved ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
-            Reviewed <Check className="h-3 w-3" strokeWidth={3} />
+            Approved <Check className="h-3 w-3" strokeWidth={3} />
           </span>
         ) : (
-          <button
-            type="button"
-            onClick={() =>
-              setReviewModal({
-                open: true,
-                unitKey: state.activeTab,
-                topicId: id,
-                data: {
-                  id, seq, title, level, hours, textbook, reference, pedagogy,
-                  unitLabel: raw?.title ?? "",
-                },
-              })
-            }
-            className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-600 hover:border-orange-400 hover:bg-orange-100 transition-colors cursor-pointer"
-          >
-            • Needs Review
-          </button>
+          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+            {status_display || status || "Scheduled"}
+          </span>
         );
       },
     },
@@ -886,16 +892,15 @@ const LessonPlan = () => {
 
       {state.recommendationsGenerated ? (
         <PageFooter
-          content1={`Reviewed: ${totalReviewedCount}/${state?.lession_data?.selected_unit?.topics_count} Topics`}
-          // content2="Course: CS309 — Computer Networks"
-            content2={`Course: ${state.courseData?.course_code} - ${state.courseData?.course_title}`}
+          content1={`Unit Topics: ${state?.lession_data?.selected_unit?.topics_count ?? 0}`}
+          content2={`Course: ${state.courseData?.course_code || ""} - ${state.courseData?.course_title || ""}`}
           batch
           actionBtn1={
             state.lessonApproved
               ? {
-                label: "Next:Learning Material",
+                label: "Next: Learning Material",
                 icon: <Check className="h-4 w-4" />,
-                onClick: () => router.push("/neurobe/learning-materials"),
+                onClick: () => router.push(course_id ? `/neurobe/learning-materials?course_id=${course_id}` : "/neurobe/learning-materials"),
                 className: "create-btn",
               }
               : {
@@ -903,7 +908,7 @@ const LessonPlan = () => {
                   ? "Approving..."
                   : state.upstreamNotApproved
                   ? "Requires Pedagogy Approval"
-                  : "Approve Lesson Plan Review",
+                  : "Approve Lesson Plan",
                 icon: state.approvingLesson ? <RotateCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
                 onClick: handleApproveLessonPlan,
                 disabled: state.approvingLesson || state.upstreamNotApproved,

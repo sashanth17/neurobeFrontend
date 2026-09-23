@@ -162,8 +162,8 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "Student Enrollment",
-      href: "/neurobe/student-enrollment",
+      label: "Instance Management",
+      href: "/neurobe/course-offering",
     },
     {
       type: "link",
@@ -234,8 +234,8 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuUsers",
-      label: "Student Enrollment",
-      href: "/neurobe/ins-student-enrollment",
+      label: "Instance Management",
+      href: "/neurobe/course-offering",
     },
     {
       type: "link",
@@ -289,8 +289,8 @@ OwnmenuConfig.FACULTY = [
   {
     type: "link",
     icon: "IconMenuNotes",
-    label: "Student Enrollment",
-    href: "/neurobe/ins-student-enrollment",
+    label: "Instance Management",
+    href: "/neurobe/course-offering",
   },
   {
     type: "link",

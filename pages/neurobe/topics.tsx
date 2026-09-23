@@ -208,41 +208,6 @@ const RAW_UNIT_DATA: Record<string, UnitData> = {
   },
 };
 
-// ─── Static config ─────────────────────────────────────────────────────────────
-
-const STAT_TABS = [
-  {
-    key: "total-topics",
-    label: "Total Topics",
-    subLabel: "Across all units",
-    count: 22,
-    icon: <BookOpen className="h-5 w-5" />,
-  },
-  {
-    key: "approved",
-    label: "Approved Topics",
-    subLabel: "Ready for lesson plan",
-    count: 10,
-    icon: <CheckCircle2 className="h-5 w-5" />,
-  },
-  {
-    key: "needs-review",
-    label: "Needs Review",
-    subLabel: "Pending approval",
-    count: 12,
-    icon: <Hourglass className="h-5 w-5" />,
-  },
-  {
-    key: "contact-hours",
-    label: "Contact Hours",
-    subLabel: "Total teaching hours",
-    count: 45,
-    icon: <Clock className="h-5 w-5" />,
-  },
-];
-
-
-
 const GENERATE_STEPS = [
   {
     title: "Analyzing Course Syllabus",
@@ -265,7 +230,6 @@ const GENERATE_STEPS = [
 const fallbackTotalTopics = UNIT_TABS.reduce((a, b) => a + b.count, 0);
 const fallbackTotalUnits = UNIT_TABS.length;
 
-// count all subtopics across all units
 const fallbackTotalSubtopics = Object.values(RAW_UNIT_DATA).reduce(
   (s, u) => s + u.topics.reduce((ts, t) => ts + t.subtopics.length, 0),
   0,
@@ -500,10 +464,10 @@ const Topics = () => {
 
   const getUnitDetail = async (syllabusId?: any, unitNumber?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id;
-    const uNum = unitNumber ?? state.activeUnitNumber ;
+    const uNum = unitNumber ?? state.activeUnitNumber;
     const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
-      setState({ loadingUnitDetail: true }); 
+      setState({ loadingUnitDetail: true });
       const res: any = await Models.topics.unit_detail(sid, uNum, vToUse);
       const data = res?.data || res;
 
@@ -515,25 +479,25 @@ const Topics = () => {
         const existingUnits = prev.unitsList || [];
         const mergedUnitsList = (Array.isArray(resUnitTabs) && resUnitTabs.length > 0)
           ? resUnitTabs.map((tab: any, idx: number) => {
-              const tabNum = tab.unit_number ?? (idx + 1);
-              const fromExisting = existingUnits.find(
-                (eu: any) => (eu.unit_number ?? eu.id) === tabNum
-              );
-              const realId =
-                (data?.selected_unit?.unit_number === tabNum ? currentUnitDbId : null) ||
-                fromExisting?.unit_id ||
-                fromExisting?.id ||
-                tab.unit_id ||
-                tab.id ||
-                (tabNum === 1 ? (currentUnitDbId || 2) : (currentUnitDbId ? currentUnitDbId + (tabNum - 1) : tabNum + 1));
+            const tabNum = tab.unit_number ?? (idx + 1);
+            const fromExisting = existingUnits.find(
+              (eu: any) => (eu.unit_number ?? eu.id) === tabNum
+            );
+            const realId =
+              (data?.selected_unit?.unit_number === tabNum ? currentUnitDbId : null) ||
+              fromExisting?.unit_id ||
+              fromExisting?.id ||
+              tab.unit_id ||
+              tab.id ||
+              (tabNum === 1 ? (currentUnitDbId || 2) : (currentUnitDbId ? currentUnitDbId + (tabNum - 1) : tabNum + 1));
 
-              return {
-                ...tab,
-                id: realId,
-                unit_id: realId,
-                unit_number: tabNum,
-              };
-            })
+            return {
+              ...tab,
+              id: realId,
+              unit_id: realId,
+              unit_number: tabNum,
+            };
+          })
           : existingUnits;
 
         const existingCourse = prev.courseDetail || {};
@@ -1076,20 +1040,20 @@ const Topics = () => {
     const existingMicroTopics = payload.micro_topics || selectedTopicToEdit?.micro_topics;
     const microTopicsList = (Array.isArray(existingMicroTopics) && existingMicroTopics.length > 0)
       ? existingMicroTopics.map((m: any) => ({
-          micro_topic_name: typeof m === "string" ? m : (m?.micro_topic_name || m?.name || m?.title || payload.topic_name),
-        }))
+        micro_topic_name: typeof m === "string" ? m : (m?.micro_topic_name || m?.name || m?.title || payload.topic_name),
+      }))
       : [
-          {
-            micro_topic_name: payload.topic_name,
-          },
-        ];
+        {
+          micro_topic_name: payload.topic_name,
+        },
+      ];
 
     const subtopicBody = {
       subtopic_code: subtopicCode,
       subtopic_name: payload.topic_name,
       micro_topics: microTopicsList,
-      hours : payload.estimated_hours,
-      knowledge_level : payload.knowledge_level,
+      hours: payload.estimated_hours,
+      knowledge_level: payload.knowledge_level,
       status: payload.status,
     };
 
@@ -1583,17 +1547,17 @@ const Topics = () => {
         },
         (isTopicApproved || state.topicsApproved)
           ? {
-              key: "status",
-              label: "Approved",
-              asTag: true as const,
-              className: "rounded-full border border-green-400 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600",
-            }
+            key: "status",
+            label: "Approved",
+            asTag: true as const,
+            className: "rounded-full border border-green-400 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600",
+          }
           : {
-              key: "status",
-              label: "Draft",
-              asTag: true as const,
-              className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
-            },
+            key: "status",
+            label: "Draft",
+            asTag: true as const,
+            className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
+          },
         {
           key: "add-subtopic",
           label: "Add Subtopic",
@@ -1900,8 +1864,8 @@ const Topics = () => {
                   label: state.approvingTopics
                     ? "Approving..."
                     : state.upstreamNotApproved
-                    ? "Requires Syllabus Approval"
-                    : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
+                      ? "Requires Syllabus Approval"
+                      : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
                   icon: state.approvingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
                   onClick: handleApproveTopics,
                   disabled: state.approvingTopics || state.upstreamNotApproved,
