@@ -384,7 +384,7 @@ const ViewLearningMaterials = () => {
               ? {
                   label: "Next Question Bank",
                   icon: <ArrowBigRight className="h-4 w-4" />,
-                  onClick: () => router.push("/neurobe/question-bank"),
+                  onClick: () => router.push("/neurobe/mcq-generation/bank"),
                 }
               : {
                   label: "Approve Material",

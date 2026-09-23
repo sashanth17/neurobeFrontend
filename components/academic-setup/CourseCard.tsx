@@ -272,7 +272,7 @@ export default function CourseCard(props: any) {
       stageKey: "question-bank",
       status: data?.academic_preparation?.question_bank?.state || "not_started",
       extra: data?.academic_preparation?.question_bank?.count !== undefined ? `${data?.academic_preparation?.question_bank?.count} Questions` : undefined,
-      route: `/neurobe/question-bank?course_id=${targetCourseId}`,
+      route: `/neurobe/mcq-generation/bank?course_id=${targetCourseId}`,
       artifactsTab: "question-bank",
       isUnlocked: isTopicsApproved,
       unlockMessage: "Requires Topic Hierarchy to be approved first.",

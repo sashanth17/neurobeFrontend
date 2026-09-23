@@ -348,6 +348,18 @@ const syllabus = {
         });
     },
 
+    get_units: (syllabus_id: string | number, params?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${syllabus_id}/units`;
+            commonInstance()
+                .get(url, { params })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
+
     get_workflow_status: (id: string | number) => {
         return new Promise((resolve, reject) => {
             let url = `course/courses/${id}/workflow-status`;

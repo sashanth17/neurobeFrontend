@@ -23,6 +23,7 @@ import pso from "@/models/pso.model";
 import application from "@/models/application.model";
 import master from "@/models/master.model";
 import notification from "@/models/notification.model";
+import mcq from "@/models/mcq.model";
 
 export const Models: any = {
   test,
@@ -54,6 +55,7 @@ export const Models: any = {
   application,
   master,
   notification,
+  mcq,
 };
 
 export default Models;

@@ -33,7 +33,7 @@ import QuestionDetailCard from "@/components/question-bank/QuestionDetailCard";
 import TabButton from "@/components/common-components/TabButton";
 import GenericTabs from "@/components/common-components/GenericTabs";
 import { QUS_TABS, UNIT_LIST, UNIT_TABS } from "@/utils/constant.utils";
-import { EditQuestionModal } from "@/components/academic-setup/Question-bank/EditQuestionModal";
+import { EditQuestionModal } from "@/components/question-bank/EditQuestionModal";
 import ViewQuestionModal from "@/components/question-bank/ViewQuestionModal";
 import GenerateQuestionsModal from "@/components/question-bank/GenerateQuestionsModal";
 import QuestionSetsHeader from "@/components/question-bank/QuestionSetsHeader";

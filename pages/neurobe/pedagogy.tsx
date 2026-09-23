@@ -1276,7 +1276,7 @@ const Pedagogy = () => {
             <div
               onClick={() => {
                 const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                router.push(cid ? `/neurobe/question-bank?course_id=${cid}` : "/neurobe/question-bank");
+                router.push(cid ? `/neurobe/mcq-generation/bank?course_id=${cid}` : "/neurobe/mcq-generation/bank");
               }}
               className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
             >

@@ -133,7 +133,7 @@ const MyAssignedCourses = () => {
     } else if (nextAction.includes("cia")) {
       router.push(`/neurobe/cia-question-paper${buildQueryString()}`);
     } else if (nextAction.includes("bank")) {
-      router.push(`/neurobe/question-bank${buildQueryString()}`);
+      router.push(`/neurobe/mcq-generation/bank${buildQueryString()}`);
     } else if (nextAction.includes("pedagogy")) {
       router.push(`/neurobe/pedagogy${buildQueryString()}`);
     } else if (nextAction.includes("lesson")) {
