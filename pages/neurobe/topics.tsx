@@ -372,8 +372,6 @@ const Topics = () => {
     if (course_id) {
       getCourseDetails();
       restoreWorkflowState(course_id);
-    } else {
-      getUnits(1);
     }
   }, [course_id]);
 
@@ -442,16 +440,24 @@ const Topics = () => {
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
       const sid = res?.syllabus_id || res?.latest_syllabus?.id;
-      getUnits(sid);
+      if (sid) {
+        getUnits(sid);
+      } else {
+        setState({ loadingUnits: false });
+      }
     } catch (error: any) {
       console.log("error fetching course detail", error);
       Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      getUnits(1);
+      setState({ loadingUnits: false });
     }
   };
 
   const getUnits = async (syllabusId?: any, verNum?: number) => {
-    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id;
+    if (!sid) {
+      setState({ loadingUnits: false });
+      return;
+    }
     const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loadingUnits: true });
@@ -880,17 +886,17 @@ const Topics = () => {
       icon: <BookOpen className="h-5 w-5" />,
     },
     {
-      key: "approved",
-      label: "Approved Topics",
-      subLabel: "Ready for lesson plan",
-      count: totalApproved,
+      key: "subtopics",
+      label: "Total Subtopics",
+      subLabel: "Decomposed units",
+      count: computedTotalSubtopics,
       icon: <CheckCircle2 className="h-5 w-5" />,
     },
     {
-      key: "needs-review",
-      label: "Needs Review",
-      subLabel: "Pending approval",
-      count: displayNeedsReview,
+      key: "status",
+      label: "Hierarchy Status",
+      subLabel: state.topicsApproved ? "Approved for pedagogy" : "Pending stage approval",
+      count: state.topicsApproved ? "Approved" : "Draft",
       icon: <Hourglass className="h-5 w-5" />,
     },
     {
@@ -1353,18 +1359,22 @@ const Topics = () => {
     try {
       setState({ approvingTopics: true });
       try {
-        await Models.topics.approve_hierarchy(sid);
-      } catch (hierErr) {
-        console.warn("approve_hierarchy fallback to approve_topics:", hierErr);
         await Models.topics.approve_topics(sid, {});
+      } catch (hierErr) {
+        console.warn("approve_topics fallback to approve_hierarchy:", hierErr);
+        await Models.topics.approve_hierarchy(sid);
       }
       try {
         await Models.syllabus.approve_stage(course_id || sid, "hierarchy");
       } catch (e) {
         console.warn("approve_stage hierarchy warning:", e);
       }
-      Success("Topics approved successfully");
+      Success("Topic hierarchy approved successfully");
       setState({ topicsApproved: true });
+      if (sid) {
+        await getUnits(sid, loadedVersion);
+        await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
+      }
       if (course_id) {
         await restoreWorkflowState(course_id);
       }
@@ -1571,7 +1581,7 @@ const Topics = () => {
           asTag: true as const,
           className: "rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600",
         },
-        isTopicApproved
+        (isTopicApproved || state.topicsApproved)
           ? {
               key: "status",
               label: "Approved",
@@ -1580,11 +1590,9 @@ const Topics = () => {
             }
           : {
               key: "status",
-              label: "Needs Review",
-              asTag: false as const,
-              className:
-                "inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-500 hover:border-orange-400 hover:bg-orange-100 cursor-pointer",
-              onClick: () => openEditTopicModal(topicObj, "Approved"),
+              label: "Draft",
+              asTag: true as const,
+              className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
             },
         {
           key: "add-subtopic",
@@ -1600,7 +1608,7 @@ const Topics = () => {
           icon: <EditIcon className="h-3.5 w-3.5" />,
           className:
             "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
-          onClick: () => openEditTopicModal(topicObj, isTopicApproved ? "Approved" : "Needs Review"),
+          onClick: () => openEditTopicModal(topicObj),
         },
         {
           key: "delete",
@@ -1654,7 +1662,7 @@ const Topics = () => {
             asTag: true as const,
             className: "rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-[#000]",
           },
-          isApproved
+          (isApproved || state.topicsApproved)
             ? {
               key: "status",
               label: "Approved",
@@ -1663,11 +1671,9 @@ const Topics = () => {
             }
             : {
               key: "status",
-              label: "• Needs Review",
-              asTag: false as const,
-              className:
-                "inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-500 hover:border-orange-400 hover:bg-orange-100 cursor-pointer",
-              onClick: () => openEditTopicModal(subtopicObj, "Approved"),
+              label: "Draft",
+              asTag: true as const,
+              className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
             },
           {
             key: "edit",
@@ -1675,7 +1681,7 @@ const Topics = () => {
             icon: <EditIcon className="h-3.5 w-3.5" />,
             className:
               "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
-            onClick: () => openEditTopicModal(subtopicObj, isApproved ? "Approved" : "Needs Review"),
+            onClick: () => openEditTopicModal(subtopicObj),
           },
           {
             key: "delete",
@@ -1861,7 +1867,7 @@ const Topics = () => {
           }
           footerContent={
             state.topicsGenerated ? (
-              <><RefreshCw className="h-3 w-3" /> Review subtopics and approve each one. Click a Needs Review badge to approve.</>
+              <><Sparkles className="h-3.5 w-3.5 text-color2" /> Review generated topics and subtopics. Edit or add topics if needed, then click 'Approve Topics' to finalize the hierarchy.</>
             ) : (
               <><Sparkles className="h-4 w-4" /> {activeUnitDetail?.callout_message || "NEURO AI will use these approved syllabus topics to create a Unit -> Topic -> Subtopics structure."}</>
             )
@@ -1871,7 +1877,7 @@ const Topics = () => {
         {/* ── Footer ── */}
         {state.topicsGenerated ? (
           <PageFooter
-            content1={`Approved: ${totalApproved}/${computedTotalSubtopics} Topics`}
+            content1={state.topicsApproved ? "Status: Topics Hierarchy Approved" : `${totalTopics} Topics · ${computedTotalSubtopics} Subtopics`}
             content2={
               activeUnitDetail?.course_display_tag ||
               (state.courseDetail

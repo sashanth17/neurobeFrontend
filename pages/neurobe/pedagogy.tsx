@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { ArrowRight, Calendar, Check, EditIcon, FileText, HelpCircle, Hourglass, Lightbulb, Plus, Presentation, RefreshCw, ReplaceAll, Save, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, Calendar, Check, EditIcon, FileText, HelpCircle, Hourglass, Lightbulb, Plus, Presentation, RefreshCw, ReplaceAll, Save, Sparkles, Trash2 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Failure, Dropdown } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
@@ -120,8 +120,6 @@ const Pedagogy = () => {
     if (course_id) {
       getCourseDetails();
       restoreWorkflowState(course_id);
-    } else {
-      getUnits(1);
     }
   }, [course_id]);
 
@@ -218,8 +216,8 @@ const Pedagogy = () => {
       ? Math.min(100, Math.round((reviewedCourseTopics / totalCourseTopics) * 100))
       : 0;
 
-  // Complete review can ONLY be enabled when EVERY unit across the entire course has all its topics reviewed!
-  const allAccepted = Boolean(isEveryUnitReviewed && totalCourseTopics > 0);
+  // Enable stage approval when recommendations are generated or topics exist
+  const allAccepted = Boolean(state.recommendationsGenerated || totalCourseTopics > 0 || isEveryUnitReviewed);
 
   const toggleAccept = async (pedagogyId: number | string, topic?: any) => {
     const isCurrentlyAccepted =
@@ -384,16 +382,24 @@ const Pedagogy = () => {
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
       const sid = res?.syllabus_id || res?.latest_syllabus?.id;
-      getUnits(sid);
+      if (sid) {
+        getUnits(sid);
+      } else {
+        setState({ loadingUnits: false });
+      }
     } catch (error: any) {
       console.log("error fetching course detail", error);
       Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      getUnits();
+      setState({ loadingUnits: false });
     }
   };
 
   const getUnits = async (syllabusId?: any, verNum?: number) => {
-    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id;
+    if (!sid) {
+      setState({ loadingUnits: false });
+      return;
+    }
     const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loadingUnits: true });
@@ -823,11 +829,12 @@ const Pedagogy = () => {
       await Models.syllabus.approve_stage(course_id || sid, "pedagogy");
       Success("Pedagogy approved successfully");
       setState({ pedagogyApproved: true });
+      if (sid) {
+        await getUnits(sid, loadedVersion);
+        await getUnitDetail(sid, activeUnitNum, loadedVersion);
+      }
       if (course_id) {
         await restoreWorkflowState(course_id);
-      }
-      if (sid) {
-        await getUnitDetail(sid, activeUnitNum);
       }
     } catch (error: any) {
       console.error("approve_pedagogy error:", error);
@@ -938,12 +945,12 @@ const Pedagogy = () => {
         id: topicId,
         title: displayTitle,
         meta: `${level} · ${hours} Hours`,
-        collapsedBadge: topicHasSelection
-          ? { label: "Reviewed", className: "border border-green-200 bg-green-50 text-green-700 font-semibold" }
-          : { label: "Needs Review", className: "border border-orange-200 bg-orange-50 text-orange-600 font-semibold" },
-        expandedBadge: topicHasSelection
-          ? { label: "Reviewed", className: "border border-green-200 bg-green-50 text-green-700 font-semibold" }
-          : { label: "Needs Review", className: "border border-orange-200 bg-orange-50 text-orange-600 font-semibold" },
+        collapsedBadge: (state.pedagogyApproved || topicHasSelection)
+          ? { label: "Approved", className: "border border-green-200 bg-green-50 text-green-700 font-semibold" }
+          : { label: `${peds.length} Methods`, className: "border border-gray-200 bg-gray-50 text-gray-600 font-semibold" },
+        expandedBadge: (state.pedagogyApproved || topicHasSelection)
+          ? { label: "Approved", className: "border border-green-200 bg-green-50 text-green-700 font-semibold" }
+          : { label: `${peds.length} Methods`, className: "border border-gray-200 bg-gray-50 text-gray-600 font-semibold" },
         onAddItem: () => setAddModal({
           open: true,
           topicId: topic.id,
@@ -996,16 +1003,16 @@ const Pedagogy = () => {
   const STAT_TABS = [
     {
       key: "approved-topics",
-      label: "Approved Topics",
+      label: "Total Topics",
       count: totalCourseTopics,
-      icon: <Check className="h-5 w-5" />,
+      icon: <BookOpen className="h-5 w-5" />,
     },
     {
       key: "pedagogy-recommendations",
-      label: "Pending Pedagogy Recommendations",
-      subLabel: "Pending Pedagogy Recommendations",
-      count: pendingRecommendationsCount,
-      icon: <Hourglass className="h-5 w-5" />,
+      label: "Pedagogy Status",
+      subLabel: state.pedagogyApproved ? "Approved for lesson plan" : "Pending stage approval",
+      count: state.pedagogyApproved ? "Approved" : "Ready for Approval",
+      icon: <Check className="h-5 w-5" />,
     },
   ];
 
@@ -1319,7 +1326,7 @@ const Pedagogy = () => {
 
         {state.recommendationsGenerated ? (
           <PageFooter
-            content1={`Status: ${reviewedCourseTopics}/${totalCourseTopics} Topics Reviewed`}
+            content1={state.pedagogyApproved ? "Status: Pedagogy Approved" : `${totalCourseTopics} Topics · Teaching Methods Ready`}
             content2={
               state.courseDetail
                 ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
@@ -1342,12 +1349,10 @@ const Pedagogy = () => {
                       ? "Approving..."
                       : state.upstreamNotApproved
                       ? "Requires Topics Approval"
-                      : !allAccepted
-                      ? `Complete Pedagogy Review (${reviewedCourseTopics}/${totalCourseTopics} Reviewed)`
-                      : (activeUnitDetail?.bottom_bar?.actions?.approve?.label || "Complete Pedagogy Review"),
+                      : (activeUnitDetail?.bottom_bar?.actions?.approve?.label || "Approve Pedagogy"),
                     icon: state.approvingPedagogy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
                     onClick: handleApprovePedagogy,
-                    disabled: !allAccepted || state.approvingPedagogy || state.upstreamNotApproved,
+                    disabled: state.approvingPedagogy || state.upstreamNotApproved,
                   }
             }
             actionBtn2={{
