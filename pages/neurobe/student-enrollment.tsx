@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useDispatch } from "react-redux";
+import { useRouter } from "next/router";
 import { Users, Upload, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
+import { useSetState, Success, Failure, showDeleteAlert, getAuthUser, isCreatedByCurrentUser } from "@/utils/function.utils";
 import IconPlus from "@/components/Icon/IconPlus";
 import IconSearch from "@/components/Icon/IconSearch";
 import PageHeader from "@/components/common-components/PageHeader";
@@ -11,6 +12,7 @@ import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import TextInput from "@/components/FormFields/TextInput.component";
 import PrivateRouter from "@/hook/privateRouter";
 import { EnrollStudentsModal, EnrollableStudent } from "@/components/academic-setup/AddModals";
+import { BulkEnrollmentUploadModal } from "@/components/course-offering/BulkEnrollmentUploadModal";
 import Models from "@/imports/models.import";
 
 const STATUS_OPTIONS = [
@@ -21,6 +23,7 @@ const STATUS_OPTIONS = [
 
 const StudentEnrollment = () => {
   const dispatch = useDispatch();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [state, setState] = useSetState({
@@ -35,6 +38,7 @@ const StudentEnrollment = () => {
   });
 
   const [enrollModal, setEnrollModal] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   useEffect(() => {
     dispatch(setPageTitle("Student Enrollment"));
@@ -52,16 +56,27 @@ const StudentEnrollment = () => {
   const fetchCourseInstances = async () => {
     try {
       setState({ loading: true });
+      const authUser = getAuthUser();
       const res: any = await Models.course_instance.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      let list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      if (!authUser.is_admin) {
+        list = list.filter((item: any) => isCreatedByCurrentUser(item, authUser));
+      }
       const options = list.map((item: any) => ({
         value: item.id,
         label: item.course_instance_name || `${item.course_code || "Course"} - Sec ${item.section || "A"} (Sem ${item.semester || 1})`,
         data: item,
       }));
+
+      const queryInstanceId = router.query.instance_id;
+      let matched = null;
+      if (queryInstanceId) {
+        matched = options.find((o: any) => String(o.value) === String(queryInstanceId));
+      }
+
       setState({
         courseInstances: options,
-        selectedInstance: options.length > 0 ? options[0] : null,
+        selectedInstance: matched || (options.length > 0 ? options[0] : null),
         loading: false,
       });
     } catch (error) {
@@ -89,6 +104,7 @@ const StudentEnrollment = () => {
       const activeOffering = state.selectedInstance?.data;
       const params: any = {};
       if (activeOffering?.department_id) params.department_id = activeOffering.department_id;
+      if (activeOffering?.course_id) params.exclude_course_id = activeOffering.course_id;
 
       const res: any = await Models.course_enrollment.getAvailableStudents(params);
       const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
@@ -333,12 +349,12 @@ const StudentEnrollment = () => {
           <div className="flex items-center gap-2 pt-5">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={state.uploading || !state.selectedInstance?.value}
+              onClick={() => setBulkModalOpen(true)}
+              disabled={!state.selectedInstance?.value}
               className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-[#000] hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
             >
               <Upload className="h-4 w-4 text-color2" />
-              {state.uploading ? "Importing…" : "Import Excel (.xlsx)"}
+              Import Excel / CSV
             </button>
           </div>
         </div>
@@ -392,6 +408,21 @@ const StudentEnrollment = () => {
         courseTitle={state.selectedInstance?.data?.course_instance_name || state.selectedInstance?.label || "Offering"}
         availableStudents={state.availableStudents}
         onEnroll={handleBatchEnroll}
+      />
+
+      {/* Bulk Upload with Validation Modal */}
+      <BulkEnrollmentUploadModal
+        open={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        courseInstanceId={state.selectedInstance?.value}
+        courseId={state.selectedInstance?.data?.course_id}
+        courseName={state.selectedInstance?.label}
+        onSuccess={() => {
+          if (state.selectedInstance?.value) {
+            fetchEnrolledStudents(state.selectedInstance.value);
+            fetchAvailableStudents();
+          }
+        }}
       />
     </div>
   );

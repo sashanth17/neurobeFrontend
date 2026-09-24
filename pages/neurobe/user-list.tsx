@@ -54,7 +54,7 @@ const UserList = () => {
     showBulkModal: false,
     editRow: null as any,
     page: 1,
-    userList: null as any[] | null,
+    userList: [] as any[],
     departmentList: null as any[] | null,
     programmeList: null as any[] | null,
     batchList: null as any[] | null,
@@ -167,7 +167,7 @@ const UserList = () => {
       setState({ userList: list, loading: false });
     } catch (error) {
       console.log("user list error", error);
-      setState({ loading: false });
+      setState({ userList: [], loading: false });
     }
   };
 
@@ -265,7 +265,7 @@ const UserList = () => {
   };
 
   // ── Filter Records ─────────────────────────────────────────────────────────
-  const userList = state.userList !== null ? state.userList : MOCK_USERS;
+  const userList = state.userList || [];
   const records = userList.filter((r: any) => {
     const s = state.search.toLowerCase();
     const fullName = (r.first_name ? `${r.first_name} ${r.last_name || ""}` : r.name || "").toLowerCase();

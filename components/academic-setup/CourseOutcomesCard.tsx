@@ -15,43 +15,10 @@ export interface CourseOutcomesCardProps {
   className?: string;
 }
 
-const DEFAULT_OUTCOMES: CourseOutcomeItemProps[] = [
-  {
-    id: "co1",
-    coCode: "CO1",
-    statement: "Understand network architectures, reference models and physical-layer fundamentals.",
-    knowledgeLevel: "K2",
-  },
-  {
-    id: "co2",
-    coCode: "CO2",
-    statement: "Analyze data-link protocols, framing, error control and medium-access techniques.",
-    knowledgeLevel: "K4",
-  },
-  {
-    id: "co3",
-    coCode: "CO3",
-    statement: "Apply IP addressing, subnetting and routing concepts.",
-    knowledgeLevel: "K3",
-  },
-  {
-    id: "co4",
-    coCode: "CO4",
-    statement: "Explain transport-layer protocols and mechanisms.",
-    knowledgeLevel: "K2",
-  },
-  {
-    id: "co5",
-    coCode: "CO5",
-    statement: "Explain application-layer protocols and services.",
-    knowledgeLevel: "K2",
-  },
-];
-
 const CourseOutcomesCard: React.FC<CourseOutcomesCardProps> = ({
   title = "COURSE OUTCOMES",
-  approvedCountText = "5 Approved Statements",
-  outcomes = DEFAULT_OUTCOMES,
+  approvedCountText,
+  outcomes = [],
   coverageUnitsText = "5 Units",
   coverageTheoryHoursText = "45 Theory Hours",
   coverageLabHoursText = "30 Lab Hours",
@@ -59,6 +26,7 @@ const CourseOutcomesCard: React.FC<CourseOutcomesCardProps> = ({
   isCopoView = false,
   className = "",
 }) => {
+  const displayCount = approvedCountText || `${outcomes.length} Approved Statement${outcomes.length === 1 ? "" : "s"}`;
   return (
     <div
       className={`rounded-3xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 ${className}`}
@@ -70,20 +38,26 @@ const CourseOutcomesCard: React.FC<CourseOutcomesCardProps> = ({
           <span className="text-md font-bold">{title}</span>
         </div>
         <span className="text-xs font-bold text-color2 dark:text-purple-400">
-          {approvedCountText}
+          {displayCount}
         </span>
       </div>
 
       {/* Outcome Cards List using CourseOutcomeItem inner sub-component */}
       <div className="space-y-3">
-        {outcomes.map((co) => (
-          <CourseOutcomeItem
-            key={co.id || co.coCode}
-            coCode={co.coCode}
-            statement={co.statement}
-            knowledgeLevel={co.knowledgeLevel}
-          />
-        ))}
+        {outcomes.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            No approved course outcomes available for this course.
+          </div>
+        ) : (
+          outcomes.map((co) => (
+            <CourseOutcomeItem
+              key={co.id || co.coCode}
+              coCode={co.coCode}
+              statement={co.statement}
+              knowledgeLevel={co.knowledgeLevel}
+            />
+          ))
+        )}
       </div>
 
       {/* Bottom Footer Bar */}

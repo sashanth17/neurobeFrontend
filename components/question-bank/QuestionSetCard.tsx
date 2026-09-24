@@ -34,15 +34,14 @@ const QuestionSetCard = ({
     <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
 
     <div className="flex flex-col gap-4 p-5">
-      {/* Unit badge + date */}
+      {/* Badge + date */}
       <div className="flex items-center justify-between">
         <span
-          className="rounded-lg px-3 py-1 text-xs font-semibold"
-          style={{ backgroundColor: unitColor, color: accentColor }}
+          className="rounded-lg px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
         >
-          {unit}
+          Question Set
         </span>
-        <div className="flex items-center gap-1.5 text-xs text-[#000]">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
           <Calendar className="h-3.5 w-3.5" />
           {date}
         </div>

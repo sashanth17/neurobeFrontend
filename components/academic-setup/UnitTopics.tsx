@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trash2, Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { capitalizeFLetter } from "@/utils/function.utils";
 
 interface Topic {
@@ -22,9 +22,11 @@ interface UnitTopicsProps {
     body: { topic_code: string; topic_name: string ,learning_sequence:any}
   ) => Promise<void>;
   onDeleteTopic?: any;
+  onUpdateHours?: (unitId: number, hours: number) => Promise<void>;
+  onUpdateUnitTitle?: (unitId: number, title: string) => Promise<void>;
 }
 
-const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
+const UnitTopics = ({ data, onAddTopic, onDeleteTopic, onUpdateHours, onUpdateUnitTitle }: UnitTopicsProps) => {
   const [units, setUnits] = useState<Unit[]>(data || []);
   console.log("✌️data --->", data);
 
@@ -44,7 +46,7 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
     if (data && data.length > 0) setUnits(data);
   }, [data]);
 
-  const totalHours = units.reduce((sum, u) => sum + (u.hours || 0), 0);
+  const totalHours = units.reduce((sum, u: any) => sum + Number(u.theory_hours ?? u.hours ?? 0), 0);
 
   const openModal = (unit: any) => {
     setTopicCode("");
@@ -93,10 +95,30 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
     );
   };
 
-  const updateHours = (unitNumber: number, hours: number) => {
-    setUnits((prev) =>
-      prev.map((u) => (u.unitNumber === unitNumber ? { ...u, hours } : u))
+  const updateHours = (unit: any, hours: number) => {
+    setUnits((prev: any) =>
+      prev.map((u: any) =>
+        u.id === unit.id || (unit.unit_number && u.unit_number === unit.unit_number)
+          ? { ...u, theory_hours: hours, hours }
+          : u
+      )
     );
+    if (onUpdateHours && unit.id != null) {
+      onUpdateHours(unit.id, hours);
+    }
+  };
+
+  const updateTitle = (unit: any, title: string) => {
+    setUnits((prev: any) =>
+      prev.map((u: any) =>
+        u.id === unit.id || (unit.unit_number && u.unit_number === unit.unit_number)
+          ? { ...u, unit_title: title, title }
+          : u
+      )
+    );
+    if (onUpdateUnitTitle && unit.id != null) {
+      onUpdateUnitTitle(unit.id, title);
+    }
   };
 
   if (!units || units.length === 0) {
@@ -218,49 +240,33 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
                   Unit {String(unit.unit_number).padStart(2, "0")}
                 </span>
                 <input
-                  value={unit.unit_title}
-                  onChange={(e) =>
-                    setUnits((prev) =>
-                      prev.map((u: any) =>
-                        u.unit_number === unit.unit_number
-                          ? { ...u, title: e.target.value }
-                          : u
-                      )
-                    )
-                  }
-                  size={unit.unit_title?.length || 1}
+                  value={unit.unit_title ?? unit.title ?? ""}
+                  onChange={(e) => updateTitle(unit, e.target.value)}
+                  size={unit.unit_title?.length || unit.title?.length || 1}
                   className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-[#000] outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                 />
                 <div className="ml-auto flex shrink-0 items-center gap-2">
-                  <span className="text-pri text-sm">Hours:</span>
+                  <span className="text-pri text-sm font-semibold">Hours:</span>
                   <input
-                    disabled
                     type="number"
-                    value={
-                      unit.theory_hours + unit?.syllabus_id + unit?.lab_hours
-                    }
+                    min="0"
+                    value={Number(unit.theory_hours ?? unit.hours ?? 0)}
                     onChange={(e) =>
-                      updateHours(unit.unitNumber, Number(e.target.value))
+                      updateHours(unit, Math.max(0, Number(e.target.value)))
                     }
-                    className="w-14 rounded-lg border border-gray-200 py-1.5 text-center text-sm font-bold tabular-nums text-[#000] [appearance:textfield] dark:border-gray-600 dark:bg-gray-800 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-center text-sm font-bold tabular-nums text-[#000] focus:border-color2 focus:ring-1 focus:ring-color2 outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
               </div>
 
-              {/* Topics header */}
+              {/* Topics header — read-only in Syllabus units view */}
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-md text-color1 py-1 font-extrabold uppercase tracking-wide dark:text-gray-300">
                   Topics ({unit.topics?.length ?? 0})
                 </span>
-                <button
-                  onClick={() => openModal( unit)}
-                  className="text-green flex items-center gap-1 text-sm font-semibold hover:text-green-700"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Topic
-                </button>
               </div>
 
-              {/* Topic list */}
+              {/* Topic list — display only */}
               <div className="space-y-2">
                 {unit.topics?.map((topic, index) => (
                   <div
@@ -273,12 +279,6 @@ const UnitTopics = ({ data, onAddTopic, onDeleteTopic }: UnitTopicsProps) => {
                     <span className="flex-1 text-sm text-[#000] dark:text-gray-300">
                       {topic.topic_name}
                     </span>
-                    <button
-                      onClick={() => deleteTopic(unit.unitNumber, topic.id)}
-                      className="text-color1 hover:text-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </div>
                 ))}
               </div>

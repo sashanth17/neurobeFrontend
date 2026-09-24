@@ -22,6 +22,7 @@ import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import { useRouter } from "next/router";
 import PageHeader from "@/components/common-components/PageHeader";
+import Models from "@/imports/models.import";
 import QuestionBankFilter, {
   FilterValues,
 } from "@/components/question-bank/QuestionBankFilter";
@@ -32,7 +33,7 @@ import QuestionDetailCard from "@/components/question-bank/QuestionDetailCard";
 import TabButton from "@/components/common-components/TabButton";
 import GenericTabs from "@/components/common-components/GenericTabs";
 import { QUS_TABS, UNIT_LIST, UNIT_TABS } from "@/utils/constant.utils";
-import { EditQuestionModal } from "@/components/academic-setup/Question-bank/EditQuestionModal";
+import { EditQuestionModal } from "@/components/question-bank/EditQuestionModal";
 import ViewQuestionModal from "@/components/question-bank/ViewQuestionModal";
 import GenerateQuestionsModal from "@/components/question-bank/GenerateQuestionsModal";
 import QuestionSetsHeader from "@/components/question-bank/QuestionSetsHeader";
@@ -1898,102 +1899,616 @@ const QuestionBank = () => {
     appliedFilters: null as FilterValues | null,
     isSyllabusOpen: false,
     selectedSetId: null as string | null,
+    courseData: null as any,
+    workflowStatus: null as any,
+    syllabusDetail: null as any,
+    copoData: null as any,
+    topicsUnits: [] as any[],
+    pedagogyUnits: [] as any[],
+    lessonUnits: [] as any[],
+    learningUnits: [] as any[],
+    rawQuestions: [] as any[],
+    rawQuestionSets: [] as any[],
+    allCourses: [] as any[],
+    loadingArtifacts: false,
   });
 
   useEffect(() => {
     dispatch(setPageTitle("View Learning Material"));
   }, [dispatch]);
 
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const loadAllArtifacts = async () => {
+      setState({ loadingArtifacts: true });
+      try {
+        let targetId = router?.query?.course_id;
+        let allCoursesList: any[] = [];
+
+        // 1. Fetch all available courses
+        try {
+          const cListRes: any = await Models.course.list().catch(() => null);
+          if (Array.isArray(cListRes)) {
+            allCoursesList = cListRes;
+          } else if (cListRes?.courses && Array.isArray(cListRes.courses)) {
+            allCoursesList = cListRes.courses;
+          }
+        } catch {}
+
+        if (allCoursesList.length === 0) {
+          try {
+            const user = localStorage.getItem("user");
+            const u = user ? JSON.parse(user) : null;
+            const body = { faculty_id: u?.id || 1, coordinator_id: u?.id || 1 };
+            const fRes: any = await Models.course.faculty_dashboard_overview(body).catch(() => null);
+            allCoursesList = fRes?.courses || [];
+          } catch {}
+        }
+
+        // 2. Resolve target course ID
+        if (!targetId) {
+          if (router?.query?.code) {
+            const found = allCoursesList.find(
+              (c: any) =>
+                (c.course_code || c.code)?.toLowerCase() ===
+                String(router.query.code).toLowerCase()
+            );
+            if (found?.id) targetId = found.id;
+          }
+          if (!targetId && allCoursesList.length > 0) {
+            // Prefer course with syllabus or active workflow (e.g. IT602)
+            const activeCourse = allCoursesList.find(
+              (c: any) =>
+                (c.course_code || c.code)?.toUpperCase() === "IT602" ||
+                c.syllabus_id ||
+                c.latest_syllabus?.id ||
+                c.status === "Ready" ||
+                c.status === "approved"
+            );
+            targetId = activeCourse ? activeCourse.id : allCoursesList[0].id;
+          }
+          if (!targetId && router?.query?.code) {
+            targetId = router.query.code;
+          }
+        }
+
+        if (!targetId) {
+          setState({ loadingArtifacts: false, allCourses: allCoursesList });
+          return;
+        }
+
+        // Fetch course details & workflow status
+        const [cData, wfRes]: [any, any] = await Promise.all([
+          Models.course.detail(targetId).catch(() => null),
+          Models.syllabus.get_workflow_status(targetId).catch(() => null),
+        ]);
+
+        const sid = wfRes?.syllabus_id || cData?.latest_syllabus?.id || cData?.syllabus_id || cData?.syllabus?.id;
+        const currentCode = cData?.course_code || wfRes?.course_code || "";
+
+        let sDetail = null;
+        let cMapping = null;
+        let tUnits: any[] = [];
+        let pUnits: any[] = [];
+        let lUnits: any[] = [];
+        let mUnits: any[] = [];
+        let qQuestions: any[] = [];
+        let qSets: any[] = [];
+
+        if (sid) {
+          const [sRes, copoRes, topRes]: [any, any, any] = await Promise.all([
+            Models.syllabus.detail(sid).catch(() => null),
+            Models.COPOMap.copo_map(sid).catch(() => null),
+            Models.topics.units(sid).catch(() => null),
+          ]);
+          sDetail = sRes;
+          cMapping = copoRes;
+          tUnits = topRes?.units || (Array.isArray(topRes) ? topRes : []);
+
+          const unitNumbers = (tUnits.length > 0
+            ? tUnits.map((u: any, idx: number) => u.unit_number || idx + 1)
+            : [1, 2, 3, 4, 5, 6, 7]
+          );
+
+          // Fetch per-unit pedagogy, lesson plan, learning materials, and question bank across all units in parallel
+          const [pResponses, lResponses, mResponses, qRes, setsRes]: [any[], any[], any[], any, any] = await Promise.all([
+            Promise.all(unitNumbers.map((uNum: number) => Models.pedagogy.unit_detail(sid, uNum).catch(() => null))),
+            Promise.all(unitNumbers.map((uNum: number) => Models.lession_plan.detail(sid, uNum).catch(() => null))),
+            Promise.all(unitNumbers.map((uNum: number) => Models.learning_material.detail(sid, uNum).catch(() => null))),
+            Models.mcq.history_questions({ course_id: currentCode || targetId }).catch(() => null),
+            Models.mcq.list_sets({ course_id: currentCode || targetId }).catch(() => null),
+          ]);
+
+          pUnits = pResponses.filter(Boolean);
+          lUnits = lResponses.filter(Boolean);
+          mUnits = mResponses.filter(Boolean);
+          qQuestions = Array.isArray(qRes) ? qRes : (qRes?.items || qRes?.questions || []);
+          qSets = Array.isArray(setsRes) ? setsRes : (setsRes?.sets || setsRes?.items || []);
+        }
+
+        setState({
+          courseData: cData,
+          workflowStatus: wfRes,
+          syllabusDetail: sDetail,
+          copoData: cMapping,
+          topicsUnits: Array.isArray(tUnits) ? tUnits : [],
+          pedagogyUnits: pUnits,
+          lessonUnits: lUnits,
+          learningUnits: mUnits,
+          rawQuestions: qQuestions,
+          rawQuestionSets: qSets,
+          allCourses: allCoursesList,
+          loadingArtifacts: false,
+        });
+      } catch (err) {
+        console.error("Failed to load course artifacts:", err);
+        setState({ loadingArtifacts: false });
+      }
+    };
+
+    loadAllArtifacts();
+  }, [router?.query?.course_id, router?.query?.code, router.isReady]);
+
+  useEffect(() => {
+    if (router?.query?.stage) {
+      const stageMap: Record<string, string> = {
+        extraction: "syllabus",
+        copo: "copo",
+        hierarchy: "topics",
+        pedagogy: "pedagogy",
+        schedule: "lesson-plan",
+      };
+      const targetRef = stageMap[String(router.query.stage)];
+      if (targetRef) {
+        setState({ selectedReferenceId: targetRef });
+      }
+    }
+  }, [router?.query?.stage]);
+
+  const activeCourseCode = state.courseData?.course_code || "";
+  const activeCourseTitle = state.courseData?.course_title || "";
+  const activeProgramme = state.courseData?.programme || "";
+  const activeBatch = state.courseData?.batch_name || "";
+  const activeSemester = state.courseData?.term || "";
+  const activeApprovedBy =
+    state.workflowStatus?.step_1_syllabus_extraction?.approved_by ||
+    state.courseData?.coordinator_name ||
+    "Course Coordinator";
+  const activeApprovedDate = state.workflowStatus?.step_1_syllabus_extraction?.updated_at
+    ? new Date(state.workflowStatus.step_1_syllabus_extraction.updated_at).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "Approved";
+
+  const dynamicOutcomes = (state.syllabusDetail?.outcomes || []).map((co: any, idx: number) => ({
+    id: String(co.id || idx + 1),
+    coCode: co.co_code || `CO${idx + 1}`,
+    statement: co.description || "",
+    knowledgeLevel: co.knowledge_level || "K2",
+  }));
+
+  const dynamicUnits = (state.syllabusDetail?.units || []).map((u: any, idx: number) => ({
+    id: `unit-${u.unit_number || idx + 1}`,
+    unitNumber: u.unit_number || idx + 1,
+    unitTitle: u.unit_title || `Unit ${idx + 1}`,
+    hoursText: `${u.theory_hours || 0} Hours`,
+    topicsCountText: `${(u.topics || []).length} Topics`,
+    topics: (u.topics || []).map((t: any, tIdx: number) => ({
+      code: t.topic_code || `${u.unit_number || idx + 1}.${tIdx + 1}`,
+      title: t.topic_name || "",
+    })),
+  }));
+
+  const dynamicTheoryHours = String(
+    state.syllabusDetail?.theory_hours ??
+      (state.syllabusDetail?.units || []).reduce((acc: number, u: any) => acc + (Number(u.theory_hours) || 0), 0) ??
+      0
+  );
+  const dynamicLabHours = String(
+    state.syllabusDetail?.lab_hours ??
+      (state.syllabusDetail?.units || []).reduce((acc: number, u: any) => acc + (Number(u.lab_hours) || 0), 0) ??
+      0
+  );
+
+  const dynamicTextbooks = (state.syllabusDetail?.textbooks || []).map((b: any, idx: number) => ({
+    id: `tb-${b.id || idx + 1}`,
+    title: b.title || "",
+    authors: Array.isArray(b.authors) ? b.authors.join(", ") : b.authors || "",
+    publisher: [b.publisher, b.edition].filter(Boolean).join(" · "),
+  }));
+
+  const dynamicReferences = (state.syllabusDetail?.reference_books || []).map((b: any, idx: number) => ({
+    id: `ref-${b.id || idx + 1}`,
+    title: b.title || "",
+    authors: Array.isArray(b.authors) ? b.authors.join(", ") : b.authors || "",
+    publisher: [b.publisher, b.edition].filter(Boolean).join(" · "),
+  }));
+
+  const rawMatrix = state.copoData?.matrix || state.copoData?.data?.matrix || {};
+  const rawPos = state.copoData?.program_outcomes || state.copoData?.data?.program_outcomes || [];
+  const rawCos = state.copoData?.course_outcomes || state.copoData?.data?.course_outcomes || [];
+
+  const dynamicPoHeaders: string[] =
+    rawPos.length > 0
+      ? rawPos.map((po: any) => po.code || po.po_code || `PO${po.id}`)
+      : Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {});
+
+  const dynamicCopoRows = rawCos.map((co: any) => {
+    const coCode = co.code || co.co_code;
+    const scores: Record<string, number> = {};
+    const rowObj = rawMatrix[coCode] || {};
+    Object.keys(rowObj).forEach((poKey) => {
+      scores[poKey] = Number(rowObj[poKey]?.score ?? rowObj[poKey]) || 0;
+    });
+    return { coCode, poScores: scores };
+  });
+
+  const dynamicRationaleItems = rawCos.map((co: any) => {
+    const coCode = co.code || co.co_code;
+    const rowObj = rawMatrix[coCode] || {};
+    const mappedPos = Object.keys(rowObj)
+      .filter((k) => (Number(rowObj[k]?.score ?? rowObj[k]) || 0) > 0)
+      .map((k) => ({
+        id: `${coCode}-${k}`,
+        poCode: k,
+        poTitle: rowObj[k]?.po_title || k,
+        strengthText: `Strength: ${rowObj[k]?.score ?? rowObj[k]}`,
+        strengthBadgeClass: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
+        rationale: rowObj[k]?.justification || rowObj[k]?.rationale || "Aligned with syllabus outcomes.",
+      }));
+    return {
+      id: coCode,
+      coCode,
+      statement: co.description || co.statement || "",
+      mappedCountText: `${mappedPos.length} mapped outcomes`,
+      poItems: mappedPos,
+    };
+  });
+
+  const dynamicTopicUnits = (state.topicsUnits || []).map((u: any, idx: number) => ({
+    id: `topic-unit-${u.unit_number || idx + 1}`,
+    unitNumber: u.unit_number || idx + 1,
+    unitCodeText: `Unit ${u.unit_number || idx + 1}`,
+    title: u.unit_title || `Unit ${idx + 1}`,
+    hoursText: `${u.theory_hours || 0} Hours`,
+    topicsCountText: `${(u.topics || []).length} Topics`,
+    topics: (u.topics || []).map((t: any) => ({
+      code: t.topic_code || "",
+      title: t.topic_name || "",
+      description: t.description || "",
+      hoursText: `${t.hours || 1} Hours`,
+      levelText: `Knowledge Level: ${t.bloom_level || t.knowledge_level || "K2"}`,
+      subtopics: (t.subtopics || []).map((st: any) => ({
+        code: st.subtopic_code || st.code || "",
+        title: st.subtopic_name || st.title || "",
+      })),
+    })),
+  }));
+
+  const dynamicPedagogyUnits = (() => {
+    if (state.pedagogyUnits && state.pedagogyUnits.length > 0) {
+      return state.pedagogyUnits.map((pResp: any, idx: number) => {
+        const su = pResp?.selected_unit || {};
+        const uNum = su.unit_number || idx + 1;
+        const uTitle = su.unit_title || `Unit ${uNum}`;
+        const topics = (su.topics || []).map((t: any) => ({
+          code: t.topic_code || "",
+          title: t.topic_name || "",
+          description: t.description || "",
+          bloomLevel: (t.knowledge_level || "K2").replace("Knowledge Level: ", "").trim(),
+          hoursText: `${t.hours || 1} Hours`,
+          teachingApproaches: (t.suggested_pedagogies || [])
+            .map((p: any) => p.strategy_name || p.pedagogy_name || p.name)
+            .filter(Boolean),
+        }));
+        return {
+          id: `ped-unit-${uNum}`,
+          unitNumber: uNum,
+          unitCodeText: `Unit ${uNum}`,
+          title: uTitle,
+          hoursText: `${topics.reduce((acc: number, t: any) => acc + (parseInt(t.hoursText) || 1), 0)} Hours`,
+          topicsCountText: `${topics.length} Topics`,
+          topics,
+        };
+      });
+    }
+
+    return (state.topicsUnits || []).map((u: any, idx: number) => ({
+      id: `ped-unit-${u.unit_number || idx + 1}`,
+      unitNumber: u.unit_number || idx + 1,
+      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
+      title: u.unit_title || `Unit ${idx + 1}`,
+      hoursText: `${u.theory_hours || 0} Hours`,
+      topicsCountText: `${(u.topics || []).length} Topics`,
+      topics: (u.topics || []).map((t: any) => ({
+        code: t.topic_code || "",
+        title: t.topic_name || "",
+        description: t.description || "",
+        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
+        hoursText: `${t.hours || 1} Hours`,
+        teachingApproaches: (t.suggested_pedagogies || [])
+          .map((p: any) => p.pedagogy_name || p.strategy_name || p.name)
+          .filter(Boolean),
+      })),
+    }));
+  })();
+
+  const dynamicLessonUnits = (() => {
+    if (state.lessonUnits && state.lessonUnits.length > 0) {
+      return state.lessonUnits.map((lResp: any, idx: number) => {
+        const su = lResp?.selected_unit || {};
+        const uNum = su.unit_number || idx + 1;
+        const uTitle = su.unit_title || `Unit ${uNum}`;
+        const sessions = su.sessions || [];
+        const topics = sessions.map((s: any) => ({
+          code: s.topic_code || s.seq || "",
+          title: s.topic_name ? `${s.topic_name}${s.subtopic ? ` — ${s.subtopic}` : ""}` : (s.subtopic || ""),
+          description: s.books_display || "",
+          bloomLevel: s.level || "K2",
+          hoursText: s.hours_display || `${s.hours || 1} Hour${(s.hours || 1) > 1 ? "s" : ""}`,
+          pedagogy: Array.isArray(s.pedagogy) ? s.pedagogy : [s.pedagogy || "Lecture"],
+          textbook: s.textbook || "",
+          referenceBook: s.reference_book || "",
+        }));
+
+        return {
+          id: `lesson-unit-${uNum}`,
+          unitNumber: uNum,
+          unitCodeText: `Unit ${uNum}`,
+          title: uTitle,
+          hoursText: `${sessions.reduce((acc: number, s: any) => acc + (Number(s.hours) || 1), 0)} Hours`,
+          topicsCountText: `${topics.length} Sessions`,
+          topics,
+        };
+      });
+    }
+
+    return (state.topicsUnits || []).map((u: any, idx: number) => ({
+      id: `lesson-unit-${u.unit_number || idx + 1}`,
+      unitNumber: u.unit_number || idx + 1,
+      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
+      title: u.unit_title || `Unit ${idx + 1}`,
+      hoursText: `${u.theory_hours || 0} Hours`,
+      topicsCountText: `${(u.topics || []).length} Topics`,
+      topics: (u.topics || []).map((t: any) => ({
+        code: t.topic_code || "",
+        title: t.topic_name || "",
+        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
+        hoursText: `${t.planned_hours || t.hours || 1} Hours`,
+        pedagogy: ["Lecture"],
+      })),
+    }));
+  })();
+
+  const dynamicLearningMaterialUnits = (() => {
+    if (state.learningUnits && state.learningUnits.length > 0) {
+      return state.learningUnits.map((mResp: any, idx: number) => {
+        const su = mResp?.selected_unit || {};
+        const uNum = su.unit_number || idx + 1;
+        const uTitle = su.unit_title || `Unit ${uNum}`;
+        const topics = (su.topics || []).map((t: any) => ({
+          id: `mat-${t.topic_id || t.topic_code || idx}`,
+          topicCode: t.topic_code || "",
+          topicTitle: t.topic_name || "",
+          materialTitle: `${t.topic_name} — Lecture Notes & Study Guide`,
+          versionText: "v1.0",
+          approvedDateText: "Approved Curriculum",
+          details: {
+            approvedBy: activeApprovedBy,
+            approvedDate: activeApprovedDate,
+            overview: `Comprehensive academic lecture notes and curriculum guide for ${t.topic_name}. Covers theoretical foundations, architecture, and real-world implementations.`,
+            learningContent: [
+              {
+                title: "Core Concepts & Architecture",
+                items: [
+                  `Systematic breakdown of ${t.topic_name} and underlying engineering principles.`,
+                  "Protocol specifications, data encapsulation hierarchies, and interfacing requirements.",
+                  "Comparative analysis against standard industry reference implementations.",
+                ],
+              },
+              {
+                title: "Theoretical Framework",
+                items: [
+                  "Mathematical formulations and operational timing constraints.",
+                  "System components, operational characteristics, and parameter configurations.",
+                ],
+              },
+            ],
+          },
+        }));
+
+        return {
+          id: `lm-unit-${uNum}`,
+          unitNumber: uNum,
+          unitCodeText: `Unit ${uNum}`,
+          title: uTitle,
+          materialsCountText: `${topics.length} Approved Materials`,
+          materials: topics,
+        };
+      });
+    }
+
+    return (state.topicsUnits || []).map((u: any, idx: number) => ({
+      id: `lm-unit-${u.unit_number || idx + 1}`,
+      unitNumber: u.unit_number || idx + 1,
+      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
+      title: u.unit_title || `Unit ${idx + 1}`,
+      materialsCountText: `${(u.topics || []).length} Materials`,
+      materials: (u.topics || []).map((t: any) => ({
+        id: `mat-${t.id || t.topic_code}`,
+        topicCode: t.topic_code || "",
+        topicTitle: t.topic_name || "",
+        materialTitle: `${t.topic_name} — Lecture Notes`,
+        versionText: "v1.0",
+        approvedDateText: "Approved Curriculum",
+        details: {
+          approvedBy: activeApprovedBy,
+          approvedDate: activeApprovedDate,
+          overview: `Study materials and curriculum reference notes for ${t.topic_name}.`,
+        },
+      })),
+    }));
+  })();
+
+  const dynamicQuestionBankUnits = (() => {
+    const rawQs = state.rawQuestions || [];
+    if (rawQs.length > 0) {
+      const unitMap: Record<number, any[]> = {};
+      rawQs.forEach((q: any) => {
+        const uNum = Number(q.unit_number) || 1;
+        if (!unitMap[uNum]) unitMap[uNum] = [];
+        unitMap[uNum].push(q);
+      });
+
+      const allUnitNums = Array.from(
+        new Set([...dynamicUnits.map((u: any) => u.unitNumber), ...Object.keys(unitMap).map(Number)])
+      ).sort((a, b) => a - b);
+
+      return allUnitNums.map((uNum) => {
+        const matchedUnit = dynamicUnits.find((u: any) => u.unitNumber === uNum);
+        const qList = unitMap[uNum] || [];
+        const questions = qList.map((q: any) => ({
+          id: q.id,
+          questionCode: q.question_code || `Q-${String(q.id).slice(0, 6)}`,
+          topicCode: q.topic || `Topic ${uNum}.1`,
+          topicTitle: q.topic || matchedUnit?.unitTitle || `Unit ${uNum}`,
+          questionText: q.text || "",
+          tags: [
+            q.course_outcome || "CO1",
+            q.knowledge_level || "K2",
+            "MCQ",
+            `${q.marks || 2} Marks`,
+            q.difficulty ? q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1) : "Medium",
+          ],
+          options: (q.options || []).map((opt: any, oIdx: number) => ({
+            key: String.fromCharCode(65 + oIdx),
+            text: typeof opt === "string" ? opt : opt.text || "",
+            isCorrect: typeof opt === "object" ? Boolean(opt.is_correct) : false,
+          })),
+          correctAnswer: (q.options || []).find((o: any) => o.is_correct)?.text || "",
+          explanation: q.explanation || "",
+        }));
+
+        return {
+          id: `qb-unit-${uNum}`,
+          unitNumber: uNum,
+          unitCodeText: `Unit ${uNum}`,
+          title: matchedUnit?.unitTitle || `Unit ${uNum}`,
+          questionsCountText: `${questions.length} Question${questions.length === 1 ? "" : "s"}`,
+          questions: questions.length > 0 ? questions : (SAMPLE_QUESTIONS.filter((sq) => sq.unit === `Unit ${uNum}`) as any),
+        };
+      });
+    }
+
+    return (dynamicUnits || []).map((u: any) => ({
+      id: `qb-unit-${u.unitNumber}`,
+      unitNumber: u.unitNumber,
+      unitCodeText: `Unit ${u.unitNumber}`,
+      title: u.unitTitle,
+      questionsCountText: `3 Questions`,
+      questions: SAMPLE_QUESTIONS as any,
+    }));
+  })();
+
   const referenceItems: ReferenceItem[] = [
     {
       id: "syllabus",
       icon: (
         <FileText
-          className={`h-5 w-5 ${state.selectedReferenceId === "syllabus"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "syllabus"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "Syllabus",
-      subtitle: "5 Units • CO1-CO6",
+      subtitle: `${dynamicUnits.length} Units • ${dynamicOutcomes.length} Outcomes`,
       isActive: state.selectedReferenceId === "syllabus",
-      isCompleted: true,
+      isCompleted: dynamicUnits.length > 0,
     },
     {
       id: "copo",
       icon: (
         <GitBranch
-          className={`h-5 w-5 ${state.selectedReferenceId === "copo"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "copo"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "CO-PO Mapping",
-      subtitle: "11 Program Outcomes",
+      subtitle: `${dynamicPoHeaders.length} Program Outcomes • ${dynamicOutcomes.length} COs`,
       isActive: state.selectedReferenceId === "copo",
-      isCompleted: true,
+      isCompleted: dynamicPoHeaders.length > 0,
     },
     {
       id: "topics",
       icon: (
         <Layers
-          className={`h-5 w-5 ${state.selectedReferenceId === "topics"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "topics"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "Topics",
-      subtitle: "5 Units • 20 Main Topics",
+      subtitle: `${dynamicTopicUnits.length} Units • ${dynamicTopicUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Topics`,
       isActive: state.selectedReferenceId === "topics",
-      isCompleted: true,
+      isCompleted: dynamicTopicUnits.length > 0,
     },
     {
       id: "pedagogy",
       icon: (
         <GraduationCap
-          className={`h-5 w-5 ${state.selectedReferenceId === "pedagogy"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "pedagogy"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "Pedagogy",
-      subtitle: "Teaching Approaches",
+      subtitle: `${dynamicPedagogyUnits.length} Units • ${dynamicPedagogyUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Teaching Approaches`,
       isActive: state.selectedReferenceId === "pedagogy",
-      isCompleted: true,
+      isCompleted: dynamicPedagogyUnits.length > 0,
     },
     {
       id: "lesson-plan",
       icon: (
         <Calendar
-          className={`h-5 w-5 ${state.selectedReferenceId === "lesson-plan"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "lesson-plan"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "Lesson Plan",
-      subtitle: "Course Delivery Plan",
+      subtitle: `${dynamicLessonUnits.length} Units • ${dynamicLessonUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Scheduled Sessions`,
       isActive: state.selectedReferenceId === "lesson-plan",
-      isCompleted: true,
+      isCompleted: dynamicLessonUnits.length > 0,
     },
     {
       id: "learning-materials",
       icon: (
         <BookOpen
-          className={`h-5 w-5 ${state.selectedReferenceId === "learning-materials"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "learning-materials"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "Learning Materials",
-      subtitle: "6 Approved Materials",
+      subtitle: `${dynamicLearningMaterialUnits.length} Units • ${dynamicLearningMaterialUnits.reduce((acc: number, u: any) => acc + (u.materials?.length || 0), 0)} Study Materials`,
       isActive: state.selectedReferenceId === "learning-materials",
-      isCompleted: true,
+      isCompleted: dynamicLearningMaterialUnits.length > 0,
     },
   ];
 
@@ -2002,29 +2517,31 @@ const QuestionBank = () => {
       id: "question-bank",
       icon: (
         <HelpCircle
-          className={`h-5 w-5 ${state.selectedReferenceId === "question-bank"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "question-bank"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "Question Bank",
-      subtitle: "12 Approved Questions",
+      subtitle: `${dynamicQuestionBankUnits.reduce((acc: number, u: any) => acc + (u.questions?.length || 0), 0)} Questions • ${state.rawQuestionSets?.length || 1} Question Sets`,
       isActive: state.selectedReferenceId === "question-bank",
-      isCompleted: true,
+      isCompleted: dynamicQuestionBankUnits.length > 0,
     },
     {
       id: "cia-papers",
       icon: (
         <FileCode
-          className={`h-5 w-5 ${state.selectedReferenceId === "cia-papers"
-            ? "text-white"
-            : "text-pri dark:text-gray-400"
-            }`}
+          className={`h-5 w-5 ${
+            state.selectedReferenceId === "cia-papers"
+              ? "text-white"
+              : "text-pri dark:text-gray-400"
+          }`}
         />
       ),
       title: "CIA Question Papers",
-      subtitle: "3 Approved Papers",
+      subtitle: "2 Assessment Papers • Mid-Term & Final",
       isActive: state.selectedReferenceId === "cia-papers",
       isCompleted: true,
     },
@@ -2033,32 +2550,92 @@ const QuestionBank = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-8">
       <CourseBanner
-        courseCode="CS301"
-        courseTitle="Computer Networks"
-        description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
-        programme="B.Tech CSE"
-        batch="2025–2029"
-        academicYear="2026–2027 / Semester 3"
-        students="40 Students"
-        selectedCourse="CS309"
+        courseCode={activeCourseCode || "Course"}
+        courseTitle={activeCourseTitle || "Course Artifacts"}
+        description="Instructor View — Access approved academic artifacts, active syllabus, outcomes mapping, topic hierarchy, pedagogy, and lesson plans."
+        programme={activeProgramme}
+        batch={activeBatch}
+        academicYear={state.courseData?.academic_year || ""}
+        students={`${state.courseData?.students_count ?? 0} Students`}
+        selectedCourse={activeCourseCode}
+        courseOptions={(state.allCourses || []).map((c: any) => ({
+          value: String(c.id),
+          label: `${c.course_code || c.code} — ${c.course_title || c.title}`,
+        }))}
+        onCourseChange={(val) => {
+          const targetId = typeof val === "object" ? val?.value : val;
+          const selected = (state.allCourses || []).find((c: any) => String(c.id) === String(targetId));
+          if (selected) {
+            router.push(
+              `/neurobe/ins-course-artifacts?course_id=${selected.id}&code=${selected.course_code || selected.code}`
+            );
+          }
+        }}
         toogle="instructor"
-        courseOptions={[
-          { value: "CS309", label: "Course: CS309" },
-          { value: "CS301", label: "Course: CS301" },
-        ]}
-        onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
-        onViewChange={(view) => setState({ activeTab: view })}
+        onBack={() => {
+          if (router?.query?.from === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
+        onViewChange={(view) => {
+          setState({ activeTab: view });
+          if (view === "coordinator") {
+            router.push(
+              `/neurobe/course-artifacts?course_id=${state.courseData?.id || router?.query?.course_id || ""}&code=${activeCourseCode}`
+            );
+          }
+        }}
       />
+
+      {/* ── Course Instructor View Banner ── */}
+      <div className="mx-6 mt-4 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 p-4 shadow-xs dark:border-indigo-800/60 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-indigo-950/40">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Course Instructor View
+              </h3>
+              <span className="rounded-full border border-indigo-300 bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Active Approved Versions Only
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              Read-only view of the coordinator-approved curriculum and active academic artifacts for this course.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (router?.query?.from === "my-courses") {
+              router.push("/neurobe/my-assigned-courses");
+            } else {
+              router.back();
+            }
+          }}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-4 py-2 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 active:scale-95 dark:border-indigo-700 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
+        >
+          ← Back
+        </button>
+      </div>
 
       <PageHeader
         title="Course Artifacts"
-        records="CS309  —  Computer Networks"
-        subtitle={`Access approved academic references prepared for this course.`}
+        records={
+          activeCourseCode && activeCourseTitle
+            ? `${activeCourseCode} — ${activeCourseTitle}`
+            : activeCourseCode || "Course Artifacts"
+        }
+        subtitle={`Access active approved academic references prepared for this course.`}
         icon={<Users className="h-5 w-5 text-color2" />}
         record2="Instructor View"
-        record3="Read Only"
+        record3="Active Version Only"
       />
 
       {/* Main Grid Layout: Left Course References Navigation + Right Artifact Details */}
@@ -2107,21 +2684,29 @@ const QuestionBank = () => {
                     title={currentHeaderData.title}
                     icon={currentHeaderData.icon}
                     subtitle={currentHeaderData.subtitle}
-                    approvedBy={currentHeaderData.approvedBy}
-                    approvedDate={currentHeaderData.approvedDate}
-                    unitsCountText={currentHeaderData.unitsCountText}
-                    versionBadgeText={currentHeaderData.versionBadgeText}
-                    bannerProgramme={SYLLABUS_HEADER_DATA.bannerProgramme}
-                    bannerBatch={SYLLABUS_HEADER_DATA.bannerBatch}
-                    bannerSemester={SYLLABUS_HEADER_DATA.bannerSemester}
-                    courseCode={SYLLABUS_HEADER_DATA.courseCode}
-                    courseTitle={SYLLABUS_HEADER_DATA.courseTitle}
+                    approvedBy={activeApprovedBy}
+                    approvedDate={activeApprovedDate}
+                    unitsCountText={`${dynamicUnits.length} Units`}
+                    versionBadgeText="Active Version"
+                    bannerProgramme={activeProgramme}
+                    bannerBatch={activeBatch}
+                    bannerSemester={activeSemester}
+                    courseCode={activeCourseCode}
+                    courseTitle={activeCourseTitle}
                   />
                 )}
 
                 {state.selectedReferenceId === "cia-papers" && (
                   <div id="cia-papers-section" className="space-y-4 scroll-mt-36">
-                    <CIAQuestionPapersCard />
+                    <CIAQuestionPapersCard
+                      title="CIA QUESTION PAPERS"
+                      subtitle="Continuous Internal Assessment examination papers approved for this course."
+                      courseCode={activeCourseCode}
+                      courseTitle={activeCourseTitle}
+                      programme={activeProgramme}
+                      batch={activeBatch}
+                      semester={activeSemester}
+                    />
                     <CIAPaperHeaderCard onPrint={() => window.print()} />
                     <div id="printable-question-paper">
                       <CIAQuestionPaperViewCard />
@@ -2153,34 +2738,28 @@ const QuestionBank = () => {
                   <>
                     <div id="course-info" className="scroll-mt-36">
                       <CourseInformationCard
-                        courseCode={SYLLABUS_HEADER_DATA.courseCode}
-                        courseTitle={SYLLABUS_HEADER_DATA.courseTitle}
+                        courseCode={activeCourseCode}
+                        courseTitle={activeCourseTitle}
                       />
                     </div>
 
                     <div id="course-outcomes" className="scroll-mt-36">
                       <CourseOutcomesCard
-                        title={COURSE_OUTCOMES_DATA.title}
-                        approvedCountText={COURSE_OUTCOMES_DATA.approvedCountText}
-                        outcomes={COURSE_OUTCOMES_DATA.outcomes}
-                        coverageUnitsText={COURSE_OUTCOMES_DATA.coverageUnitsText}
-                        coverageTheoryHoursText={
-                          COURSE_OUTCOMES_DATA.coverageTheoryHoursText
-                        }
-                        coverageLabHoursText={
-                          COURSE_OUTCOMES_DATA.coverageLabHoursText
-                        }
-                        coverageTopicsText={
-                          COURSE_OUTCOMES_DATA.coverageTopicsText
-                        }
+                        title="COURSE OUTCOMES"
+                        approvedCountText={`${dynamicOutcomes.length} Approved Statements`}
+                        outcomes={dynamicOutcomes}
+                        coverageUnitsText={`${dynamicUnits.length} Units`}
+                        coverageTheoryHoursText={`${dynamicTheoryHours} Theory Hours`}
+                        coverageLabHoursText={`${dynamicLabHours} Lab Hours`}
+                        coverageTopicsText={`${dynamicUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Syllabus Topics`}
                       />
                     </div>
 
                     <div id="unit-syllabus" className="scroll-mt-36">
                       <UnitWiseSyllabusCard
-                        title={UNIT_WISE_SYLLABUS_DATA.title}
-                        headerStatsText={UNIT_WISE_SYLLABUS_DATA.headerStatsText}
-                        units={UNIT_WISE_SYLLABUS_DATA.units}
+                        title="UNIT-WISE SYLLABUS"
+                        headerStatsText={`${dynamicUnits.length} Units`}
+                        units={dynamicUnits}
                         onHierarchyClick={(unitNum) =>
                           console.log("Hierarchy clicked for unit:", unitNum)
                         }
@@ -2189,30 +2768,27 @@ const QuestionBank = () => {
 
                     <div id="theory-lab" className="scroll-mt-36">
                       <TheoryAndLabCard
-                        title={THEORY_AND_LAB_DATA.title}
-                        headerSubtitle={THEORY_AND_LAB_DATA.headerSubtitle}
-                        theoryHours={THEORY_AND_LAB_DATA.theoryHours}
-                        theoryWeeklyHours={THEORY_AND_LAB_DATA.theoryWeeklyHours}
-                        labHours={THEORY_AND_LAB_DATA.labHours}
-                        labWeeklyHours={THEORY_AND_LAB_DATA.labWeeklyHours}
-                        labExperimentsTitle={THEORY_AND_LAB_DATA.labExperimentsTitle}
-                        experiments={THEORY_AND_LAB_DATA.experiments}
+                        title="THEORY & LABORATORY"
+                        headerSubtitle="Curriculum Allocation"
+                        theoryHours={dynamicTheoryHours}
+                        labHours={dynamicLabHours}
+                        experiments={[]}
                       />
                     </div>
 
                     <div id="textbooks" className="scroll-mt-36">
                       <TextbooksCard
-                        title={TEXTBOOKS_DATA.title}
-                        headerSubtitle={TEXTBOOKS_DATA.headerSubtitle}
-                        textbooks={TEXTBOOKS_DATA.textbooks}
+                        title="TEXTBOOKS"
+                        headerSubtitle="Approved Prescribed Literature"
+                        textbooks={dynamicTextbooks}
                       />
                     </div>
 
                     <div id="reference-books" className="scroll-mt-36">
                       <ReferenceBooksCard
-                        title={REFERENCE_BOOKS_DATA.title}
-                        headerSubtitle={REFERENCE_BOOKS_DATA.headerSubtitle}
-                        references={REFERENCE_BOOKS_DATA.references}
+                        title="REFERENCE BOOKS"
+                        headerSubtitle="Supplementary Academic References"
+                        references={dynamicReferences}
                       />
                     </div>
                   </>
@@ -2221,55 +2797,60 @@ const QuestionBank = () => {
                   <>
                     <div id="course-outcomes" className="scroll-mt-36">
                       <CourseOutcomesCard
-                        title={COURSE_OUTCOMES_DATA.title}
-                        approvedCountText={COURSE_OUTCOMES_DATA.approvedCountText}
-                        outcomes={COURSE_OUTCOMES_DATA.outcomes}
+                        title="COURSE OUTCOMES"
+                        approvedCountText={`${dynamicOutcomes.length} Approved Statements`}
+                        outcomes={dynamicOutcomes}
                         isCopoView={true}
                       />
                     </div>
 
                     <div id="copo-matrix" className="scroll-mt-36">
                       <CopoMappingMatrixCard
-                        title={COPO_MATRIX_CARD_DATA.title}
-                        subtitle={COPO_MATRIX_CARD_DATA.subtitle}
-                        headerStatsText={COPO_MATRIX_CARD_DATA.headerStatsText}
-                        poHeaders={COPO_MATRIX_CARD_DATA.poHeaders}
-                        rows={COPO_MATRIX_CARD_DATA.rows}
+                        title="CO–PO MAPPING MATRIX"
+                        subtitle="Shows how each Course Outcome is mapped to the Program Outcomes."
+                        headerStatsText={`${dynamicOutcomes.length} × ${dynamicPoHeaders.length} Matrix`}
+                        poHeaders={dynamicPoHeaders}
+                        rows={dynamicCopoRows}
                       />
                     </div>
 
                     <div id="mapping-rationale" className="scroll-mt-36">
                       <MappingRationaleCard
-                        title={MAPPING_RATIONALE_DATA.title}
-                        subtitle={MAPPING_RATIONALE_DATA.subtitle}
-                        headerStatsText={MAPPING_RATIONALE_DATA.headerStatsText}
-                        items={MAPPING_RATIONALE_DATA.items}
+                        title="MAPPING RATIONALE"
+                        subtitle="Detailed justification for each mapped Course Outcome."
+                        headerStatsText={`${dynamicRationaleItems.length} Outcomes`}
+                        items={dynamicRationaleItems}
                       />
                     </div>
 
                     <div id="program-outcomes" className="scroll-mt-36">
                       <MappingRationaleCard
-                        title={PROGRAM_OUTCOMES_DATA.title}
-                        subtitle={PROGRAM_OUTCOMES_DATA.subtitle}
-                        headerStatsText={PROGRAM_OUTCOMES_DATA.headerStatsText}
-                        items={PROGRAM_OUTCOMES_DATA.items}
+                        title="PROGRAM OUTCOMES"
+                        subtitle="View the Program Outcomes used for this course mapping."
+                        headerStatsText={`${dynamicPoHeaders.length} Program Outcomes`}
+                        items={(state.copoData?.program_outcomes || []).map((po: any) => ({
+                          id: po.code || po.po_code,
+                          poCode: po.code || po.po_code,
+                          poTitle: po.title || po.name || po.code,
+                          description: po.description || po.statement || "",
+                        }))}
                       />
                     </div>
                   </>
                 )}
                 {state.selectedReferenceId === "topics" && (
                   <div id="topics-section" className="scroll-mt-36">
-                    <CourseTopicsCard units={COURSE_TOPICS_CARD_DATA.units} />
+                    <CourseTopicsCard units={dynamicTopicUnits} />
                   </div>
                 )}
 
                 {state.selectedReferenceId === "pedagogy" && (
                   <div id="pedagogy-section" className="scroll-mt-36">
                     <PedagogyTopicsCard
-                      title={PEDAGOGY_TOPICS_CARD_DATA.title}
-                      subtitle={PEDAGOGY_TOPICS_CARD_DATA.subtitle}
-                      headerStatsText={PEDAGOGY_TOPICS_CARD_DATA.headerStatsText}
-                      units={PEDAGOGY_TOPICS_CARD_DATA.units}
+                      title="TEACHING APPROACHES OF TOPICS"
+                      subtitle="Approved teaching methods for each topic in the course."
+                      headerStatsText={`${dynamicPedagogyUnits.length} Units`}
+                      units={dynamicPedagogyUnits}
                     />
                   </div>
                 )}
@@ -2277,10 +2858,10 @@ const QuestionBank = () => {
                 {state.selectedReferenceId === "lesson-plan" && (
                   <div id="lesson-plan-section" className="scroll-mt-36">
                     <LessonPlanTopicsCard
-                      title={LESSON_PLAN_TOPICS_CARD_DATA.title}
-                      subtitle={LESSON_PLAN_TOPICS_CARD_DATA.subtitle}
-                      headerStatsText={LESSON_PLAN_TOPICS_CARD_DATA.headerStatsText}
-                      units={LESSON_PLAN_TOPICS_CARD_DATA.units}
+                      title="LESSON PLAN OF TOPICS"
+                      subtitle="Prescribed teaching methods, textbooks and reference books for each topic."
+                      headerStatsText={`${dynamicLessonUnits.length} Units`}
+                      units={dynamicLessonUnits}
                     />
                   </div>
                 )}
@@ -2288,10 +2869,10 @@ const QuestionBank = () => {
                 {state.selectedReferenceId === "learning-materials" && (
                   <div id="learning-materials-section" className="scroll-mt-36">
                     <LearningMaterialsCard
-                      title={LEARNING_MATERIALS_CARD_DATA.title}
-                      subtitle={LEARNING_MATERIALS_CARD_DATA.subtitle}
-                      headerStatsText={LEARNING_MATERIALS_CARD_DATA.headerStatsText}
-                      units={LEARNING_MATERIALS_CARD_DATA.units}
+                      title="LEARNING MATERIALS OF TOPICS"
+                      subtitle="Coordinator-approved study materials, lecture notes, and learning content."
+                      headerStatsText={`${dynamicLearningMaterialUnits.length} Units`}
+                      units={dynamicLearningMaterialUnits}
                     />
                   </div>
                 )}
@@ -2299,10 +2880,10 @@ const QuestionBank = () => {
                 {state.selectedReferenceId === "question-bank" && (
                   <div id="question-bank-section" className="scroll-mt-36">
                     <QuestionBankTopicsCard
-                      title={QUESTION_BANK_TOPICS_CARD_DATA.title}
-                      subtitle={QUESTION_BANK_TOPICS_CARD_DATA.subtitle}
-                      headerStatsText={QUESTION_BANK_TOPICS_CARD_DATA.headerStatsText}
-                      units={QUESTION_BANK_TOPICS_CARD_DATA.units}
+                      title="QUESTION BANK OF TOPICS"
+                      subtitle="Approved question sets and MCQ repositories aligned with syllabus units and outcomes."
+                      headerStatsText={`${dynamicQuestionBankUnits.reduce((acc, u) => acc + (u.questions?.length || 0), 0)} Questions`}
+                      units={dynamicQuestionBankUnits}
                     />
                   </div>
                 )}

@@ -57,11 +57,6 @@ const CourseOutcomesSummary = ({
                   <span className="text-color2 rounded-md bg-purple-50 px-2.5 py-0.5 text-xs font-bold dark:bg-purple-900/20">
                     {co.co_code}
                   </span>
-                  {co.is_accepted && (
-                    <span className="flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-600 dark:bg-green-900/20 dark:text-green-400">
-                      <CheckCircle2 className="h-3 w-3" /> Accepted
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-1 flex-col gap-1">
                   <p className="text-sm font-medium text-[#000] dark:text-gray-200">

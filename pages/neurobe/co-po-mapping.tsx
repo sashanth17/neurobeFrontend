@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
   GraduationCap,
@@ -9,6 +9,9 @@ import {
   Info,
   ArrowRight,
   Cable,
+  Sparkles,
+  RotateCw,
+  Edit3,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Dropdown, Failure } from "@/utils/function.utils";
@@ -22,8 +25,46 @@ import PageFooter from "@/components/common-components/PageFooter";
 import KeepFilePrompt from "@/components/academic-setup/KeepFilePrompt";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/common-components/PageHeader";
+import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
 import Models from "@/imports/models.import";
-import { DEFAULT_COPO_MATRIX, COPOMatrixResponse } from "@/mock/copo_matrix.data";
+
+export interface ProgramOutcome {
+  code: string;
+  title: string;
+  description: string;
+}
+
+export interface CourseOutcome {
+  id: number;
+  co_code: string;
+  bloom_level: string;
+  description: string;
+}
+
+export interface MappingCell {
+  correlation_level: number;
+  strength_label: string;
+  is_ai_suggested: boolean;
+  justification: string | null;
+  status: string;
+  mapping_id: number | null;
+}
+
+export interface COPOMatrixResponse {
+  syllabus_id: number;
+  course_id: number;
+  po_version: string;
+  mapping_status: string;
+  summary: {
+    course_outcomes_count: number;
+    program_outcomes_count: number;
+    ai_suggestions_count: number;
+    mappings_need_review_count: number;
+  };
+  program_outcomes: ProgramOutcome[];
+  course_outcomes: CourseOutcome[];
+  matrix: Record<string, Record<string, MappingCell>>;
+}
 
 const getErrorMessage = (error: any, fallback: string) => {
   if (!error) return fallback;
@@ -37,17 +78,31 @@ const getErrorMessage = (error: any, fallback: string) => {
 const COPOMapping = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const course_id = useSearchParams().get("course_id");
+  const searchParams = useSearchParams();
+  const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
+
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopPolling(), []);
 
   const [state, setState] = useSetState({
     search: "",
     selectedCourse: null,
     activeCourse: null as any,
     loading: false,
+    generatingCopo: false,
     activeTab: "coordinator",
     approvedMappings: [] as string[],
     mappingApproved: false,
-    copoMatrix: [],
+    copoMatrix: null as any,
     courseDetail: null as any,
     courseList: [] as any[],
     organization_id: "",
@@ -72,7 +127,13 @@ const COPOMapping = () => {
     updatingCell: false,
     savingDraft: false,
     approvingMap: false,
+    versionRefreshKey: 0,
+    selectedExtractionVer: null as number | null,
+    copoVersionsDetailed: [] as any[],
+    extractionNotApproved: false,
   });
+
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(setPageTitle("CO-PO Mapping"));
@@ -99,9 +160,21 @@ const COPOMapping = () => {
   useEffect(() => {
     if (course_id) {
       getCourseDetails();
-      // getCOPOMatrix();
+      restoreWorkflowState(course_id);
+      loadCopoVersions(course_id);
     }
   }, [course_id]);
+
+  const loadCopoVersions = async (cid: string | number) => {
+    try {
+      const res: any = await Models.syllabus.get_versions(cid, "copo");
+      if (res?.versions) {
+        setState({ copoVersionsDetailed: res.versions });
+      }
+    } catch (e) {
+      console.warn("loadCopoVersions error:", e);
+    }
+  };
 
   // API integrations
   const getAllCourse = async (orgId?: any) => {
@@ -125,20 +198,29 @@ const COPOMapping = () => {
         courseDetail: res,
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
-      const sid = res?.syllabus_id || res?.latest_syllabus?.id ;
-      getCOPOMatrix(sid);
+      const sid = res?.syllabus_id || res?.latest_syllabus?.id;
+      if (sid) {
+        getCOPOMatrix(sid);
+      } else {
+        setState({ loading: false, copoMatrix: null });
+      }
     } catch (error: any) {
       console.log("error fetching course detail", error);
       Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      getCOPOMatrix();
+      setState({ loading: false, copoMatrix: null });
     }
   };
 
-  const getCOPOMatrix = async (syllabusId?: any) => {
+  const getCOPOMatrix = async (syllabusId?: any, verNum?: number) => {
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
+    if (!sid) {
+      setState({ loading: false, copoMatrix: null });
+      return;
+    }
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loading: true });
-      const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
-      const res: any = await Models.COPOMap.copo_map(sid);
+      const res: any = await Models.COPOMap.copo_map(sid, vToUse);
       if (res && (res.matrix || res.data?.matrix)) {
         const matrixObj = res.matrix ? res : res.data;
         const isApprovedStatus = matrixObj?.mapping_status === "Approved";
@@ -148,24 +230,206 @@ const COPOMapping = () => {
           loading: false,
         });
       } else {
-        setState({ loading: false });
+        setState({ copoMatrix: res?.data || null, loading: false });
       }
     } catch (error: any) {
       console.log("error fetching copo matrix", error);
       Failure(getErrorMessage(error, "Failed to fetch CO-PO matrix"));
-      setState({ loading: false });
+      setState({ loading: false, copoMatrix: null });
+    }
+  };
+
+  const restoreWorkflowState = async (cid: string | number) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
+      const isExtractionApproved = extractionStep?.status === "approved";
+      setState({ extractionNotApproved: !isExtractionApproved });
+
+      const copoStep = wfRes?.workflow?.step_2_copo_mapping;
+      if (!copoStep) return;
+
+      if (copoStep.versions_detailed) {
+        setState({ copoVersionsDetailed: copoStep.versions_detailed });
+      }
+
+      const { status, job_id } = copoStep;
+      if (status === "redis_queued" || status === "generating") {
+        setState({ generatingCopo: true });
+        startPolling(cid, job_id);
+      } else if (status === "approved") {
+        setState({ mappingApproved: true, generatingCopo: false });
+      } else {
+        setState({ generatingCopo: false });
+      }
+    } catch (err) {
+      console.warn("restoreWorkflowState warning:", err);
+    }
+  };
+
+  const startPolling = (cid: string | number, jobId?: string) => {
+    stopPolling();
+    setState({ generatingCopo: true });
+
+    let attempts = 0;
+    const maxAttempts = 15; // 15 attempts with 2-minute interval
+    const pollInterval = 120000; // 2 minutes (120,000 ms)
+
+    const checkCopoStatus = async () => {
+      attempts++;
+      try {
+        const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+        const copoStep = wfRes?.workflow?.step_2_copo_mapping;
+        const currentStatus = copoStep?.status;
+
+        if (currentStatus === "draft" || currentStatus === "approved") {
+          stopPolling();
+          setState({
+            generatingCopo: false,
+            mappingApproved: currentStatus === "approved",
+            versionRefreshKey: Date.now(),
+          });
+          const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
+          await loadCopoVersions(cid);
+          await getCourseDetails();
+          await getCOPOMatrix(sid);
+          Success("CO-PO mapping generated successfully with NEURO AI!");
+        } else if (attempts >= maxAttempts) {
+          stopPolling();
+          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
+          const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
+          await loadCopoVersions(cid);
+          await getCourseDetails();
+          await getCOPOMatrix(sid);
+        }
+      } catch (pollErr) {
+        console.warn("COPO polling error:", pollErr);
+        if (attempts >= maxAttempts) {
+          stopPolling();
+          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
+        }
+      }
+    };
+
+    checkCopoStatus();
+    pollRef.current = setInterval(checkCopoStatus, pollInterval);
+  };
+
+  const handleGenerateCopo = async (parentParams?: { extraction_version?: number }) => {
+    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
+    if (!sid) {
+      Failure("No syllabus found for this course. Please upload a syllabus first.");
+      return;
+    }
+    const extVerToUse = parentParams?.extraction_version ?? state.selectedExtractionVer;
+    try {
+      setState({ generatingCopo: true });
+      const res: any = await Models.COPOMap.generate_copo(sid, {
+        extraction_version: extVerToUse,
+      });
+      Success("CO-PO mapping generation started with NEURO AI!");
+      startPolling(course_id || sid, res?.job_id);
+    } catch (error: any) {
+      console.error("Error generating CO-PO mapping:", error);
+      Failure(getErrorMessage(error, "Failed to generate CO-PO mapping"));
+      setState({ generatingCopo: false });
+    }
+  };
+
+  const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
+    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
+    if (sid) {
+      await getCOPOMatrix(sid, newVer);
+    }
+    if (course_id) {
+      await loadCopoVersions(course_id);
+      await restoreWorkflowState(course_id);
     }
   };
 
   // Matrix data resolution
-  const matrixData: COPOMatrixResponse = state.copoMatrix;
+  const matrixData: COPOMatrixResponse = state.copoMatrix || {};
   const programOutcomes = matrixData?.program_outcomes || [];
   const courseOutcomes = matrixData?.course_outcomes || [];
   const matrix = matrixData?.matrix || {};
-  const summary = matrixData?.summary ;
+  const summary = matrixData?.summary;
 
-  const isApproved = state.mappingApproved || matrixData?.mapping_status === "Approved";
+  // Filter CO-PO versions by selected extraction version (tactics identical to CourseCard)
+  const currentExtVer = state.selectedExtractionVer;
+  const matchingChildCopo = currentExtVer
+    ? (state.copoVersionsDetailed || []).filter(
+        (v: any) => Number(v.extraction_version_used ?? v.parent_version ?? 1) === Number(currentExtVer)
+      )
+    : state.copoVersionsDetailed || [];
+
+  const activeChild =
+    matchingChildCopo.find((v: any) => v.is_active) ||
+    (matchingChildCopo.length > 0 ? matchingChildCopo[matchingChildCopo.length - 1] : null);
+
+  const activeChildApproved = activeChild?.status === "approved";
+  const displayStatus = matchingChildCopo.length === 0 ? "Draft" : (activeChildApproved ? "Approved" : "Draft");
+  const isApproved = state.mappingApproved || activeChildApproved || matrixData?.mapping_status === "Approved";
   const allMapped = state.approvedMappings.length > 0;
+
+  // Direct cell cycle handler (0 -> 1 -> 2 -> 3 -> 0)
+  const handleDirectCellCycle = async (row: any, po: any) => {
+    const co_code = row.co_code;
+    const target_code = po.code;
+    const currentCell: any = matrix[co_code]?.[target_code] || {};
+    const currentScore = currentCell.correlation_level ?? 0;
+    const nextScore = (currentScore + 1) % 4; // Cycles: 0 -> 1 -> 2 -> 3 -> 0
+
+    const strengthMap: Record<number, string> = {
+      3: "3 – High",
+      2: "2 – Medium",
+      1: "1 – Low",
+      0: "– No Mapping",
+    };
+
+    // Optimistic UI update
+    const currentCoMap = matrix[co_code] || {};
+    const updatedMatrix = {
+      ...matrix,
+      [co_code]: {
+        ...currentCoMap,
+        [target_code]: {
+          ...currentCell,
+          correlation_level: nextScore,
+          strength_label: strengthMap[nextScore] || "– No Mapping",
+          status: "accepted",
+          is_ai_suggested: false,
+        },
+      },
+    };
+
+    const mappingKey = `${co_code}-${target_code}`;
+    const updatedApproved = state.approvedMappings.includes(mappingKey)
+      ? state.approvedMappings
+      : [...state.approvedMappings, mappingKey];
+
+    setState({
+      approvedMappings: updatedApproved,
+      copoMatrix: {
+        ...matrixData,
+        matrix: updatedMatrix,
+      },
+    });
+
+    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || state.copoMatrix?.syllabus_id || course_id;
+    try {
+      await Models.COPOMap.copo_update(sid, {
+        co_code,
+        target_code,
+        correlation_level: nextScore,
+        justification: currentCell.justification || `Updated correlation level to ${nextScore}`,
+        status: "accepted",
+      });
+    } catch (error: any) {
+      console.error("Error cycling cell score:", error);
+      Failure(getErrorMessage(error, `Failed to update ${co_code} × ${target_code}`));
+    }
+  };
 
   const handleCellClick = async (row: any, po: any) => {
     const co_code = row.co_code;
@@ -198,7 +462,7 @@ const COPOMapping = () => {
       const res: any = await Models.COPOMap.get_cell_detail(sid, {
         co_code,
         target_code,
-      });
+      }, loadedVersion);
       const data = res?.data || res;
       if (data) {
         const newScore =
@@ -252,8 +516,8 @@ const COPOMapping = () => {
       setState({ updatingCell: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
 
-      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.copo_update(sid, payload);
+      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
+      await Models.COPOMap.copo_update(sid, payload, loadedVersion);
 
       const { co_code, target_code, correlation_level, justification, status } = payload;
       const strengthMap: Record<number, string> = {
@@ -312,8 +576,8 @@ const COPOMapping = () => {
       setState({ updatingCell: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
 
-      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.accept_map(sid, payload);
+      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
+      await Models.COPOMap.accept_map(sid, payload, loadedVersion);
 
       const { co_code, target_code } = payload;
       const currentCoMatrix = matrix[co_code] || {};
@@ -359,6 +623,10 @@ const COPOMapping = () => {
   };
 
   const handleApproveMapping = async () => {
+    if (state.extractionNotApproved) {
+      Failure("Cannot approve CO-PO mapping: Syllabus extraction must be approved first.");
+      return;
+    }
     try {
       setState({ approvingMap: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
@@ -368,7 +636,7 @@ const COPOMapping = () => {
       const fullName =
         user?.first_name && user?.last_name
           ? `${user.first_name} ${user.last_name}`
-          : user?.name || user?.full_name || "Arun Kumar";
+          : user?.name || user?.full_name || "Faculty Member";
       const formattedName = fullName.toLowerCase().includes("dr") ? fullName : `${fullName}`;
       const roleName =
         user?.role === "course_coordinator" || !user?.role ? "Course Coordinator" : user.role;
@@ -380,9 +648,19 @@ const COPOMapping = () => {
 
       console.log("Calling approve_map with syllabus_id:", sid, "payload:", payload);
       await Models.COPOMap.approve_map(sid, payload);
+      try {
+        await Models.syllabus.approve_stage(course_id || sid, "copo");
+      } catch (e) {
+        console.warn("approve_stage warning:", e);
+      }
       Success("CO-PO mapping approved successfully");
-      setState({ mappingApproved: true, approvingMap: false });
-      getCOPOMatrix(sid);
+      setState({ mappingApproved: true, approvingMap: false, versionRefreshKey: Date.now() });
+      if (course_id) {
+        await loadCopoVersions(course_id);
+        await restoreWorkflowState(course_id);
+      }
+      await getCourseDetails();
+      await getCOPOMatrix(sid);
     } catch (error: any) {
       console.log("error approving map", error);
       setState({ approvingMap: false });
@@ -468,7 +746,7 @@ const COPOMapping = () => {
   const verifiedCount = state.approvedMappings.length;
   const needReviewCount = Math.max(
     0,
-    (summary?.mappings_need_review_count ?? summary?.ai_suggestions_count ?? 56) - verifiedCount
+    (summary?.mappings_need_review_count ?? summary?.ai_suggestions_count ?? 0) - verifiedCount
   );
 
   const TABS = [
@@ -483,14 +761,14 @@ const COPOMapping = () => {
       key: "program_outcome",
       label: "Program Outcome",
       count: summary?.program_outcomes_count ?? programOutcomes.length,
-      subLabel: matrixData.po_version || "PO 2025 v1",
+      subLabel: matrixData?.po_version || "—",
       icon: <GraduationCap className="h-5 w-5" />,
     },
     {
       key: "ai_suggestions",
       label: "AI Generated Mapping Suggestions",
       subLabel: "Mappings Need Review",
-      count: summary?.ai_suggestions_count,
+      count: summary?.ai_suggestions_count ?? 0,
       icon: <GitCompare className="h-5 w-5" />,
     },
     {
@@ -510,7 +788,7 @@ const COPOMapping = () => {
         description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
         programme={state?.courseDetail?.programme}
         batch={state?.courseDetail?.batch_name}
-        academicYear={`${state?.courseDetail?.batch_name}`}
+        academicYear={state?.courseDetail?.academic_year || state?.courseDetail?.batch_name || ""}
         students={state?.courseDetail?.students_count}
         selectedCourse={state.selectedCourse}
         courseOptions={state.courseList}
@@ -519,14 +797,20 @@ const COPOMapping = () => {
           router.push(`/neurobe/co-po-mapping?course_id=${val.value}`);
         }}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 
       <PageHeader
         title="CO–PO Mapping"
-        records={`PO Version: ${matrixData.po_version}`}
-        subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Review each suggested mapping and rationale before approval."
+        records={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
+        subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Hover over any cell to see strength & rationale, or click to cycle strength."
         icon={<Cable className="h-5 w-5 text-color2" />}
       />
 
@@ -546,101 +830,215 @@ const COPOMapping = () => {
 
       <KeepFilePrompt
         icon={<Info className="text-color2 h-4 w-4" />}
-        title="Select any cell in the matrix to review the suggested strength and NEURO AI rationale. Accept or edit the suggestion as needed."
-        actionBtn1={{
-          label: "Open Inspector Drawer",
-          onClick: () => {
-            const firstCo = courseOutcomes[0];
-            const firstPo = programOutcomes[0];
-            if (firstCo && firstPo) {
-              handleCellClick(firstCo, firstPo);
-            }
-          },
-        }}
+        title="Hover over any cell to inspect correlation strength, Bloom level, and NEURO AI rationale. Click any cell to cycle strength directly."
       />
+
+      {course_id && (
+        <StageVersionHistoryPanel
+          key={state.versionRefreshKey}
+          stage="copo"
+          stageLabel="CO-PO Mapping"
+          courseId={course_id}
+          onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
+          onGenerateNew={handleGenerateCopo}
+          isGenerating={state.generatingCopo}
+          refreshTrigger={state.versionRefreshKey}
+          onExtractionChange={(extVer) => setState({ selectedExtractionVer: extVer })}
+        />
+      )}
 
       {/* CO-PO Mapping Matrix */}
       <div className="panel">
         <MappingMatrixHeader
-          title={`${courseOutcomes[0]?.co_code || "CO1"}–${courseOutcomes[courseOutcomes.length - 1]?.co_code || "CO6"} × ${programOutcomes[0]?.code || "PO1"}–${programOutcomes[programOutcomes.length - 1]?.code || "PO12"} Mapping Matrix`}
-          version={matrixData.po_version || "PO 2025 v1"}
-          status={isApproved ? "Approved" : matrixData.mapping_status || "Review Required"}
+          title={
+            courseOutcomes.length > 0 && programOutcomes.length > 0
+              ? `${courseOutcomes[0]?.co_code}–${courseOutcomes[courseOutcomes.length - 1]?.co_code} × ${programOutcomes[0]?.code}–${programOutcomes[programOutcomes.length - 1]?.code} Mapping Matrix`
+              : "CO–PO Mapping Matrix"
+          }
+          version={matrixData?.po_version || "PO 2025 v1"}
+          status={displayStatus}
+          onGenerate={() => handleGenerateCopo()}
+          isGenerating={state.generatingCopo}
         />
 
-        <TableComponent
-          records={filteredRecords}
-          loading={state.loading}
-          noRecordsText="No CO-PO mappings found"
-          columns={[
-            {
-              accessor: "co_code",
-              title: "COURSE OUTCOME",
-              render: ({ co_code, bloom_level, description }: any) => (
-                <div className="min-w-[220px] max-w-[280px] py-1">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-color2-l text-color2 rounded-md px-2 py-0.5 text-xs font-bold">
-                      {co_code}
-                    </span>
-                    {bloom_level && (
-                      <span className="rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-color2 dark:bg-purple-900/30">
-                        {bloom_level}
+        {(courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0)) && !state.loading ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+            <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
+            <h4 className="text-base font-bold text-gray-900 dark:text-white">
+              {state.selectedExtractionVer && matchingChildCopo.length === 0
+                ? `No CO-PO Mapping Generated Yet for Extraction v${state.selectedExtractionVer}`
+                : "No CO-PO Mapping Generated Yet"}
+            </h4>
+            <p className="mt-1 text-sm text-gray-500 max-w-md">
+              Generate AI-assisted mapping between approved Course Outcomes from Extraction v{state.selectedExtractionVer || 1} and Program Outcomes with academic rationales.
+            </p>
+            <button
+              type="button"
+              onClick={() => handleGenerateCopo({ extraction_version: state.selectedExtractionVer || 1 })}
+              disabled={state.generatingCopo}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {state.generatingCopo ? (
+                <>
+                  <RotateCw className="h-4 w-4 animate-spin" />
+                  <span>Generating Mapping with AI...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate CO-PO Mapping (Extraction v{state.selectedExtractionVer || 1})</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <TableComponent
+            records={filteredRecords}
+            loading={state.loading}
+            noRecordsText="No CO-PO mappings found"
+            columns={[
+              {
+                accessor: "co_code",
+                title: "COURSE OUTCOME",
+                render: ({ co_code, bloom_level, description }: any) => (
+                  <div className="min-w-[220px] max-w-[280px] py-1">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-color2-l text-color2 rounded-md px-2 py-0.5 text-xs font-bold">
+                        {co_code}
                       </span>
-                    )}
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-[#000] dark:text-gray-300" title={description}>
-                    {description}
-                  </p>
-                </div>
-              ),
-            },
-            ...programOutcomes.map((po) => ({
-              accessor: po.code,
-              title: (
-                <div
-                  className="flex flex-col items-center justify-center text-center cursor-help"
-                  title={`${po.code}: ${po.title}\n${po.description}`}
-                >
-                  <span className="font-bold text-xs">{po.code}</span>
-                </div>
-              ),
-              render: (row: any) => {
-                const cell = matrix[row.co_code]?.[po.code] || {
-                  correlation_level: 0,
-                  strength_label: "- No Mapping",
-                  is_ai_suggested: false,
-                  justification: null,
-                  status: "suggested",
-                };
-                const mappingKey = `${row.co_code}-${po.code}`;
-                const isMappingApproved = state.approvedMappings.includes(mappingKey);
-                const score = cell.correlation_level ?? 0;
-
-                return (
-                  <div
-                    className="flex cursor-pointer justify-center py-1 group"
-                    onClick={() => handleCellClick(row, po)}
-                  >
-                    <div className="relative transition-transform group-hover:scale-110">
-                      {getScoreBadge(score)}
-                      {cell.is_ai_suggested && score > 0 && !isMappingApproved && (
-                        <div
-                          title="AI Suggested (Review Required)"
-                          className="bg-color2 absolute right-0.5 -top-0.5 inline-flex h-2 w-2 rounded-full ring-2 ring-white"
-                        />
-                      )}
-                      {(isMappingApproved && !isApproved ) && (
-                        <div
-                          title="Mapping Verified"
-                          className="bg-green-600 absolute right-0.5 -top-0.5 inline-flex h-2 w-2 rounded-full ring-2 ring-white"
-                        />
+                      {bloom_level && (
+                        <span className="rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-color2 dark:bg-purple-900/30">
+                          {bloom_level}
+                        </span>
                       )}
                     </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-[#000] dark:text-gray-300" title={description}>
+                      {description}
+                    </p>
                   </div>
-                );
+                ),
               },
-            })),
-          ]}
-        />
+              ...programOutcomes.map((po) => ({
+                accessor: po.code,
+                title: (
+                  <div
+                    className="flex flex-col items-center justify-center text-center cursor-help"
+                    title={`${po.code}: ${po.title}\n${po.description}`}
+                  >
+                    <span className="font-bold text-xs">{po.code}</span>
+                  </div>
+                ),
+                render: (row: any) => {
+                  const cell = matrix[row.co_code]?.[po.code] || {
+                    correlation_level: 0,
+                    strength_label: "– No Mapping",
+                    is_ai_suggested: false,
+                    justification: null,
+                    status: "suggested",
+                  };
+                  const mappingKey = `${row.co_code}-${po.code}`;
+                  const isMappingApproved = state.approvedMappings.includes(mappingKey);
+                  const score = cell.correlation_level ?? 0;
+
+                  return (
+                    <div className="relative group flex items-center justify-center py-1">
+                      {/* Clickable Badge: direct cycle 0 -> 1 -> 2 -> 3 -> 0 */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDirectCellCycle(row, po);
+                        }}
+                        className="relative p-1 rounded-lg transition-transform hover:scale-110 active:scale-95 focus:outline-none cursor-pointer"
+                        title="Click to cycle correlation strength (0 → 1 → 2 → 3)"
+                      >
+                        {getScoreBadge(score)}
+                        {cell.is_ai_suggested && score > 0 && !isMappingApproved && (
+                          <div
+                            title="AI Suggested (Review Required)"
+                            className="bg-color2 absolute right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white animate-pulse"
+                          />
+                        )}
+                        {isMappingApproved && !isApproved && (
+                          <div
+                            title="Mapping Verified"
+                            className="bg-green-600 absolute right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                          />
+                        )}
+                      </button>
+
+                      {/* Floating Hover Card on Cell (Strength, Bloom level, and Justification without opening any dropdown or modal!) */}
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl group-hover:block dark:border-slate-700 dark:bg-slate-900">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-slate-800 dark:text-slate-100">
+                              {row.co_code} × {po.code}
+                            </span>
+                            {row.bloom_level && (
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+                                {row.bloom_level}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              score === 3
+                                ? "bg-green-100 text-green-800"
+                                : score === 2
+                                ? "bg-blue-100 text-blue-800"
+                                : score === 1
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {score === 3
+                              ? "3 – High"
+                              : score === 2
+                              ? "2 – Medium"
+                              : score === 1
+                              ? "1 – Low"
+                              : "– No Mapping"}
+                          </span>
+                        </div>
+
+                        <div className="mt-2">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                            Target Program Outcome ({po.code})
+                          </p>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
+                            {po.title || po.code}
+                          </p>
+                          {po.description && (
+                            <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2">
+                              {po.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/60">
+                          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                            <Sparkles className="h-3 w-3" /> Academic Rationale
+                          </p>
+                          <p className="mt-1 max-h-24 overflow-y-auto text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                            {cell.justification || "No rationale provided yet. Click cell to cycle strength."}
+                          </p>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 dark:border-slate-800">
+                          <span>💡 Click cell to cycle: 0 → 1 → 2 → 3</span>
+                          {cell.is_ai_suggested && (
+                            <span className="font-medium text-indigo-500">NEURO AI</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              })),
+            ]}
+          />
+        )}
       </div>
 
       {state.mappingModal && (
@@ -663,21 +1061,24 @@ const COPOMapping = () => {
           fetching={state.fetchingCell}
           loading={state.updatingCell}
           onUpdate={handleUpdateMapping}
-          onAccept={handleAcceptMapping}
         />
       )}
 
       <div className="mt-4">
         <PageFooter
-          batch={!allMapped && !isApproved}
+          batch={!allMapped && displayStatus !== "Approved"}
           status={{
-            label: isApproved ? "Approved" : (matrixData.mapping_status || "Review Required"),
-            color: isApproved ? "#16a34a" : "#ea580c",
+            label: displayStatus,
+            color: displayStatus === "Approved" ? "#16a34a" : "#ea580c",
           }}
-          content1={`Course: ${state.courseDetail?.course_code || "CS309"} – ${state.courseDetail?.course_title || "Computer Networks"}`}
-          content2={`PO Version: ${matrixData.po_version || "PO 2025 v1"}`}
+          content1={
+            state.courseDetail?.course_code
+              ? `Course: ${state.courseDetail?.course_code} – ${state.courseDetail?.course_title || ""}`
+              : ""
+          }
+          content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
           actionBtn1={
-            isApproved
+            displayStatus === "Approved"
               ? {
                   label: "Next: Topic",
                   icon: <ArrowRight className="h-4 w-4" />,
@@ -688,14 +1089,18 @@ const COPOMapping = () => {
                   className: "create-btn",
                 }
               : {
-                  label: state.approvingMap ? "Approving..." : "Approve Mapping",
+                  label: state.approvingMap
+                    ? "Approving..."
+                    : state.extractionNotApproved
+                    ? "Requires Syllabus Approval"
+                    : "Approve Mapping",
                   icon: <Check className="h-4 w-4" />,
                   onClick: handleApproveMapping,
-                  disabled: state.approvingMap,
+                  disabled: state.approvingMap || state.extractionNotApproved,
                 }
           }
           actionBtn2={
-            isApproved
+            displayStatus === "Approved"
               ? {
                   label: "Mapping Approved",
                   icon: <Check className="h-4 w-4" />,

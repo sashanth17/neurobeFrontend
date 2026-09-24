@@ -11,7 +11,15 @@ const job = {
                     resolve(res.data);
                 })
                 .catch((error) => {
-                    if (error.response) {
+                    // Fallback to course/jobs/{id} if 404
+                    if (error.response?.status === 404) {
+                        commonInstance()
+                            .get(`course/jobs/${id}`)
+                            .then((res) => resolve(res.data))
+                            .catch((err) => {
+                                reject(err.response?.data?.message || err.response?.data || err);
+                            });
+                    } else if (error.response) {
                         reject(error.response.data?.message || error.response.data);
                     } else {
                         reject(error);

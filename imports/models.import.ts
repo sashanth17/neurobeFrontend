@@ -18,8 +18,14 @@ import COPOMap from "@/models/copo_map.models";
 import topics from "@/models/topics.models";
 import pedagogy from "@/models/pedagogy.models";
 import course_enrollment from "@/models/course_enrollment.model";
+import faculty from "@/models/faculty.model";
+import pso from "@/models/pso.model";
+import application from "@/models/application.model";
+import master from "@/models/master.model";
+import notification from "@/models/notification.model";
+import mcq from "@/models/mcq.model";
 
-export const Models = {
+export const Models: any = {
   test,
   auth,
   department,
@@ -35,6 +41,8 @@ export const Models = {
   user_import,
   course_import,
   course_instructor,
+  faculty,
+  faculties: faculty,
   syllabus,
   job,
   lession_plan,
@@ -42,6 +50,12 @@ export const Models = {
   COPOMap,
   topics,
   pedagogy,
+  pso,
+  psos: pso,
+  application,
+  master,
+  notification,
+  mcq,
 };
 
 export default Models;

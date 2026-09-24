@@ -22,7 +22,7 @@ import {
 import {
   QuestionCardProps,
 } from "@/components/question-bank/QuestionCard";
-import { EditQuestionModal } from "@/components/academic-setup/Question-bank/EditQuestionModal";
+import { EditQuestionModal } from "@/components/question-bank/EditQuestionModal";
 import ViewQuestionModal from "@/components/question-bank/ViewQuestionModal";
 import GenerateQuestionsModal from "@/components/question-bank/GenerateQuestionsModal";
 import QuestionSetsSearch from "@/components/question-bank/QuestionSetsSearch";
@@ -485,7 +485,13 @@ const MCQTextPreperation = () => {
         ]}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeBannerTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router?.query?.from === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeBannerTab: view })}
       />
 

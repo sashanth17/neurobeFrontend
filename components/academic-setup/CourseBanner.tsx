@@ -13,7 +13,7 @@ type CourseBannerProps = {
   batch: string;
   academicYear: string;
   students: string;
-  selectedCourse?: { value: string; label: string };
+  selectedCourse?: string | { value: string; label: string };
   courseOptions?: { value: string; label: string }[];
   onCourseChange?: (val: any) => void;
   /** Accepted for backward compat — view highlight is driven by Redux, this value is ignored */
@@ -45,12 +45,16 @@ export default function CourseBanner({
 
   // Reset to coordinator only once per app session (not on every page navigation)
   useEffect(() => {
+    if (toogle === "instructor" || toogle === "coordinator") {
+      dispatch(setCourseView(toogle));
+      return;
+    }
     const alreadySet = sessionStorage.getItem("courseViewInitialized");
     if (!alreadySet) {
       dispatch(setCourseView("coordinator"));
       sessionStorage.setItem("courseViewInitialized", "1");
     }
-  }, []);
+  }, [toogle, dispatch]);
 
   const handleViewChange = (view: "coordinator" | "instructor") => {
     dispatch(setCourseView(view));
@@ -70,9 +74,13 @@ export default function CourseBanner({
 
         <CustomSelect
           options={courseOptions}
-          value={selectedCourse || null}
+          value={
+            typeof selectedCourse === "string"
+              ? courseOptions.find((o) => o.value === selectedCourse) || { value: selectedCourse, label: `Course: ${selectedCourse}` }
+              : selectedCourse || null
+          }
           onChange={onCourseChange}
-          placeholder={`Course: ${selectedCourse || courseCode}`}
+          placeholder={`Course: ${typeof selectedCourse === "object" ? selectedCourse?.label : selectedCourse || courseCode}`}
           isSearchable={false}
           isClearable={false}
           className="course-banner-select w-30"

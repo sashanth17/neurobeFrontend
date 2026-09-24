@@ -30,209 +30,8 @@ export interface CourseTopicsCardProps {
   className?: string;
 }
 
-const DEFAULT_UNITS: UnitTopicData[] = [
-  {
-    id: "unit-1",
-    unitNumber: 1,
-    unitCodeText: "Unit 1",
-    title: "Introduction & Physical Layer",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "1.1",
-        title: "Fundamentals of Computer Networks",
-        description:
-          "Introduces basic data communication concepts, network purpose, components and network classifications.",
-        hoursText: "2 Hours",
-        levelText: "Knowledge Level: K2",
-        subtopics: [
-          { code: "1.1.1", title: "Data Communication and Network Fundamentals" },
-          { code: "1.1.2", title: "Network Components and Communication Links" },
-          { code: "1.1.3", title: "LAN, MAN and WAN Concepts" },
-        ],
-      },
-      {
-        code: "1.2",
-        title: "Network Architecture and Layered Communication",
-        description:
-          "Explains layered architecture, network services, protocols and interfaces used for structured communication.",
-        hoursText: "2 Hours",
-        levelText: "Knowledge Level: K2",
-        subtopics: [
-          { code: "1.2.1", title: "Layered Network Architecture" },
-          { code: "1.2.2", title: "Protocols, Services and Interfaces" },
-          { code: "1.2.3", title: "Benefits of Layered Communication" },
-        ],
-      },
-      {
-        code: "1.3",
-        title: "OSI and TCP/IP Reference Models",
-        description:
-          "Studies standard reference models and functions of networking layers.",
-        hoursText: "3 Hours",
-        levelText: "Knowledge Level: K2",
-        subtopics: [
-          { code: "1.3.1", title: "OSI Reference Model and Layer Functions" },
-          { code: "1.3.2", title: "TCP/IP Reference Model and Protocol Suite" },
-          { code: "1.3.3", title: "Comparison of OSI and TCP/IP Models" },
-        ],
-      },
-      {
-        code: "1.4",
-        title: "Physical Layer and Transmission Media",
-        description:
-          "Covers physical transmission concepts and communication media used in computer networks.",
-        hoursText: "2 Hours",
-        levelText: "Knowledge Level: K2",
-        subtopics: [
-          { code: "1.4.1", title: "Signals and Data Transmission Fundamentals" },
-          { code: "1.4.2", title: "Guided Transmission Media" },
-          { code: "1.4.3", title: "Unguided Transmission Media" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "unit-2",
-    unitNumber: 2,
-    unitCodeText: "Unit 2",
-    title: "Data Link Layer & MAC Sublayer",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "2.1",
-        title: "Data Link Layer Design & Framing",
-        description:
-          "Examines framing, error detection mechanisms, and sliding window flow control protocols.",
-        hoursText: "2 Hours",
-        levelText: "Knowledge Level: K3",
-        subtopics: [
-          { code: "2.1.1", title: "Framing Methods & Character/Bit Stuffing" },
-          { code: "2.1.2", title: "CRC & Checksum Error Control Algorithms" },
-          {
-            code: "2.1.3",
-            title:
-              "Sliding Window Protocols (Stop-and-Wait, Go-Back-N, Selective Repeat)",
-          },
-        ],
-      },
-      {
-        code: "2.2",
-        title: "Medium Access Control & Ethernet",
-        description:
-          "Covers random access protocols, collision handling, and Ethernet standards.",
-        hoursText: "3 Hours",
-        levelText: "Knowledge Level: K3",
-        subtopics: [
-          { code: "2.2.1", title: "ALOHA and CSMA/CD Protocol Mechanics" },
-          { code: "2.2.2", title: "Binary Exponential Backoff Algorithm" },
-          { code: "2.2.3", title: "IEEE 802.3 Frame Format and Fast/Gigabit Ethernet" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "unit-3",
-    unitNumber: 3,
-    unitCodeText: "Unit 3",
-    title: "Network Layer & Routing",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "3.1",
-        title: "IPv4/IPv6 Addressing & Subnetting",
-        description: "IP addressing structures, VLSM, CIDR, and IPv6 transition.",
-        hoursText: "3 Hours",
-        levelText: "Knowledge Level: K3",
-        subtopics: [
-          { code: "3.1.1", title: "Classful vs Classless Inter-Domain Routing (CIDR)" },
-          { code: "3.1.2", title: "Variable Length Subnet Masking (VLSM)" },
-        ],
-      },
-      {
-        code: "3.2",
-        title: "Routing Algorithms & Protocols",
-        description: "Distance Vector, Link State, RIP, OSPF, and BGP protocols.",
-        hoursText: "4 Hours",
-        levelText: "Knowledge Level: K4",
-        subtopics: [
-          { code: "3.2.1", title: "Distance Vector vs Link State Routing" },
-          { code: "3.2.2", title: "RIP, OSPF and BGP Operation Mechanics" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "unit-4",
-    unitNumber: 4,
-    unitCodeText: "Unit 4",
-    title: "Transport Layer Protocols",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "4.1",
-        title: "TCP Connection Management & Flow Control",
-        description: "TCP three-way handshake, sliding window, and congestion control.",
-        hoursText: "4 Hours",
-        levelText: "Knowledge Level: K3",
-        subtopics: [
-          { code: "4.1.1", title: "Three-Way Handshake & Connection Termination" },
-          { code: "4.1.2", title: "TCP Sliding Window & Congestion Control" },
-        ],
-      },
-      {
-        code: "4.2",
-        title: "UDP & Socket Programming",
-        description: "UDP datagram communication and socket programming basics.",
-        hoursText: "3 Hours",
-        levelText: "Knowledge Level: K2",
-        subtopics: [
-          { code: "4.2.1", title: "Connectionless UDP Transmission" },
-          { code: "4.2.2", title: "Socket API Fundamentals" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "unit-5",
-    unitNumber: 5,
-    unitCodeText: "Unit 5",
-    title: "Application Layer",
-    hoursText: "9 Hours",
-    topicsCountText: "4 Main Topics",
-    topics: [
-      {
-        code: "5.1",
-        title: "Application Protocols",
-        description: "DNS resolution, HTTP/HTTPS operations, and email protocols.",
-        hoursText: "4 Hours",
-        levelText: "Knowledge Level: K2",
-        subtopics: [
-          { code: "5.1.1", title: "Domain Name System (DNS) Architecture" },
-          { code: "5.1.2", title: "HTTP/HTTPS Request-Response Mechanics" },
-        ],
-      },
-      {
-        code: "5.2",
-        title: "Network Management & Security",
-        description: "Encryption basics, firewalls, and VPN technologies.",
-        hoursText: "4 Hours",
-        levelText: "Knowledge Level: K3",
-        subtopics: [
-          { code: "5.2.1", title: "Symmetric & Asymmetric Encryption Overview" },
-          { code: "5.2.2", title: "Firewalls and Virtual Private Networks (VPN)" },
-        ],
-      },
-    ],
-  },
-];
-
 const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
-  units = DEFAULT_UNITS,
+  units = [],
   className = "",
 }) => {
   const [openUnits, setOpenUnits] = useState<Record<string, boolean>>({});
@@ -288,17 +87,26 @@ const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
     })
     .filter(Boolean) as UnitTopicData[];
 
+  const totalUnits = units.length;
+  const totalMainTopics = units.reduce((acc, u) => acc + (u.topics?.length || 0), 0);
+  const totalChildTopics = units.reduce(
+    (acc, u) =>
+      acc +
+      (u.topics || []).reduce((subAcc, t) => subAcc + (t.subtopics?.length || 0), 0),
+    0
+  );
+
   return (
     <div className={`space-y-4 ${className} panel p-5`}>
       {/* Top Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 py-1 px-1">
         {/* Left Stats Bar */}
         <div className="flex items-center gap-2 text-sm font-bold text-[#1e1b4b] dark:text-white">
-          <span >5 Units</span>
+          <span>{totalUnits} Units</span>
           <span className="text-gray-300 dark:text-[#000]">•</span>
-          <span className="text-color2 font-bold">20 Main Topics</span>
+          <span className="text-color2 font-bold">{totalMainTopics} Main Topics</span>
           <span className="text-gray-300 dark:text-[#000]">•</span>
-          <span>70 Child Topics</span>
+          <span>{totalChildTopics} Child Topics</span>
         </div>
 
         {/* Right Search + Expand/Collapse */}
@@ -336,7 +144,12 @@ const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
 
       {/* Accordion Units List */}
       <div className="space-y-3">
-        {filteredUnits.map((unit) => {
+        {filteredUnits.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">
+            No approved topic hierarchy available for this course.
+          </div>
+        ) : (
+          filteredUnits.map((unit) => {
           const isOpen = Boolean(openUnits[unit.id] || searchQuery.trim());
           return (
             <div
@@ -452,7 +265,7 @@ const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

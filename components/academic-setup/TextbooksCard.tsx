@@ -8,19 +8,10 @@ export interface TextbooksCardProps {
   className?: string;
 }
 
-const DEFAULT_TEXTBOOKS: BookItem[] = [
-  {
-    id: "tb-1",
-    title: "Computer Networks",
-    authors: "Andrew S. Tanenbaum, David J. Wetherall",
-    publisher: "Pearson · 5th Edition",
-  },
-];
-
 const TextbooksCard: React.FC<TextbooksCardProps> = ({
   title = "TEXTBOOKS",
   headerSubtitle = "Approved Prescribed Literature",
-  textbooks = DEFAULT_TEXTBOOKS,
+  textbooks = [],
   className = "",
 }) => {
   return (
@@ -41,15 +32,21 @@ const TextbooksCard: React.FC<TextbooksCardProps> = ({
 
       {/* List of Textbooks using BookRowItem inner component */}
       <div className="space-y-2">
-        {textbooks.map((book, idx) => (
-          <BookRowItem
-            key={book.id || idx}
-            index={idx + 1}
-            title={book.title}
-            authors={book.authors}
-            publisher={book.publisher}
-          />
-        ))}
+        {textbooks.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            No approved textbooks prescribed for this course.
+          </div>
+        ) : (
+          textbooks.map((book, idx) => (
+            <BookRowItem
+              key={book.id || idx}
+              index={idx + 1}
+              title={book.title}
+              authors={book.authors}
+              publisher={book.publisher}
+            />
+          ))
+        )}
       </div>
     </div>
   );

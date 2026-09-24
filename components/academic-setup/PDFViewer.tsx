@@ -169,10 +169,11 @@ const PDFViewer = ({ file, fileName = "Document", fileSize = "" }: PDFViewerProp
   };
 
   const shouldRender = (idx: number) => {
-    for (const v of visiblePages) {
-      if (Math.abs(v - idx) <= BUFFER) return true;
-    }
-    return false;
+    let match = false;
+    visiblePages.forEach((v) => {
+      if (Math.abs(v - idx) <= BUFFER) match = true;
+    });
+    return match;
   };
 
   const headerColor =

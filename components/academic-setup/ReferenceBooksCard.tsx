@@ -8,25 +8,10 @@ export interface ReferenceBooksCardProps {
   className?: string;
 }
 
-const DEFAULT_REFERENCES: BookItem[] = [
-  {
-    id: "ref-1",
-    title: "Data Communications and Networking",
-    authors: "Behrouz A. Forouzan",
-    publisher: "McGraw Hill",
-  },
-  {
-    id: "ref-2",
-    title: "Computer Networking: A Top-Down Approach",
-    authors: "James F. Kurose, Keith W. Ross",
-    publisher: "Pearson",
-  },
-];
-
 const ReferenceBooksCard: React.FC<ReferenceBooksCardProps> = ({
   title = "REFERENCE BOOKS",
   headerSubtitle = "Supplementary Academic References",
-  references = DEFAULT_REFERENCES,
+  references = [],
   className = "",
 }) => {
   return (
@@ -47,15 +32,21 @@ const ReferenceBooksCard: React.FC<ReferenceBooksCardProps> = ({
 
       {/* List of Reference Books using BookRowItem inner component */}
       <div className="space-y-3">
-        {references.map((book, idx) => (
-          <BookRowItem
-            key={book.id || idx}
-            index={idx + 1}
-            title={book.title}
-            authors={book.authors}
-            publisher={book.publisher}
-          />
-        ))}
+        {references.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            No approved reference books prescribed for this course.
+          </div>
+        ) : (
+          references.map((book, idx) => (
+            <BookRowItem
+              key={book.id || idx}
+              index={idx + 1}
+              title={book.title}
+              authors={book.authors}
+              publisher={book.publisher}
+            />
+          ))
+        )}
       </div>
     </div>
   );

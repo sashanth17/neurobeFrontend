@@ -288,6 +288,7 @@ const LearningMeterials = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const course_id = searchParams.get("course_id");
+  const fromParam = searchParams.get("from");
 
   const [state, setState] = useSetState({
     search: "",
@@ -309,7 +310,9 @@ const LearningMeterials = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    course_data();
+    if (course_id) {
+      course_data();
+    }
   }, [course_id]);
 
   const material_data = async (syllabus_id, unit) => {
@@ -351,13 +354,12 @@ const LearningMeterials = () => {
   console.log('✌️activeTab --->', state.activeTab);
 
   const course_data = async () => {
+    if (!course_id) return;
     try {
-      const res: any = await Models.course.detail(48);
+      const res: any = await Models.course.detail(course_id);
       console.log('course_data --->', res);
 
-      // setState({ courseData: res });
       setState({ courseData: res, activeTab: `unit-${res?.latest_syllabus?.units?.[0]?.unit_number}` });
-
 
       material_data(res?.latest_syllabus?.id, res?.latest_syllabus?.units?.[0]?.unit_number);
 
@@ -682,7 +684,13 @@ const LearningMeterials = () => {
         courseOptions={state.course_list}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Save,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { useSetState, Success, Failure, Dropdown } from "@/utils/function.utils";
@@ -33,10 +34,12 @@ import GenericTabs from "@/components/common-components/GenericTabs";
 import AccordiansStyle from "@/components/common-components/AccordiansStyle";
 import PageFooter from "@/components/common-components/PageFooter";
 import AddTopicModal from "@/components/academic-setup/AddTopicModal";
+import AddSubtopicModal from "@/components/academic-setup/AddSubtopicModal";
 import EditTopicModal from "@/components/academic-setup/EditTopicModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UNIT_TABS } from "@/utils/constant.utils";
 import PageHeader from "@/components/common-components/PageHeader";
+import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
 import Models from "@/imports/models.import";
 
 // ─── Raw unit data ─────────────────────────────────────────────────────────────
@@ -205,41 +208,6 @@ const RAW_UNIT_DATA: Record<string, UnitData> = {
   },
 };
 
-// ─── Static config ─────────────────────────────────────────────────────────────
-
-const STAT_TABS = [
-  {
-    key: "total-topics",
-    label: "Total Topics",
-    subLabel: "Across all units",
-    count: 22,
-    icon: <BookOpen className="h-5 w-5" />,
-  },
-  {
-    key: "approved",
-    label: "Approved Topics",
-    subLabel: "Ready for lesson plan",
-    count: 10,
-    icon: <CheckCircle2 className="h-5 w-5" />,
-  },
-  {
-    key: "needs-review",
-    label: "Needs Review",
-    subLabel: "Pending approval",
-    count: 12,
-    icon: <Hourglass className="h-5 w-5" />,
-  },
-  {
-    key: "contact-hours",
-    label: "Contact Hours",
-    subLabel: "Total teaching hours",
-    count: 45,
-    icon: <Clock className="h-5 w-5" />,
-  },
-];
-
-
-
 const GENERATE_STEPS = [
   {
     title: "Analyzing Course Syllabus",
@@ -262,7 +230,6 @@ const GENERATE_STEPS = [
 const fallbackTotalTopics = UNIT_TABS.reduce((a, b) => a + b.count, 0);
 const fallbackTotalUnits = UNIT_TABS.length;
 
-// count all subtopics across all units
 const fallbackTotalSubtopics = Object.values(RAW_UNIT_DATA).reduce(
   (s, u) => s + u.topics.reduce((ts, t) => ts + t.subtopics.length, 0),
   0,
@@ -273,6 +240,8 @@ const fallbackTotalSubtopics = Object.values(RAW_UNIT_DATA).reduce(
 const Topics = () => {
   const dispatch = useDispatch();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromParam = searchParams?.get("from");
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
 
@@ -286,6 +255,9 @@ const Topics = () => {
     showGenerateModal: false,
     generatingTopics: false,
     topicsLoading: false,
+    jobStatus: "idle" as "idle" | "processing" | "complete" | "failed",
+    jobId: "" as string | number,
+    jobData: null as any,
     activeBannerTab: "coordinator",
     selectedCourse: null,
     courseDetail: null as any,
@@ -297,6 +269,8 @@ const Topics = () => {
     unitDetailsMap: {} as Record<number, any>,
     loadingUnits: false,
     loadingUnitDetail: false,
+    upstreamNotApproved: false,
+    approvingTopics: false,
   });
 
   const course_id = useSearchParams().get("course_id");
@@ -316,6 +290,10 @@ const Topics = () => {
   );
 
   const [addTopicModal, setAddTopicModal] = useState(false);
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
+  const [addSubtopicModal, setAddSubtopicModal] = useState(false);
+  const [selectedTopicForSubtopic, setSelectedTopicForSubtopic] = useState<any>(null);
+  const [addingSubtopic, setAddingSubtopic] = useState(false);
   const [editTopicModal, setEditTopicModal] = useState(false);
   const [selectedTopicToEdit, setSelectedTopicToEdit] = useState<any>(null);
   const [updatingTopic, setUpdatingTopic] = useState(false);
@@ -325,6 +303,11 @@ const Topics = () => {
     setSelectedTopicToEdit(topic);
     setEditModalInitialStatus(initialStatus);
     setEditTopicModal(true);
+  };
+
+  const openAddSubtopicModal = (topic: any) => {
+    setSelectedTopicForSubtopic(topic);
+    setAddSubtopicModal(true);
   };
 
   useEffect(() => {
@@ -352,10 +335,35 @@ const Topics = () => {
   useEffect(() => {
     if (course_id) {
       getCourseDetails();
-    } else {
-      getUnits(1);
+      restoreWorkflowState(course_id);
     }
   }, [course_id]);
+
+  const restoreWorkflowState = async (cid: string | number) => {
+    try {
+      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
+      const isExtractionApproved = extractionStep?.status === "approved";
+      setState({ upstreamNotApproved: !isExtractionApproved });
+
+      const topicStep = wfRes?.workflow?.step_3_topic_hierarchy;
+      if (!topicStep) return;
+
+      const { status, job_id } = topicStep;
+      if (status === "redis_queued" || status === "generating") {
+        setState({ generatingTopics: true, jobStatus: "processing", jobId: job_id });
+        if (job_id) {
+          job_Data(job_id);
+        }
+      } else if (status === "approved") {
+        setState({ topicsApproved: true, topicsGenerated: true, generatingTopics: false, jobStatus: "complete" });
+      } else if (status === "draft") {
+        setState({ topicsGenerated: true, generatingTopics: false, jobStatus: "complete" });
+      }
+    } catch (err) {
+      console.warn("restoreWorkflowState in topics error:", err);
+    }
+  };
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -396,16 +404,25 @@ const Topics = () => {
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
       const sid = res?.syllabus_id || res?.latest_syllabus?.id;
-      getUnits(sid);
+      if (sid) {
+        getUnits(sid);
+      } else {
+        setState({ loadingUnits: false });
+      }
     } catch (error: any) {
       console.log("error fetching course detail", error);
       Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      getUnits(1);
+      setState({ loadingUnits: false });
     }
   };
 
-  const getUnits = async (syllabusId?: any) => {
-    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
+  const getUnits = async (syllabusId?: any, verNum?: number) => {
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id;
+    if (!sid) {
+      setState({ loadingUnits: false });
+      return;
+    }
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loadingUnits: true });
       const res: any = await Models.topics.units(sid);
@@ -433,10 +450,10 @@ const Topics = () => {
           loadingUnits: false,
         });
 
-        getUnitDetail(sid, initialUnitNum);
+        getUnitDetail(sid, initialUnitNum, vToUse);
       } else {
         setState({ loadingUnits: false });
-        getUnitDetail(sid, 1);
+        getUnitDetail(sid, 1, vToUse);
       }
     } catch (error: any) {
       console.log("error fetching units", error);
@@ -445,12 +462,13 @@ const Topics = () => {
     }
   };
 
-  const getUnitDetail = async (syllabusId?: any, unitNumber?: any) => {
+  const getUnitDetail = async (syllabusId?: any, unitNumber?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id;
-    const uNum = unitNumber ?? state.activeUnitNumber ;
+    const uNum = unitNumber ?? state.activeUnitNumber;
+    const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
-      setState({ loadingUnitDetail: true }); 
-      const res: any = await Models.topics.unit_detail(sid, uNum);
+      setState({ loadingUnitDetail: true });
+      const res: any = await Models.topics.unit_detail(sid, uNum, vToUse);
       const data = res?.data || res;
 
       setState((prev: any) => {
@@ -461,25 +479,25 @@ const Topics = () => {
         const existingUnits = prev.unitsList || [];
         const mergedUnitsList = (Array.isArray(resUnitTabs) && resUnitTabs.length > 0)
           ? resUnitTabs.map((tab: any, idx: number) => {
-              const tabNum = tab.unit_number ?? (idx + 1);
-              const fromExisting = existingUnits.find(
-                (eu: any) => (eu.unit_number ?? eu.id) === tabNum
-              );
-              const realId =
-                (data?.selected_unit?.unit_number === tabNum ? currentUnitDbId : null) ||
-                fromExisting?.unit_id ||
-                fromExisting?.id ||
-                tab.unit_id ||
-                tab.id ||
-                (tabNum === 1 ? (currentUnitDbId || 2) : (currentUnitDbId ? currentUnitDbId + (tabNum - 1) : tabNum + 1));
+            const tabNum = tab.unit_number ?? (idx + 1);
+            const fromExisting = existingUnits.find(
+              (eu: any) => (eu.unit_number ?? eu.id) === tabNum
+            );
+            const realId =
+              (data?.selected_unit?.unit_number === tabNum ? currentUnitDbId : null) ||
+              fromExisting?.unit_id ||
+              fromExisting?.id ||
+              tab.unit_id ||
+              tab.id ||
+              (tabNum === 1 ? (currentUnitDbId || 2) : (currentUnitDbId ? currentUnitDbId + (tabNum - 1) : tabNum + 1));
 
-              return {
-                ...tab,
-                id: realId,
-                unit_id: realId,
-                unit_number: tabNum,
-              };
-            })
+            return {
+              ...tab,
+              id: realId,
+              unit_id: realId,
+              unit_number: tabNum,
+            };
+          })
           : existingUnits;
 
         const existingCourse = prev.courseDetail || {};
@@ -517,6 +535,26 @@ const Topics = () => {
           },
         };
       });
+
+      const loadedTopics = data?.selected_unit?.topics || data?.topics || [];
+      const targetUnitNum = data?.selected_unit?.unit_number ?? uNum;
+      const uKey = `unit-${targetUnitNum}`;
+      setApprovedMap((prev: any) => {
+        const nextSet = new Set(prev[uKey] || []);
+        loadedTopics.forEach((t: any) => {
+          if (t.status === "Approved" || t.status?.toLowerCase() === "approved") {
+            nextSet.add(String(t.id));
+            if (t.topic_code) nextSet.add(String(t.topic_code));
+          }
+          (t.subtopics || []).forEach((s: any) => {
+            if (s.status === "Approved" || s.status?.toLowerCase() === "approved") {
+              nextSet.add(String(s.id));
+              if (s.subtopic_code) nextSet.add(String(s.subtopic_code));
+            }
+          });
+        });
+        return { ...prev, [uKey]: nextSet };
+      });
     } catch (error: any) {
       console.log("error fetching unit detail", error);
       setState({ loadingUnitDetail: false });
@@ -535,51 +573,80 @@ const Topics = () => {
       return;
     }
 
+    const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes (120,000 ms)
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+    setState({
+      jobStatus: "processing",
+      topicsLoading: true,
+      jobId: targetId,
+    });
+
     const fetchOnce = async () => {
       try {
-        setState({
-          topicsLoading: true,
-        });
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          stopPolling();
+          setState({ topicsLoading: false, jobStatus: "failed" });
+          Failure("Topic generation timed out after 15 minutes. Please try again or check status manually.");
+          return;
+        }
+
         const res: any = await Models.job.detail(targetId);
-        console.log("job_Data", res);
+        console.log("job_Data response:", res);
         setState({ jobData: res });
 
-        const status = res?.status ?? res?.state?.live_redis_status ?? res?.result?.status;
+        const rawStatus = (res?.status ?? res?.state?.live_redis_status ?? res?.result?.status ?? "").toLowerCase();
         const syllabusId = res?.result?.syllabus_id || res?.syllabus_id;
 
-        if (status === "complete" || status === "completed" || status === "finished" || status === "success" || syllabusId) {
+        const isComplete =
+          rawStatus === "complete" ||
+          rawStatus === "completed" ||
+          rawStatus === "finished" ||
+          rawStatus === "success" ||
+          (Boolean(syllabusId) && rawStatus !== "processing" && rawStatus !== "running" && rawStatus !== "redis_queued");
+
+        if (isComplete) {
           stopPolling();
           console.log("job_Data complete, syllabus_id:", syllabusId);
 
           const targetSid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id;
           const currentUnitNum = state.activeUnitNumber || 1;
 
-          await getUnits(targetSid);
-          await getUnitDetail(targetSid, currentUnitNum);
+          if (targetSid) {
+            await getUnits(targetSid);
+            await getUnitDetail(targetSid, currentUnitNum);
+          }
 
           setState({
+            jobStatus: "complete",
             topicsLoading: false,
             topicsGenerated: true,
+            topicsApproved: false,
           });
-        } else if (status === "failed" || status === "error") {
+          Success("Topic hierarchy generated successfully!");
+        } else if (rawStatus === "failed" || rawStatus === "error") {
           stopPolling();
           setState({
+            jobStatus: "failed",
             topicsLoading: false,
           });
           Failure(res?.message || res?.error || "Topic generation job failed");
+        } else {
+          // Still processing in Redis/background
+          setState({
+            jobStatus: "processing",
+            topicsLoading: true,
+          });
         }
       } catch (error) {
         console.log("job_Data error", error);
-        stopPolling();
-        setState({
-          topicsLoading: false,
-        });
       }
     };
 
-    // call immediately, then every 3 seconds
+    // call immediately, then every 2 minutes
     await fetchOnce();
-    pollRef.current = setInterval(fetchOnce, 3000);
+    pollRef.current = setInterval(fetchOnce, POLL_INTERVAL_MS);
   };
 
 
@@ -734,22 +801,42 @@ const Topics = () => {
   unitsList.forEach((u: any) => {
     const uDetail = state.unitDetailsMap?.[u.unit_number];
     const topicsArr = uDetail?.selected_unit?.topics || uDetail?.topics;
+    const uKey = `unit-${u.unit_number}`;
+    const uApprovedSet = approvedMap[uKey] || new Set<string>();
     if (Array.isArray(topicsArr) && topicsArr.length > 0) {
       topicsArr.forEach((t: any) => {
-        const topicId = String(t.id || t.topic_code);
-        const isAppr =
-          approvedInUnit.has(topicId) ||
-          approvedInUnit.has(String(t.id)) ||
-          t.status === "Approved" ||
-          t.status_badge === "success";
-        if (isAppr) {
-          computedApprovedCount++;
+        const subList = Array.isArray(t.subtopics) ? t.subtopics : [];
+        if (subList.length > 0) {
+          subList.forEach((s: any) => {
+            const subId = String(s.id);
+            const subCode = String(s.subtopic_code || "");
+            const isSubAppr =
+              uApprovedSet.has(subId) ||
+              (subCode && uApprovedSet.has(subCode)) ||
+              s.status === "Approved" ||
+              s.status?.toLowerCase() === "approved" ||
+              s.status_badge === "success";
+            if (isSubAppr) {
+              computedApprovedCount++;
+            }
+          });
+        } else {
+          const topicId = String(t.id || t.topic_code);
+          const isAppr =
+            uApprovedSet.has(topicId) ||
+            uApprovedSet.has(String(t.id)) ||
+            t.status === "Approved" ||
+            t.status?.toLowerCase() === "approved" ||
+            t.status_badge === "success";
+          if (isAppr) {
+            computedApprovedCount++;
+          }
         }
       });
     }
   });
 
-  const totalApproved = Object.values(approvedMap).reduce((s, set) => s + set.size, 0) || computedApprovedCount;
+  const totalApproved = computedApprovedCount || Object.values(approvedMap).reduce((s, set) => s + set.size, 0);
   const allApproved = totalApproved >= computedTotalSubtopics;
 
   const displayNeedsReview = Math.max(0, totalTopics - totalApproved);
@@ -763,17 +850,17 @@ const Topics = () => {
       icon: <BookOpen className="h-5 w-5" />,
     },
     {
-      key: "approved",
-      label: "Approved Topics",
-      subLabel: "Ready for lesson plan",
-      count: totalApproved,
+      key: "subtopics",
+      label: "Total Subtopics",
+      subLabel: "Decomposed units",
+      count: computedTotalSubtopics,
       icon: <CheckCircle2 className="h-5 w-5" />,
     },
     {
-      key: "needs-review",
-      label: "Needs Review",
-      subLabel: "Pending approval",
-      count: displayNeedsReview,
+      key: "status",
+      label: "Hierarchy Status",
+      subLabel: state.topicsApproved ? "Approved for pedagogy" : "Pending stage approval",
+      count: state.topicsApproved ? "Approved" : "Draft",
       icon: <Hourglass className="h-5 w-5" />,
     },
     {
@@ -824,7 +911,14 @@ const Topics = () => {
     const knowledgeLevel = newTopic.level;
     const status = newTopic.status;
 
+    const sid =
+      activeUnitDetail?.syllabus_id ||
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      9;
+
     const body = {
+      syllabus_id: sid,
       topic_name: topicName,
       estimated_hours: estimatedHours,
       knowledge_level: knowledgeLevel,
@@ -839,11 +933,6 @@ const Topics = () => {
       console.log("create topic response:", res);
       Success(res?.message || "Topic created successfully");
 
-      const sid =
-        activeUnitDetail?.syllabus_id ||
-        state.courseDetail?.latest_syllabus?.id ||
-        state.unitsList?.[0]?.syllabus_id ||
-        9;
       await getUnitDetail(sid, matchedUnitNum);
     } catch (error: any) {
       console.log("create topic error:", error);
@@ -951,20 +1040,20 @@ const Topics = () => {
     const existingMicroTopics = payload.micro_topics || selectedTopicToEdit?.micro_topics;
     const microTopicsList = (Array.isArray(existingMicroTopics) && existingMicroTopics.length > 0)
       ? existingMicroTopics.map((m: any) => ({
-          micro_topic_name: typeof m === "string" ? m : (m?.micro_topic_name || m?.name || m?.title || payload.topic_name),
-        }))
+        micro_topic_name: typeof m === "string" ? m : (m?.micro_topic_name || m?.name || m?.title || payload.topic_name),
+      }))
       : [
-          {
-            micro_topic_name: payload.topic_name,
-          },
-        ];
+        {
+          micro_topic_name: payload.topic_name,
+        },
+      ];
 
     const subtopicBody = {
       subtopic_code: subtopicCode,
       subtopic_name: payload.topic_name,
       micro_topics: microTopicsList,
-      hours : payload.estimated_hours,
-      knowledge_level : payload.knowledge_level,
+      hours: payload.estimated_hours,
+      knowledge_level: payload.knowledge_level,
       status: payload.status,
     };
 
@@ -981,11 +1070,11 @@ const Topics = () => {
       setUpdatingTopic(true);
       let res: any;
       if (isSub) {
-        console.log("Calling Models.topics.subTopics_update with topicId:", targetTopicId, "body:", subtopicBody);
-        res = await Models.topics.subTopics_update(targetTopicId, subtopicBody);
+        console.log("Calling Models.topics.update_subtopic with topicId:", targetTopicId, "subtopicId:", subtopicId, "body:", subtopicBody);
+        res = await (Models.topics as any).update_subtopic(targetTopicId, subtopicId, subtopicBody, loadedVersion);
       } else {
         console.log("Calling Models.topics.update with topicId:", targetTopicId, "body:", topicBody);
-        res = await Models.topics.update(targetTopicId, topicBody);
+        res = await Models.topics.update(targetTopicId, topicBody, loadedVersion);
       }
 
       if (res && (res.status === false || res.success === false)) {
@@ -996,17 +1085,25 @@ const Topics = () => {
       setEditTopicModal(false);
 
       const trackedId = String(isSub ? subtopicId : targetTopicId);
-      if (payload.status === "Approved") {
+      const isApprStatus = payload.status === "Approved" || payload.status?.toLowerCase() === "approved";
+      const uKey = `unit-${matchedUnitNum}`;
+      if (isApprStatus) {
         setApprovedMap((prev: any) => {
-          const next = new Set(prev[state.activeTab] || []);
-          next.add(trackedId);
-          return { ...prev, [state.activeTab]: next };
+          const nextActive = new Set(prev[state.activeTab] || []);
+          nextActive.add(trackedId);
+          if (payload.subtopic_code) nextActive.add(String(payload.subtopic_code));
+          const nextUnit = new Set(prev[uKey] || []);
+          nextUnit.add(trackedId);
+          if (payload.subtopic_code) nextUnit.add(String(payload.subtopic_code));
+          return { ...prev, [state.activeTab]: nextActive, [uKey]: nextUnit };
         });
       } else {
         setApprovedMap((prev: any) => {
-          const next = new Set(prev[state.activeTab] || []);
-          next.delete(trackedId);
-          return { ...prev, [state.activeTab]: next };
+          const nextActive = new Set(prev[state.activeTab] || []);
+          nextActive.delete(trackedId);
+          const nextUnit = new Set(prev[uKey] || []);
+          nextUnit.delete(trackedId);
+          return { ...prev, [state.activeTab]: nextActive, [uKey]: nextUnit };
         });
       }
 
@@ -1101,6 +1198,95 @@ const Topics = () => {
     }
   };
 
+  const handleDeleteTopic = async (topicObj: any) => {
+    const topicId = topicObj?.id || topicObj?.topic_id;
+    if (!topicId) {
+      Failure("Cannot identify topic to delete");
+      return;
+    }
+    const topicTitle = topicObj?.topic_name || topicObj?.title || "this topic";
+    if (!window.confirm(`Are you sure you want to delete topic "${topicTitle}"?`)) {
+      return;
+    }
+    try {
+      setState({ topicsLoading: true });
+      await Models.topics.delete_topic(topicId, loadedVersion);
+      Success("Topic deleted successfully");
+      const sid =
+        activeUnitDetail?.syllabus_id ||
+        state.courseDetail?.latest_syllabus?.id ||
+        state.unitsList?.[0]?.syllabus_id ||
+        course_id ||
+        9;
+      await getUnitDetail(sid, activeUnitNum);
+    } catch (error: any) {
+      console.log("delete topic error:", error);
+      Failure(getErrorMessage(error, "Failed to delete topic"));
+    } finally {
+      setState({ topicsLoading: false });
+    }
+  };
+
+  const handleDeleteSubtopic = async (parentTopicId: any, subtopicId: any) => {
+    if (!parentTopicId || !subtopicId) {
+      Failure("Cannot identify subtopic to delete");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this subtopic?")) {
+      return;
+    }
+    try {
+      setState({ topicsLoading: true });
+      await Models.topics.delete_subtopic(parentTopicId, subtopicId, loadedVersion);
+      Success("Subtopic deleted successfully");
+      const sid =
+        activeUnitDetail?.syllabus_id ||
+        state.courseDetail?.latest_syllabus?.id ||
+        state.unitsList?.[0]?.syllabus_id ||
+        course_id ||
+        9;
+      await getUnitDetail(sid, activeUnitNum);
+    } catch (error: any) {
+      console.log("delete subtopic error:", error);
+      Failure(getErrorMessage(error, "Failed to delete subtopic"));
+    } finally {
+      setState({ topicsLoading: false });
+    }
+  };
+
+  const handleAddSubtopic = async (payload: {
+    subtopic_code: string;
+    subtopic_name: string;
+    hours: number;
+    knowledge_level: string;
+    status: string;
+    micro_topics: { micro_topic_name: string }[];
+  }) => {
+    const parentTopicId = selectedTopicForSubtopic?.id || selectedTopicForSubtopic?.topic_id;
+    if (!parentTopicId) {
+      Failure("Parent topic ID not found");
+      return;
+    }
+    try {
+      setAddingSubtopic(true);
+      const res: any = await Models.topics.add_subtopic(parentTopicId, payload, loadedVersion);
+      Success(res?.message || "Subtopic added successfully");
+      const sid =
+        activeUnitDetail?.syllabus_id ||
+        state.courseDetail?.latest_syllabus?.id ||
+        state.unitsList?.[0]?.syllabus_id ||
+        course_id ||
+        9;
+      await getUnitDetail(sid, activeUnitNum);
+    } catch (error: any) {
+      console.log("add subtopic error:", error);
+      Failure(getErrorMessage(error, "Failed to add subtopic"));
+      throw error;
+    } finally {
+      setAddingSubtopic(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     const sid =
       activeUnitDetail?.syllabus_id ||
@@ -1123,53 +1309,97 @@ const Topics = () => {
 
   const handleApproveTopics = async () => {
     const sid =
-      activeUnitDetail?.syllabus_id ||
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
+      activeUnitDetail?.syllabus_id ||
+      course_id ||
       9;
+
+    if (state.upstreamNotApproved) {
+      Failure("Cannot approve topics: Syllabus extraction must be approved first.");
+      return;
+    }
 
     try {
       setState({ approvingTopics: true });
-      const res: any = await Models.topics.approve_topics(sid, {});
-      console.log("approve_topics response:", res);
-      Success(res?.message || "Topics approved successfully");
+      try {
+        await Models.topics.approve_topics(sid, {});
+      } catch (hierErr) {
+        console.warn("approve_topics fallback to approve_hierarchy:", hierErr);
+        await Models.topics.approve_hierarchy(sid);
+      }
+      try {
+        await Models.syllabus.approve_stage(course_id || sid, "hierarchy");
+      } catch (e) {
+        console.warn("approve_stage hierarchy warning:", e);
+      }
+      Success("Topic hierarchy approved successfully");
       setState({ topicsApproved: true });
+      if (sid) {
+        await getUnits(sid, loadedVersion);
+        await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
+      }
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
     } catch (error: any) {
       console.log("approve_topics error:", error);
       Failure(getErrorMessage(error, "Failed to approve topics"));
-      setState({ topicsApproved: true });
     } finally {
       setState({ approvingTopics: false });
     }
   };
 
-  const handleGenerateTopics = async () => {
+  const handleGenerateTopics = async (parentParams?: { extraction_version?: number }) => {
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
       activeUnitDetail?.syllabus_id ||
+      course_id ||
       9;
     try {
       setState({ generatingTopics: true });
-      const res: any = await Models.topics.generate(sid, {});
+      const res: any = await Models.topics.generate_hierarchy(sid, {
+        extraction_version: parentParams?.extraction_version,
+      });
       console.log("generate response", res);
       Success(res?.message || "Topic hierarchy generation job enqueued");
       setState({
         generatingTopics: false,
         showGenerateModal: true,
         jobId: res.job_id,
+        jobStatus: "processing",
+        topicsLoading: true,
+        topicsApproved: false,
       });
+      if (res?.job_id) {
+        job_Data(res.job_id);
+      }
     } catch (error: any) {
       console.log("generate error", error);
       Failure(getErrorMessage(error, "Failed to generate topics"));
       setState({
         generatingTopics: false,
-        showGenerateModal: true,
       });
     }
   };
 
-  // ── Pre-generate: plain topic rows with level + hours badges ─────────────────
+  const handleVersionActivated = async (newVer: number) => {
+    setLoadedVersion(newVer);
+    const sid =
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      course_id;
+    if (sid) {
+      await getUnits(sid, newVer);
+      await getUnitDetail(sid, state.activeUnitNumber || 1, newVer);
+    }
+    if (course_id) {
+      await restoreWorkflowState(course_id);
+    }
+  };
+
+  // ── Pre-generate: plain topic rows with level + hours badges & extracted subtopics ──────
   console.log("apiTopics", apiTopics);
 
   const buildInitialTopics = () => {
@@ -1197,19 +1427,40 @@ const Topics = () => {
               ? (String(topic.hours).toLowerCase().includes("hour") ? String(topic.hours) : `${topic.hours} Hours`)
               : (topic.theory_hours ? `${topic.theory_hours} Hours` : "2 Hours");
 
-        const isApproved =
-          approvedInUnit.has(String(topicId)) ||
-          approvedInUnit.has(String(topic.id)) ||
-          topic.status === "Approved" ||
-          topic.status_badge === "success";
+        const subtopicsList = Array.isArray(topic.subtopics) && topic.subtopics.length > 0
+          ? topic.subtopics
+          : Array.isArray(topic.extracted_subtopics) && topic.extracted_subtopics.length > 0
+            ? topic.extracted_subtopics
+            : Array.isArray(topic.topics) && topic.topics.length > 0
+              ? topic.topics
+              : [];
 
-        // const statusBadge = {
-        //   label: isApproved ? "Approved" : (topic.status || "Needs Review"),
-        //   className: isApproved
-        //     ? "border border-green-300 bg-green-50 text-green-700 font-semibold"
-        //     : "border border-orange-300 bg-orange-50 text-orange-600 font-semibold",
-        //   onClick: () => toggleApprove(state.activeTab, String(topicId)),
-        // };
+        const items = subtopicsList.map((sub: any, sIdx: number) => {
+          const subId = String(sub.id || `${topicId}.${sIdx + 1}`);
+          const subTitle = sub.subtopic_name || sub.title || sub.name || `Subtopic ${subId}`;
+          const subHours = sub.hours || sub.theory_hours || "—";
+          const subLevel = sub.level || sub.knowledge_level || "K2";
+          return {
+            id: subId,
+            index: sIdx + 1,
+            title: subTitle,
+            highlighted: false,
+            actions: [
+              {
+                key: "level",
+                label: String(subLevel).toUpperCase().startsWith("K") ? String(subLevel).toUpperCase() : `K${subLevel}`,
+                asTag: true as const,
+                className: "rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600",
+              },
+              ...(subHours !== "—" ? [{
+                key: "hours",
+                label: String(subHours).toLowerCase().includes("hour") ? subHours : `${subHours} Hours`,
+                asTag: true as const,
+                className: "rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-[#000]",
+              }] : []),
+            ],
+          };
+        });
 
         return {
           id: `${state.activeTab}-${topicId}`,
@@ -1217,9 +1468,27 @@ const Topics = () => {
           collapsedBadge: [
             { label: levelBadge, className: "bg-color2-l text-color2 font-bold" },
             { label: hoursBadge, className: "bg-gray-200 text-pri font-bold" },
-            // statusBadge,
+            ...(items.length > 0 ? [{ label: `${items.length} Subtopics`, className: "bg-indigo-50 text-indigo-700 font-semibold" }] : []),
           ],
-          items: [],
+          actions: [
+            {
+              key: "edit",
+              label: "",
+              icon: <EditIcon className="h-3.5 w-3.5" />,
+              className:
+                "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
+              onClick: () => openEditTopicModal(topic, "Approved"),
+            },
+            {
+              key: "delete",
+              label: "",
+              icon: <Trash2 className="h-3.5 w-3.5 text-red-500" />,
+              className:
+                "flex items-center rounded border border-red-200 bg-red-50/60 p-1 text-red-500 hover:border-red-400 hover:bg-red-100 cursor-pointer shadow-xs",
+              onClick: () => handleDeleteTopic(topic),
+            },
+          ],
+          items,
         };
       });
     }
@@ -1277,7 +1546,11 @@ const Topics = () => {
           ? String(rawKLevel).split(" ")[0]
           : `K${rawKLevel}`;
 
-      const isTopicApproved = topic.status === "Approved" ||
+      const isTopicApproved =
+        approvedInUnit.has(String(topic.id)) ||
+        approvedInUnit.has(String(topicId)) ||
+        topic.status === "Approved" ||
+        topic.status?.toLowerCase() === "approved" ||
         topic.status_badge === "success";
 
       const topicActions = [
@@ -1293,28 +1566,42 @@ const Topics = () => {
           asTag: true as const,
           className: "rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600",
         },
-        isTopicApproved
+        (isTopicApproved || state.topicsApproved)
           ? {
-              key: "status",
-              label: "Approved",
-              asTag: true as const,
-              className: "rounded-full border border-green-400 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600",
-            }
+            key: "status",
+            label: "Approved",
+            asTag: true as const,
+            className: "rounded-full border border-green-400 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600",
+          }
           : {
-              key: "status",
-              label: "Needs Review",
-              asTag: false as const,
-              className:
-                "inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-500 hover:border-orange-400 hover:bg-orange-100 cursor-pointer",
-              onClick: () => openEditTopicModal(topicObj, "Approved"),
-            },
+            key: "status",
+            label: "Draft",
+            asTag: true as const,
+            className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
+          },
+        {
+          key: "add-subtopic",
+          label: "Add Subtopic",
+          icon: <Plus className="h-3.5 w-3.5" />,
+          className:
+            "flex items-center gap-1 rounded-md border border-dashed border-indigo-400 bg-indigo-50/70 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-500 cursor-pointer shadow-xs transition-all",
+          onClick: () => openAddSubtopicModal(topicObj),
+        },
         {
           key: "edit",
           label: "",
           icon: <EditIcon className="h-3.5 w-3.5" />,
           className:
             "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
-          onClick: () => openEditTopicModal(topicObj, isTopicApproved ? "Approved" : "Needs Review"),
+          onClick: () => openEditTopicModal(topicObj),
+        },
+        {
+          key: "delete",
+          label: "",
+          icon: <Trash2 className="h-3.5 w-3.5 text-red-500" />,
+          className:
+            "flex items-center rounded border border-red-200 bg-red-50/50 p-1 text-red-500 hover:border-red-400 hover:bg-red-100 cursor-pointer shadow-xs transition-all",
+          onClick: () => handleDeleteTopic(topicObj),
         },
       ];
 
@@ -1324,8 +1611,14 @@ const Topics = () => {
 
       const items = subtopicsList.map((sub: any, idx: number) => {
         const subId = String(sub.id || `${topicId}.${idx + 1}`);
-        const isApproved = sub.status === "Approved" || sub.status_badge === "success";
         const subCode = sub.subtopic_code || sub.code || `${topic.topic_code || topicId}.${idx + 1}`;
+        const isApproved =
+          approvedInUnit.has(String(sub.id)) ||
+          approvedInUnit.has(subId) ||
+          (subCode && approvedInUnit.has(String(subCode))) ||
+          sub.status === "Approved" ||
+          sub.status?.toLowerCase() === "approved" ||
+          sub.status_badge === "success";
         const subtopicObj = {
           ...sub,
           is_subtopic: true,
@@ -1354,7 +1647,7 @@ const Topics = () => {
             asTag: true as const,
             className: "rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-[#000]",
           },
-          isApproved
+          (isApproved || state.topicsApproved)
             ? {
               key: "status",
               label: "Approved",
@@ -1363,11 +1656,9 @@ const Topics = () => {
             }
             : {
               key: "status",
-              label: "• Needs Review",
-              asTag: false as const,
-              className:
-                "inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-500 hover:border-orange-400 hover:bg-orange-100 cursor-pointer",
-              onClick: () => openEditTopicModal(subtopicObj, "Approved"),
+              label: "Draft",
+              asTag: true as const,
+              className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
             },
           {
             key: "edit",
@@ -1375,7 +1666,15 @@ const Topics = () => {
             icon: <EditIcon className="h-3.5 w-3.5" />,
             className:
               "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
-            onClick: () => openEditTopicModal(subtopicObj, isApproved ? "Approved" : "Needs Review"),
+            onClick: () => openEditTopicModal(subtopicObj),
+          },
+          {
+            key: "delete",
+            label: "",
+            icon: <Trash2 className="h-3.5 w-3.5 text-red-500" />,
+            className:
+              "flex items-center rounded border border-red-200 bg-red-50/50 p-1 text-red-500 hover:border-red-400 hover:bg-red-100 cursor-pointer shadow-xs transition-all",
+            onClick: () => handleDeleteSubtopic(topic.id || topic.topic_id || topicId, sub.id || subId),
           },
         ];
 
@@ -1389,7 +1688,10 @@ const Topics = () => {
       });
 
       const approvedCount = subtopicsList.filter((s: any) =>
-        approvedInUnit.has(String(s.id)) || s.status === "Approved"
+        approvedInUnit.has(String(s.id)) ||
+        (s.subtopic_code && approvedInUnit.has(String(s.subtopic_code))) ||
+        s.status === "Approved" ||
+        s.status?.toLowerCase() === "approved"
       ).length;
 
       return {
@@ -1434,7 +1736,13 @@ const Topics = () => {
           router.push(`/neurobe/topics?course_id=${val.value}`);
         }}
         activeView={state.activeBannerTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (fromParam === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeBannerTab: view })}
       />
 
@@ -1466,6 +1774,18 @@ const Topics = () => {
           />
         ))}
       </div>
+
+      {course_id && (
+        <StageVersionHistoryPanel
+          stage="hierarchy"
+          stageLabel="Topic Hierarchy"
+          courseId={course_id}
+          onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionActivated}
+          onGenerateNew={handleGenerateTopics}
+          isGenerating={state.generatingTopics}
+        />
+      )}
 
 
       {/* ── Progress bar — shown after generation ── */}
@@ -1513,8 +1833,8 @@ const Topics = () => {
 
         <AccordiansStyle
           loading={state.topicsLoading || (state.loadingUnitDetail && !activeUnitDetail)}
-          loadingMessage={state.topicsLoading ? "Applying with NEURO AI..." : "Loading unit details..."}
-          expandable={state.topicsGenerated}
+          loadingMessage={state.topicsLoading ? "Processing topic hierarchy with NEURO AI... (Status: Processing · Polling every 2m)" : "Loading unit details..."}
+          expandable={state.topicsGenerated || buildInitialTopics().some((t: any) => t.items && t.items.length > 0)}
           topics={state.topicsGenerated ? buildGeneratedTopics() : buildInitialTopics()}
           title={currentUnitTitle}
           subtitle={
@@ -1532,7 +1852,7 @@ const Topics = () => {
           }
           footerContent={
             state.topicsGenerated ? (
-              <><RefreshCw className="h-3 w-3" /> Review subtopics and approve each one. Click a Needs Review badge to approve.</>
+              <><Sparkles className="h-3.5 w-3.5 text-color2" /> Review generated topics and subtopics. Edit or add topics if needed, then click 'Approve Topics' to finalize the hierarchy.</>
             ) : (
               <><Sparkles className="h-4 w-4" /> {activeUnitDetail?.callout_message || "NEURO AI will use these approved syllabus topics to create a Unit -> Topic -> Subtopics structure."}</>
             )
@@ -1542,7 +1862,7 @@ const Topics = () => {
         {/* ── Footer ── */}
         {state.topicsGenerated ? (
           <PageFooter
-            content1={`Approved: ${totalApproved}/${computedTotalSubtopics} Topics`}
+            content1={state.topicsApproved ? "Status: Topics Hierarchy Approved" : `${totalTopics} Topics · ${computedTotalSubtopics} Subtopics`}
             content2={
               activeUnitDetail?.course_display_tag ||
               (state.courseDetail
@@ -1562,10 +1882,14 @@ const Topics = () => {
                   className: "create-btn",
                 }
                 : {
-                  label: state.approvingTopics ? "Approving..." : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
+                  label: state.approvingTopics
+                    ? "Approving..."
+                    : state.upstreamNotApproved
+                      ? "Requires Syllabus Approval"
+                      : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
                   icon: state.approvingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
                   onClick: handleApproveTopics,
-                  disabled: state.approvingTopics,
+                  disabled: state.approvingTopics || state.upstreamNotApproved,
                 }
             }
             actionBtn2={{
@@ -1630,84 +1954,181 @@ const Topics = () => {
         onUpdate={handleUpdateTopic}
       />
 
+      {/* ── Add Subtopic modal ── */}
+      <AddSubtopicModal
+        open={addSubtopicModal}
+        onClose={() => setAddSubtopicModal(false)}
+        parentTopic={selectedTopicForSubtopic}
+        loading={addingSubtopic}
+        onAdd={handleAddSubtopic}
+      />
+
       {/* ── Generate Topics modal ── */}
-      {state.showGenerateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style={{ animation: "fadeIn 0.22s ease" }}
-        >
-          <div className="absolute inset-0 bg-black/40" onClick={() => setState({ showGenerateModal: false })} />
+      {state.showGenerateModal && (() => {
+        const isJobComplete = state.jobStatus === "complete" || (state.topicsGenerated && state.jobStatus !== "processing");
+
+        return (
           <div
-            className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
-            style={{ animation: "slideUp 0.22s ease" }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ animation: "fadeIn 0.22s ease" }}
           >
-            {/* Modal header */}
-            <div className="flex items-center gap-3 bg-[#111238] px-5 py-4">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-color2">
-                <Sparkles className="h-4 w-4 text-white" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-white">Generate Topics with NEURO AI</p>
-                <p className="text-xs text-white/60">
-                  {state.courseDetail
-                    ? `${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
-                    : "CS309 — Computer Networks"}
-                </p>
-              </div>
-            </div>
-
-            {/* Modal body */}
-            <div className="px-6 py-5">
-              {/* Progress */}
-              <div className="mb-5">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-bold text-color2">Topics Generated Successfully</span>
-                  <span className="text-sm font-bold text-color2">100%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                  <div className="h-2 w-full rounded-full bg-color2 transition-all" />
+            <div className="absolute inset-0 bg-black/40" onClick={() => setState({ showGenerateModal: false })} />
+            <div
+              className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
+              style={{ animation: "slideUp 0.22s ease" }}
+            >
+              {/* Modal header */}
+              <div className="flex items-center gap-3 bg-[#111238] px-5 py-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-color2">
+                  <Sparkles className="h-4 w-4 text-white" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    {isJobComplete ? "Topics Generated Successfully" : "Generating Topics with NEURO AI"}
+                  </p>
+                  <p className="text-xs text-white/60">
+                    {state.courseDetail
+                      ? `${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
+                      : "CS309 — Computer Networks"}
+                  </p>
                 </div>
               </div>
 
-              {/* Steps */}
-              <div className="space-y-3">
-                {GENERATE_STEPS.map((step, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500">
-                      <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-[#000] dark:text-white">{step.title}</p>
-                      <p className="text-xs text-pri">{step.description}</p>
+              {/* Modal body */}
+              <div className="px-6 py-5">
+                {isJobComplete ? (
+                  <>
+                    {/* Progress 100% */}
+                    <div className="mb-5">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-bold text-color2">Topics Generated Successfully</span>
+                        <span className="text-sm font-bold text-color2">100%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                        <div className="h-2 w-full rounded-full bg-color2 transition-all" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Modal footer */}
-            <div className="flex justify-end gap-3 border-t px-6 py-4 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => setState({ showGenerateModal: false })}
-                className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-[#000] hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setState({ showGenerateModal: false, topicsGenerated: true });
-                  job_Data(state.jobId);
-                }}
-                className="bg-color2 flex items-center gap-1.5 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <Check className="h-3.5 w-3.5" /> Apply Topics
-              </button>
+                    {/* Steps complete */}
+                    <div className="space-y-3">
+                      {GENERATE_STEPS.map((step, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500">
+                            <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-[#000] dark:text-white">{step.title}</p>
+                            <p className="text-xs text-pri">{step.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Processing Status screen */}
+                    <div className="mb-5">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm font-semibold text-color2">
+                          <RefreshCw className="h-4 w-4 animate-spin text-color2" />
+                          AI Generating Hierarchy...
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-color2 dark:bg-blue-950/50">
+                          Polling every 2m
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div className="h-2 w-2/3 rounded-full bg-color2 animate-pulse transition-all" />
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        NEURO AI is structuring your syllabus into detailed units, topics, and subtopics. Status automatically checks every 2 minutes.
+                      </p>
+                    </div>
+
+                    {/* Steps during processing */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500">
+                          <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">Syllabus Analysis</p>
+                          <p className="text-xs text-gray-500">Course structure and unit requirements identified</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-color2">
+                          <RefreshCw className="h-3.5 w-3.5 text-white animate-spin" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-color2">Generating Topic Hierarchy</p>
+                          <p className="text-xs text-gray-500">Creating topics, subtopics, Bloom's levels & hours...</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 opacity-60">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gray-300 dark:border-gray-600">
+                          <Clock className="h-3.5 w-3.5 text-gray-400" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Final Verification</p>
+                          <p className="text-xs text-gray-400">Validating learning outcomes and taxonomy</p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div className="flex justify-end gap-3 border-t px-6 py-4 dark:border-gray-700">
+                {isJobComplete ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setState({ showGenerateModal: false })}
+                      className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-[#000] hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setState({ showGenerateModal: false, topicsGenerated: true });
+                      }}
+                      className="bg-color2 flex items-center gap-1.5 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90"
+                    >
+                      <Check className="h-3.5 w-3.5" /> View Topics
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setState({ showGenerateModal: false })}
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+                    >
+                      Run in Background
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (state.jobId) {
+                          job_Data(state.jobId);
+                        }
+                      }}
+                      className="bg-color2 flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
+                    >
+                      <RefreshCw className="h-3 w-3" /> Check Status Now
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

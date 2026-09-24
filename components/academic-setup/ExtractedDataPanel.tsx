@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import CourseOutcomes from "@/components/academic-setup/CourseOutcomes";
 import UnitTopics from "@/components/academic-setup/UnitTopics";
-import LabExperiments from "@/components/academic-setup/LabExperiments";
 import PrescribedTextbooks from "@/components/academic-setup/PrescribedTextbooks";
 
 const TABS = [
@@ -10,19 +9,10 @@ const TABS = [
   "Course Details",
   "COs & Knowledge Levels",
   "Units & Topics",
-  "Lab Experiments",
+  "Prescribed Textbooks",
 ];
 
-const KNOWLEDGE_OPTIONS = [
-  { value: "K1", label: "K1 Remember" },
-  { value: "K2", label: "K2 Understand" },
-  { value: "K3", label: "K3 Apply" },
-  { value: "K4", label: "K4 Analyze" },
-  { value: "K5", label: "K5 Evaluate" },
-  { value: "K6", label: "K6 Create" },
-];
-
-const ExtractedDataPanel = (props) => {
+const ExtractedDataPanel = (props: any) => {
   const {
     data,
     courseData,
@@ -35,24 +25,75 @@ const ExtractedDataPanel = (props) => {
     handleSaveOutcome,
     handleAcceptOutcome,
     handleKnowledgeLevelChange,
+    onUpdateUnitHours,
+    onUpdateUnitTitle,
+    onUpdateLTPC,
     syllabusId,
   } = props;
-  console.log("data", data);
 
   const [activeTab, setActiveTab] = useState("All Fields");
-  const [courseCode, setCourseCode] = useState("CS309");
-  const [courseTitle, setCourseTitle] = useState("Computer Networks");
-  const [L, setL] = useState("3");
-  const [T, setT] = useState("0");
-  const [P, setP] = useState("2");
-  const [C, setC] = useState("4");
+
+  // Initial values extracted from jobData or courseData
+  const getInitL = () => String(data?.lectureHours ?? data?.lecture_hours ?? data?.course_data?.lecture_hours ?? courseData?.latest_syllabus?.lecture_hours ?? courseData?.lecture_hours ?? 3);
+  const getInitT = () => String(data?.tutorialHours ?? data?.tutorial_hours ?? data?.course_data?.tutorial_hours ?? courseData?.latest_syllabus?.tutorial_hours ?? courseData?.tutorial_hours ?? 0);
+  const getInitP = () => String(data?.practicalHours ?? data?.practical_hours ?? data?.course_data?.practical_hours ?? courseData?.latest_syllabus?.practical_hours ?? courseData?.practical_hours ?? 0);
+  const getInitC = () => String(courseData?.credits ?? courseData?.latest_syllabus?.credits ?? data?.credits ?? 4);
+
+  const [L, setL] = useState(getInitL);
+  const [T, setT] = useState(getInitT);
+  const [P, setP] = useState(getInitP);
+  const [C, setC] = useState(getInitC);
+
+  useEffect(() => {
+    setL(getInitL());
+    setT(getInitT());
+    setP(getInitP());
+    setC(getInitC());
+  }, [data, courseData]);
+
+  const handleLChange = (val: string) => {
+    setL(val);
+    const numVal = parseFloat(val) || 0;
+    onUpdateLTPC?.({
+      lecture_hours: numVal,
+      tutorial_hours: parseFloat(T) || 0,
+      practical_hours: parseFloat(P) || 0,
+    });
+  };
+
+  const handleTChange = (val: string) => {
+    setT(val);
+    const numVal = parseFloat(val) || 0;
+    onUpdateLTPC?.({
+      lecture_hours: parseFloat(L) || 0,
+      tutorial_hours: numVal,
+      practical_hours: parseFloat(P) || 0,
+    });
+  };
+
+  const handlePChange = (val: string) => {
+    setP(val);
+    const numVal = parseFloat(val) || 0;
+    onUpdateLTPC?.({
+      lecture_hours: parseFloat(L) || 0,
+      tutorial_hours: parseFloat(T) || 0,
+      practical_hours: numVal,
+    });
+  };
+
+  const lNum = parseFloat(L) || 0;
+  const tNum = parseFloat(T) || 0;
+  const pNum = parseFloat(P) || 0;
+  const theoryHoursDisplay = (lNum + tNum) > 0 ? (lNum + tNum) * 15 : (courseData?.latest_syllabus?.total_theory_hours ?? data?.total_theory_hours ?? 45);
+  const labHoursDisplay = pNum > 0 ? pNum * 15 : (courseData?.latest_syllabus?.total_lab_hours ?? data?.total_lab_hours ?? 0);
+  const totalContactDisplay = theoryHoursDisplay + labHoursDisplay;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sectionRefs = {
     "Course Details": useRef<HTMLDivElement>(null),
     "COs & Knowledge Levels": useRef<HTMLDivElement>(null),
     "Units & Topics": useRef<HTMLDivElement>(null),
-    "Lab Experiments": useRef<HTMLDivElement>(null),
+    "Prescribed Textbooks": useRef<HTMLDivElement>(null),
   };
 
   const handleTabClick = (tab: string) => {
@@ -70,6 +111,9 @@ const ExtractedDataPanel = (props) => {
       scrollRef.current.scrollTo({ top: offset, behavior: "smooth" });
     }
   };
+
+  const courseCodeDisplay = courseData?.course_code || data?.courseCode || data?.course_code || "";
+  const courseTitleDisplay = courseData?.course_title || data?.courseName || data?.course_title || "";
 
   return (
     <div className="flex h-full flex-col">
@@ -90,13 +134,6 @@ const ExtractedDataPanel = (props) => {
         ))}
       </div>
 
-      {/* Textbooks accept row */}
-      <div className="text-pri mb-3 flex items-center gap-2 text-sm">
-        <span>Textbooks:</span>
-        <button className="bg-primary2 text-color2 hover:bg-color2/20 flex items-center gap-1 rounded-md px-3 py-1 font-semibold">
-          <CheckCircle2 className="h-4 w-4" /> Accept All Inferred Levels
-        </button>
-      </div>
 
       {/* Scrollable content */}
       <div
@@ -104,7 +141,7 @@ const ExtractedDataPanel = (props) => {
         className="flex-1 space-y-4 overflow-y-auto"
         style={{ scrollbarWidth: "none" }}
       >
-        {/* Section 1 — Course Identification */}
+        {/* Section 1 — Course Identification & L-T-P-C Structure */}
         <div
           ref={sectionRefs["Course Details"]}
           className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
@@ -118,68 +155,103 @@ const ExtractedDataPanel = (props) => {
                 Course Identification & L-T-P-C Structure
               </h3>
             </div>
-            <span className="text-xs text-[#000]">
-              Editable extracted fields
+            <span className="text-xs text-color2 font-medium">
+              L, T, P are editable (extracted from syllabus)
             </span>
           </div>
 
           <div className="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label className="text-pri mb-1 block text-xs">
-                Course Code:
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-pri block text-xs font-semibold">
+                  Course Code:
+                </label>
+                <span className="text-[10px] text-gray-400 font-medium">From Course Table</span>
+              </div>
               <input
-                value={courseData?.course_code || data?.courseCode || data?.course_code || ""}
-                onChange={(e) => setCourseCode(e.target.value)}
+                value={courseCodeDisplay}
                 disabled
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                className="w-full rounded-lg border border-gray-200 bg-gray-100/80 px-3 py-2 text-sm font-medium text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
               />
             </div>
             <div>
-              <label className="text-pri mb-1 block text-xs">
-                Course Title:
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-pri block text-xs font-semibold">
+                  Course Title:
+                </label>
+                <span className="text-[10px] text-gray-400 font-medium">From Course Table</span>
+              </div>
               <input
                 disabled
-                value={courseData?.course_title || data?.courseName || data?.course_title || ""}
-                onChange={(e) => setCourseTitle(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                value={courseTitleDisplay}
+                className="w-full rounded-lg border border-gray-200 bg-gray-100/80 px-3 py-2 text-sm font-medium text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
               />
             </div>
           </div>
 
           <div className="mb-4 grid grid-cols-4 gap-3">
-            {[
-              ["Lecture (L):", courseData?.lecture_hours ?? data?.lectureHours ?? data?.lecture_hours ?? 0, setL],
-              ["Tutorial (T):", courseData?.tutorial_hours ?? data?.tutorialHours ?? data?.tutorial_hours ?? 0, setT],
-              ["Practical (P):", courseData?.practical_hours ?? data?.practicalHours ?? data?.practical_hours ?? 0, setP],
-              ["Credits (C):", courseData?.credits ?? data?.credits ?? 0, setC],
-            ].map(([label, val, setter]: any) => (
-              <div key={label}>
-                <label className="text-pri mb-1 block text-xs">{label}</label>
-                <input
-                  disabled
-                  value={val}
-                  onChange={(e) => setter(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                />
+            <div>
+              <label className="text-pri mb-1 block text-xs font-semibold">Lecture (L):</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={L}
+                onChange={(e) => handleLChange(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-pri mb-1 block text-xs font-semibold">Tutorial (T):</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={T}
+                onChange={(e) => handleTChange(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-pri mb-1 block text-xs font-semibold">Practical (P):</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={P}
+                onChange={(e) => handlePChange(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-pri block text-xs font-semibold">Credits (C):</label>
+                <span className="text-[10px] text-gray-400 font-medium">Locked</span>
               </div>
-            ))}
+              <input
+                disabled
+                value={C}
+                className="w-full rounded-lg border border-gray-200 bg-gray-100/80 px-3 py-2 text-sm font-semibold text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+              />
+            </div>
           </div>
 
-          <div className="text-pri flex items-center justify-between text-sm">
+          <div className="text-pri flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
             <span>
               Theory Hours:{" "}
               <strong className="text-[#000] dark:text-gray-200">
-                {courseData?.total_theory_hours ?? data?.totalHours ?? data?.total_theory_hours ?? 0} hrs
+                {theoryHoursDisplay} hrs
               </strong>
-              &nbsp; Lab Hours:{" "}
+              &nbsp; • &nbsp; Lab Hours:{" "}
               <strong className="text-[#000] dark:text-gray-200">
-                {courseData?.total_lab_hours ?? 0} hrs
+                {labHoursDisplay} hrs
               </strong>
             </span>
             <span className="text-md text-color2 font-bold">
-              Total Contact: {data?.course_data?.totalHours ?? data?.totalHours ?? data?.total_theory_hours ?? (courseData?.total_theory_hours || 0)} hrs
+              Total Contact: {totalContactDisplay} hrs
             </span>
           </div>
         </div>
@@ -200,24 +272,23 @@ const ExtractedDataPanel = (props) => {
             data={data?.units}
             onAddTopic={onAddTopic}
             onDeleteTopic={onDeleteTopic}
+            onUpdateHours={onUpdateUnitHours}
+            onUpdateUnitTitle={onUpdateUnitTitle}
           />
         </div>
 
-        {/* Section 4 — Lab Experiments */}
-        <div ref={sectionRefs["Lab Experiments"]}>
-          <LabExperiments />
+        {/* Section 4 — Prescribed Textbooks */}
+        <div ref={sectionRefs["Prescribed Textbooks"]}>
+          <PrescribedTextbooks
+            textBooks={data?.textbooks}
+            reference={data?.reference_books}
+            onDeleteBook={onDeleteTextbook}
+            onAddBook={handleAddTextbook}
+            syllabusId={syllabusId}
+            onAddReference={handleAddReference}
+            onDeleteReference={onDeleteReference}
+          />
         </div>
-
-        {/* Section 5 — Prescribed Textbooks */}
-        <PrescribedTextbooks
-          textBooks={data?.textbooks}
-          reference={data?.reference_books}
-          onDeleteBook={onDeleteTextbook}
-          onAddBook={handleAddTextbook}
-          syllabusId={syllabusId}
-          onAddReference={handleAddReference}
-          onDeleteReference={onDeleteReference}
-        />
       </div>
     </div>
   );

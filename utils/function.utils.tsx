@@ -14,6 +14,135 @@ export const useSetState = (initialState: any) => {
   return [state, newSetState];
 };
 
+export const decodeToken = (token?: string | null): any => {
+  if (!token && typeof window !== "undefined") {
+    token = localStorage.getItem("token");
+  }
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    try {
+      const parts = token.split(".");
+      return JSON.parse(atob(parts[1]));
+    } catch {
+      return null;
+    }
+  }
+};
+
+export interface AuthUserInfo {
+  id?: number | string;
+  user_id?: number | string;
+  register_number?: string;
+  role?: string;
+  email?: string;
+  organization_id?: number;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  is_admin?: boolean;
+  raw_user?: any;
+  decoded_token?: any;
+}
+
+export const getAuthUser = (): AuthUserInfo => {
+  if (typeof window === "undefined") return {};
+  try {
+    const token = localStorage.getItem("token");
+    const decoded = decodeToken(token);
+    const userStr = localStorage.getItem("user");
+    const user = userStr ? JSON.parse(userStr) : {};
+
+    const rawId = decoded?.sub ?? user?.id ?? user?.user_id;
+    const numId = rawId !== undefined && rawId !== null && !isNaN(Number(rawId)) ? Number(rawId) : rawId;
+
+    const regNum =
+      decoded?.register_number ||
+      decoded?.student_register_number ||
+      decoded?.employee_register_number ||
+      user?.register_number ||
+      user?.registry_employee_number ||
+      user?.student_register_number ||
+      user?.employee_register_number ||
+      "";
+
+    const role = decoded?.role || user?.role || "";
+    const normRole = String(role).trim().toLowerCase().replace(/[\s_]+/g, "");
+    const isAdmin =
+      normRole === "superadmin" ||
+      normRole === "erpadmin" ||
+      normRole === "admin" ||
+      normRole === "administrator";
+
+    const orgId = decoded?.organization_id ?? user?.organization_id ?? getOrganizationId();
+
+    return {
+      id: numId,
+      user_id: numId,
+      register_number: regNum ? String(regNum).trim() : undefined,
+      role: role,
+      email: decoded?.email || user?.email,
+      organization_id: orgId ? Number(orgId) : undefined,
+      first_name: user?.first_name,
+      last_name: user?.last_name,
+      name: `${user?.first_name || ""} ${user?.last_name || ""}`.trim() || user?.name || decoded?.email || user?.email || "",
+      is_admin: isAdmin,
+      raw_user: user,
+      decoded_token: decoded,
+    };
+  } catch (e) {
+    console.error("Failed to parse auth user:", e);
+    return {};
+  }
+};
+
+export const isCreatedByCurrentUser = (item: any, authUser?: AuthUserInfo): boolean => {
+  const current = authUser || getAuthUser();
+  if (!current || current.is_admin) return true; // Super Admin & ERP Admin can see all
+
+  const authId = current.id !== undefined && current.id !== null ? String(current.id) : null;
+  const authReg = current.register_number ? String(current.register_number).toLowerCase().trim() : null;
+  const authEmail = current.email ? String(current.email).toLowerCase().trim() : null;
+  const authName = current.name ? String(current.name).toLowerCase().trim() : null;
+
+  // 1. Exact created_by_id match
+  if (item.created_by_id !== undefined && item.created_by_id !== null && authId && String(item.created_by_id) === authId) {
+    return true;
+  }
+
+  // 2. Created by register number match
+  if (item.created_by_register_number && authReg && String(item.created_by_register_number).toLowerCase().trim() === authReg) {
+    return true;
+  }
+
+  // 3. String name or email in created_by / created_by_name
+  const creatorStrings = [item.created_by, item.created_by_name, item.faculty_name].filter(Boolean).map(s => String(s).toLowerCase().trim());
+  for (const cs of creatorStrings) {
+    if (authEmail && cs === authEmail) return true;
+    if (authName && (cs === authName || cs.includes(authName) || authName.includes(cs))) return true;
+    if (authReg && cs === authReg) return true;
+  }
+
+  // 4. Coordinator or Instructor assignments matching current user ID
+  if (authId) {
+    if (String(item.coordinator_id) === authId || String(item.instructor_id) === authId) return true;
+    if (String(item.faculty_id) === authId || String(item.user_id) === authId) return true;
+  }
+
+  return false;
+};
+
 export const getOrganizationId = (): number => {
   if (typeof window !== "undefined") {
     try {
@@ -32,7 +161,7 @@ export const getOrganizationId = (): number => {
       console.error("Failed to parse organization_id", e);
     }
   }
-  return 3;
+  return 1;
 };
 
 export const Success = (message: string) => {

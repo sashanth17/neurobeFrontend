@@ -236,18 +236,18 @@ export const makeUserListColumns = (
     ),
   },
   {
+    accessor: "role",
+    title: "ROLE",
+    render: (row: any) => <RoleBadge role={row.role || "-"} />,
+  },
+  {
     accessor: "regNo",
-    title: "REGISTER NO.",
+    title: "REGISTER NUMBER / EMPLOYEE NUMBER",
     render: (row: any) => (
       <span className="font-mono text-xs font-medium text-[#000] dark:text-gray-300">
         {row.register_number || row.regNo || (row.id ? `USR-${String(row.id).padStart(4, "0")}` : "-")}
       </span>
     ),
-  },
-  {
-    accessor: "role",
-    title: "ROLE",
-    render: (row: any) => <RoleBadge role={row.role || "-"} />,
   },
   {
     accessor: "department",
@@ -285,32 +285,28 @@ export const makeUserListColumns = (
     },
   },
   {
-    accessor: "type",
+    accessor: "actions",
     title: "ACTIONS",
-    render: (row: any) => {
-      const type = row.type || (row.is_staff ? "Faculty / Staff" : "Student");
-      return (
-        <div className="flex items-center gap-2">
-          <TypeBadge type={type} />
+    render: (row: any) => (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onEdit(row)}
+          className="text-[#000] hover:text-color2"
+          title="Edit"
+        >
+          <IconEdit className="h-4 w-4" />
+        </button>
+        {onDelete && (
           <button
-            onClick={() => onEdit(row)}
-            className="text-[#000] hover:text-color2"
-            title="Edit"
+            onClick={() => onDelete(row)}
+            className="text-[#000] hover:text-red-500"
+            title="Delete"
           >
-            <IconEdit className="h-4 w-4" />
+            <IconTrash className="h-4 w-4" />
           </button>
-          {onDelete && (
-            <button
-              onClick={() => onDelete(row)}
-              className="text-[#000] hover:text-red-500"
-              title="Delete"
-            >
-              <IconTrash className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      );
-    },
+        )}
+      </div>
+    ),
   },
 ];
 

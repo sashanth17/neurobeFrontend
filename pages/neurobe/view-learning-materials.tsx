@@ -297,7 +297,13 @@ const ViewLearningMaterials = () => {
         ]}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router?.query?.from === "my-courses") {
+            router.push("/neurobe/my-assigned-courses");
+          } else {
+            router.back();
+          }
+        }}
         onViewChange={(view) => setState({ activeTab: view })}
       />
 
@@ -378,7 +384,7 @@ const ViewLearningMaterials = () => {
               ? {
                   label: "Next Question Bank",
                   icon: <ArrowBigRight className="h-4 w-4" />,
-                  onClick: () => router.push("/neurobe/question-bank"),
+                  onClick: () => router.push("/neurobe/mcq-generation/bank"),
                 }
               : {
                   label: "Approve Material",

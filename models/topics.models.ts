@@ -21,9 +21,12 @@ const topics = {
         return promise;
     },
 
-     unit_detail : (syllabus_id?: any,unit_number?: any) => {
+     unit_detail : (syllabus_id?: any, unit_number?: any, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${ syllabus_id}/topics-workspace?unit_number=${unit_number}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `&version_number=${version_number}`;
+            }
 
             commonInstance()
                 .get(url)
@@ -92,9 +95,12 @@ const topics = {
         return promise;
     },
 
-    update: (topic_id?: any, body?: any) => { 
+    update: (topic_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .put(url, body)
@@ -112,9 +118,12 @@ const topics = {
         return promise;
     },
 
-    subTopics_update: (topic_id?: any, body?: any) => { 
+    subTopics_update: (topic_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}/subtopics`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             commonInstance()
                 .post(url, body)
@@ -130,6 +139,19 @@ const topics = {
                 });
         });
         return promise;
+    },
+
+    update_subtopic: (topic_id: string | number, subtopic_id: string | number, body: any, version_number?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/subtopics/${subtopic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
+            commonInstance()
+                .put(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
     },
 
     save_draft: (syllabus_id?: any, body?: any) => { 
@@ -192,6 +214,74 @@ const topics = {
         return promise;
     },
 
+    generate_hierarchy: (id: string | number, body?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/generate-hierarchy`;
+            commonInstance()
+                .post(url, body || {})
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    update_topic: (id: string | number, topic_id: string | number, body: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/topics/${topic_id}`;
+            commonInstance()
+                .patch(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    approve_hierarchy: (id: string | number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/${id}/approve-hierarchy`;
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    delete_topic: (topic_id: string | number, version_number?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
+            commonInstance()
+                .delete(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
+    },
+
+    delete_subtopic: (topic_id: string | number, subtopic_id: string | number, version_number?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/subtopics/${subtopic_id}`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
+            commonInstance()
+                .delete(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
+    },
+
+    add_subtopic: (topic_id: string | number, body: any, version_number?: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/topics/${topic_id}/subtopics`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
+            commonInstance()
+                .post(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.response?.data || error));
+        });
+    }
 
 }
 

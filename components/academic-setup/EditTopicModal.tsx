@@ -353,18 +353,6 @@ const EditTopicModal = ({
                 isClearable={false}
               />
             </div>
-
-            {/* Status */}
-            <div>
-              <CustomSelect
-                title="Status"
-                options={statusOptions}
-                value={selectedStatus}
-                onChange={(val) => setSelectedStatus(val)}
-                placeholder="Select Status"
-                isClearable={false}
-              />
-            </div>
           </div>
 
           {/* ───────────────── FOOTER ───────────────── */}
@@ -386,9 +374,7 @@ const EditTopicModal = ({
               ) : (
                 <Check className="h-4 w-4 stroke-[2.5]" />
               )}
-              {selectedStatus?.value === "Needs Review"
-                ? (topic?.is_subtopic ? "Update Subtopic" : "Update Topic")
-                : (topic?.is_subtopic ? "Approval Subtopic" : "Approval Topic")}
+              {topic?.is_subtopic ? "Update Subtopic" : "Update Topic"}
             </button>
           </div>
         </form>
