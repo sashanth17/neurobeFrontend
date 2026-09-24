@@ -31,21 +31,15 @@ const user_import = {
         return promise;
     },
 
-    validate: (data: any, orgId?: any, default_password?: any) => {
+    validate: (data: any, orgId?: any) => {
         let promise = new Promise((resolve, reject) => {
             const organizationId = orgId || getOrganizationId();
             const params = new URLSearchParams();
             if (organizationId) {
                 params.append("organization_id", String(organizationId));
             }
-            if (default_password) {
-                params.append("default_password", String(default_password));
-            }
             let url = `bulk-import/users/validate?${params.toString()}`;
             const payload = data instanceof File ? (() => { const fd = new FormData(); fd.append("file", data); return fd; })() : data;
-            if (default_password && payload instanceof FormData) {
-                payload.append("default_password", default_password);
-            }
             instance()
                 .post(url, payload)
                 .then((res) => {
@@ -62,22 +56,16 @@ const user_import = {
         return promise;
     },
 
-    import: (data: any, orgId?: any, default_password?: any) => {
+    import: (data: any, orgId?: any) => {
         let promise = new Promise((resolve, reject) => {
             const organizationId = orgId || getOrganizationId();
             const params = new URLSearchParams();
             if (organizationId) {
                 params.append("organization_id", String(organizationId));
             }
-            if (default_password) {
-                params.append("default_password", String(default_password));
-            }
             let url = `bulk-import/users?${params.toString()}`;
 
             const payload = data instanceof File ? (() => { const fd = new FormData(); fd.append("file", data); return fd; })() : data;
-            if (default_password && payload instanceof FormData) {
-                payload.append("default_password", default_password);
-            }
             instance()
                 .post(url, payload)
                 .then((res) => {

@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { Users, Upload, Trash2, CheckCircle2 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
+import { useSetState, Success, Failure, showDeleteAlert, getAuthUser, isCreatedByCurrentUser } from "@/utils/function.utils";
 import IconPlus from "@/components/Icon/IconPlus";
 import IconSearch from "@/components/Icon/IconSearch";
 import PageHeader from "@/components/common-components/PageHeader";
@@ -50,12 +50,16 @@ const InsStudentEnrollment = () => {
     }
   }, [state.selectedInstance]);
 
-  // 1. Fetch active course instances
+  // 1. Fetch active course instances created by current user
   const fetchCourseInstances = async () => {
     try {
       setState({ loading: true });
+      const authUser = getAuthUser();
       const res: any = await Models.course_instance.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      let list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      if (!authUser.is_admin) {
+        list = list.filter((item: any) => isCreatedByCurrentUser(item, authUser));
+      }
       const options = list.map((item: any) => ({
         value: item.id,
         label: item.course_instance_name || `${item.course_code || "Course"} - Sec ${item.section || "A"} (Sem ${item.semester || 1})`,
@@ -79,7 +83,7 @@ const InsStudentEnrollment = () => {
     }
   };
 
-  // 2. Fetch enrolled students for selected course offering
+  // 2. Fetch enrolled students for selected course instance
   const fetchEnrolledStudents = async (instanceId: number) => {
     try {
       setState({ loading: true });
@@ -95,10 +99,10 @@ const InsStudentEnrollment = () => {
   // 3. Fetch available students for manual enrollment
   const fetchAvailableStudents = async () => {
     try {
-      const activeOffering = state.selectedInstance?.data;
+      const activeInstance = state.selectedInstance?.data;
       const params: any = {};
-      if (activeOffering?.department_id) params.department_id = activeOffering.department_id;
-      if (activeOffering?.course_id) params.exclude_course_id = activeOffering.course_id;
+      if (activeInstance?.department_id) params.department_id = activeInstance.department_id;
+      if (activeInstance?.course_id) params.exclude_course_id = activeInstance.course_id;
 
       const res: any = await Models.course_enrollment.getAvailableStudents(params);
       const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
@@ -127,7 +131,7 @@ const InsStudentEnrollment = () => {
   // 4. Batch Multi-Select Enrollment
   const handleBatchEnroll = async (selected: EnrollableStudent[]) => {
     if (!state.selectedInstance?.value) {
-      Failure("Please select a course offering first.");
+      Failure("Please select a course instance first.");
       return;
     }
 
@@ -176,7 +180,7 @@ const InsStudentEnrollment = () => {
         }
       },
       () => {},
-      `Remove ${row.student_name || row.name || row.student_id || "Student"} from this course offering?`
+      `Remove ${row.student_name || row.name || row.student_id || "Student"} from this course instance?`
     );
   };
 
@@ -249,7 +253,7 @@ const InsStudentEnrollment = () => {
             type="button"
             onClick={() => handleDeleteEnrollment(row)}
             className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/20"
-            title="Remove from course offering"
+            title="Remove from course instance"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -287,16 +291,16 @@ const InsStudentEnrollment = () => {
         }}
       />
 
-      {/* Offering Selector & Controls */}
+      {/* Instance Selector & Controls */}
       <div className="panel mb-5 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-[280px] flex-1">
             <CustomSelect
-              title="Select Course Offering (Section)"
+              title="Select Course Instance (Section)"
               options={state.courseInstances}
               value={state.selectedInstance}
               onChange={(v) => setState({ selectedInstance: v })}
-              placeholder="Select Course Offering..."
+              placeholder="Select Course Instance..."
             />
           </div>
           <div className="flex items-center gap-2 pt-5">
@@ -344,8 +348,8 @@ const InsStudentEnrollment = () => {
           loading={state.loading}
           noRecordsText={
             state.selectedInstance
-              ? "No students enrolled in this offering yet."
-              : "Please select a course offering above."
+              ? "No students enrolled in this instance yet."
+              : "Please select a course instance above."
           }
           showPagination
           pageSize={10}

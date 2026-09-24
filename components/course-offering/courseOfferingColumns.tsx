@@ -1,6 +1,5 @@
 import { Users, Archive, Eye, EyeOff, UserPlus } from "lucide-react";
 import IconEdit from "@/components/Icon/IconEdit";
-import IconTrash from "@/components/Icon/IconTrash";
 
 // ─── Shared cells ─────────────────────────────────────────────────────────────
 export const StatusCell = ({ status }: { status: string }) => (
@@ -107,19 +106,18 @@ export const MOCK_OFFERINGS = [
   },
 ];
 
-// ─── Column factory — accepts onEdit, onDelete, onManageStudents, onToggleArchive callbacks ──
+// ─── Column factory — accepts onEdit, onManageStudents, onToggleArchive callbacks ──
 export const makeCourseOfferingColumns = (
   onEdit?: (row: any) => void,
-  onDelete?: (row: any) => void,
   onManageStudents?: (row: any) => void,
   onToggleArchive?: (row: any) => void
 ) => [
   {
     accessor: "course",
-    title: "COURSE OFFERING",
+    title: "COURSE INSTANCE",
     render: (row: any) => {
       const code = row.course_code || row.code || "CS";
-      const title = row.course_instance_name || row.course || row.course_title || "Course Offering";
+      const title = row.course_instance_name || row.course || row.course_title || "Course Instance";
       const sub = row.course_title ? `${row.course_code || ""} · ${row.course_title}` : (row.subtitle || `Semester ${row.semester || 1}`);
       return (
         <div className="flex items-center gap-2">
@@ -233,7 +231,7 @@ export const makeCourseOfferingColumns = (
               ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
               : "border-gray-200 text-gray-500 hover:text-amber-600 hover:bg-amber-50"
           }`}
-          title={row.is_archived ? "Unarchive Offering" : "Archive Offering"}
+          title={row.is_archived ? "Unarchive Instance" : "Archive Instance"}
         >
           <Archive className="h-3.5 w-3.5" />
         </button>
@@ -241,17 +239,9 @@ export const makeCourseOfferingColumns = (
           type="button"
           onClick={() => onEdit?.(row)}
           className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-color2 dark:border-gray-700 dark:text-gray-300 dark:hover:text-purple-400"
-          title="Edit Course Offering"
+          title="Edit Course Instance"
         >
           <IconEdit className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete?.(row)}
-          className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-red-500 dark:border-gray-700 dark:text-gray-300 dark:hover:text-red-400"
-          title="Delete Course Offering"
-        >
-          <IconTrash className="h-3.5 w-3.5" />
         </button>
       </div>
     ),

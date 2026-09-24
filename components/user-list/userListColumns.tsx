@@ -242,7 +242,7 @@ export const makeUserListColumns = (
   },
   {
     accessor: "regNo",
-    title: "REGISTER NO.",
+    title: "REGISTER NUMBER / EMPLOYEE NUMBER",
     render: (row: any) => (
       <span className="font-mono text-xs font-medium text-[#000] dark:text-gray-300">
         {row.register_number || row.regNo || (row.id ? `USR-${String(row.id).padStart(4, "0")}` : "-")}

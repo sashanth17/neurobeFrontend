@@ -1399,7 +1399,7 @@ const Topics = () => {
     }
   };
 
-  // ── Pre-generate: plain topic rows with level + hours badges ─────────────────
+  // ── Pre-generate: plain topic rows with level + hours badges & extracted subtopics ──────
   console.log("apiTopics", apiTopics);
 
   const buildInitialTopics = () => {
@@ -1427,20 +1427,40 @@ const Topics = () => {
               ? (String(topic.hours).toLowerCase().includes("hour") ? String(topic.hours) : `${topic.hours} Hours`)
               : (topic.theory_hours ? `${topic.theory_hours} Hours` : "2 Hours");
 
-        const isApproved =
-          approvedInUnit.has(String(topicId)) ||
-          approvedInUnit.has(String(topic.id)) ||
-          topic.status === "Approved" ||
-          topic.status?.toLowerCase() === "approved" ||
-          topic.status_badge === "success";
+        const subtopicsList = Array.isArray(topic.subtopics) && topic.subtopics.length > 0
+          ? topic.subtopics
+          : Array.isArray(topic.extracted_subtopics) && topic.extracted_subtopics.length > 0
+            ? topic.extracted_subtopics
+            : Array.isArray(topic.topics) && topic.topics.length > 0
+              ? topic.topics
+              : [];
 
-        // const statusBadge = {
-        //   label: isApproved ? "Approved" : (topic.status || "Needs Review"),
-        //   className: isApproved
-        //     ? "border border-green-300 bg-green-50 text-green-700 font-semibold"
-        //     : "border border-orange-300 bg-orange-50 text-orange-600 font-semibold",
-        //   onClick: () => toggleApprove(state.activeTab, String(topicId)),
-        // };
+        const items = subtopicsList.map((sub: any, sIdx: number) => {
+          const subId = String(sub.id || `${topicId}.${sIdx + 1}`);
+          const subTitle = sub.subtopic_name || sub.title || sub.name || `Subtopic ${subId}`;
+          const subHours = sub.hours || sub.theory_hours || "—";
+          const subLevel = sub.level || sub.knowledge_level || "K2";
+          return {
+            id: subId,
+            index: sIdx + 1,
+            title: subTitle,
+            highlighted: false,
+            actions: [
+              {
+                key: "level",
+                label: String(subLevel).toUpperCase().startsWith("K") ? String(subLevel).toUpperCase() : `K${subLevel}`,
+                asTag: true as const,
+                className: "rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600",
+              },
+              ...(subHours !== "—" ? [{
+                key: "hours",
+                label: String(subHours).toLowerCase().includes("hour") ? subHours : `${subHours} Hours`,
+                asTag: true as const,
+                className: "rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-[#000]",
+              }] : []),
+            ],
+          };
+        });
 
         return {
           id: `${state.activeTab}-${topicId}`,
@@ -1448,6 +1468,7 @@ const Topics = () => {
           collapsedBadge: [
             { label: levelBadge, className: "bg-color2-l text-color2 font-bold" },
             { label: hoursBadge, className: "bg-gray-200 text-pri font-bold" },
+            ...(items.length > 0 ? [{ label: `${items.length} Subtopics`, className: "bg-indigo-50 text-indigo-700 font-semibold" }] : []),
           ],
           actions: [
             {
@@ -1467,7 +1488,7 @@ const Topics = () => {
               onClick: () => handleDeleteTopic(topic),
             },
           ],
-          items: [],
+          items,
         };
       });
     }
@@ -1813,7 +1834,7 @@ const Topics = () => {
         <AccordiansStyle
           loading={state.topicsLoading || (state.loadingUnitDetail && !activeUnitDetail)}
           loadingMessage={state.topicsLoading ? "Processing topic hierarchy with NEURO AI... (Status: Processing · Polling every 2m)" : "Loading unit details..."}
-          expandable={state.topicsGenerated}
+          expandable={state.topicsGenerated || buildInitialTopics().some((t: any) => t.items && t.items.length > 0)}
           topics={state.topicsGenerated ? buildGeneratedTopics() : buildInitialTopics()}
           title={currentUnitTitle}
           subtitle={

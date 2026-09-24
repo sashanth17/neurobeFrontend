@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { Users, Upload, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
+import { useSetState, Success, Failure, showDeleteAlert, getAuthUser, isCreatedByCurrentUser } from "@/utils/function.utils";
 import IconPlus from "@/components/Icon/IconPlus";
 import IconSearch from "@/components/Icon/IconSearch";
 import PageHeader from "@/components/common-components/PageHeader";
@@ -56,8 +56,12 @@ const StudentEnrollment = () => {
   const fetchCourseInstances = async () => {
     try {
       setState({ loading: true });
+      const authUser = getAuthUser();
       const res: any = await Models.course_instance.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      let list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      if (!authUser.is_admin) {
+        list = list.filter((item: any) => isCreatedByCurrentUser(item, authUser));
+      }
       const options = list.map((item: any) => ({
         value: item.id,
         label: item.course_instance_name || `${item.course_code || "Course"} - Sec ${item.section || "A"} (Sem ${item.semester || 1})`,

@@ -49,10 +49,10 @@ const attachInterceptors = (axiosInstance: AxiosInstance) => {
   // Request: attach bearer token
   axiosInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-      const accessToken = localStorage.getItem("token");
-      // if (accessToken && config.headers) {
-      //   config.headers["Authorization"] = `Bearer ${accessToken}`;
-      // }
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (accessToken && config.headers) {
+        config.headers["Authorization"] = `Bearer ${accessToken}`;
+      }
       return config;
     },
     (error: AxiosError) => Promise.reject(error),

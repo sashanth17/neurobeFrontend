@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { ArrowRight, BookOpen, Info, User, UserCheck, Users } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, showDeleteAlert } from "@/utils/function.utils";
+import { useSetState, Success, Failure, getAuthUser, isCreatedByCurrentUser } from "@/utils/function.utils";
 import IconSearch from "@/components/Icon/IconSearch";
 import IconPlus from "@/components/Icon/IconPlus";
 import AcademicTable from "@/components/common-components/TableComponent";
@@ -39,9 +39,9 @@ const STATUS_OPTIONS = [
 ];
 
 const ARCHIVE_OPTIONS = [
-  { value: "all", label: "All Offerings" },
-  { value: "active", label: "Active Offerings" },
-  { value: "archived", label: "Archived Offerings" },
+  { value: "all", label: "All Instances" },
+  { value: "active", label: "Active Instances" },
+  { value: "archived", label: "Archived Instances" },
 ];
 
 const CourseOffering = () => {
@@ -85,7 +85,7 @@ const CourseOffering = () => {
   };
 
   useEffect(() => {
-    dispatch(setPageTitle("Course Offerings"));
+    dispatch(setPageTitle("Course Instances"));
   }, []);
 
   useEffect(() => {
@@ -95,8 +95,12 @@ const CourseOffering = () => {
   const course_instance_list = async () => {
     try {
       setState({ loading: true });
+      const authUser = getAuthUser();
       const res: any = await Models.course_instance.list();
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      let list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+      if (!authUser.is_admin) {
+        list = list.filter((item: any) => isCreatedByCurrentUser(item, authUser));
+      }
       setState({ instanceList: list, loading: false });
     } catch (error) {
       console.log("error", error);
@@ -104,27 +108,13 @@ const CourseOffering = () => {
     }
   };
 
-  const handleDelete = (row: any) => {
-    showDeleteAlert(
-      async () => {
-        try {
-          setState({ loading: true });
-          await Models.course_instance.delete(row.id);
-          Success("Course offering deleted successfully");
-          course_instance_list();
-        } catch (error: any) {
-          Failure(typeof error === "string" ? error : error?.message || "Failed to delete course offering");
-          setState({ loading: false });
-        }
-      },
-      () => { },
-      `Are you sure you want to delete ${row.course_instance_name || row.course || "this course offering"}?`
-    );
-  };
-
   // ── filtered records ───────────────────────────────────────────────────────
+  const authUser = getAuthUser();
   const rawList = state.instanceList || [];
   const records = rawList.filter((r: any) => {
+    if (!authUser.is_admin && !isCreatedByCurrentUser(r, authUser)) {
+      return false;
+    }
     const s = state.search.toLowerCase();
     const courseTitle = r.course_instance_name || r.course || r.course_title || "";
     const courseCode = r.course_code || r.code || "";
@@ -149,7 +139,7 @@ const CourseOffering = () => {
     <div className="min-h-screen">
       {/* Info banner */}
       <PageHeader
-        title="Course Offerings & Instance Management"
+        title="Course Instances & Section Management"
         subtitle="Overview of course offerings and section instances across programmes and terms."
         icon={<BookOpen className="h-5 w-5 text-color2" />}
         records={`${records.length} Records`}
@@ -160,7 +150,7 @@ const CourseOffering = () => {
           outline: true,
         }}
         actionBtn1={{
-          label: "Create Offering",
+          label: "Create Instance",
           icon: <IconPlus className="h-4 w-4" />,
           onClick: openCreate,
           view: false,
@@ -255,7 +245,7 @@ const CourseOffering = () => {
               ARCHIVE_OPTIONS.find((o) => o.value === state.archiveFilter) ?? null
             }
             onChange={(e) => setState({ archiveFilter: e?.value ?? "all" })}
-            placeholder="Active Offerings"
+            placeholder="Active Instances"
             className="filter-input"
             isClearable={false}
           />
@@ -266,9 +256,9 @@ const CourseOffering = () => {
       <div className="panel">
         <AcademicTable
           records={records}
-          columns={makeCourseOfferingColumns(openEdit, handleDelete, handleManageStudents, handleToggleArchive)}
+          columns={makeCourseOfferingColumns(openEdit, handleManageStudents, handleToggleArchive)}
           loading={state.loading}
-          noRecordsText="No course offerings found"
+          noRecordsText="No course instances found"
         />
       </div>
     </div>

@@ -437,7 +437,7 @@ const MCQTestExecution = () => {
   }>({ open: false, data: null });
   const [configureModal, setConfigureModal] = useState<{
     open: boolean;
-    data: MCQTestExecutionItem | null;
+    data: any | null;
   }>({ open: false, data: null });
 
   // ── Per-unit reviewed topic tracking ──────────────────────────────────────
@@ -638,12 +638,34 @@ const MCQTestExecution = () => {
 
 
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <GenericTabs
           tabs={MCQ_TABS}
           activeKey={state.activeTab}
           onChange={(unit) => setState({ activeTab: unit as string })}
         />
+
+        <button
+          type="button"
+          onClick={() =>
+            setConfigureModal({
+              open: true,
+              data: {
+                testCode: `MCQ-TEST-${Date.now().toString().slice(-4)}`,
+                title: "New MCQ Assessment",
+                unitLabel: "Unit 1",
+                topics: "Unit Assessment Topics",
+                questionsCount: 10,
+                duration: "30 Minutes",
+                secureCode: `SEC-${Math.floor(1000 + Math.random() * 9000)}`,
+              },
+            })
+          }
+          className="flex items-center gap-1.5 rounded-lg bg-color2 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
+        >
+          <Sparkles className="h-4 w-4" />
+          <span>Create Test</span>
+        </button>
       </div>
 
       <div className="mt-6 space-y-4">

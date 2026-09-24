@@ -19,13 +19,34 @@ const course = {
                 params.append("status", body.status);
             }
             if (body?.department_id) {
-                params.append("department_id", body.department_id);
+                params.append("department_id", String(body.department_id));
+            }
+            if (body?.coordinator_id) {
+                params.append("coordinator_id", String(body.coordinator_id));
+            }
+            if (body?.instructor_id) {
+                params.append("instructor_id", String(body.instructor_id));
+            }
+            if (body?.created_by_id !== undefined && body?.created_by_id !== null && body?.created_by_id !== "") {
+                params.append("created_by_id", String(body.created_by_id));
+            }
+            if (body?.created_by_register_number) {
+                params.append("created_by_register_number", String(body.created_by_register_number));
+            }
+            if (body?.course_instance_id) {
+                params.append("course_instance_id", String(body.course_instance_id));
+            }
+            if (body?.programme_id) {
+                params.append("programme_id", String(body.programme_id));
+            }
+            if (body?.batch_id) {
+                params.append("batch_id", String(body.batch_id));
+            }
+            if (body?.limit) {
+                params.append("limit", String(body.limit));
             }
             if (page) {
                 params.append("page", page);
-            }
-             if (body?.coordinator_id) {
-                params.append("coordinator_id", body?.coordinator_id);
             }
 
             if (params.toString()) {

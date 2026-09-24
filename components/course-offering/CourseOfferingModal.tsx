@@ -4,7 +4,7 @@ import * as Yup from "yup";
 import { ModalShell } from "@/components/academic-setup/AddModals";
 import TextInput from "@/components/FormFields/TextInput.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
-import { useSetState, Failure } from "@/utils/function.utils";
+import { useSetState, Failure, getAuthUser } from "@/utils/function.utils";
 import Models from "@/imports/models.import";
 
 type DropdownOption = { value: string | number; label: string };
@@ -155,11 +155,10 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-    const user = userStr ? JSON.parse(userStr) : {};
+    const authUser = getAuthUser();
 
     const values = {
-      organization_id: user?.organization_id || 0,
+      organization_id: authUser?.organization_id || 0,
       course_id: state.course?.value,
       course_instance_name: state.course_instance_name,
       programme_id: state.programme?.value,
@@ -168,7 +167,7 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
       is_active: true,
       term_visibility: Boolean(state.term_visibility),
       is_archived: Boolean(state.is_archived),
-      created_by_id: user?.id || 0,
+      created_by_id: authUser?.id || 0,
       created_on: new Date().toISOString(),
     };
 
