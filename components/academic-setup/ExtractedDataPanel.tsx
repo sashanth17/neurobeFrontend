@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import CourseOutcomes from "@/components/academic-setup/CourseOutcomes";
 import UnitTopics from "@/components/academic-setup/UnitTopics";
+import LabExperiments from "@/components/academic-setup/LabExperiments";
 import PrescribedTextbooks from "@/components/academic-setup/PrescribedTextbooks";
 
 const TABS = [
@@ -9,6 +10,7 @@ const TABS = [
   "Course Details",
   "COs & Knowledge Levels",
   "Units & Topics",
+  "Lab Experiments",
   "Prescribed Textbooks",
 ];
 
@@ -37,7 +39,7 @@ const ExtractedDataPanel = (props: any) => {
   const getInitL = () => String(data?.lectureHours ?? data?.lecture_hours ?? data?.course_data?.lecture_hours ?? courseData?.latest_syllabus?.lecture_hours ?? courseData?.lecture_hours ?? 3);
   const getInitT = () => String(data?.tutorialHours ?? data?.tutorial_hours ?? data?.course_data?.tutorial_hours ?? courseData?.latest_syllabus?.tutorial_hours ?? courseData?.tutorial_hours ?? 0);
   const getInitP = () => String(data?.practicalHours ?? data?.practical_hours ?? data?.course_data?.practical_hours ?? courseData?.latest_syllabus?.practical_hours ?? courseData?.practical_hours ?? 0);
-  const getInitC = () => String(courseData?.credits ?? courseData?.latest_syllabus?.credits ?? data?.credits ?? 4);
+  const getInitC = () => String(courseData?.credits ?? courseData?.latest_syllabus?.credits ?? data?.credits ?? 0);
 
   const [L, setL] = useState(getInitL);
   const [T, setT] = useState(getInitT);
@@ -84,7 +86,7 @@ const ExtractedDataPanel = (props: any) => {
   const lNum = parseFloat(L) || 0;
   const tNum = parseFloat(T) || 0;
   const pNum = parseFloat(P) || 0;
-  const theoryHoursDisplay = (lNum + tNum) > 0 ? (lNum + tNum) * 15 : (courseData?.latest_syllabus?.total_theory_hours ?? data?.total_theory_hours ?? 45);
+  const theoryHoursDisplay = (lNum + tNum) > 0 ? (lNum + tNum) * 15 : (courseData?.latest_syllabus?.total_theory_hours ?? data?.total_theory_hours ?? 0);
   const labHoursDisplay = pNum > 0 ? pNum * 15 : (courseData?.latest_syllabus?.total_lab_hours ?? data?.total_lab_hours ?? 0);
   const totalContactDisplay = theoryHoursDisplay + labHoursDisplay;
 
@@ -93,6 +95,7 @@ const ExtractedDataPanel = (props: any) => {
     "Course Details": useRef<HTMLDivElement>(null),
     "COs & Knowledge Levels": useRef<HTMLDivElement>(null),
     "Units & Topics": useRef<HTMLDivElement>(null),
+    "Lab Experiments": useRef<HTMLDivElement>(null),
     "Prescribed Textbooks": useRef<HTMLDivElement>(null),
   };
 
@@ -277,7 +280,15 @@ const ExtractedDataPanel = (props: any) => {
           />
         </div>
 
-        {/* Section 4 — Prescribed Textbooks */}
+        {/* Section 4 — Laboratory Experiments */}
+        <div ref={sectionRefs["Lab Experiments"]}>
+          <LabExperiments
+            experiments={data?.laboratory_experiments || data?.laboratoryExperiments || data?.experiments || []}
+            syllabusId={syllabusId}
+          />
+        </div>
+
+        {/* Section 5 — Prescribed Textbooks */}
         <div ref={sectionRefs["Prescribed Textbooks"]}>
           <PrescribedTextbooks
             textBooks={data?.textbooks}

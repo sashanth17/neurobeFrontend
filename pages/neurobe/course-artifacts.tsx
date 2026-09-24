@@ -2126,6 +2126,17 @@ const QuestionBank = () => {
     publisher: [b.publisher, b.edition].filter(Boolean).join(" · "),
   }));
 
+  const dynamicLaboratoryExperiments = (
+    state.syllabusDetail?.laboratory_experiments ||
+    state.syllabusDetail?.laboratoryExperiments ||
+    state.syllabusDetail?.experiments ||
+    []
+  ).map((e: any, idx: number) => ({
+    id: `exp-${e.id || idx + 1}`,
+    title: e.title || e.experiment_title || `Experiment ${idx + 1}`,
+    hours: e.allocated_hours || e.hours || 0,
+  }));
+
   const rawMatrix = state.copoData?.matrix || state.copoData?.data?.matrix || {};
   const rawPos = state.copoData?.program_outcomes || state.copoData?.data?.program_outcomes || [];
   const rawCos = state.copoData?.course_outcomes || state.copoData?.data?.course_outcomes || [];
@@ -2397,7 +2408,7 @@ const QuestionBank = () => {
           unitCodeText: `Unit ${uNum}`,
           title: matchedUnit?.unitTitle || `Unit ${uNum}`,
           questionsCountText: `${questions.length} Question${questions.length === 1 ? "" : "s"}`,
-          questions: questions.length > 0 ? questions : (SAMPLE_QUESTIONS.filter((sq) => sq.unit === `Unit ${uNum}`) as any),
+          questions: questions,
         };
       });
     }
@@ -2407,8 +2418,8 @@ const QuestionBank = () => {
       unitNumber: u.unitNumber,
       unitCodeText: `Unit ${u.unitNumber}`,
       title: u.unitTitle,
-      questionsCountText: `3 Questions`,
-      questions: SAMPLE_QUESTIONS as any,
+      questionsCountText: `0 Questions`,
+      questions: [],
     }));
   })();
 
@@ -2764,7 +2775,7 @@ const QuestionBank = () => {
                         headerSubtitle="Curriculum Allocation"
                         theoryHours={dynamicTheoryHours}
                         labHours={dynamicLabHours}
-                        experiments={[]}
+                        experiments={dynamicLaboratoryExperiments}
                       />
                     </div>
 

@@ -198,6 +198,12 @@ const CourseOutcomes = (props: any) => {
             )}
           </div>
         ))}
+
+        {cos.length === 0 && (
+          <p className="py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+            No course outcomes found in this syllabus.
+          </p>
+        )}
       </div>
     </div>
   );

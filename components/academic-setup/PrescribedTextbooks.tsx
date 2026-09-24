@@ -282,14 +282,20 @@ const PrescribedTextbooks = (props) => {
       {/* Primary Textbooks */}
       <p className="mb-3 text-xs font-bold uppercase tracking-wide text-pri">Primary Textbooks</p>
       <div className="mb-5 space-y-3">
-        {textbooks.map((book, i) => (
-          <BookCard key={book.id} book={book}
-            label={`Textbook ${String(i + 1).padStart(2, "0")}`}
-            labelClass="bg-purple-50 text-color2 dark:bg-purple-900/20"
-            showEditionPublisher
-            onDelete={() => deleteBook(textbooks, setTextbooks, book.id)}
-            onChange={(field, value) => updateBook(textbooks, setTextbooks, book.id, field, value)} />
-        ))}
+        {textbooks.length === 0 ? (
+          <p className="text-xs text-gray-500 italic py-2 dark:text-gray-400">
+            No primary textbooks found in this syllabus.
+          </p>
+        ) : (
+          textbooks.map((book, i) => (
+            <BookCard key={book.id} book={book}
+              label={`Textbook ${String(i + 1).padStart(2, "0")}`}
+              labelClass="bg-purple-50 text-color2 dark:bg-purple-900/20"
+              showEditionPublisher
+              onDelete={() => deleteBook(textbooks, setTextbooks, book.id)}
+              onChange={(field, value) => updateBook(textbooks, setTextbooks, book.id, field, value)} />
+          ))
+        )}
       </div>
 
       {/* Reference Books */}
@@ -301,14 +307,20 @@ const PrescribedTextbooks = (props) => {
         </button>
       </div>
       <div className="space-y-3">
-        {references.map((book, i) => (
-          <BookCard key={book.id} book={book}
-            label={`Ref ${String(i + 1).padStart(2, "0")}`}
-            labelClass="bg-gray-100 text-[#000] dark:bg-gray-700 dark:text-gray-300"
-            showEditionPublisher={true}
-            onDelete={() => deleteReference(references, setReferences, book.id)}
-            onChange={(field, value) => updateBook(references, setReferences, book.id, field, value)} />
-        ))}
+        {references.length === 0 ? (
+          <p className="text-xs text-gray-500 italic py-2 dark:text-gray-400">
+            No reference literature found in this syllabus.
+          </p>
+        ) : (
+          references.map((book, i) => (
+            <BookCard key={book.id} book={book}
+              label={`Ref ${String(i + 1).padStart(2, "0")}`}
+              labelClass="bg-gray-100 text-[#000] dark:bg-gray-700 dark:text-gray-300"
+              showEditionPublisher={true}
+              onDelete={() => deleteReference(references, setReferences, book.id)}
+              onChange={(field, value) => updateBook(references, setReferences, book.id, field, value)} />
+          ))
+        )}
       </div>
     </div>
   );

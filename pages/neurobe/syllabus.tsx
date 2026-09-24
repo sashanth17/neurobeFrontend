@@ -306,20 +306,39 @@ const Syllabus = () => {
     // 2. Units & Topics
     const rawUnits = source?.units || data?.units || [];
     const units = rawUnits.map((u: any, idx: number) => {
+      const uNum = u.unit_number ?? u.unitNumber ?? (idx + 1);
       const rawTopics = u.topics || [];
-      const topics = rawTopics.map((t: any, tIdx: number) => ({
-        id: t.id ?? tIdx + 1,
-        topic_code: t.topic_code || t.topicId || `${u.unit_number || u.unitNumber || idx + 1}.${tIdx + 1}`,
-        topic_name: t.topic_name || t.title || "",
-        learning_sequence: t.learning_sequence || t.sequence || tIdx + 1,
-      }));
+      const topics = rawTopics.map((t: any, tIdx: number) => {
+        const topicText = typeof t === "string" ? t : (t.topic_name || t.title || t.name || "");
+        const topicCode = (typeof t === "object" && (t.topic_code || t.topicId))
+          ? (t.topic_code || t.topicId)
+          : `${uNum}.${tIdx + 1}`;
+        const topicId = (typeof t === "object" && t.id) ? t.id : tIdx + 1;
+        const seq = (typeof t === "object" && (t.learning_sequence || t.sequence))
+          ? (t.learning_sequence || t.sequence)
+          : tIdx + 1;
+        return {
+          id: topicId,
+          topic_code: topicCode,
+          topicId: topicCode,
+          topic_name: topicText,
+          title: topicText,
+          learning_sequence: seq,
+        };
+      });
 
+      const uTitle = u.unit_title || u.title || `UNIT ${uNum}`;
+      const thHours = Number(u.theory_hours ?? u.hours ?? 0);
+      const lbHours = Number(u.lab_hours ?? 0);
       return {
         id: u.id ?? idx + 1,
-        unit_number: u.unit_number ?? u.unitNumber ?? (idx + 1),
-        unit_title: u.unit_title || u.title || `UNIT ${idx + 1}`,
-        theory_hours: u.theory_hours ?? u.hours ?? 0,
-        lab_hours: u.lab_hours ?? 0,
+        unit_number: uNum,
+        unitNumber: uNum,
+        unit_title: uTitle,
+        title: uTitle,
+        theory_hours: thHours,
+        hours: thHours,
+        lab_hours: lbHours,
         syllabus_id: u.syllabus_id || data?.id || source?.syllabus_id,
         topics,
       };
@@ -347,6 +366,41 @@ const Syllabus = () => {
       publication_year: b.publication_year ?? b.publicationYear ?? "",
     }));
 
+    // 5. Laboratory Experiments
+    const rawExperiments =
+      source?.laboratory_experiments ||
+      source?.laboratoryExperiments ||
+      source?.experiments ||
+      data?.laboratory_experiments ||
+      data?.laboratoryExperiments ||
+      data?.experiments ||
+      [];
+    const laboratory_experiments = rawExperiments.map((e: any, idx: number) => {
+      if (typeof e === "string") {
+        return {
+          id: idx + 1,
+          experiment_number: idx + 1,
+          number: idx + 1,
+          title: e,
+          allocated_hours: 0,
+          hours: 0,
+          description: "",
+        };
+      }
+      const expNum = e.experiment_number ?? e.experimentNumber ?? e.number ?? (idx + 1);
+      const hrs = e.allocated_hours ?? e.hours ?? 0;
+      return {
+        id: e.id ?? idx + 1,
+        experiment_number: expNum,
+        experimentNumber: expNum,
+        number: expNum,
+        title: e.title || e.experiment_title || `Experiment ${idx + 1}`,
+        allocated_hours: hrs,
+        hours: hrs,
+        description: e.description || "",
+      };
+    });
+
     return {
       ...data,
       ...source,
@@ -355,6 +409,9 @@ const Syllabus = () => {
       units,
       textbooks,
       reference_books,
+      laboratory_experiments,
+      laboratoryExperiments: laboratory_experiments,
+      experiments: laboratory_experiments,
     };
   };
 
@@ -516,10 +573,22 @@ const Syllabus = () => {
         const existingData = prev.jobData;
         const hasDbContent =
           (normalizedDetail?.outcomes && normalizedDetail.outcomes.length > 0) ||
-          (normalizedDetail?.units && normalizedDetail.units.length > 0);
+          (normalizedDetail?.units && normalizedDetail.units.length > 0) ||
+          (normalizedDetail?.laboratory_experiments && normalizedDetail.laboratory_experiments.length > 0);
 
         if (hasDbContent || !existingData) {
-          return { jobData: normalizedDetail };
+          const mergedUnits = (normalizedDetail?.units || []).map((u: any) => {
+            if (!u.topics || u.topics.length === 0) {
+              const matched = existingData?.units?.find(
+                (eu: any) => (eu.unit_number === u.unit_number || eu.unitNumber === u.unitNumber || eu.id === u.id)
+              );
+              if (matched?.topics && matched.topics.length > 0) {
+                return { ...u, topics: matched.topics };
+              }
+            }
+            return u;
+          });
+          return { jobData: { ...normalizedDetail, units: mergedUnits } };
         } else {
           // Keep existing extracted jobData but merge DB metadata like id, etc.
           return {
@@ -530,6 +599,9 @@ const Syllabus = () => {
               units: existingData.units?.length > 0 ? existingData.units : normalizedDetail.units,
               textbooks: existingData.textbooks?.length > 0 ? existingData.textbooks : normalizedDetail.textbooks,
               reference_books: existingData.reference_books?.length > 0 ? existingData.reference_books : normalizedDetail.reference_books,
+              laboratory_experiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
+              laboratoryExperiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
+              experiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
             },
           };
         }

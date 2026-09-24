@@ -83,7 +83,7 @@ const TheoryAndLabCard: React.FC<TheoryAndLabCardProps> = ({
       </div>
 
       {/* Lab Experiments Section */}
-      {experiments.length > 0 && (
+      {experiments.length > 0 ? (
         <div className="mt-5 rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-800/80">
           <h4 className="text-sm font-bold uppercase tracking-wider text-[#000] dark:text-white mb-3">
             {labExperimentsTitle}
@@ -100,6 +100,21 @@ const TheoryAndLabCard: React.FC<TheoryAndLabCardProps> = ({
               />
             ))}
           </div>
+        </div>
+      ) : Number(labHours) > 0 ? (
+        <div className="mt-5 rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-800/80">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-[#000] dark:text-white mb-2">
+            {labExperimentsTitle}
+          </h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            No specific laboratory experiments listed in the syllabus extract.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl border border-gray-100 bg-gray-50/50 p-4 text-center dark:border-gray-800 dark:bg-gray-800/40">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Theory-only course. No laboratory experiments required.
+          </p>
         </div>
       )}
     </div>
