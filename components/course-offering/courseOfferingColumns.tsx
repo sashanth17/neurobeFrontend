@@ -161,11 +161,21 @@ export const makeCourseOfferingColumns = (
   {
     accessor: "students",
     title: "ENROLLED STUDENTS",
-    render: (row: any) => (
-      <span className="text-sm font-semibold text-[#000] dark:text-gray-300">
-        {row.enrolled_count ?? row.students ?? 0} Students
-      </span>
-    ),
+    render: (row: any) => {
+      const count =
+        row.student_count ??
+        row.students_count ??
+        row.enrolled_students_count ??
+        row.enrolled_count ??
+        row.students ??
+        row.total_enrolled ??
+        0;
+      return (
+        <span className="text-sm font-semibold text-[#000] dark:text-gray-300">
+          {count} Students
+        </span>
+      );
+    },
   },
   {
     accessor: "term_visibility",
