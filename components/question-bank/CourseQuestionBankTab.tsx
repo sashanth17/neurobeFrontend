@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Models from "@/imports/models.import";
 import { Success, Failure } from "@/utils/function.utils";
+import { useRouter } from "next/router";
 import QuestionSetsList, { QuestionSetItem } from "./QuestionSetsList";
 import QuestionSetDetailView from "./QuestionSetDetailView";
 import CreateQuestionSetModal from "./CreateQuestionSetModal";
@@ -43,6 +44,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
   courseUnits = [],
   onRefreshQuestions,
 }) => {
+  const router = useRouter();
   const [activeSubView, setActiveSubView] = useState<"sets" | "detail" | "all-questions">("sets");
   const [questionSets, setQuestionSets] = useState<QuestionSetItem[]>([]);
   const [loadingSets, setLoadingSets] = useState(false);
@@ -251,6 +253,16 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
               <span>All Questions ({courseQuestions.length})</span>
             </button>
           </div>
+
+          {/* Generate MCQs with AI */}
+          <button
+            type="button"
+            onClick={() => router.push(courseKey ? `/neurobe/mcq-generation?course_id=${courseKey}` : "/neurobe/mcq-generation")}
+            className="flex items-center gap-1.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-100 transition active:scale-98 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 cursor-pointer"
+          >
+            <Sparkles className="h-4 w-4 text-indigo-600" />
+            <span>Generate MCQs</span>
+          </button>
 
           {/* Primary Create Button */}
           <button

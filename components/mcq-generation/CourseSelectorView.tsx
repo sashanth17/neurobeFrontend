@@ -131,9 +131,15 @@ export const CourseSelectorView: React.FC<CourseSelectorViewProps> = ({
             const code = course.code || course.course_code || "";
             const title = course.title || course.course_title || "";
             const isCoordinator = course.role_type === "coordinator";
-            const totalQ = course.questions_count || 32;
-            const approvedQ = course.approved_questions_count || 24;
-            const pct = Math.round((approvedQ / totalQ) * 100);
+            const totalQ = course.questions_count ?? 0;
+            const approvedQ = course.approved_questions_count ?? 0;
+            const pct = totalQ > 0 ? Math.round((approvedQ / totalQ) * 100) : 0;
+            const studentCount =
+              course.students_count ??
+              course.student_count ??
+              course.enrolled_students_count ??
+              course.enrolled_count ??
+              0;
             return (
               <div
                 key={course.id}
@@ -178,7 +184,7 @@ export const CourseSelectorView: React.FC<CourseSelectorViewProps> = ({
                     </div>
                     <div className="flex items-center gap-1.5 truncate">
                       <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                      <span className="truncate">{course.students_count || 40} Students</span>
+                      <span className="truncate">{studentCount} Students</span>
                     </div>
                   </div>
                   <div className="mt-3.5 rounded-xl border border-slate-100 bg-indigo-50/40 p-3 dark:border-slate-800 dark:bg-indigo-950/20">

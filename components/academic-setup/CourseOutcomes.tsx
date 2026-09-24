@@ -113,7 +113,6 @@ const CourseOutcomes = (props: any) => {
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary2 text-xs font-bold text-color2">2</span>
           <h3 className="text-sm font-extrabold  uppercase tracking-wide text-[#000] dark:text-white">Course Outcomes & Knowledge Levels</h3>
         </div>
-        <span className="text-md font-bold text-color2">{acceptedCount} / {cos.length} Accepted</span>
       </div>
 
       <div className="space-y-4">
@@ -144,19 +143,6 @@ const CourseOutcomes = (props: any) => {
               </div>
 
               <div className="flex items-center gap-2">
-                {co.is_accepted ? (
-                  <span className="flex items-center gap-1.5 rounded-md border border-green-400 px-3 py-0.5 text-md font-semibold text-green-600">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Accepted
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleAccept(co.id)}
-                    disabled={loading}
-                    className="flex items-center gap-1.5 rounded-md bg-green-500 px-3 py-0.5 text-md font-semibold text-white hover:bg-green-600 disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Accept
-                  </button>
-                )}
                 {editingId === co.id ? (
                   <div className="flex gap-1">
                     <button

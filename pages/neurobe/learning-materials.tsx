@@ -310,7 +310,9 @@ const LearningMeterials = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    course_data();
+    if (course_id) {
+      course_data();
+    }
   }, [course_id]);
 
   const material_data = async (syllabus_id, unit) => {
@@ -352,9 +354,9 @@ const LearningMeterials = () => {
   console.log('✌️activeTab --->', state.activeTab);
 
   const course_data = async () => {
-    const targetCourseId = course_id || 1;
+    if (!course_id) return;
     try {
-      const res: any = await Models.course.detail(targetCourseId);
+      const res: any = await Models.course.detail(course_id);
       console.log('course_data --->', res);
 
       setState({ courseData: res, activeTab: `unit-${res?.latest_syllabus?.units?.[0]?.unit_number}` });

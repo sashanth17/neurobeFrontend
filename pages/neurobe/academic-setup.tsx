@@ -498,35 +498,45 @@ const AcademicSetup = () => {
 
       // Sync coordinator and instructors with the backend
       if (courseId) {
-        const userIdsToAssign = new Set<number>();
-        if (formData.coordinator_id) {
-          userIdsToAssign.add(Number(formData.coordinator_id));
-        }
-        if (Array.isArray(formData.instructor_ids)) {
-          formData.instructor_ids.forEach((id: number) => {
-            if (id) userIdsToAssign.add(Number(id));
-          });
-        }
-
-        for (const userId of Array.from(userIdsToAssign)) {
-          try {
-            await Models.faculty.assignCourseInstructor({
-              user_id: userId,
-              course_id: Number(courseId),
-            });
-          } catch (assignErr) {
-            console.warn(`Could not assign instructor ${userId} to course ${courseId}:`, assignErr);
-          }
-        }
+        const coordId = formData.coordinator_id ? Number(formData.coordinator_id) : null;
+        const instructorIds = Array.isArray(formData.instructor_ids)
+          ? formData.instructor_ids
+              .map((id: any) => Number(id))
+              .filter((id: number) => Boolean(id) && (!coordId || id !== coordId))
+          : [];
 
         try {
           await Models.faculty.patchCourseAssignments(courseId, {
-            coordinator_id: formData.coordinator_id || null,
-            remove_coordinator: !formData.coordinator_id,
-            set_instructor_ids: formData.instructor_ids || [],
+            coordinator_id: coordId,
+            remove_coordinator: !coordId,
+            set_instructor_ids: instructorIds,
           });
-        } catch {
-          // Ignored if patchCourseAssignments is not implemented
+        } catch (patchErr) {
+          console.warn("patchCourseAssignments failed, attempting fallback endpoints:", patchErr);
+          if (coordId) {
+            try {
+              await Models.faculty.assignCoordinator({
+                course_id: Number(courseId),
+                faculty_id: coordId,
+              });
+            } catch (cErr) {
+              console.error("Failed to assign coordinator:", cErr);
+            }
+          } else {
+            try {
+              await Models.faculty.removeCoordinator(courseId);
+            } catch (rErr) {
+              console.error("Failed to remove coordinator:", rErr);
+            }
+          }
+
+          try {
+            await Models.faculty.setInstructors(courseId, {
+              faculty_ids: instructorIds,
+            });
+          } catch (iErr) {
+            console.error("Failed to set instructors:", iErr);
+          }
         }
       }
 

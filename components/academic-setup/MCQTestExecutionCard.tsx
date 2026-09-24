@@ -9,6 +9,7 @@ import {
   BarChart2,
   Sliders,
   Settings,
+  Layers,
 } from "lucide-react";
 
 export type MCQTestStatus =
@@ -35,6 +36,9 @@ export interface MCQTestExecutionItem {
   submissionCount?: string;
   classAverage?: string;
   warningNotice?: string;
+  questionSetId?: string;
+  questionSetName?: string;
+  questions?: any[];
 }
 
 export interface MCQTestExecutionCardProps {
@@ -226,6 +230,13 @@ const MCQTestExecutionCard: React.FC<MCQTestExecutionCardProps> = ({
             >
               <Users className="h-4 w-4" />
               <span className="font-bold text-md">Submission Count: {test.submissionCount}</span>
+            </div>
+          )}
+
+          {test.questionSetName && (
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+              <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Question Set: <strong>{test.questionSetName}</strong></span>
             </div>
           )}
 

@@ -208,41 +208,6 @@ const RAW_UNIT_DATA: Record<string, UnitData> = {
   },
 };
 
-// ─── Static config ─────────────────────────────────────────────────────────────
-
-const STAT_TABS = [
-  {
-    key: "total-topics",
-    label: "Total Topics",
-    subLabel: "Across all units",
-    count: 22,
-    icon: <BookOpen className="h-5 w-5" />,
-  },
-  {
-    key: "approved",
-    label: "Approved Topics",
-    subLabel: "Ready for lesson plan",
-    count: 10,
-    icon: <CheckCircle2 className="h-5 w-5" />,
-  },
-  {
-    key: "needs-review",
-    label: "Needs Review",
-    subLabel: "Pending approval",
-    count: 12,
-    icon: <Hourglass className="h-5 w-5" />,
-  },
-  {
-    key: "contact-hours",
-    label: "Contact Hours",
-    subLabel: "Total teaching hours",
-    count: 45,
-    icon: <Clock className="h-5 w-5" />,
-  },
-];
-
-
-
 const GENERATE_STEPS = [
   {
     title: "Analyzing Course Syllabus",
@@ -265,7 +230,6 @@ const GENERATE_STEPS = [
 const fallbackTotalTopics = UNIT_TABS.reduce((a, b) => a + b.count, 0);
 const fallbackTotalUnits = UNIT_TABS.length;
 
-// count all subtopics across all units
 const fallbackTotalSubtopics = Object.values(RAW_UNIT_DATA).reduce(
   (s, u) => s + u.topics.reduce((ts, t) => ts + t.subtopics.length, 0),
   0,
@@ -372,8 +336,6 @@ const Topics = () => {
     if (course_id) {
       getCourseDetails();
       restoreWorkflowState(course_id);
-    } else {
-      getUnits(1);
     }
   }, [course_id]);
 
@@ -442,16 +404,24 @@ const Topics = () => {
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
       const sid = res?.syllabus_id || res?.latest_syllabus?.id;
-      getUnits(sid);
+      if (sid) {
+        getUnits(sid);
+      } else {
+        setState({ loadingUnits: false });
+      }
     } catch (error: any) {
       console.log("error fetching course detail", error);
       Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      getUnits(1);
+      setState({ loadingUnits: false });
     }
   };
 
   const getUnits = async (syllabusId?: any, verNum?: number) => {
-    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id;
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id;
+    if (!sid) {
+      setState({ loadingUnits: false });
+      return;
+    }
     const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
       setState({ loadingUnits: true });
@@ -494,10 +464,10 @@ const Topics = () => {
 
   const getUnitDetail = async (syllabusId?: any, unitNumber?: any, verNum?: number) => {
     const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.unitsList?.[0]?.syllabus_id;
-    const uNum = unitNumber ?? state.activeUnitNumber ;
+    const uNum = unitNumber ?? state.activeUnitNumber;
     const vToUse = verNum !== undefined ? verNum : loadedVersion;
     try {
-      setState({ loadingUnitDetail: true }); 
+      setState({ loadingUnitDetail: true });
       const res: any = await Models.topics.unit_detail(sid, uNum, vToUse);
       const data = res?.data || res;
 
@@ -509,25 +479,25 @@ const Topics = () => {
         const existingUnits = prev.unitsList || [];
         const mergedUnitsList = (Array.isArray(resUnitTabs) && resUnitTabs.length > 0)
           ? resUnitTabs.map((tab: any, idx: number) => {
-              const tabNum = tab.unit_number ?? (idx + 1);
-              const fromExisting = existingUnits.find(
-                (eu: any) => (eu.unit_number ?? eu.id) === tabNum
-              );
-              const realId =
-                (data?.selected_unit?.unit_number === tabNum ? currentUnitDbId : null) ||
-                fromExisting?.unit_id ||
-                fromExisting?.id ||
-                tab.unit_id ||
-                tab.id ||
-                (tabNum === 1 ? (currentUnitDbId || 2) : (currentUnitDbId ? currentUnitDbId + (tabNum - 1) : tabNum + 1));
+            const tabNum = tab.unit_number ?? (idx + 1);
+            const fromExisting = existingUnits.find(
+              (eu: any) => (eu.unit_number ?? eu.id) === tabNum
+            );
+            const realId =
+              (data?.selected_unit?.unit_number === tabNum ? currentUnitDbId : null) ||
+              fromExisting?.unit_id ||
+              fromExisting?.id ||
+              tab.unit_id ||
+              tab.id ||
+              (tabNum === 1 ? (currentUnitDbId || 2) : (currentUnitDbId ? currentUnitDbId + (tabNum - 1) : tabNum + 1));
 
-              return {
-                ...tab,
-                id: realId,
-                unit_id: realId,
-                unit_number: tabNum,
-              };
-            })
+            return {
+              ...tab,
+              id: realId,
+              unit_id: realId,
+              unit_number: tabNum,
+            };
+          })
           : existingUnits;
 
         const existingCourse = prev.courseDetail || {};
@@ -880,17 +850,17 @@ const Topics = () => {
       icon: <BookOpen className="h-5 w-5" />,
     },
     {
-      key: "approved",
-      label: "Approved Topics",
-      subLabel: "Ready for lesson plan",
-      count: totalApproved,
+      key: "subtopics",
+      label: "Total Subtopics",
+      subLabel: "Decomposed units",
+      count: computedTotalSubtopics,
       icon: <CheckCircle2 className="h-5 w-5" />,
     },
     {
-      key: "needs-review",
-      label: "Needs Review",
-      subLabel: "Pending approval",
-      count: displayNeedsReview,
+      key: "status",
+      label: "Hierarchy Status",
+      subLabel: state.topicsApproved ? "Approved for pedagogy" : "Pending stage approval",
+      count: state.topicsApproved ? "Approved" : "Draft",
       icon: <Hourglass className="h-5 w-5" />,
     },
     {
@@ -1070,20 +1040,20 @@ const Topics = () => {
     const existingMicroTopics = payload.micro_topics || selectedTopicToEdit?.micro_topics;
     const microTopicsList = (Array.isArray(existingMicroTopics) && existingMicroTopics.length > 0)
       ? existingMicroTopics.map((m: any) => ({
-          micro_topic_name: typeof m === "string" ? m : (m?.micro_topic_name || m?.name || m?.title || payload.topic_name),
-        }))
+        micro_topic_name: typeof m === "string" ? m : (m?.micro_topic_name || m?.name || m?.title || payload.topic_name),
+      }))
       : [
-          {
-            micro_topic_name: payload.topic_name,
-          },
-        ];
+        {
+          micro_topic_name: payload.topic_name,
+        },
+      ];
 
     const subtopicBody = {
       subtopic_code: subtopicCode,
       subtopic_name: payload.topic_name,
       micro_topics: microTopicsList,
-      hours : payload.estimated_hours,
-      knowledge_level : payload.knowledge_level,
+      hours: payload.estimated_hours,
+      knowledge_level: payload.knowledge_level,
       status: payload.status,
     };
 
@@ -1353,18 +1323,22 @@ const Topics = () => {
     try {
       setState({ approvingTopics: true });
       try {
-        await Models.topics.approve_hierarchy(sid);
-      } catch (hierErr) {
-        console.warn("approve_hierarchy fallback to approve_topics:", hierErr);
         await Models.topics.approve_topics(sid, {});
+      } catch (hierErr) {
+        console.warn("approve_topics fallback to approve_hierarchy:", hierErr);
+        await Models.topics.approve_hierarchy(sid);
       }
       try {
         await Models.syllabus.approve_stage(course_id || sid, "hierarchy");
       } catch (e) {
         console.warn("approve_stage hierarchy warning:", e);
       }
-      Success("Topics approved successfully");
+      Success("Topic hierarchy approved successfully");
       setState({ topicsApproved: true });
+      if (sid) {
+        await getUnits(sid, loadedVersion);
+        await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
+      }
       if (course_id) {
         await restoreWorkflowState(course_id);
       }
@@ -1425,7 +1399,7 @@ const Topics = () => {
     }
   };
 
-  // ── Pre-generate: plain topic rows with level + hours badges ─────────────────
+  // ── Pre-generate: plain topic rows with level + hours badges & extracted subtopics ──────
   console.log("apiTopics", apiTopics);
 
   const buildInitialTopics = () => {
@@ -1453,20 +1427,40 @@ const Topics = () => {
               ? (String(topic.hours).toLowerCase().includes("hour") ? String(topic.hours) : `${topic.hours} Hours`)
               : (topic.theory_hours ? `${topic.theory_hours} Hours` : "2 Hours");
 
-        const isApproved =
-          approvedInUnit.has(String(topicId)) ||
-          approvedInUnit.has(String(topic.id)) ||
-          topic.status === "Approved" ||
-          topic.status?.toLowerCase() === "approved" ||
-          topic.status_badge === "success";
+        const subtopicsList = Array.isArray(topic.subtopics) && topic.subtopics.length > 0
+          ? topic.subtopics
+          : Array.isArray(topic.extracted_subtopics) && topic.extracted_subtopics.length > 0
+            ? topic.extracted_subtopics
+            : Array.isArray(topic.topics) && topic.topics.length > 0
+              ? topic.topics
+              : [];
 
-        // const statusBadge = {
-        //   label: isApproved ? "Approved" : (topic.status || "Needs Review"),
-        //   className: isApproved
-        //     ? "border border-green-300 bg-green-50 text-green-700 font-semibold"
-        //     : "border border-orange-300 bg-orange-50 text-orange-600 font-semibold",
-        //   onClick: () => toggleApprove(state.activeTab, String(topicId)),
-        // };
+        const items = subtopicsList.map((sub: any, sIdx: number) => {
+          const subId = String(sub.id || `${topicId}.${sIdx + 1}`);
+          const subTitle = sub.subtopic_name || sub.title || sub.name || `Subtopic ${subId}`;
+          const subHours = sub.hours || sub.theory_hours || "—";
+          const subLevel = sub.level || sub.knowledge_level || "K2";
+          return {
+            id: subId,
+            index: sIdx + 1,
+            title: subTitle,
+            highlighted: false,
+            actions: [
+              {
+                key: "level",
+                label: String(subLevel).toUpperCase().startsWith("K") ? String(subLevel).toUpperCase() : `K${subLevel}`,
+                asTag: true as const,
+                className: "rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600",
+              },
+              ...(subHours !== "—" ? [{
+                key: "hours",
+                label: String(subHours).toLowerCase().includes("hour") ? subHours : `${subHours} Hours`,
+                asTag: true as const,
+                className: "rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-[#000]",
+              }] : []),
+            ],
+          };
+        });
 
         return {
           id: `${state.activeTab}-${topicId}`,
@@ -1474,6 +1468,7 @@ const Topics = () => {
           collapsedBadge: [
             { label: levelBadge, className: "bg-color2-l text-color2 font-bold" },
             { label: hoursBadge, className: "bg-gray-200 text-pri font-bold" },
+            ...(items.length > 0 ? [{ label: `${items.length} Subtopics`, className: "bg-indigo-50 text-indigo-700 font-semibold" }] : []),
           ],
           actions: [
             {
@@ -1493,7 +1488,7 @@ const Topics = () => {
               onClick: () => handleDeleteTopic(topic),
             },
           ],
-          items: [],
+          items,
         };
       });
     }
@@ -1571,21 +1566,19 @@ const Topics = () => {
           asTag: true as const,
           className: "rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600",
         },
-        isTopicApproved
+        (isTopicApproved || state.topicsApproved)
           ? {
-              key: "status",
-              label: "Approved",
-              asTag: true as const,
-              className: "rounded-full border border-green-400 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600",
-            }
+            key: "status",
+            label: "Approved",
+            asTag: true as const,
+            className: "rounded-full border border-green-400 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600",
+          }
           : {
-              key: "status",
-              label: "Needs Review",
-              asTag: false as const,
-              className:
-                "inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-500 hover:border-orange-400 hover:bg-orange-100 cursor-pointer",
-              onClick: () => openEditTopicModal(topicObj, "Approved"),
-            },
+            key: "status",
+            label: "Draft",
+            asTag: true as const,
+            className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
+          },
         {
           key: "add-subtopic",
           label: "Add Subtopic",
@@ -1600,7 +1593,7 @@ const Topics = () => {
           icon: <EditIcon className="h-3.5 w-3.5" />,
           className:
             "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
-          onClick: () => openEditTopicModal(topicObj, isTopicApproved ? "Approved" : "Needs Review"),
+          onClick: () => openEditTopicModal(topicObj),
         },
         {
           key: "delete",
@@ -1654,7 +1647,7 @@ const Topics = () => {
             asTag: true as const,
             className: "rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-[#000]",
           },
-          isApproved
+          (isApproved || state.topicsApproved)
             ? {
               key: "status",
               label: "Approved",
@@ -1663,11 +1656,9 @@ const Topics = () => {
             }
             : {
               key: "status",
-              label: "• Needs Review",
-              asTag: false as const,
-              className:
-                "inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-500 hover:border-orange-400 hover:bg-orange-100 cursor-pointer",
-              onClick: () => openEditTopicModal(subtopicObj, "Approved"),
+              label: "Draft",
+              asTag: true as const,
+              className: "rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500",
             },
           {
             key: "edit",
@@ -1675,7 +1666,7 @@ const Topics = () => {
             icon: <EditIcon className="h-3.5 w-3.5" />,
             className:
               "flex items-center rounded border border-gray-300 bg-white p-1 text-gray-500 hover:border-color2 hover:text-color2 cursor-pointer shadow-xs",
-            onClick: () => openEditTopicModal(subtopicObj, isApproved ? "Approved" : "Needs Review"),
+            onClick: () => openEditTopicModal(subtopicObj),
           },
           {
             key: "delete",
@@ -1843,7 +1834,7 @@ const Topics = () => {
         <AccordiansStyle
           loading={state.topicsLoading || (state.loadingUnitDetail && !activeUnitDetail)}
           loadingMessage={state.topicsLoading ? "Processing topic hierarchy with NEURO AI... (Status: Processing · Polling every 2m)" : "Loading unit details..."}
-          expandable={state.topicsGenerated}
+          expandable={state.topicsGenerated || buildInitialTopics().some((t: any) => t.items && t.items.length > 0)}
           topics={state.topicsGenerated ? buildGeneratedTopics() : buildInitialTopics()}
           title={currentUnitTitle}
           subtitle={
@@ -1861,7 +1852,7 @@ const Topics = () => {
           }
           footerContent={
             state.topicsGenerated ? (
-              <><RefreshCw className="h-3 w-3" /> Review subtopics and approve each one. Click a Needs Review badge to approve.</>
+              <><Sparkles className="h-3.5 w-3.5 text-color2" /> Review generated topics and subtopics. Edit or add topics if needed, then click 'Approve Topics' to finalize the hierarchy.</>
             ) : (
               <><Sparkles className="h-4 w-4" /> {activeUnitDetail?.callout_message || "NEURO AI will use these approved syllabus topics to create a Unit -> Topic -> Subtopics structure."}</>
             )
@@ -1871,7 +1862,7 @@ const Topics = () => {
         {/* ── Footer ── */}
         {state.topicsGenerated ? (
           <PageFooter
-            content1={`Approved: ${totalApproved}/${computedTotalSubtopics} Topics`}
+            content1={state.topicsApproved ? "Status: Topics Hierarchy Approved" : `${totalTopics} Topics · ${computedTotalSubtopics} Subtopics`}
             content2={
               activeUnitDetail?.course_display_tag ||
               (state.courseDetail
@@ -1894,8 +1885,8 @@ const Topics = () => {
                   label: state.approvingTopics
                     ? "Approving..."
                     : state.upstreamNotApproved
-                    ? "Requires Syllabus Approval"
-                    : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
+                      ? "Requires Syllabus Approval"
+                      : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
                   icon: state.approvingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
                   onClick: handleApproveTopics,
                   disabled: state.approvingTopics || state.upstreamNotApproved,

@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState } from "@/utils/function.utils";
+import { useSetState, Success, getAuthUser } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import useDebounce from "@/hook/useDebounce";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
@@ -18,6 +18,7 @@ import { EditQuestionModal } from "@/components/question-bank/EditQuestionModal"
 import ViewQuestionModal from "@/components/question-bank/ViewQuestionModal";
 import { CreateQuestionSetModal } from "@/components/question-bank/CreateQuestionSetModal";
 import CourseQuestionBankTab from "@/components/question-bank/CourseQuestionBankTab";
+import ConfigureTestScheduleModal from "@/components/academic-setup/ConfigureTestScheduleModal";
 
 import {
   CourseItem,
@@ -103,6 +104,8 @@ const MCQGenerationIndexPage = () => {
     viewQuestion: null as MCQQuestion | null,
     isViewModalOpen: false,
     isSetModalOpen: false,
+    isConfigureModalOpen: false,
+    configureModalData: null as any,
   });
 
   const debouncedSearch = useDebounce(state.search, 300);
@@ -190,9 +193,9 @@ const MCQGenerationIndexPage = () => {
   const fetchAssignedCourses = async () => {
     try {
       setState({ loading: true });
-      const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      const user = userStr ? JSON.parse(userStr) : null;
-      const body = { faculty_id: user?.id || 1, coordinator_id: user?.id || 1 };
+      const authUser = getAuthUser();
+      const userId = authUser?.id || 1;
+      const body = { faculty_id: userId, coordinator_id: userId };
       const res: any = await Models.course.faculty_dashboard_overview(body).catch(() => null);
       const raw = res?.courses || res?.data || res || [];
       if (Array.isArray(raw) && raw.length > 0) {
@@ -201,6 +204,7 @@ const MCQGenerationIndexPage = () => {
             c.role_type === "coordinator" || c.faculty_role === "coordinator" || c.role === "Course Coordinator"
               ? "coordinator"
               : "instructor";
+          const qb = c.academic_preparation?.question_bank || {};
           return {
             id: c.id || c.course_id || `c-${idx}`,
             code: c.code || c.course_code || `COURSE${idx}`,
@@ -210,22 +214,23 @@ const MCQGenerationIndexPage = () => {
             programme: c.programme || "B.Tech CSE",
             batch: c.batch_name || c.batch || "2024–2028",
             semester: c.semester || c.term || "Semester 5",
-            students_count: c.students_count || c.enrolled_students_count || 45,
+            students_count: c.students_count ?? c.student_count ?? c.enrolled_students_count ?? c.enrolled_count ?? 0,
+            student_count: c.student_count ?? c.students_count ?? c.enrolled_students_count ?? 0,
             role: roleType === "coordinator" ? "Course Coordinator" : "Course Instructor",
             role_type: roleType,
-            questions_count: 20 + idx * 6,
-            approved_questions_count: 15 + idx * 4,
-            drafted_questions_count: 3 + idx,
-            need_review_questions_count: 2 + idx,
-            units_count: 5,
+            questions_count: c.questions_count ?? qb.questions_count ?? (Array.isArray(c.questions) ? c.questions.length : 0),
+            approved_questions_count: c.approved_questions_count ?? qb.approved_questions_count ?? 0,
+            drafted_questions_count: c.drafted_questions_count ?? qb.drafted_questions_count ?? 0,
+            need_review_questions_count: c.need_review_questions_count ?? qb.need_review_questions_count ?? 0,
+            units_count: c.units_count ?? c.total_units ?? 5,
           } as CourseItem;
         });
         setState({ courses: formatted, loading: false });
       } else {
-        setState({ courses: FALLBACK_COURSES, loading: false });
+        setState({ courses: [], loading: false });
       }
     } catch {
-      setState({ courses: FALLBACK_COURSES, loading: false });
+      setState({ courses: [], loading: false });
     }
   };
 
@@ -851,34 +856,62 @@ const MCQGenerationIndexPage = () => {
           />
 
           {/* Workspace Tabs */}
-          <div className="mb-6 flex border-b border-gray-200 dark:border-gray-800">
-            {(["generator", "bank"] as const).map((tab) => (
+          <div className="mb-6 flex flex-wrap items-center justify-between border-b border-gray-200 dark:border-gray-800 gap-3">
+            <div className="flex">
+              {(["generator", "bank"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setState({ activeTab: tab })}
+                  className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
+                    state.activeTab === tab
+                      ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                  }`}
+                >
+                  {tab === "generator" ? (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      <span>AI Generation Studio</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileCheck2 className="h-4 w-4" />
+                      <span>Course Question Bank</span>
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        {currentQuestions.length}
+                      </span>
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="pb-2">
               <button
-                key={tab}
                 type="button"
-                onClick={() => setState({ activeTab: tab })}
-                className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
-                  state.activeTab === tab
-                    ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                }`}
+                onClick={() => {
+                  const c = state.selectedCourse;
+                  setState({
+                    isConfigureModalOpen: true,
+                    configureModalData: {
+                      testCode: `MCQ-${c?.code || "TEST"}-${Date.now().toString().slice(-4)}`,
+                      courseCodeTitle: c ? `${c.code || c.course_code} — ${c.title || c.course_title}` : "Course MCQ Test",
+                      testName: "Unit Assessment / MCQ Quiz",
+                      unitLabel: "Unit 1",
+                      topics: "Selected Question Bank Topics",
+                      questionsCount: currentQuestions.length > 0 ? Math.min(currentQuestions.length, 10) : 10,
+                      duration: "30 Minutes",
+                      secureCode: `SEC-${Math.floor(1000 + Math.random() * 9000)}`,
+                    },
+                  });
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-color2 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
               >
-                {tab === "generator" ? (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    <span>AI Generation Studio</span>
-                  </>
-                ) : (
-                  <>
-                    <FileCheck2 className="h-4 w-4" />
-                    <span>Course Question Bank</span>
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                      {currentQuestions.length}
-                    </span>
-                  </>
-                )}
+                <Sparkles className="h-4 w-4" />
+                <span>Create Test</span>
               </button>
-            ))}
+            </div>
           </div>
 
           {/* TAB 1: AI GENERATION STUDIO */}
@@ -1081,6 +1114,28 @@ const MCQGenerationIndexPage = () => {
               units={UNITS_CONFIG.map((u) => ({ unit_number: u.unitId, title: u.title }))}
               onCreated={() => {
                 fetchQuestions(state.selectedCourse?.code || state.selectedCourse?.id);
+              }}
+            />
+          )}
+
+          {state.isConfigureModalOpen && (
+            <ConfigureTestScheduleModal
+              open={state.isConfigureModalOpen}
+              onClose={() => setState({ isConfigureModalOpen: false, configureModalData: null })}
+              testData={state.configureModalData}
+              courseCodeTitle={state.configureModalData?.courseCodeTitle}
+              testCode={state.configureModalData?.testCode}
+              testName={state.configureModalData?.testName}
+              unitLabel={state.configureModalData?.unitLabel}
+              topics={state.configureModalData?.topics}
+              questionsCount={state.configureModalData?.questionsCount}
+              duration={state.configureModalData?.duration}
+              secureCode={state.configureModalData?.secureCode}
+              onSave={() => {
+                Success("Test schedule configured successfully!");
+                setState({ isConfigureModalOpen: false, configureModalData: null });
+                const cId = state.selectedCourse?.id || state.selectedCourse?.code || "";
+                router.push(`/neurobe/ins-mcq-test-execution?course_id=${cId}`);
               }}
             />
           )}

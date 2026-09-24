@@ -189,6 +189,10 @@ export default function CourseCard(props: any) {
   const sTopics = getStageInfo("hierarchy", workflowStatus?.step_3_topic_hierarchy, data?.academic_preparation?.topics?.state);
   const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
   const sLesson = getStageInfo("schedule", workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
+  const sQuestionBank = getStageInfo("question-bank", (workflowStatus as any)?.step_6_question_bank, data?.academic_preparation?.question_bank?.state);
+
+  const qbData = data?.academic_preparation?.question_bank;
+  const qbCount = qbData?.count ?? qbData?.questions_count ?? data?.questions_count ?? (Array.isArray(data?.questions) ? data?.questions.length : undefined);
 
   // Approval status indicators for topological gating
   const isSyllabusApproved = sSyllabus.status === "approved";
@@ -270,8 +274,11 @@ export default function CourseCard(props: any) {
     {
       label: "QUESTION BANK",
       stageKey: "question-bank",
-      status: data?.academic_preparation?.question_bank?.state || "not_started",
-      extra: data?.academic_preparation?.question_bank?.count !== undefined ? `${data?.academic_preparation?.question_bank?.count} Questions` : undefined,
+      status: sQuestionBank.status !== "not_started" ? sQuestionBank.status : (data?.academic_preparation?.question_bank?.state || (qbCount && qbCount > 0 ? "draft" : "not_started")),
+      version: optimisticVersions["question-bank"] || sQuestionBank.ver,
+      totalVersions: sQuestionBank.totalVers,
+      availableVersions: sQuestionBank.availableVersions,
+      extra: qbCount !== undefined ? `${qbCount} Questions` : undefined,
       route: `/neurobe/mcq-generation/bank?course_id=${targetCourseId}`,
       artifactsTab: "question-bank",
       isUnlocked: isTopicsApproved,

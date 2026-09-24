@@ -114,7 +114,7 @@ const ReviewLessonItemModal = ({
             onClick={() => { onAccept(); onClose(); }}
             className="bg-color2 flex items-center gap-1.5 rounded-lg px-6 py-2 text-sm font-semibold text-white hover:opacity-90"
           >
-            <CheckCircle2 className="h-3.5 w-3.5" /> Accept
+            <CheckCircle2 className="h-3.5 w-3.5" /> Mark as Reviewed
           </button>
         </div>
       </div>

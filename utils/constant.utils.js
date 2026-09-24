@@ -4,7 +4,7 @@ export const CLIENT_ID =
 // export const BACKEND_URL = "http://31.97.206.165/api/";
 
 // export const BACKEND_URL = "http://88.222.213.249/api/";
-export const BACKEND_URL = "http://172.31.176.1:80/";
+export const BACKEND_URL = "http://localhost:8080/";
 export const FRONTEND_URL = "https://localhost:3000";
 
 export const CALENDAR_CLIENT_ID =
@@ -162,8 +162,8 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "Student Enrollment",
-      href: "/neurobe/student-enrollment",
+      label: "Instance Management",
+      href: "/neurobe/course-offering",
     },
     {
       type: "link",
@@ -234,8 +234,8 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuUsers",
-      label: "Student Enrollment",
-      href: "/neurobe/ins-student-enrollment",
+      label: "Instance Management",
+      href: "/neurobe/course-offering",
     },
     {
       type: "link",
@@ -289,8 +289,8 @@ OwnmenuConfig.FACULTY = [
   {
     type: "link",
     icon: "IconMenuNotes",
-    label: "Student Enrollment",
-    href: "/neurobe/ins-student-enrollment",
+    label: "Instance Management",
+    href: "/neurobe/course-offering",
   },
   {
     type: "link",

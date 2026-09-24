@@ -11,7 +11,10 @@ export interface CourseItem {
   batch: string;
   semester: string | number;
   students_count?: number;
+  student_count?: number;
   enrolled_students?: number | string;
+  enrolled_students_count?: number;
+  enrolled_count?: number;
   role?: string;
   faculty_role?: string;
   role_type?: "coordinator" | "instructor";
