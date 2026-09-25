@@ -4,8 +4,16 @@ export const CLIENT_ID =
 // export const BACKEND_URL = "http://31.97.206.165/api/";
 
 // export const BACKEND_URL = "http://88.222.213.249/api/";
-export const BACKEND_URL = "http://localhost:8080/";
-export const FRONTEND_URL = "https://localhost:3000";
+/**
+ * Reads backend origin from environment. Set NEXT_PUBLIC_API_BASE_URL in .env
+ * for each environment (dev / staging / production). Falls back to localhost
+ * only when the var is absent (local docker-compose dev setup).
+ */
+export const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:80/";
+
+export const FRONTEND_URL =
+  process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
 
 export const CALENDAR_CLIENT_ID =
   "130334216230-5ur5a79k0k203lu20eri4crgkic25j9q.apps.googleusercontent.com";
@@ -149,6 +157,12 @@ export const OwnmenuConfig = {
       className: "pb-2",
     },
     {
+      type: "link",
+      icon: "IconMenuNotes",
+      label: "Question Bank",
+      href: "/neurobe/question-bank",
+    },
+    {
       type: "heading",
       label: "INSTRUCTOR FUNCTIONS",
       className: "pb-2 pt-2",
@@ -274,6 +288,12 @@ OwnmenuConfig.FACULTY = [
     label: "My Assigned Courses",
     href: "/neurobe/my-assigned-courses",
     className: "pb-2",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Question Bank",
+    href: "/neurobe/question-bank",
   },
   {
     type: "heading",

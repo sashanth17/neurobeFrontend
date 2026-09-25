@@ -24,6 +24,7 @@ import application from "@/models/application.model";
 import master from "@/models/master.model";
 import notification from "@/models/notification.model";
 import mcq from "@/models/mcq.model";
+import cia_test from "@/models/cia_test.model";
 
 export const Models: any = {
   test,
@@ -56,6 +57,8 @@ export const Models: any = {
   master,
   notification,
   mcq,
+  cia_test,
+  ciaTest: cia_test,
 };
 
 export default Models;
