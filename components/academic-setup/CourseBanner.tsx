@@ -72,20 +72,6 @@ export default function CourseBanner({
           Back to My Courses
         </button>
 
-        <CustomSelect
-          options={courseOptions}
-          value={
-            typeof selectedCourse === "string"
-              ? courseOptions.find((o) => o.value === selectedCourse) || { value: selectedCourse, label: `Course: ${selectedCourse}` }
-              : selectedCourse || null
-          }
-          onChange={onCourseChange}
-          placeholder={`Course: ${typeof selectedCourse === "object" ? selectedCourse?.label : selectedCourse || courseCode}`}
-          isSearchable={false}
-          isClearable={false}
-          className="course-banner-select w-30"
-          menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-        />
       </div>
 
       {/* Title Row */}

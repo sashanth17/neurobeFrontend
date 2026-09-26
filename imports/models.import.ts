@@ -24,6 +24,7 @@ import application from "@/models/application.model";
 import master from "@/models/master.model";
 import notification from "@/models/notification.model";
 import mcq from "@/models/mcq.model";
+import student from "@/models/student.model";
 
 export const Models: any = {
   test,
@@ -43,6 +44,8 @@ export const Models: any = {
   course_instructor,
   faculty,
   faculties: faculty,
+  student,
+  students: student,
   syllabus,
   job,
   lession_plan,

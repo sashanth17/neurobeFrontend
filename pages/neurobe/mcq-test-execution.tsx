@@ -687,29 +687,31 @@ const MCQTestExecution = () => {
           />
         </div>
 
-        {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Dropdown Filters & Actions */}
+        <div className="flex flex-wrap items-center gap-3">
           {/* Unit Filter Dropdown */}
-          <div className="w-48">
+          <div className="w-48 shrink-0">
             <CustomSelect
               options={state.unitOptions}
               value={state.unitOptions.find((o) => o.value === state.unitFilter) || state.unitOptions[0]}
               onChange={(e) => setState({ unitFilter: e?.value || "all" })}
               placeholder="Filter by Unit"
               isClearable={false}
-              className="filter-input text-xs"
+              borderRadius={12}
+              className="w-full text-xs"
             />
           </div>
 
           {/* Status Filter Dropdown */}
-          <div className="w-48">
+          <div className="w-48 shrink-0">
             <CustomSelect
               options={STATUS_FILTER_OPTIONS}
               value={STATUS_FILTER_OPTIONS.find((o) => o.value === state.statusFilter) || STATUS_FILTER_OPTIONS[0]}
               onChange={(e) => setState({ statusFilter: e?.value || "all" })}
               placeholder="Filter by Status"
               isClearable={false}
-              className="filter-input text-xs"
+              borderRadius={12}
+              className="w-full text-xs"
             />
           </div>
 
@@ -717,7 +719,7 @@ const MCQTestExecution = () => {
           <button
             type="button"
             onClick={openCreateTest}
-            className="flex items-center gap-2 rounded-xl bg-color1 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
+            className="flex h-[38px] items-center gap-2 rounded-xl bg-color1 px-4 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shrink-0 whitespace-nowrap"
           >
             <Plus className="h-4 w-4" />
             <span>Create Test</span>
@@ -777,6 +779,16 @@ const MCQTestExecution = () => {
                 Success(`Viewing assessment results for "${t.title}" (${t.submissionCount || "Completed"})`)
               }
               onCopyCode={handleCopyCode}
+              onMonitorLive={(t) =>
+                router.push(
+                  `/neurobe/ins-mcq-live-monitor?test_id=${t.id}&test_title=${encodeURIComponent(t.title)}&course_id=${state.selectedCourse?.id || ""}`
+                )
+              }
+              onViewReport={(t) =>
+                router.push(
+                  `/neurobe/ins-mcq-report?test_id=${t.id}&test_title=${encodeURIComponent(t.title)}&course_id=${state.selectedCourse?.id || ""}`
+                )
+              }
             />
           ))
         )}

@@ -179,6 +179,12 @@ export const OwnmenuConfig = {
     },
     {
       type: "link",
+      icon: "IconMenuCharts",
+      label: "Live Test Monitor",
+      href: "/neurobe/ins-mcq-live-monitor",
+    },
+    {
+      type: "link",
       icon: "IconMenuNotes",
       label: "Results & Analysis",
       href: "/neurobe/result-analysis",
@@ -253,6 +259,12 @@ export const OwnmenuConfig = {
     },
     {
       type: "link",
+      icon: "IconMenuCharts",
+      label: "Live Test Monitor",
+      href: "/neurobe/ins-mcq-live-monitor",
+    },
+    {
+      type: "link",
       icon: "IconMenuNotes",
       label: "Results & Analysis",
       href: "/neurobe/ins-result-analysis",
@@ -306,6 +318,12 @@ OwnmenuConfig.FACULTY = [
   },
   {
     type: "link",
+    icon: "IconMenuCharts",
+    label: "Live Test Monitor",
+    href: "/neurobe/ins-mcq-live-monitor",
+  },
+  {
+    type: "link",
     icon: "IconMenuNotes",
     label: "Results & Analysis",
     href: "/neurobe/ins-result-analysis",
@@ -318,16 +336,45 @@ OwnmenuConfig.FACULTY = [
   },
 ];
 
+OwnmenuConfig.STUDENT = [
+  {
+    type: "link",
+    icon: "IconMenuDashboard",
+    label: "Student Dashboard",
+    href: "/neurobe/student-dashboard",
+    className: "pb-2",
+  },
+  {
+    type: "heading",
+    label: "ACADEMICS & TESTS",
+    className: "pb-2 pt-2",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Scheduled Tests",
+    href: "/neurobe/student-dashboard?tab=tests",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Enrolled Courses",
+    href: "/neurobe/student-dashboard?tab=courses",
+  },
+];
+
 // Aliases for role lookup consistency
 OwnmenuConfig["ERP Admin"] = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig["Course Coordinator"] = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig["Course Instructor"] = OwnmenuConfig.COURSE_INSTRUCTOR;
 OwnmenuConfig["Faculty"] = OwnmenuConfig.FACULTY;
+OwnmenuConfig["Student"] = OwnmenuConfig.STUDENT;
 OwnmenuConfig["Super Admin"] = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig.erp = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig.hr = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig.instructor = OwnmenuConfig.COURSE_INSTRUCTOR;
 OwnmenuConfig.faculty = OwnmenuConfig.FACULTY;
+OwnmenuConfig.student = OwnmenuConfig.STUDENT;
 
 /**
  * Returns the respective menu items based on the user's role
@@ -360,6 +407,9 @@ export const getMenuByRole = (role) => {
   ) {
     return OwnmenuConfig.COURSE_INSTRUCTOR;
   }
+  if (normalized === "STUDENT") {
+    return OwnmenuConfig.STUDENT;
+  }
 
   return (
     OwnmenuConfig[role] || OwnmenuConfig[normalized] || OwnmenuConfig.ERP_ADMIN
@@ -375,9 +425,12 @@ export const getDefaultRouteByRole = (role) => {
     .toUpperCase()
     .replace(/\s+/g, "_");
 
+  if (normalized === "STUDENT") {
+    return "/neurobe/student-dashboard";
+  }
+
   if (
     normalized === "FACULTY" ||
-    normalized === "STUDENT" ||
     normalized === "COURSE_COORDINATOR" ||
     normalized === "COORDINATOR" ||
     normalized === "COURSE_INSTRUCTOR" ||
