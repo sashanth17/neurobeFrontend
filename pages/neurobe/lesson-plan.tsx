@@ -316,7 +316,7 @@ const LessonPlan = () => {
       const lpStep = wfRes?.workflow?.step_5_lesson_plan_schedules;
       if (!lpStep) return;
 
-      const { status, job_id } = lpStep;
+      const { status, job_id, active_version, total_versions } = lpStep;
       if (status === "redis_queued" || status === "generating") {
         setState({ generateLoading: true });
         if (job_id) {
@@ -325,9 +325,10 @@ const LessonPlan = () => {
       } else if (status === "approved") {
         setState({ lessonApproved: true, recommendationsGenerated: true, generateLoading: false });
       } else if (status === "draft") {
-        setState({ recommendationsGenerated: true, generateLoading: false });
-      } else if (status === "failed") {
-        setState({ generateLoading: false });
+        const hasVer = Boolean(active_version || (total_versions && total_versions > 0));
+        setState({ recommendationsGenerated: hasVer, generateLoading: false });
+      } else if (status === "failed" || status === "not_started") {
+        setState({ recommendationsGenerated: false, generateLoading: false });
       }
     } catch (err) {
       console.warn("restoreWorkflowState in lesson-plan error:", err);
@@ -386,15 +387,29 @@ const LessonPlan = () => {
       const vToUse = verNum !== undefined ? verNum : loadedVersion;
       const res: any = await Models.lession_plan.detail(syllabus_id, unit, vToUse);
       const isApproved = res?.overall_approval_status === "Approved" || res?.workspace_status === "Approved";
+      
+      const hasActiveVersion = Boolean(
+        verNum !== undefined ||
+        loadedVersion !== null ||
+        (res?.version && Number(res.version) > 0) ||
+        res?.active_version ||
+        res?.is_generated
+      );
+
       const isGen = Boolean(
-        isApproved ||
-        res?.workspace_status === "Ready" ||
-        res?.workspace_status === "Review Required" ||
-        (res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0)
+        hasActiveVersion && (
+          isApproved ||
+          res?.workspace_status === "Ready" ||
+          res?.workspace_status === "Review Required" ||
+          (res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0)
+        )
       );
       if (isGen) {
         setState({ recommendationsGenerated: true });
+      } else if (!hasActiveVersion && !isApproved) {
+        setState({ recommendationsGenerated: false });
       }
+
       if (isApproved) {
         setState({ lessonApproved: true });
       }
@@ -417,7 +432,7 @@ const LessonPlan = () => {
         key: "status",
         label: "Schedule Status",
         subLabel: "Milestone status",
-        count: isApproved ? "Approved" : (isGen ? "Ready" : "Draft"),
+        count: isApproved ? "Approved" : (isGen ? "Ready" : "Not Started"),
         icon: <ClipboardCheck className="h-5 w-5" />,
       }];
       setState({ lession_data: res, matrix: data });
@@ -515,13 +530,25 @@ const LessonPlan = () => {
 
   // ── Pre-generate: topics list for the accordion (level + hours badges only) ──
   const buildInitialTopics = () => {
-    if (!state?.lession_data?.selected_unit?.sessions) return [];
-    return state?.lession_data?.selected_unit?.sessions.map((session: any) => ({
-      id: session.slot_id,
-      title: `Topic ${session.topic_code} — ${session.topic_name}`,
+    if (state?.lession_data?.selected_unit?.sessions?.length) {
+      return state.lession_data.selected_unit.sessions.map((session: any) => ({
+        id: session.slot_id || session.id,
+        title: session.topic_name ? `Topic ${session.topic_code || session.seq || ''} — ${session.topic_name}` : (session.title || ""),
+        collapsedBadge: [
+          { label: `Knowledge Level ${session.level || 'K2'}`, className: "bg-color2-l text-color2 font-bold" },
+          { label: session.hours_display || `${session.hours || 2} Hours`, className: "bg-gray-200 text-pri font-bold" },
+        ],
+        items: [],
+      }));
+    }
+    const raw = RAW_UNIT_DATA[state.activeTab] || RAW_UNIT_DATA["unit-1"];
+    if (!raw) return [];
+    return raw.topics.map((t) => ({
+      id: t.id,
+      title: `${t.id} — ${t.title}`,
       collapsedBadge: [
-        { label: `Knowledge Level ${session.level}`, className: "bg-color2-l text-color2 font-bold" },
-        { label: session.hours_display, className: "bg-gray-200 text-pri font-bold" },
+        { label: `Knowledge Level ${t.level}`, className: "bg-color2-l text-color2 font-bold" },
+        { label: t.hours, className: "bg-gray-200 text-pri font-bold" },
       ],
       items: [],
     }));
@@ -746,6 +773,7 @@ const LessonPlan = () => {
 
   const handleVersionActivated = async (newVer: number) => {
     setLoadedVersion(newVer);
+    setState({ recommendationsGenerated: true });
     const syllabusId = state.courseData?.latest_syllabus?.id || course_id;
     if (syllabusId) {
       const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
@@ -815,9 +843,9 @@ const LessonPlan = () => {
       )}
 
       <TableTitle
-        title="Approved topcis"
-        label={`${state?.lession_data?.unit_tabs?.length} Units`}
-        subLabel={`${state?.lession_data?.selected_unit?.topics_count} Topics`}
+        title={state.recommendationsGenerated ? "Generated Lesson Plan & Schedules" : "Topics from Approved Syllabus"}
+        label={`${state?.lession_data?.unit_tabs?.length || 5} Units`}
+        subLabel={`${state?.lession_data?.selected_unit?.topics_count || 0} Topics`}
       />
 
       <div className="mt-4">

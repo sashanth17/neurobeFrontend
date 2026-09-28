@@ -1983,7 +1983,12 @@ const QuestionBank = () => {
           Models.syllabus.get_workflow_status(targetId).catch(() => null),
         ]);
 
-        const sid = wfRes?.syllabus_id || cData?.latest_syllabus?.id || cData?.syllabus_id || cData?.syllabus?.id;
+        const sid =
+          wfRes?.syllabus_id ||
+          cData?.latest_syllabus?.id ||
+          cData?.syllabus_id ||
+          cData?.syllabus?.id ||
+          targetId;
         const currentCode = cData?.course_code || wfRes?.course_code || "";
 
         let sDetail = null;
@@ -2003,6 +2008,9 @@ const QuestionBank = () => {
           ]);
           sDetail = sRes;
           cMapping = copoRes;
+          if (!cMapping && targetId && String(targetId) !== String(sid)) {
+            cMapping = await Models.COPOMap.copo_map(targetId).catch(() => null);
+          }
           tUnits = topRes?.units || (Array.isArray(topRes) ? topRes : []);
 
           const unitNumbers = (tUnits.length > 0
@@ -2070,17 +2078,51 @@ const QuestionBank = () => {
   const activeProgramme = state.courseData?.programme || "";
   const activeBatch = state.courseData?.batch_name || "";
   const activeSemester = state.courseData?.term || "";
+
+  const wfObj = state.workflowStatus?.workflow || state.workflowStatus || {};
+  const stageWorkflowMap: Record<string, any> = {
+    syllabus: wfObj?.step_1_syllabus_extraction,
+    copo: wfObj?.step_2_copo_mapping,
+    topics: wfObj?.step_3_topic_hierarchy,
+    pedagogy: wfObj?.step_4_pedagogy_generation,
+    "lesson-plan": wfObj?.step_5_lesson_plan_schedules,
+  };
+  const activeStageWf = stageWorkflowMap[state.selectedReferenceId] || wfObj?.step_1_syllabus_extraction;
+
   const activeApprovedBy =
-    state.workflowStatus?.step_1_syllabus_extraction?.approved_by ||
+    activeStageWf?.approved_by ||
+    wfObj?.step_1_syllabus_extraction?.approved_by ||
     state.courseData?.coordinator_name ||
     "Course Coordinator";
-  const activeApprovedDate = state.workflowStatus?.step_1_syllabus_extraction?.updated_at
-    ? new Date(state.workflowStatus.step_1_syllabus_extraction.updated_at).toLocaleDateString("en-IN", {
+
+  const rawApprovedDate = activeStageWf?.updated_at || wfObj?.step_1_syllabus_extraction?.updated_at;
+  const activeApprovedDate = rawApprovedDate
+    ? new Date(rawApprovedDate).toLocaleDateString("en-IN", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       })
     : "Approved";
+
+  const activeStageStatusRaw =
+    (state.selectedReferenceId === "copo"
+      ? state.copoData?.mapping_status || state.copoData?.status || state.copoData?.data?.mapping_status
+      : null) ||
+    activeStageWf?.status ||
+    "approved";
+
+  const formatStatusBadgeText = (status: string, version?: number | null) => {
+    const s = (status || "").toLowerCase();
+    if (s === "approved") return version ? `Approved v${version}` : "Approved";
+    if (s === "draft") return version ? `Draft v${version}` : "Draft";
+    if (s === "generating") return "Generating...";
+    if (s === "redis_queued") return "Queued...";
+    if (s === "not_started") return "Not Started";
+    if (s === "failed") return "Failed";
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Approved";
+  };
+
+  const activeVersionBadgeText = formatStatusBadgeText(activeStageStatusRaw, activeStageWf?.active_version);
 
   const dynamicOutcomes = (state.syllabusDetail?.outcomes || []).map((co: any, idx: number) => ({
     id: String(co.id || idx + 1),
@@ -2137,42 +2179,86 @@ const QuestionBank = () => {
     hours: e.allocated_hours || e.hours || 0,
   }));
 
-  const rawMatrix = state.copoData?.matrix || state.copoData?.data?.matrix || {};
-  const rawPos = state.copoData?.program_outcomes || state.copoData?.data?.program_outcomes || [];
-  const rawCos = state.copoData?.course_outcomes || state.copoData?.data?.course_outcomes || [];
+  const rawMatrix =
+    state.copoData?.matrix ||
+    state.copoData?.data?.matrix ||
+    state.copoData?.copo_matrix ||
+    {};
+
+  const rawPos =
+    (state.copoData?.program_outcomes?.length ? state.copoData?.program_outcomes : null) ||
+    (state.copoData?.data?.program_outcomes?.length ? state.copoData?.data?.program_outcomes : null) ||
+    (state.copoData?.pos?.length ? state.copoData?.pos : null) ||
+    [];
+
+  const rawCos =
+    (state.copoData?.course_outcomes?.length ? state.copoData?.course_outcomes : null) ||
+    (state.copoData?.data?.course_outcomes?.length ? state.copoData?.data?.course_outcomes : null) ||
+    (state.copoData?.outcomes?.length ? state.copoData?.outcomes : null) ||
+    (state.syllabusDetail?.outcomes?.length ? state.syllabusDetail?.outcomes : null) ||
+    Object.keys(rawMatrix).map((coKey) => ({ co_code: coKey, code: coKey }));
+
+  const defaultPos = ["PO01", "PO02", "PO03", "PO04", "PO05", "PO06", "PO07", "PO08", "PO09", "PO10", "PO11"];
 
   const dynamicPoHeaders: string[] =
     rawPos.length > 0
       ? rawPos.map((po: any) => po.code || po.po_code || `PO${po.id}`)
-      : Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {});
+      : Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {}).length > 0
+      ? Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {})
+      : defaultPos;
 
-  const dynamicCopoRows = rawCos.map((co: any) => {
-    const coCode = co.code || co.co_code;
+  const dynamicCopoRows = rawCos.map((co: any, idx: number) => {
+    const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
     const scores: Record<string, number> = {};
-    const rowObj = rawMatrix[coCode] || {};
-    Object.keys(rowObj).forEach((poKey) => {
-      scores[poKey] = Number(rowObj[poKey]?.score ?? rowObj[poKey]) || 0;
+    const rowObj =
+      rawMatrix[coCode] ||
+      rawMatrix[co.co_code] ||
+      rawMatrix[co.code] ||
+      rawMatrix[String(co.id)] ||
+      rawMatrix[`CO${idx + 1}`] ||
+      {};
+
+    dynamicPoHeaders.forEach((poKey) => {
+      const exactVal = rowObj[poKey];
+      const fallbackKey = Object.keys(rowObj).find(
+        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === poKey.toLowerCase().replace(/[^a-z0-9]/g, "")
+      );
+      const val = exactVal !== undefined ? exactVal : fallbackKey ? rowObj[fallbackKey] : undefined;
+      scores[poKey] = typeof val === "object" && val !== null ? Number(val.score ?? 0) : Number(val || 0);
     });
     return { coCode, poScores: scores };
   });
 
-  const dynamicRationaleItems = rawCos.map((co: any) => {
-    const coCode = co.code || co.co_code;
-    const rowObj = rawMatrix[coCode] || {};
+  const dynamicRationaleItems = rawCos.map((co: any, idx: number) => {
+    const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
+    const rowObj =
+      rawMatrix[coCode] ||
+      rawMatrix[co.co_code] ||
+      rawMatrix[co.code] ||
+      rawMatrix[String(co.id)] ||
+      rawMatrix[`CO${idx + 1}`] ||
+      {};
+
     const mappedPos = Object.keys(rowObj)
-      .filter((k) => (Number(rowObj[k]?.score ?? rowObj[k]) || 0) > 0)
-      .map((k) => ({
-        id: `${coCode}-${k}`,
-        poCode: k,
-        poTitle: rowObj[k]?.po_title || k,
-        strengthText: `Strength: ${rowObj[k]?.score ?? rowObj[k]}`,
-        strengthBadgeClass: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
-        rationale: rowObj[k]?.justification || rowObj[k]?.rationale || "Aligned with syllabus outcomes.",
-      }));
+      .filter((k) => (Number(typeof rowObj[k] === "object" ? rowObj[k]?.score : rowObj[k]) || 0) > 0)
+      .map((k) => {
+        const val = rowObj[k];
+        const score = typeof val === "object" ? val?.score : val;
+        const rationale = typeof val === "object" ? (val?.justification || val?.rationale) : undefined;
+        return {
+          id: `${coCode}-${k}`,
+          poCode: k,
+          poTitle: (typeof val === "object" && val?.po_title) || k,
+          strengthText: `Strength: ${score}`,
+          strengthBadgeClass: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
+          rationale: rationale || "Aligned with course outcome requirements.",
+        };
+      });
+
     return {
       id: coCode,
       coCode,
-      statement: co.description || co.statement || "",
+      statement: co.description || co.statement || co.title || "",
       mappedCountText: `${mappedPos.length} mapped outcomes`,
       poItems: mappedPos,
     };
@@ -2695,7 +2781,7 @@ const QuestionBank = () => {
                     approvedBy={activeApprovedBy}
                     approvedDate={activeApprovedDate}
                     unitsCountText={`${dynamicUnits.length} Units`}
-                    versionBadgeText="Active Version"
+                    versionBadgeText={activeVersionBadgeText}
                     bannerProgramme={activeProgramme}
                     bannerBatch={activeBatch}
                     bannerSemester={activeSemester}
