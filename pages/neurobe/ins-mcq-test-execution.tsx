@@ -18,6 +18,7 @@ import {
   Key,
   ChevronDown,
   Filter,
+  Activity,
 } from "lucide-react";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/flatpickr.css";
@@ -88,6 +89,7 @@ const MCQTestExecution = () => {
     tests: [] as MCQTestExecutionItem[],
     questionSets: [] as QuestionSetItem[],
     questionPool: [] as any[],
+    enrolledStudents: [] as any[],
     search: "",
     statusFilter: "all",
     unitFilter: "all",
@@ -118,6 +120,7 @@ const MCQTestExecution = () => {
 
   const [createModal, setCreateModal] = useState<{
     open: boolean;
+    submitting: boolean;
     testCode: string;
     title: string;
     unitLabel: string;
@@ -129,8 +132,14 @@ const MCQTestExecution = () => {
     startTime: string;
     endTime: string;
     secureCode: string;
+    maxTabSwitches: number;
+    randomizeQuestions: boolean;
+    randomizeOptions: boolean;
+    haveViva: boolean;
+    vivaThreshold: number;
   }>({
     open: false,
+    submitting: false,
     testCode: "",
     title: "",
     unitLabel: "Unit 1",
@@ -142,6 +151,11 @@ const MCQTestExecution = () => {
     startTime: "10:00 AM",
     endTime: "11:00 AM",
     secureCode: "",
+    maxTabSwitches: 3,
+    randomizeQuestions: false,
+    randomizeOptions: false,
+    haveViva: false,
+    vivaThreshold: 50,
   });
 
   useEffect(() => {
@@ -230,17 +244,17 @@ const MCQTestExecution = () => {
         { value: "all", label: "All Units" },
         ...(rawUnits.length > 0
           ? rawUnits.map((u, idx) => {
-              const uNum = u.unit_number || idx + 1;
-              const uTitle = u.unit_title || u.title || u.name || `Unit ${uNum}`;
-              return {
-                value: `Unit ${uNum}`,
-                label: `Unit ${uNum}: ${uTitle}`,
-              };
-            })
+            const uNum = u.unit_number || idx + 1;
+            const uTitle = u.unit_title || u.title || u.name || `Unit ${uNum}`;
+            return {
+              value: `Unit ${uNum}`,
+              label: `Unit ${uNum}: ${uTitle}`,
+            };
+          })
           : [1, 2, 3, 4, 5].map((u) => ({
-              value: `Unit ${u}`,
-              label: `Unit ${u}`,
-            }))),
+            value: `Unit ${u}`,
+            label: `Unit ${u}`,
+          }))),
       ];
 
       // 2b. Fetch Question Sets from backend
@@ -263,99 +277,94 @@ const MCQTestExecution = () => {
         else if (qRes.data && Array.isArray(qRes.data)) rawQuestions = qRes.data;
       }
 
-      // 2d. Build tests list for this course
-      const courseCode = courseObj.course_code || courseObj.code || "COURSE";
-      const storageKey = `neurobe_mcq_tests_${courseObj.id}`;
-      let storedTests: MCQTestExecutionItem[] = [];
-      try {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) storedTests = JSON.parse(saved);
-      } catch (e) {
-        console.warn("Could not read local tests:", e);
+      // 2d. Fetch tests from backend API
+      const testsRes: any = await Models.mcq.list_tests({ course_id: courseId }).catch(() => null);
+      let backendTests: MCQTestExecutionItem[] = [];
+
+      if (testsRes && Array.isArray(testsRes) && testsRes.length > 0) {
+        const courseCode = courseObj.course_code || courseObj.code || "MCQ";
+        backendTests = testsRes.map((t: any) => {
+          const startT = t.test_window_start ? new Date(t.test_window_start) : null;
+          const endT = t.test_window_end ? new Date(t.test_window_end) : null;
+          const now = new Date();
+          let status: any = "upcoming";
+          let statusLabel = "Upcoming Test";
+          const s = (t.status || "").toLowerCase();
+          if (s === "cancelled" || s === "canceled") {
+            status = "cancelled";
+            statusLabel = "Cancelled";
+          } else if (s === "completed") {
+            status = "completed";
+            statusLabel = "Completed Session";
+          } else if (s === "draft") {
+            status = "setup_required";
+            statusLabel = "Access Setup Required";
+          } else if (startT && endT && now >= startT && now <= endT) {
+            status = "live";
+            statusLabel = "• Live Assessment";
+          } else if (s === "live") {
+            status = "live";
+            statusLabel = "• Live Assessment";
+          } else if (endT && now > endT) {
+            status = "completed";
+            statusLabel = "Completed Session";
+          } else {
+            status = "upcoming";
+            statusLabel = "Upcoming Test";
+          }
+
+          const formatDateGB = (d: Date) => {
+            const day = String(d.getDate()).padStart(2, "0");
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+          };
+
+          const rawDateStr = startT ? formatDateGB(startT) : undefined;
+          const rawStartTimeStr = startT
+            ? startT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+            : undefined;
+          const rawEndTimeStr = endT
+            ? endT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+            : undefined;
+
+          return {
+            id: t.test_id,
+            testCode: t.test_code || `MCQ-${courseCode}-T`,
+            title: t.title || `MCQ Test`,
+            status,
+            statusLabel,
+            unitLabel: t.unit_name || "Unit 1",
+            questionsCount: t.question_count || 10,
+            duration: `${t.duration_minutes || 30} Minutes`,
+            testWindow: startT && endT
+              ? `${startT.toLocaleDateString()} ${startT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – ${endT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+              : status === "setup_required" ? "Pending (Setup Required)" : "Not Scheduled",
+            isPendingWindow: !startT,
+            topics: Array.isArray(t.topics) ? t.topics.join("; ") : (t.topics || ""),
+            secureCode: t.secure_code,
+            questionSetId: t.question_set_id,
+            questionSetName: undefined,
+            maxTabSwitches: t.max_tab_switches,
+            randomizeQuestions: t.randomize_questions,
+            randomizeOptions: t.randomize_options,
+            haveViva: t.have_viva,
+            rawTestDate: rawDateStr,
+            rawStartTime: rawStartTimeStr,
+            rawEndTime: rawEndTimeStr,
+            testWindowStart: t.test_window_start,
+            testWindowEnd: t.test_window_end,
+          };
+        });
       }
 
-      // If no stored tests, create default assessments linked to question sets
-      let initialTests: MCQTestExecutionItem[] = storedTests;
-      if (!initialTests || initialTests.length === 0) {
-        const u1Title = rawUnits[0]?.unit_title || rawUnits[0]?.title || "Physical & Network Architectures";
-        const u2Title = rawUnits[1]?.unit_title || rawUnits[1]?.title || "Data Link & Error Control";
-        const u3Title = rawUnits[2]?.unit_title || rawUnits[2]?.title || "Network Layer & Routing";
-
-        initialTests = [
-          {
-            id: `test-${courseObj.id}-1`,
-            testCode: `MCQ-${courseCode}-T1`,
-            title: `${courseCode} — ${u1Title} Quiz`,
-            status: "live",
-            statusLabel: "• Live Assessment",
-            unitLabel: "Unit 1",
-            questionsCount: setsList.length > 0 ? (setsList[0].total_questions || setsList[0].questions?.length || 5) : Math.min(rawQuestions.length || 5, 5),
-            duration: "30 Minutes",
-            testWindow: "Today, Active Live Window",
-            topics: rawUnits[0]?.topics?.map((t: any) => t.topic_name || t.title || t).slice(0, 2).join("; ") || "Foundational concepts & principles",
-            secureCode: `${courseCode.slice(0, 2).toUpperCase()}-9J2R`,
-            submissionCount: `${Math.max(1, Math.min(courseObj.students_count || 12, 12))} / ${courseObj.students_count || 40} Students Submitted`,
-            questionSetId: setsList.length > 0 ? setsList[0].id : undefined,
-            questionSetName: setsList.length > 0 ? setsList[0].name : "Unit 1 Question Set",
-            questions: setsList.length > 0 && setsList[0].questions?.length ? setsList[0].questions : rawQuestions.slice(0, 5),
-          },
-          {
-            id: `test-${courseObj.id}-2`,
-            testCode: `MCQ-${courseCode}-T2`,
-            title: `${courseCode} — ${u2Title} Assessment`,
-            status: "upcoming",
-            statusLabel: "Upcoming Test",
-            unitLabel: "Unit 2",
-            questionsCount: setsList.length > 1 ? (setsList[1].total_questions || 5) : 5,
-            duration: "30 Minutes",
-            testWindow: "Tomorrow, 10:00 AM – 11:00 AM",
-            topics: rawUnits[1]?.topics?.map((t: any) => t.topic_name || t.title || t).slice(0, 2).join("; ") || "Core protocols and transmission control",
-            secureCode: `${courseCode.slice(0, 2).toUpperCase()}-4V9X`,
-            questionSetId: setsList.length > 1 ? setsList[1].id : undefined,
-            questionSetName: setsList.length > 1 ? setsList[1].name : "Unit 2 Assessment Set",
-            questions: rawQuestions.slice(0, 5),
-          },
-          {
-            id: `test-${courseObj.id}-3`,
-            testCode: `MCQ-${courseCode}-T3`,
-            title: `${courseCode} — ${u3Title} Mid-Term Drill`,
-            status: "setup_required",
-            statusLabel: "Access Setup Required",
-            unitLabel: "Unit 3",
-            questionsCount: 10,
-            duration: "45 Minutes",
-            testWindow: "Pending (Setup Required)",
-            isPendingWindow: true,
-            topics: rawUnits[2]?.topics?.map((t: any) => t.topic_name || t.title || t).slice(0, 2).join("; ") || "Network routing and evaluation",
-            warningNotice: "Access configuration pending. Instructor must set the Test Date, Start & End Time, and Secure Test Code before test can be activated.",
-            questionSetName: "Unit 3 Comprehensive Pool",
-            questions: rawQuestions.slice(0, 10),
-          },
-          {
-            id: `test-${courseObj.id}-4`,
-            testCode: `MCQ-${courseCode}-T0`,
-            title: `${courseCode} — Diagnostic Readiness Quiz`,
-            status: "completed",
-            statusLabel: "Completed Session",
-            completedTimeAgo: "Completed recently",
-            unitLabel: "Diagnostic",
-            questionsCount: "5 Questions",
-            duration: "30 Minutes",
-            isReadOnlyDuration: true,
-            testWindow: "Completed",
-            topics: "Prerequisite concepts & initial knowledge test",
-            secureCode: `${courseCode.slice(0, 2).toUpperCase()}-7A1B`,
-            submissionCount: `${courseObj.students_count || 40} / ${courseObj.students_count || 40} Students Submitted`,
-            classAverage: "84.2%",
-            questionSetName: "Diagnostic Readiness Set",
-            questions: rawQuestions.slice(0, 5),
-          },
-        ];
-        try {
-          localStorage.setItem(storageKey, JSON.stringify(initialTests));
-        } catch (e) {
-          console.warn("Could not save initial tests:", e);
-        }
+      // 2e. Fetch Enrolled Students for this course
+      const enrollRes: any = await Models.course_enrollment.list({ course_id: courseId }).catch(() => null);
+      let enrolledList: any[] = [];
+      if (enrollRes) {
+        if (Array.isArray(enrollRes)) enrolledList = enrollRes;
+        else if (enrollRes.data && Array.isArray(enrollRes.data)) enrolledList = enrollRes.data;
+        else if (enrollRes.items && Array.isArray(enrollRes.items)) enrolledList = enrollRes.items;
       }
 
       setState({
@@ -363,7 +372,8 @@ const MCQTestExecution = () => {
         unitOptions: formattedUnitOptions,
         questionSets: setsList,
         questionPool: rawQuestions,
-        tests: initialTests,
+        enrolledStudents: enrolledList,
+        tests: backendTests,
         loadingTests: false,
       });
     } catch (err) {
@@ -394,19 +404,9 @@ const MCQTestExecution = () => {
     }
   };
 
-  // Helper to persist updated tests
+  // Helper to persist updated tests locally if needed
   const saveTestsState = (newTests: MCQTestExecutionItem[]) => {
     setState({ tests: newTests });
-    if (state.selectedCourse?.id) {
-      try {
-        localStorage.setItem(
-          `neurobe_mcq_tests_${state.selectedCourse.id}`,
-          JSON.stringify(newTests)
-        );
-      } catch (e) {
-        console.warn("Storage write error:", e);
-      }
-    }
   };
 
   // 3. Open Create Test Modal
@@ -416,84 +416,183 @@ const MCQTestExecution = () => {
     const randCode = `${prefix}-${Math.floor(1000 + Math.random() * 9000).toString(36).toUpperCase().slice(0, 4)}`;
     const newTestNum = state.tests.length + 1;
     const defaultSet = state.questionSets[0];
+    const initialUnit = defaultSet?.unit_number ? `Unit ${defaultSet.unit_number}` : "Unit 1";
+    const initialTopics =
+      defaultSet?.topics_included?.join(", ") ||
+      state.courseUnits[0]?.topics?.map((t: any) => t.topic_name || t.title || t).slice(0, 3).join(", ") ||
+      "";
+
+    const now = new Date();
+    const startMins = Math.ceil((now.getMinutes() + 2) / 5) * 5;
+    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), startMins);
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    const formatTime12 = (d: Date) => {
+      let hh = d.getHours();
+      const mm = d.getMinutes().toString().padStart(2, "0");
+      const period = hh >= 12 ? "PM" : "AM";
+      hh = hh % 12;
+      hh = hh ? hh : 12;
+      return `${hh.toString().padStart(2, "0")}:${mm} ${period}`;
+    };
 
     setCreateModal({
       open: true,
+      submitting: false,
       testCode: `MCQ-${courseCode}-T${newTestNum}`,
-      title: `${courseCode} — Unit 1 Assessment ${newTestNum}`,
-      unitLabel: "Unit 1",
-      topics: state.courseUnits[0]?.topics?.map((t: any) => t.topic_name || t.title || t).slice(0, 3).join(", ") || "Core Assessment Topics",
-      questionSetId: defaultSet?.id || "custom-pool",
-      questionsCount: defaultSet?.total_questions || 10,
+      title: `${courseCode} — ${initialUnit} Assessment`,
+      unitLabel: initialUnit,
+      topics: initialTopics,
+      questionSetId: defaultSet?.id || "",
+      questionsCount: defaultSet?.total_count || defaultSet?.total_questions || defaultSet?.questions?.length || 10,
       duration: "30 Minutes",
-      testDate: new Date().toLocaleDateString("en-GB"),
-      startTime: "10:00 AM",
-      endTime: "11:00 AM",
+      testDate: startDate.toLocaleDateString("en-GB"),
+      startTime: formatTime12(startDate),
+      endTime: formatTime12(endDate),
       secureCode: randCode,
+      maxTabSwitches: 3,
+      randomizeQuestions: false,
+      randomizeOptions: false,
+      haveViva: false,
+      vivaThreshold: 50,
     });
   };
 
-  const handleSaveNewTest = () => {
+  const handleSaveNewTest = async () => {
     if (!createModal.title.trim()) {
-      Failure("Please enter a valid test title.");
+      Failure("Please enter a valid assessment title.");
+      return;
+    }
+    if (!createModal.questionSetId) {
+      Failure("Please select a Question Set from the pool.");
+      return;
+    }
+    if (!createModal.secureCode.trim()) {
+      Failure("Please enter or generate a secure test passcode.");
+      return;
+    }
+    if (!state.selectedCourse?.id) {
+      Failure("No course selected.");
       return;
     }
 
-    const assignedSet = state.questionSets.find((s) => s.id === createModal.questionSetId);
-    const assignedSetName =
-      assignedSet?.name ||
-      (createModal.questionSetId === "custom-pool"
-        ? "All Approved Questions Pool"
-        : `${createModal.unitLabel} Practice Set`);
-    const assignedQuestions = assignedSet?.questions || state.questionPool.slice(0, createModal.questionsCount);
-
-    const newTest: MCQTestExecutionItem = {
-      id: `test-${state.selectedCourse?.id || "c"}-${Date.now()}`,
-      testCode: createModal.testCode,
-      title: createModal.title,
-      status: "upcoming",
-      statusLabel: "Upcoming Test",
-      unitLabel: createModal.unitLabel,
-      questionsCount: createModal.questionsCount,
-      duration: createModal.duration,
-      testWindow: `${createModal.testDate}, ${createModal.startTime} – ${createModal.endTime}`,
-      topics: createModal.topics || `${createModal.unitLabel} Core Topics`,
-      secureCode: createModal.secureCode,
-      questionSetId: createModal.questionSetId,
-      questionSetName: assignedSetName,
-      questions: assignedQuestions,
+    // Parse date + times to ISO
+    const parseDatetime = (dateStr: string, timeStr: string) => {
+      try {
+        const parts = dateStr.includes("/") ? dateStr.split("/").map(Number) : dateStr.split("-").map(Number);
+        let day: number, month: number, year: number;
+        if (parts[0] > 1000) {
+          [year, month, day] = parts;
+        } else {
+          [day, month, year] = parts;
+        }
+        const [time, period] = (timeStr || "10:00 AM").trim().split(" ");
+        const [hh, mm] = time.split(":").map(Number);
+        const h24 =
+          period?.toUpperCase() === "PM" ? (hh === 12 ? 12 : hh + 12) : hh === 12 ? 0 : hh;
+        return new Date(year, month - 1, day, h24, mm, 0).toISOString();
+      } catch {
+        return undefined;
+      }
     };
 
-    const updated = [newTest, ...state.tests];
-    saveTestsState(updated);
-    Success("MCQ Assessment scheduled and Question Set assigned successfully!");
-    setCreateModal((prev) => ({ ...prev, open: false }));
+    const startISO = parseDatetime(createModal.testDate, createModal.startTime);
+    const endISO = parseDatetime(createModal.testDate, createModal.endTime);
+
+    if (!startISO || !endISO) {
+      Failure("Please select a valid test date, start time, and end time.");
+      return;
+    }
+    if (new Date(endISO) <= new Date(startISO)) {
+      Failure("Test end time must be after start time.");
+      return;
+    }
+    if (new Date(endISO).getTime() <= Date.now()) {
+      Failure("Test window end time must be in the future. Please select a valid future date and time.");
+      return;
+    }
+
+    const durationMins = parseInt(createModal.duration) || 30;
+    const enrolledEmails = (state.enrolledStudents || [])
+      .map((s: any) => s.email)
+      .filter(Boolean);
+
+    const payload = {
+      question_set_id: createModal.questionSetId,
+      course_id: Number(state.selectedCourse.id),
+      title: createModal.title.trim(),
+      test_code: createModal.testCode.trim(),
+      unit_name: createModal.unitLabel,
+      topics: createModal.topics
+        ? createModal.topics.split(/[,;]/).map((t: string) => t.trim()).filter(Boolean)
+        : [],
+      duration_minutes: durationMins,
+      test_window_start: startISO,
+      test_window_end: endISO,
+      secure_code: createModal.secureCode.trim(),
+      max_tab_switches: Number(createModal.maxTabSwitches) || 0,
+      randomize_questions: Boolean(createModal.randomizeQuestions),
+      randomize_options: Boolean(createModal.randomizeOptions),
+      have_viva: Boolean(createModal.haveViva),
+      viva_threshold: Number(createModal.vivaThreshold) || 50,
+      students_associated: enrolledEmails,
+    };
+
+    try {
+      setCreateModal((prev) => ({ ...prev, submitting: true }));
+      await (Models.mcq as any).create_test_schedule(payload);
+      Success(`MCQ Assessment "${createModal.title}" scheduled successfully!`);
+      setCreateModal((prev) => ({ ...prev, open: false, submitting: false }));
+      // Reload tests directly from backend API
+      await loadCourseTestData(state.selectedCourse);
+    } catch (err: any) {
+      setCreateModal((prev) => ({ ...prev, submitting: false }));
+      const errorMsg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        (typeof err === "string" ? err : "Failed to create and schedule test.");
+      Failure(errorMsg);
+    }
   };
 
-  // 4. Update existing schedule
-  const handleUpdateSchedule = (updatedData: any) => {
+  // 4. Update existing schedule via real API
+  const handleUpdateSchedule = async (updatedData: any) => {
     if (!editModal.data) return;
     const testId = editModal.data.id;
-    const updated = state.tests.map((t) => {
-      if (t.id === testId) {
-        return {
-          ...t,
-          secureCode: updatedData.secureCode || t.secureCode,
-          testWindow: updatedData.testDate
-            ? `${updatedData.testDate}, ${updatedData.startTime || "10:00 AM"} – ${updatedData.endTime || "11:00 AM"}`
-            : t.testWindow,
-          status: (t.status === "setup_required" ? "upcoming" : t.status) as any,
-          statusLabel: (t.status === "setup_required" ? "Upcoming Test" : t.statusLabel) as any,
-          warningNotice: undefined,
-          isPendingWindow: false,
-        };
-      }
-      return t;
-    });
 
-    saveTestsState(updated);
-    Success("Test schedule and access passcode updated successfully.");
-    setEditModal({ open: false, data: null });
+    const parseDatetime = (dateStr: string, timeStr: string) => {
+      try {
+        const parts = dateStr.includes("/") ? dateStr.split("/").map(Number) : dateStr.split("-").map(Number);
+        let day: number, month: number, year: number;
+        if (parts[0] > 1000) [year, month, day] = parts;
+        else[day, month, year] = parts;
+        const [time, period] = (timeStr || "10:00 AM").trim().split(" ");
+        const [hh, mm] = time.split(":").map(Number);
+        const h24 = period?.toUpperCase() === "PM" ? (hh === 12 ? 12 : hh + 12) : hh === 12 ? 0 : hh;
+        return new Date(year, month - 1, day, h24, mm, 0).toISOString();
+      } catch {
+        return undefined;
+      }
+    };
+
+    const startISO = updatedData.testDate && updatedData.startTime ? parseDatetime(updatedData.testDate, updatedData.startTime) : undefined;
+    const endISO = updatedData.testDate && updatedData.endTime ? parseDatetime(updatedData.testDate, updatedData.endTime) : undefined;
+
+    const payload: any = {};
+    if (updatedData.secureCode) payload.secure_code = updatedData.secureCode.trim();
+    if (startISO) payload.test_window_start = startISO;
+    if (endISO) payload.test_window_end = endISO;
+
+    try {
+      await (Models.mcq as any).update_test_schedule(testId, payload);
+      Success("Test schedule and access passcode updated successfully.");
+      setEditModal({ open: false, data: null });
+      await loadCourseTestData(state.selectedCourse);
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || err?.message || "Failed to update test schedule";
+      Failure(errorMsg);
+    }
   };
 
   // 5. Preview Questions Modal handler
@@ -522,6 +621,60 @@ const MCQTestExecution = () => {
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     Success(`Passcode "${code}" copied to clipboard!`);
+  };
+
+  // 7. Navigate to live monitor
+  const handleMonitorLive = (testItem: MCQTestExecutionItem) => {
+    router.push(
+      `/neurobe/ins-mcq-live-monitor?test_id=${testItem.id}&test_title=${encodeURIComponent(testItem.title)}&course_id=${state.selectedCourse?.id || ""}`
+    );
+  };
+
+  // 8. Navigate to post-test report
+  const handleViewReport = (testItem: MCQTestExecutionItem) => {
+    router.push(
+      `/neurobe/ins-mcq-report?test_id=${testItem.id}&test_title=${encodeURIComponent(testItem.title)}&course_id=${state.selectedCourse?.id || ""}`
+    );
+  };
+
+  // 9. Cancel test
+  const handleCancelTest = async (testItem: MCQTestExecutionItem) => {
+    try {
+      await (Models.mcq as any).cancel_test(testItem.id);
+      const updated = state.tests.map((t) =>
+        t.id === testItem.id ? { ...t, status: "cancelled" as any, statusLabel: "Cancelled" } : t
+      );
+      setState({ tests: updated });
+      Success(`Test "${testItem.title}" cancelled successfully.`);
+    } catch (e: any) {
+      Failure(e?.message || "Failed to cancel test");
+    }
+  };
+
+  // 9b. Complete test
+  const handleCompleteTest = async (testItem: MCQTestExecutionItem) => {
+    try {
+      await (Models.mcq as any).complete_test(testItem.id);
+      const updated = state.tests.map((t) =>
+        t.id === testItem.id ? { ...t, status: "completed" as any, statusLabel: "Completed" } : t
+      );
+      setState({ tests: updated });
+      Success(`Assessment "${testItem.title}" concluded and marked as Completed.`);
+    } catch (e: any) {
+      Failure(e?.message || "Failed to complete test");
+    }
+  };
+
+  // 10. Delete test
+  const handleDeleteTest = async (testItem: MCQTestExecutionItem) => {
+    try {
+      await (Models.mcq as any).delete_test(testItem.id);
+      const updated = state.tests.filter((t) => t.id !== testItem.id);
+      setState({ tests: updated });
+      Success(`Test "${testItem.title}" deleted.`);
+    } catch (e: any) {
+      Failure(e?.message || "Failed to delete test");
+    }
   };
 
   // Derived filtered tests
@@ -595,19 +748,9 @@ const MCQTestExecution = () => {
         students={`${studentCount} Students`}
         toogle="instructor"
         selectedCourse={state.selectedCourseOption}
-        courseOptions={state.courseOptions}
-        onCourseChange={handleCourseChange}
         activeView={state.activeTab}
         onBack={() => router.push("/neurobe/mcq-generation")}
         onViewChange={(view) => setState({ activeTab: view })}
-      />
-
-      {/* 2. Step Header */}
-      <StepHeader
-        title="MCQ Test Execution"
-        description="Manage test execution schedules, configure secure student access passcodes, assign question sets, and view submission analytics."
-        pill={`${courseCode} — ${courseTitle}`}
-        pill2={`Assigned: ${studentCount} Enrolled Students`}
       />
 
       {/* 3. Summary Stats Banner */}
@@ -687,29 +830,31 @@ const MCQTestExecution = () => {
           />
         </div>
 
-        {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Dropdown Filters & Actions */}
+        <div className="flex flex-wrap items-center gap-3">
           {/* Unit Filter Dropdown */}
-          <div className="w-48">
+          <div className="w-48 shrink-0">
             <CustomSelect
               options={state.unitOptions}
               value={state.unitOptions.find((o) => o.value === state.unitFilter) || state.unitOptions[0]}
               onChange={(e) => setState({ unitFilter: e?.value || "all" })}
               placeholder="Filter by Unit"
               isClearable={false}
-              className="filter-input text-xs"
+              borderRadius={12}
+              className="w-full text-xs"
             />
           </div>
 
           {/* Status Filter Dropdown */}
-          <div className="w-48">
+          <div className="w-48 shrink-0">
             <CustomSelect
               options={STATUS_FILTER_OPTIONS}
               value={STATUS_FILTER_OPTIONS.find((o) => o.value === state.statusFilter) || STATUS_FILTER_OPTIONS[0]}
               onChange={(e) => setState({ statusFilter: e?.value || "all" })}
               placeholder="Filter by Status"
               isClearable={false}
-              className="filter-input text-xs"
+              borderRadius={12}
+              className="w-full text-xs"
             />
           </div>
 
@@ -717,7 +862,7 @@ const MCQTestExecution = () => {
           <button
             type="button"
             onClick={openCreateTest}
-            className="flex items-center gap-2 rounded-xl bg-color1 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
+            className="flex h-[38px] items-center gap-2 rounded-xl bg-color1 px-4 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shrink-0 whitespace-nowrap"
           >
             <Plus className="h-4 w-4" />
             <span>Create Test</span>
@@ -773,10 +918,13 @@ const MCQTestExecution = () => {
               onPreviewQuestions={handlePreviewQuestions}
               onEditSettings={(t) => setEditModal({ open: true, data: t })}
               onConfigureTest={(t) => setEditModal({ open: true, data: t })}
-              onViewResults={(t) =>
-                Success(`Viewing assessment results for "${t.title}" (${t.submissionCount || "Completed"})`)
-              }
+              onViewResults={handleViewReport}
               onCopyCode={handleCopyCode}
+              onMonitorLive={handleMonitorLive}
+              onViewReport={handleViewReport}
+              onCancelTest={handleCancelTest}
+              onCompleteTest={handleCompleteTest}
+              onDeleteTest={handleDeleteTest}
             />
           ))
         )}
@@ -800,15 +948,20 @@ const MCQTestExecution = () => {
         testData={
           editModal.data
             ? {
-                testCode: editModal.data.testCode,
-                courseCodeTitle: `${courseCode} — ${courseTitle}`,
-                testName: editModal.data.title,
-                unitLabel: editModal.data.unitLabel,
-                topics: editModal.data.topics,
-                questionsCount: editModal.data.questionsCount,
-                duration: editModal.data.duration,
-                secureCode: editModal.data.secureCode || "CN-4V9X",
-              }
+              testCode: editModal.data.testCode,
+              courseCodeTitle: `${courseCode} — ${courseTitle}`,
+              testName: editModal.data.title,
+              unitLabel: editModal.data.unitLabel,
+              topics: editModal.data.topics,
+              questionsCount: editModal.data.questionsCount,
+              duration: editModal.data.duration,
+              testDate: editModal.data.rawTestDate || new Date().toLocaleDateString("en-GB"),
+              startTime: editModal.data.rawStartTime || "10:00 AM",
+              endTime: editModal.data.rawEndTime || "11:00 AM",
+              secureCode: editModal.data.secureCode || "",
+              maxTabSwitches: editModal.data.maxTabSwitches,
+              haveViva: editModal.data.haveViva,
+            }
             : null
         }
         onSave={handleUpdateSchedule}
@@ -889,16 +1042,19 @@ const MCQTestExecution = () => {
                   }}
                   className="mt-2 w-full rounded-xl border border-indigo-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer"
                 >
-                  <option value="">-- Select Question Set from Pool --</option>
+                  <option value="">-- Select Question Set from Course Pool --</option>
                   {state.questionSets.map((qs) => (
                     <option key={qs.id} value={qs.id}>
-                      {qs.name} ({qs.total_questions || qs.questions?.length || 10} Questions • Unit {qs.unit_number || 1})
+                      {qs.name} ({qs.total_count || qs.total_questions || qs.questions?.length || 0} Questions • Unit {qs.unit_number || 1})
                     </option>
                   ))}
-                  <option value="custom-pool">
-                    All Approved Questions Pool ({state.questionPool.length || 15} Available)
-                  </option>
                 </select>
+
+                {state.questionSets.length === 0 && (
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                    ⚠️ No Question Sets found for this course. Please create a Question Set in MCQ Question Bank first.
+                  </p>
+                )}
               </div>
 
               {/* Unit & Questions Count */}
@@ -927,7 +1083,7 @@ const MCQTestExecution = () => {
                   <input
                     type="number"
                     min={1}
-                    max={50}
+                    max={100}
                     value={createModal.questionsCount}
                     onChange={(e) =>
                       setCreateModal((p) => ({ ...p, questionsCount: Number(e.target.value) || 1 }))
@@ -960,7 +1116,7 @@ const MCQTestExecution = () => {
                     type="text"
                     value={createModal.topics}
                     onChange={(e) => setCreateModal((p) => ({ ...p, topics: e.target.value }))}
-                    placeholder="e.g. 1.2 Protocol Stack, 1.4 Physical Media"
+                    placeholder="e.g. Protocol Stack, Physical Media"
                     className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
@@ -1005,7 +1161,7 @@ const MCQTestExecution = () => {
                 </div>
               </div>
 
-              {/* Passcode */}
+              {/* Passcode & Enrolled Students */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-gray-900 dark:text-white">
@@ -1035,6 +1191,101 @@ const MCQTestExecution = () => {
                     className="w-full rounded-xl border border-gray-200 bg-gray-50/50 pl-10 pr-4 py-2.5 font-mono text-xs font-bold text-purple-700 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-purple-300"
                   />
                 </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                  <span>Students enter this passcode to join the proctored test environment.</span>
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                    👥 {state.enrolledStudents.length} Students Enrolled
+                  </span>
+                </div>
+              </div>
+
+              {/* Proctoring Settings */}
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 font-bold text-emerald-900 dark:text-emerald-200">
+                    <Lock className="h-4 w-4 text-emerald-600" />
+                    <span>Strict Proctoring Controls</span>
+                  </label>
+                  <span className="text-[11px] text-emerald-700 font-semibold">Active Monitoring</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                      Max Tab Switches (0 = unltd)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={createModal.maxTabSwitches}
+                      onChange={(e) => setCreateModal((p) => ({ ...p, maxTabSwitches: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-gray-900 focus:border-emerald-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-start gap-2 pt-4">
+                    <input
+                      type="checkbox"
+                      id="randomize_q"
+                      checked={createModal.randomizeQuestions}
+                      onChange={(e) => setCreateModal((p) => ({ ...p, randomizeQuestions: e.target.checked }))}
+                      className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="randomize_q" className="text-xs font-semibold text-gray-800 dark:text-gray-200 cursor-pointer">
+                      Shuffle Questions
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-start gap-2 pt-4">
+                    <input
+                      type="checkbox"
+                      id="randomize_opt"
+                      checked={createModal.randomizeOptions}
+                      onChange={(e) => setCreateModal((p) => ({ ...p, randomizeOptions: e.target.checked }))}
+                      className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="randomize_opt" className="text-xs font-semibold text-gray-800 dark:text-gray-200 cursor-pointer">
+                      Shuffle Options
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Viva Settings */}
+              <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-4 dark:border-purple-900/40 dark:bg-purple-950/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-200">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <span>AI Viva Voce Integration</span>
+                  </label>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={createModal.haveViva}
+                      onChange={(e) => setCreateModal((p) => ({ ...p, haveViva: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+
+                {createModal.haveViva && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <label className="text-xs font-semibold text-purple-900 dark:text-purple-300">
+                      Viva Score Threshold (% to trigger viva):
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={createModal.vivaThreshold}
+                      onChange={(e) => setCreateModal((p) => ({ ...p, vivaThreshold: Number(e.target.value) || 50 }))}
+                      className="w-20 rounded-xl border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 focus:border-purple-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-purple-300"
+                    />
+                    <span className="text-xs text-gray-500 dark:text-gray-400">% minimum</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1049,11 +1300,16 @@ const MCQTestExecution = () => {
               </button>
               <button
                 type="button"
+                disabled={createModal.submitting}
                 onClick={handleSaveNewTest}
-                className="flex items-center gap-2 rounded-xl bg-color1 px-5 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
+                className="flex items-center gap-2 rounded-xl bg-color1 px-5 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
               >
-                <Check className="h-4 w-4" />
-                <span>Save & Schedule Assessment</span>
+                {createModal.submitting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                <span>{createModal.submitting ? "Scheduling Assessment..." : "Save & Schedule Assessment"}</span>
               </button>
             </div>
           </div>

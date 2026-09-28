@@ -60,6 +60,8 @@ export interface EditTestScheduleModalProps {
     startTime?: string;
     endTime?: string;
     secureCode?: string;
+    maxTabSwitches?: number;
+    haveViva?: boolean;
   } | null;
   onSave?: (data: any) => void;
 }
@@ -74,26 +76,43 @@ export const EditTestScheduleModal: React.FC<EditTestScheduleModalProps> = ({
   useLockBodyScroll(visible);
 
   // Form State
-  const [testDate, setTestDate] = useState("08/09/2026");
-  const [startTime, setStartTime] = useState("10:00 AM");
-  const [endTime, setEndTime] = useState("11:00 AM");
-  const [secureCode, setSecureCode] = useState("CN-4V9X");
+  const [testDate, setTestDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [secureCode, setSecureCode] = useState("");
   const [copied, setCopied] = useState(false);
 
   // Sync testData prop when opened
   useEffect(() => {
-    if (testData) {
-      if (testData.testDate) setTestDate(testData.testDate);
-      if (testData.startTime) setStartTime(testData.startTime);
-      if (testData.endTime) setEndTime(testData.endTime);
-      if (testData.secureCode) setSecureCode(testData.secureCode);
+    if (testData && open) {
+      const now = new Date();
+      const startMins = Math.ceil((now.getMinutes() + 2) / 5) * 5;
+      const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), startMins);
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+      const formatTime12 = (d: Date) => {
+        let hh = d.getHours();
+        const mm = d.getMinutes().toString().padStart(2, "0");
+        const period = hh >= 12 ? "PM" : "AM";
+        hh = hh % 12;
+        hh = hh ? hh : 12;
+        return `${hh.toString().padStart(2, "0")}:${mm} ${period}`;
+      };
+
+      setTestDate(testData.testDate || startDate.toLocaleDateString("en-GB"));
+      setStartTime(testData.startTime || formatTime12(startDate));
+      setEndTime(testData.endTime || formatTime12(endDate));
+      setSecureCode(testData.secureCode || "");
     }
   }, [testData, open]);
 
   // Generate random passcode (e.g. CN-9X4V)
   const handleGenerateCode = () => {
+    const prefix = (testData?.testCode || testData?.courseCodeTitle || "MC")
+      .replace(/[^a-zA-Z]/g, "")
+      .slice(0, 2)
+      .toUpperCase() || "MC";
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let code = "CN-";
+    let code = `${prefix}-`;
     for (let i = 0; i < 4; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
@@ -122,15 +141,13 @@ export const EditTestScheduleModal: React.FC<EditTestScheduleModalProps> = ({
 
   if (!visible) return null;
 
-  const code = testData?.testCode || "MCQ-CN-2026-T2";
-  const course = testData?.courseCodeTitle || "CS309 — Computer Networks";
-  const name = testData?.testName || "Data Link Layer MCQ Test";
-  const unit = testData?.unitLabel || "Unit 2: Data Link Layer";
-  const topics =
-    testData?.topics ||
-    "2.2 Error Detection (CRC, Checksum, Parity) & Error Correction; 2.3 ARQ Protocols (Stop-and-Wait, Go-Back-N, Selective Repeat)";
-  const questionsCount = testData?.questionsCount || "5 Questions";
-  const duration = testData?.duration || "30 Minutes";
+  const code = testData?.testCode || "-";
+  const course = testData?.courseCodeTitle || "-";
+  const name = testData?.testName || "-";
+  const unit = testData?.unitLabel || "-";
+  const topics = testData?.topics || "-";
+  const questionsCount = testData?.questionsCount || "-";
+  const duration = testData?.duration || "-";
 
   return (
     <div
