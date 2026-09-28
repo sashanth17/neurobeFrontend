@@ -140,7 +140,7 @@ const CourseOffering = () => {
       {/* Info banner */}
       <PageHeader
         title="Course Instances & Section Management"
-        subtitle="Overview of course offerings and section instances across programmes and terms."
+        subtitle="Overview of course instances and section instances across programmes and terms."
         icon={<BookOpen className="h-5 w-5 text-color2" />}
         records={`${records.length} Records`}
         actionBtn2={{

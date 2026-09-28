@@ -28,7 +28,7 @@ const Icons: Record<string, () => JSX.Element> = {
       <path d="M2 12l10 5 10-5" />
     </svg>
   ),
-  "Course Offerings": () => (
+  "Course Instances": () => (
     <svg
       width="18"
       height="18"

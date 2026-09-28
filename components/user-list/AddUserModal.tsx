@@ -290,7 +290,7 @@ const AddUserModal = ({
               <CustomSelect title="Role"       required options={roleOpts}   value={form.role}       onChange={(v) => set("role",       v)} placeholder="Select role..." />
 
               <TextInput
-                title={isCurrentFaculty ? "Employee Number" : "Register Number"}
+                title={isCurrentFaculty ? "staff-id" : "Register Number"}
                 required={isCurrentRegNoRequired}
                 placeholder={
                   isCurrentStudent
