@@ -108,6 +108,8 @@ const course = {
         return promise;
     },
 
+    details: (id: any) => course.detail(id),
+
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `courses/${id}`;
