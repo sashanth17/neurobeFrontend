@@ -46,7 +46,7 @@ const DEFAULT_COURSE_ITEMS: ReferenceItem[] = [
     icon: <GitBranch className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "CO-PO Mapping",
     subtitle: "11 Program Outcomes",
-    isCompleted: true,
+    isCompleted: false,
     category: "course",
   },
   {
@@ -54,7 +54,7 @@ const DEFAULT_COURSE_ITEMS: ReferenceItem[] = [
     icon: <Layers className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "Topics",
     subtitle: "5 Units • 20 Main Topics",
-    isCompleted: true,
+    isCompleted: false,
     category: "course",
   },
   {
@@ -62,7 +62,7 @@ const DEFAULT_COURSE_ITEMS: ReferenceItem[] = [
     icon: <GraduationCap className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "Pedagogy",
     subtitle: "Teaching Approaches",
-    isCompleted: true,
+    isCompleted: false,
     category: "course",
   },
   {
@@ -70,7 +70,7 @@ const DEFAULT_COURSE_ITEMS: ReferenceItem[] = [
     icon: <Calendar className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "Lesson Plan",
     subtitle: "Course Delivery Plan",
-    isCompleted: true,
+    isCompleted: false,
     category: "course",
   },
   {
@@ -78,7 +78,7 @@ const DEFAULT_COURSE_ITEMS: ReferenceItem[] = [
     icon: <BookOpen className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "Learning Materials",
     subtitle: "6 Approved Materials",
-    isCompleted: true,
+    isCompleted: false,
     category: "course",
   },
 ];
@@ -89,7 +89,7 @@ const DEFAULT_ASSESSMENT_ITEMS: ReferenceItem[] = [
     icon: <HelpCircle className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "Question Bank",
     subtitle: "12 Approved Questions",
-    isCompleted: true,
+    isCompleted: false,
     category: "assessment",
   },
   {
@@ -97,7 +97,7 @@ const DEFAULT_ASSESSMENT_ITEMS: ReferenceItem[] = [
     icon: <FileCode className="h-5 w-5 text-pri dark:text-gray-400" />,
     title: "CIA Question Papers",
     subtitle: "3 Approved Papers",
-    isCompleted: true,
+    isCompleted: false,
     category: "assessment",
   },
 ];

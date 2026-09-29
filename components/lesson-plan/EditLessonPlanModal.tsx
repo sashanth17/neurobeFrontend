@@ -38,8 +38,10 @@ const PEDAGOGY_OPTS = [
 
 export interface LessonPlanEditData {
   id: string;
+  topic_id?: string | number;
   seq: number;
   title: string;
+  subtopic?: string;
   level: string;
   hours: string;
   textbook: string;
@@ -68,6 +70,7 @@ const EditLessonPlanModal = ({
 }: EditLessonPlanModalProps) => {
   const [form, setForm] = useState({
     title: "",
+    subtopic: "",
     seq: "",
     level: null as any,
     hours: "",
@@ -82,6 +85,7 @@ const EditLessonPlanModal = ({
     if (data) {
       setForm({
         title: data.title,
+        subtopic: data.subtopic || "",
         seq: String(data.seq),
         level: toOpt(data.level),
         hours: data.hours.replace(" Hours", ""),
@@ -101,7 +105,9 @@ const EditLessonPlanModal = ({
     if (!data) return;
     onSave?.({
       ...data,
+      topic_id: data.topic_id,
       title: form.title,
+      subtopic: form.subtopic,
       seq: Number(form.seq),
       level: form.level?.value ?? data.level,
       hours: `${form.hours} Hours`,
@@ -138,6 +144,16 @@ const EditLessonPlanModal = ({
           value={form.title}
           onChange={(e) => set("title", e.target.value)}
         />
+
+        {/* Subtopic */}
+        <div className="mt-4">
+          <TextInput
+            title="Subtopic"
+            placeholder="e.g. Units of Energy, Renewable vs Non-Renewable"
+            value={form.subtopic}
+            onChange={(e) => set("subtopic", e.target.value)}
+          />
+        </div>
 
         {/* Sequence / Level / Hours / Status */}
         <div className="mt-4 grid grid-cols-4 gap-3">

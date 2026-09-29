@@ -59,6 +59,18 @@ const CopoMappingMatrixCard: React.FC<CopoMappingMatrixCardProps> = ({
   rows = DEFAULT_ROWS,
   className = "",
 }) => {
+  const getScoreForPo = (poScores: Record<string, number> | undefined, po: string) => {
+    if (!poScores) return undefined;
+    if (poScores[po] !== undefined) return poScores[po];
+    const normPo = po.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const matchingKey = Object.keys(poScores).find(
+      (k) =>
+        k.toLowerCase().replace(/[^a-z0-9]/g, "") === normPo ||
+        (po.replace(/\D/g, "") && k.replace(/\D/g, "") && Number(k.replace(/\D/g, "")) === Number(po.replace(/\D/g, "")))
+    );
+    return matchingKey ? poScores[matchingKey] : undefined;
+  };
+
   const renderBadge = (score: number | undefined) => {
     if (score === 3) {
       return (
@@ -142,7 +154,7 @@ const CopoMappingMatrixCard: React.FC<CopoMappingMatrixCardProps> = ({
                 </td>
                 {poHeaders.map((po) => (
                   <td key={po} className="py-3.5 px-2 text-center">
-                    {renderBadge(row.poScores?.[po])}
+                    {renderBadge(getScoreForPo(row.poScores, po))}
                   </td>
                 ))}
               </tr>

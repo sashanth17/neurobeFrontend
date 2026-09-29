@@ -1137,7 +1137,7 @@ export const CreateProgrammeModal = ({
         <TextInput
           title="Programme Name"
           required
-          placeholder="e.g. B.Tech Computer Science"
+          placeholder="e.g. Bachelor of Technology"
           value={state.name}
           onChange={(e) => setState({ name: e.target.value })}
         />
@@ -1145,7 +1145,7 @@ export const CreateProgrammeModal = ({
           <TextInput
             title="Short Name"
             required
-            placeholder="e.g. BTECH-CSE"
+            placeholder="e.g. BTECH"
             value={state.short_name}
             onChange={(e) => setState({ short_name: e.target.value })}
           />

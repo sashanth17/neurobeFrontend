@@ -21,7 +21,6 @@ import TableTitle from "@/components/common-components/TableTitle";
 import GenericTabs from "@/components/common-components/GenericTabs";
 import AccordiansStyle from "@/components/common-components/AccordiansStyle";
 import PageFooter from "@/components/common-components/PageFooter";
-import GenerateLessonPlanModal from "@/components/lesson-plan/GenerateLessonPlanModal";
 import EditLessonPlanModal, { LessonPlanEditData } from "@/components/lesson-plan/EditLessonPlanModal";
 import ReviewLessonItemModal, { ReviewLessonItemData } from "@/components/lesson-plan/ReviewLessonItemModal";
 import { useRouter } from "next/router";
@@ -256,12 +255,15 @@ const LessonPlan = () => {
   console.log("course_id", course_id);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const completedJobsRef = useRef<Set<string>>(new Set());
+  const pollingJobIdRef = useRef<string | number | null>(null);
 
   const stopPolling = () => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    pollingJobIdRef.current = null;
   };
 
   useEffect(() => () => stopPolling(), []);
@@ -278,6 +280,7 @@ const LessonPlan = () => {
     generateLoading: false,
     generatedResponse: null,
     lessonApproved: false,
+    versionRefreshKey: Date.now(),
     upstreamNotApproved: false,
     approvingLesson: false,
     savingDraft: false,
@@ -316,17 +319,24 @@ const LessonPlan = () => {
       const lpStep = wfRes?.workflow?.step_5_lesson_plan_schedules;
       if (!lpStep) return;
 
-      const { status, job_id } = lpStep;
+      const { status, job_id, active_version, total_versions } = lpStep;
       if (status === "redis_queued" || status === "generating") {
-        setState({ generateLoading: true });
-        if (job_id) {
+        const jobIdStr = job_id ? String(job_id) : null;
+        if (jobIdStr && completedJobsRef.current.has(jobIdStr)) {
+          // This job is already completed; do not poll again
+          setState({ generateLoading: false, recommendationsGenerated: true });
+        } else if (job_id && pollingJobIdRef.current !== job_id) {
+          setState({ generateLoading: true });
           job_Data(job_id);
+        } else if (!job_id) {
+          setState({ generateLoading: true });
         }
       } else if (status === "approved") {
         setState({ lessonApproved: true, recommendationsGenerated: true, generateLoading: false });
       } else if (status === "draft") {
-        setState({ recommendationsGenerated: true, generateLoading: false });
-      } else if (status === "failed") {
+        const hasVer = Boolean(active_version || (total_versions && total_versions > 0));
+        setState({ recommendationsGenerated: hasVer, generateLoading: false });
+      } else if (status === "failed" || status === "not_started") {
         setState({ generateLoading: false });
       }
     } catch (err) {
@@ -349,14 +359,18 @@ const LessonPlan = () => {
         await Models.lession_plan.approve(sid);
       }
       try {
-        await Models.syllabus.approve_stage(course_id || sid, "schedule");
+        await Models.syllabus.approve_stage(course_id || sid, "schedule", loadedVersion ?? undefined);
       } catch (e) {
         console.warn("approve_stage schedule warning:", e);
       }
       Success("Lesson plan review completed successfully");
-      setState({ lessonApproved: true });
+      setState({ lessonApproved: true, versionRefreshKey: Date.now() });
       if (course_id) {
         await restoreWorkflowState(course_id);
+      }
+      if (sid) {
+        const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+        await lession_data(sid, activeUnitNum, loadedVersion ?? undefined);
       }
     } catch (error: any) {
       console.log("Approve error:", error);
@@ -386,23 +400,62 @@ const LessonPlan = () => {
       const vToUse = verNum !== undefined ? verNum : loadedVersion;
       const res: any = await Models.lession_plan.detail(syllabus_id, unit, vToUse);
       const isApproved = res?.overall_approval_status === "Approved" || res?.workspace_status === "Approved";
+      
+      const vListVersion = res?.version ? Number(res.version) : (res?.active_version ? Number(res.active_version) : null);
+      if (verNum !== undefined && verNum !== null) {
+        setLoadedVersion(verNum);
+      } else if (vListVersion && loadedVersion === null) {
+        setLoadedVersion(vListVersion);
+      }
+
+      const hasActiveVersion = Boolean(
+        verNum !== undefined ||
+        loadedVersion !== null ||
+        (res?.version && Number(res.version) > 0) ||
+        res?.active_version ||
+        res?.is_generated
+      );
+
+      const hasSessions = Boolean(res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0);
       const isGen = Boolean(
+        hasSessions ||
+        res?.is_generated ||
         isApproved ||
         res?.workspace_status === "Ready" ||
         res?.workspace_status === "Review Required" ||
-        (res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0)
+        res?.workspace_status === "Approved"
       );
       if (isGen) {
         setState({ recommendationsGenerated: true });
       }
+
       if (isApproved) {
         setState({ lessonApproved: true });
       }
 
+      const topicsCount =
+        res?.metrics?.topics?.value ??
+        res?.summary?.total_topics ??
+        res?.total_topics ??
+        0;
+
+      const contactHours =
+        res?.metrics?.contact_hours?.value ??
+        res?.metrics?.contact_hours?.display ??
+        res?.total_hours ??
+        45;
+
+      const scheduleStatus =
+        isApproved
+          ? "Approved"
+          : (isGen
+            ? "Ready"
+            : (res?.workspace_status || res?.overall_approval_status || "Not Started"));
+
       const data = [{
         key: "total-topics",
         label: "Total Topics",
-        count: res?.metrics?.topics?.value ?? res?.total_topics ?? 0,
+        count: topicsCount,
         subLabel: "Curriculum topic count",
         icon: <Check className="h-5 w-5" />,
       },
@@ -410,14 +463,14 @@ const LessonPlan = () => {
         key: "total-hours",
         label: "Total Hours",
         subLabel: "Allocated semester teaching time",
-        count: res?.metrics?.contact_hours?.value ?? 45,
+        count: contactHours,
         icon: <Hourglass className="h-5 w-5" />,
       },
       {
         key: "status",
         label: "Schedule Status",
         subLabel: "Milestone status",
-        count: isApproved ? "Approved" : (isGen ? "Ready" : "Draft"),
+        count: scheduleStatus,
         icon: <ClipboardCheck className="h-5 w-5" />,
       }];
       setState({ lession_data: res, matrix: data });
@@ -477,8 +530,6 @@ const LessonPlan = () => {
     topicId: string;
   }>({ open: false, data: null, unitKey: "", topicId: "" });
 
-  const [generateModal, setGenerateModal] = useState(false);
-
   // ── Per-unit reviewed topic tracking ──────────────────────────────────────
   // Pre-seed with topics that already have status "Reviewed" in RAW_UNIT_DATA
   const [reviewedMap, setReviewedMap] = useState<Record<string, Set<string>>>(
@@ -515,16 +566,30 @@ const LessonPlan = () => {
 
   // ── Pre-generate: topics list for the accordion (level + hours badges only) ──
   const buildInitialTopics = () => {
-    if (!state?.lession_data?.selected_unit?.sessions) return [];
-    return state?.lession_data?.selected_unit?.sessions.map((session: any) => ({
-      id: session.slot_id,
-      title: `Topic ${session.topic_code} — ${session.topic_name}`,
-      collapsedBadge: [
-        { label: `Knowledge Level ${session.level}`, className: "bg-color2-l text-color2 font-bold" },
-        { label: session.hours_display, className: "bg-gray-200 text-pri font-bold" },
-      ],
-      items: [],
-    }));
+    if (state?.lession_data?.selected_unit?.sessions?.length) {
+      return state.lession_data.selected_unit.sessions.map((session: any) => ({
+        id: session.slot_id || session.id,
+        title: session.topic_name ? `Topic ${session.topic_code || session.seq || ''} — ${session.topic_name}` : (session.title || ""),
+        collapsedBadge: [
+          { label: `Knowledge Level ${session.level || 'K2'}`, className: "bg-color2-l text-color2 font-bold" },
+          { label: session.hours_display || `${session.hours || 2} Hours`, className: "bg-gray-200 text-pri font-bold" },
+        ],
+        items: [],
+      }));
+    }
+    const currentUnitTopics = state?.lession_data?.selected_unit?.topics || [];
+    if (currentUnitTopics.length > 0) {
+      return currentUnitTopics.map((t: any) => ({
+        id: t.id,
+        title: `${t.code || t.topic_code || ''} — ${t.title || t.topic_name || ''}`,
+        collapsedBadge: [
+          { label: `Knowledge Level ${t.bloom_level || t.knowledge_level || 'K2'}`, className: "bg-color2-l text-color2 font-bold" },
+          { label: `${t.hours || 2} Hours`, className: "bg-gray-200 text-pri font-bold" },
+        ],
+        items: [],
+      }));
+    }
+    return [];
   };
 
   // ── Generated: flat table columns matching the screenshot ──
@@ -609,15 +674,25 @@ const LessonPlan = () => {
     {
       accessor: "id",
       title: "EDIT",
-      render: ({ title, id, seq, level, hours, textbook, reference, pedagogy, status }: any) => (
+      render: ({ title, id, topic_id, seq, level, hours, textbook, reference, pedagogy, status, subtopic }: any) => (
         <button
           type="button"
           onClick={() =>
             setEditModal({
               open: true,
               data: {
-                id, seq, title, level, hours, textbook, reference, pedagogy, status,
-                unitLabel: raw?.title ?? "",
+                id: String(id),
+                topic_id: topic_id || id,
+                seq,
+                title,
+                subtopic: subtopic || "",
+                level,
+                hours: String(hours || "1 Hour"),
+                textbook: textbook || "",
+                reference: reference || "",
+                pedagogy: pedagogy || "",
+                status: status === "Reviewed" || status === "Approved" ? "Reviewed" : "Needs Review",
+                unitLabel: state?.lession_data?.selected_unit?.unit_title || raw?.title || "",
               },
             })
           }
@@ -633,9 +708,17 @@ const LessonPlan = () => {
     stopPolling();
     if (!id) return;
 
+    const idStr = String(id);
+    if (completedJobsRef.current.has(idStr)) {
+      setState({ generateLoading: false, recommendationsGenerated: true });
+      return;
+    }
+    pollingJobIdRef.current = id;
+    setState({ generateLoading: true });
+
     let retries = 0;
     const maxRetries = 15;
-    const pollInterval = 120000; // 2 minutes (120,000 ms)
+    const pollInterval = 5000; // 5 seconds interval for fast status updates
     const startTime = Date.now();
     const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes timeout
 
@@ -644,7 +727,7 @@ const LessonPlan = () => {
         if (Date.now() - startTime > MAX_DURATION_MS) {
           stopPolling();
           setState({ generateLoading: false });
-          Failure("Lesson plan generation timed out after 10 minutes. Please try again.");
+          Failure("Lesson plan generation timed out after 15 minutes. Please try again.");
           return;
         }
 
@@ -665,13 +748,22 @@ const LessonPlan = () => {
           status === "success"
         ) {
           stopPolling();
+          completedJobsRef.current.add(idStr);
+          pollingJobIdRef.current = null;
           setState({
             generateLoading: false,
             generatedResponse: res,
+            recommendationsGenerated: true,
+            versionRefreshKey: Date.now(),
           });
-          setGenerateModal(true);
+          const sId = getSyllabusId();
+          if (sId) {
+            await lession_data(sId, 1);
+          }
+          Success("Lesson plan generated successfully!");
         } else if (status === "failed" || status === "error") {
           stopPolling();
+          pollingJobIdRef.current = null;
           setState({ generateLoading: false });
           Failure(res?.message || res?.error || "Lesson plan generation job failed.");
         } else {
@@ -687,6 +779,7 @@ const LessonPlan = () => {
           retries++;
         } else {
           stopPolling();
+          pollingJobIdRef.current = null;
           setState({ generateLoading: false });
           if (!isJobNotFound) {
             Failure(errorMsg || "Error checking job status.");
@@ -696,7 +789,10 @@ const LessonPlan = () => {
     };
 
     await fetchOnce();
-    pollRef.current = setInterval(fetchOnce, pollInterval);
+    // Only continue polling if job has not already finished
+    if (pollingJobIdRef.current === id) {
+      pollRef.current = setInterval(fetchOnce, pollInterval);
+    }
   };
 
   const generateLessionPlan = async (parentParams?: {
@@ -730,8 +826,14 @@ const LessonPlan = () => {
           setState({
             generateLoading: false,
             generatedResponse: res,
+            recommendationsGenerated: true,
+            versionRefreshKey: Date.now(),
           });
-          setGenerateModal(true);
+          const sid = getSyllabusId();
+          if (sid) {
+            await lession_data(sid, 1);
+          }
+          Success("Lesson plan generated successfully!");
         } else {
           setState({ generateLoading: false });
           Failure("Failed to initiate lesson plan generation job.");
@@ -746,27 +848,40 @@ const LessonPlan = () => {
 
   const handleVersionActivated = async (newVer: number) => {
     setLoadedVersion(newVer);
-    const syllabusId = state.courseData?.latest_syllabus?.id || course_id;
+    setState({ recommendationsGenerated: true, versionRefreshKey: Date.now() });
+    const syllabusId = getSyllabusId();
     if (syllabusId) {
       const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
       await lession_data(syllabusId, activeUnitNum, newVer);
     }
-    if (course_id) {
-      await restoreWorkflowState(course_id);
+  };
+
+  const handleVersionLoad = async (ver: number) => {
+    setLoadedVersion(ver);
+    setState({ recommendationsGenerated: true });
+    const syllabusId = getSyllabusId();
+    if (syllabusId) {
+      const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+      await lession_data(syllabusId, activeUnitNum, ver);
     }
   };
+
+  const hasSessions = Boolean(
+    state?.lession_data?.selected_unit?.sessions &&
+    state.lession_data.selected_unit.sessions.length > 0
+  );
 
   return (
     <div className="min-h-screen">
       <CourseBanner
-        courseCode={state.courseData?.course_code || ""}
-        courseTitle={state.courseData?.course_title || ""}
+        courseCode={state.courseData?.course_code || state.lession_data?.course_code || ""}
+        courseTitle={state.courseData?.course_title || state.lession_data?.course_title || ""}
         description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
-        programme={state.courseData?.programme || ""}
-        batch={state.courseData?.batch_name || ""}
-        academicYear={state.courseData?.academic_year || ""}
-        students={`${state.courseData?.students_count ?? 0} Students`}
-        selectedCourse={state.courseData?.course_code || ""}
+        programme={state.courseData?.programme || state.lession_data?.programme || ""}
+        batch={state.courseData?.batch_name || state.courseData?.batch || state.lession_data?.batch || ""}
+        academicYear={state.courseData?.academic_year || state.courseData?.academic_year_term || state.lession_data?.academic_year_term || ""}
+        students={`${state.courseData?.students_count ?? state.courseData?.student_count ?? state.lession_data?.student_count ?? 0} Students`}
+        selectedCourse={state.courseData?.course_code || state.lession_data?.course_code || ""}
         courseOptions={state.course_list}
         onCourseChange={(val) => console.log("course", val)}
         activeView={state.activeTab}
@@ -782,12 +897,10 @@ const LessonPlan = () => {
 
       <PageHeader
         title="Lesson Plan"
-        records={`${state.courseData?.course_code} - ${state.courseData?.course_title}`}
-        subtitle={`Create a teaching plan using the approved topics, books, hours, and pedagogies.`}
+        records={`${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
+        subtitle="Create a teaching plan using the approved topics, books, hours, and pedagogies."
         icon={<ClipboardList className="h-5 w-5 text-color2" />}
-
       />
-
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
         {state.matrix?.map((tab) => (
@@ -804,20 +917,22 @@ const LessonPlan = () => {
 
       {course_id && (
         <StageVersionHistoryPanel
+          key={state.versionRefreshKey}
           stage="schedule"
           stageLabel="Lesson Plan & Schedules"
           courseId={course_id}
           onVersionActivated={handleVersionActivated}
-          onVersionLoad={handleVersionActivated}
+          onVersionLoad={handleVersionLoad}
           onGenerateNew={generateLessionPlan}
           isGenerating={state.generateLoading}
+          refreshTrigger={state.versionRefreshKey}
         />
       )}
 
       <TableTitle
-        title="Approved topcis"
-        label={`${state?.lession_data?.unit_tabs?.length} Units`}
-        subLabel={`${state?.lession_data?.selected_unit?.topics_count} Topics`}
+        title={hasSessions ? "Generated Lesson Plan & Schedules" : "Topics from Approved Syllabus"}
+        label={`${state?.lession_data?.unit_tabs?.length || 5} Units`}
+        subLabel={`${hasSessions ? (state?.lession_data?.selected_unit?.sessions?.length ?? 0) : (state?.lession_data?.selected_unit?.topics_count ?? state?.lession_data?.selected_unit?.topics?.length ?? 0)} ${hasSessions ? "Sessions" : "Topics"}`}
       />
 
       <div className="mt-4">
@@ -825,39 +940,25 @@ const LessonPlan = () => {
           tabs={
             state?.lession_data?.unit_tabs?.map((unit: any) => ({
               key: `unit-${unit.unit_number}`,
-              label: `${unit.unit_number}`,
-            })) || []
+              label: `Unit ${unit.unit_number}`,
+            })) || [
+              { key: "unit-1", label: "Unit 1" },
+              { key: "unit-2", label: "Unit 2" },
+              { key: "unit-3", label: "Unit 3" },
+              { key: "unit-4", label: "Unit 4" },
+              { key: "unit-5", label: "Unit 5" },
+            ]
           }
           activeKey={state.activeTab}
           onChange={(unit) => {
             setState({ activeTab: unit as string });
-            // Extract unit number from key (e.g., "unit-1" -> 1)
-            const unitNumber = parseInt((unit as string).split('-')[1], 10);
-            lession_data(state?.courseData?.latest_syllabus?.id, unitNumber);
+            const unitNumber = parseInt((unit as string).split("-")[1], 10) || 1;
+            lession_data(getSyllabusId(), unitNumber, loadedVersion ?? undefined);
           }}
         />
 
-        {!state.recommendationsGenerated ? (
-
-           <AccordiansStyle
-            expandable={false}
-            topics={buildInitialTopics()}
-            title={state?.lession_data?.selected_unit?.unit_title}
-            subtitle={state?.lession_data?.selected_unit?.subtitle}
-            topicCount={state?.lession_data?.selected_unit?.topics_count}
-            footerContent={
-              <>
-                <Sparkles className="h-4 w-4" /> NEURO AI will sequence all topics,
-                assign textbook chapters, calibrate session hours, and
-                link pedagogy methods.
-              </>
-            }
-          />
-          /* ── Generated: flat table with header ── */
-          
-        ) : (
+        {hasSessions ? (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 mb-5">
-            {/* dark header */}
             <div className="flex items-center justify-between bg-[#111238] px-4 py-3 text-white">
               <div>
                 <h3 className="text-lg font-bold">{state?.lession_data?.selected_unit?.unit_title}</h3>
@@ -872,28 +973,64 @@ const LessonPlan = () => {
             <TableComponent
               records={state?.lession_data?.selected_unit?.sessions?.map((session: any) => ({
                 id: session.slot_id,
+                slot_id: session.slot_id,
+                topic_id: session.topic_id,
                 seq: session.seq,
                 title: session.topic_name,
+                subtopic: session.subtopic || "",
                 level: session.level,
                 textbook: session.textbook,
                 reference: session.reference_book,
-                hours: session.hours_display,
+                hours: session.hours_display || (session.hours ? `${session.hours} Hour${Number(session.hours) > 1 ? 's' : ''}` : "1 Hour"),
                 pedagogy: session.pedagogy,
-                status: session.status_display,
+                status: session.status || session.status_display || "Scheduled",
+                status_display: session.status_display || session.status || "Scheduled",
                 status_badge: session.status_badge,
               })) ?? []}
               columns={lessonPlanColumns}
             />
           </div>
-          /* ── Pre-generate: accordion with level/hours badges ── */
-         
+        ) : (
+          <AccordiansStyle
+            expandable={false}
+            topics={buildInitialTopics()}
+            title={state?.lession_data?.selected_unit?.unit_title || "Unit 1 — Approved Topics"}
+            subtitle={state?.lession_data?.selected_unit?.subtitle || "Approved topic sequencing and teaching methods"}
+            topicCount={state?.lession_data?.selected_unit?.topics_count || state?.lession_data?.selected_unit?.topics?.length}
+            footerContent={
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-2 text-sm text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse flex-shrink-0" />
+                  <span>NEURO AI will sequence all topics, assign textbook chapters, calibrate session hours, and link pedagogy methods.</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => generateLessionPlan()}
+                  disabled={state.generateLoading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50 flex-shrink-0"
+                >
+                  {state.generateLoading ? (
+                    <>
+                      <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Generate Lesson Plan with NEURO AI</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            }
+          />
         )}
       </div>
 
-      {state.recommendationsGenerated ? (
+      {hasSessions ? (
         <PageFooter
           content1={`Unit Topics: ${state?.lession_data?.selected_unit?.topics_count ?? 0}`}
-          content2={`Course: ${state.courseData?.course_code || ""} - ${state.courseData?.course_title || ""}`}
+          content2={`Course: ${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
           batch
           actionBtn1={
             state.lessonApproved
@@ -923,7 +1060,8 @@ const LessonPlan = () => {
         />
       ) : (
         <PageFooter
-          content1="Ready to synthesize the 22-session Lesson Plan?"
+          content1={`Curriculum: ${state?.lession_data?.summary?.total_topics ?? state?.lession_data?.metrics?.topics?.value ?? 28} Topics across ${state?.lession_data?.unit_tabs?.length ?? 5} Units`}
+          content2={`Course: ${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
           actionBtn1={{
             label: state.generateLoading ? "Generating..." : "Generate Lesson Plan with NEURO AI",
             icon: state.generateLoading ? null : <Sparkles className="h-4 w-4" />,
@@ -934,22 +1072,7 @@ const LessonPlan = () => {
         />
       )}
 
-      <GenerateLessonPlanModal
-        open={generateModal}
-        onClose={() => setGenerateModal(false)}
-        courseLabel={`${state.courseData?.course_code} — ${state.courseData?.course_title}`}
-        stats={{ 
-          topics: state.generatedResponse?.result?.total_topics ?? 22, 
-          units: state.generatedResponse?.result?.total_units ?? 5, 
-          hours: state.generatedResponse?.result?.total_hours ?? 45 
-        }}
-        response={state.generatedResponse}
-        onReview={() => {
-          setState({ recommendationsGenerated: true });
-          setGenerateModal(false);
-          course_data();
-        }}
-      />
+      {/* Avoided generation popup modal per user requirement */}
 
       <EditLessonPlanModal
         open={editModal.open}
@@ -957,21 +1080,28 @@ const LessonPlan = () => {
         data={editModal.data}
         onSave={async (updated) => {
           try {
-            await Models.lession_plan.update_topics(updated.id, {
+            const targetTopicId = updated.topic_id || updated.id;
+            await Models.lession_plan.update_topics(targetTopicId, {
               topic_name: updated.title,
               seq: updated.seq,
               level: updated.level,
-              hours: updated.hours.replace(" Hours", ""),
+              hours: `${updated.hours}`.replace(" Hours", ""),
               status: updated.status,
               textbook: updated.textbook,
               reference_book: updated.reference,
               pedagogy: updated.pedagogy,
-            }, loadedVersion);
+              subtopic: updated.subtopic,
+            }, loadedVersion ?? undefined);
             Success("Lesson plan item updated successfully!");
             // Refresh the data
-            lession_data(state?.courseData?.latest_syllabus?.id, parseInt(state.activeTab.split('-')[1], 10), loadedVersion ?? undefined);
-          } catch (error) {
+            const sid = getSyllabusId();
+            if (sid) {
+              const activeUnitNum = parseInt(state.activeTab.split('-')[1], 10) || 1;
+              await lession_data(sid, activeUnitNum, loadedVersion ?? undefined);
+            }
+          } catch (error: any) {
             console.log("Update topic error:", error);
+            Failure(typeof error === "string" ? error : error?.message || "Failed to update lesson plan item");
           }
         }}
       />

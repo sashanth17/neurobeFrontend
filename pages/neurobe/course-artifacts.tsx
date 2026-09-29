@@ -1983,7 +1983,12 @@ const QuestionBank = () => {
           Models.syllabus.get_workflow_status(targetId).catch(() => null),
         ]);
 
-        const sid = wfRes?.syllabus_id || cData?.latest_syllabus?.id || cData?.syllabus_id || cData?.syllabus?.id;
+        const sid =
+          wfRes?.syllabus_id ||
+          cData?.latest_syllabus?.id ||
+          cData?.syllabus_id ||
+          cData?.syllabus?.id ||
+          targetId;
         const currentCode = cData?.course_code || wfRes?.course_code || "";
 
         let sDetail = null;
@@ -2003,6 +2008,9 @@ const QuestionBank = () => {
           ]);
           sDetail = sRes;
           cMapping = copoRes;
+          if (!cMapping && targetId && String(targetId) !== String(sid)) {
+            cMapping = await Models.COPOMap.copo_map(targetId).catch(() => null);
+          }
           tUnits = topRes?.units || (Array.isArray(topRes) ? topRes : []);
 
           const unitNumbers = (tUnits.length > 0
@@ -2070,17 +2078,92 @@ const QuestionBank = () => {
   const activeProgramme = state.courseData?.programme || "";
   const activeBatch = state.courseData?.batch_name || "";
   const activeSemester = state.courseData?.term || "";
+
+  const wfObj = state.workflowStatus?.workflow || state.workflowStatus || {};
+  const stageWorkflowMap: Record<string, any> = {
+    syllabus: wfObj?.step_1_syllabus_extraction,
+    copo: wfObj?.step_2_copo_mapping,
+    topics: wfObj?.step_3_topic_hierarchy,
+    pedagogy: wfObj?.step_4_pedagogy_generation,
+    "lesson-plan": wfObj?.step_5_lesson_plan_schedules,
+  };
+  const activeStageWf = stageWorkflowMap[state.selectedReferenceId] || wfObj?.step_1_syllabus_extraction;
+
   const activeApprovedBy =
-    state.workflowStatus?.step_1_syllabus_extraction?.approved_by ||
+    activeStageWf?.approved_by ||
+    wfObj?.step_1_syllabus_extraction?.approved_by ||
     state.courseData?.coordinator_name ||
     "Course Coordinator";
-  const activeApprovedDate = state.workflowStatus?.step_1_syllabus_extraction?.updated_at
-    ? new Date(state.workflowStatus.step_1_syllabus_extraction.updated_at).toLocaleDateString("en-IN", {
+
+  const rawApprovedDate = activeStageWf?.updated_at || wfObj?.step_1_syllabus_extraction?.updated_at;
+  const activeApprovedDate = rawApprovedDate
+    ? new Date(rawApprovedDate).toLocaleDateString("en-IN", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       })
     : "Approved";
+
+  const isSyllabusApproved = Boolean(
+    wfObj?.step_1_syllabus_extraction?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.extraction_status?.toLowerCase() === "approved" ||
+    state.syllabusDetail?.approval_status?.toLowerCase() === "approved" ||
+    state.syllabusDetail?.extraction_status?.toLowerCase() === "approved"
+  );
+
+  const isCopoApproved = Boolean(
+    wfObj?.step_2_copo_mapping?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.copo_status?.toLowerCase() === "approved" ||
+    state.copoData?.mapping_status?.toLowerCase() === "approved" ||
+    state.copoData?.status?.toLowerCase() === "approved"
+  );
+
+  const isTopicsApproved = Boolean(
+    wfObj?.step_3_topic_hierarchy?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.hierarchy_status?.toLowerCase() === "approved"
+  );
+
+  const isPedagogyApproved = Boolean(
+    wfObj?.step_4_pedagogy_generation?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.pedagogy_status?.toLowerCase() === "approved"
+  );
+
+  const isLessonPlanApproved = Boolean(
+    wfObj?.step_5_lesson_plan_schedules?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.schedule_status?.toLowerCase() === "approved" ||
+    state.lessonUnits?.some((lu: any) => lu?.workspace_status === "Approved" || lu?.overall_approval_status === "Approved")
+  );
+
+  const activeStageApproved = (() => {
+    switch (state.selectedReferenceId) {
+      case "syllabus": return isSyllabusApproved;
+      case "copo": return isCopoApproved;
+      case "topics": return isTopicsApproved;
+      case "pedagogy": return isPedagogyApproved;
+      case "lesson-plan": return isLessonPlanApproved;
+      default: return false;
+    }
+  })();
+
+  const activeStageStatusRaw =
+    (state.selectedReferenceId === "copo"
+      ? (isCopoApproved ? "approved" : (state.copoData?.mapping_status || state.copoData?.status || activeStageWf?.status || "Draft"))
+      : null) ||
+    activeStageWf?.status ||
+    (activeStageApproved ? "approved" : "Draft");
+
+  const formatStatusBadgeText = (status: string, version?: number | null) => {
+    const s = (status || "").toLowerCase();
+    if (s === "approved") return version ? `Approved v${version}` : "Approved";
+    if (s === "draft") return version ? `Draft v${version}` : "Draft";
+    if (s === "generating") return "Generating...";
+    if (s === "redis_queued") return "Queued...";
+    if (s === "not_started") return "Not Started";
+    if (s === "failed") return "Failed";
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : (activeStageApproved ? "Approved" : "Draft");
+  };
+
+  const activeVersionBadgeText = formatStatusBadgeText(activeStageStatusRaw, activeStageWf?.active_version);
 
   const dynamicOutcomes = (state.syllabusDetail?.outcomes || []).map((co: any, idx: number) => ({
     id: String(co.id || idx + 1),
@@ -2137,42 +2220,96 @@ const QuestionBank = () => {
     hours: e.allocated_hours || e.hours || 0,
   }));
 
-  const rawMatrix = state.copoData?.matrix || state.copoData?.data?.matrix || {};
-  const rawPos = state.copoData?.program_outcomes || state.copoData?.data?.program_outcomes || [];
-  const rawCos = state.copoData?.course_outcomes || state.copoData?.data?.course_outcomes || [];
+  const rawMatrix =
+    state.copoData?.matrix ||
+    state.copoData?.data?.matrix ||
+    state.copoData?.copo_matrix ||
+    {};
+
+  const rawPos =
+    (state.copoData?.program_outcomes?.length ? state.copoData?.program_outcomes : null) ||
+    (state.copoData?.data?.program_outcomes?.length ? state.copoData?.data?.program_outcomes : null) ||
+    (state.copoData?.pos?.length ? state.copoData?.pos : null) ||
+    [];
+
+  const rawCos =
+    (state.copoData?.course_outcomes?.length ? state.copoData?.course_outcomes : null) ||
+    (state.copoData?.data?.course_outcomes?.length ? state.copoData?.data?.course_outcomes : null) ||
+    (state.copoData?.outcomes?.length ? state.copoData?.outcomes : null) ||
+    (state.syllabusDetail?.outcomes?.length ? state.syllabusDetail?.outcomes : null) ||
+    Object.keys(rawMatrix).map((coKey) => ({ co_code: coKey, code: coKey }));
+
+  const defaultPos = ["PO01", "PO02", "PO03", "PO04", "PO05", "PO06", "PO07", "PO08", "PO09", "PO10", "PO11"];
 
   const dynamicPoHeaders: string[] =
     rawPos.length > 0
       ? rawPos.map((po: any) => po.code || po.po_code || `PO${po.id}`)
-      : Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {});
+      : Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {}).length > 0
+      ? Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {})
+      : defaultPos;
 
-  const dynamicCopoRows = rawCos.map((co: any) => {
-    const coCode = co.code || co.co_code;
+  const dynamicCopoRows = rawCos.map((co: any, idx: number) => {
+    const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
     const scores: Record<string, number> = {};
-    const rowObj = rawMatrix[coCode] || {};
-    Object.keys(rowObj).forEach((poKey) => {
-      scores[poKey] = Number(rowObj[poKey]?.score ?? rowObj[poKey]) || 0;
+    const coKeyMatch = Object.keys(rawMatrix).find(
+      (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === coCode.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+             (coCode.replace(/\D/g, "") && k.replace(/\D/g, "") && Number(k.replace(/\D/g, "")) === Number(coCode.replace(/\D/g, "")))
+    );
+    const rowObj =
+      rawMatrix[coCode] ||
+      rawMatrix[co.co_code] ||
+      rawMatrix[co.code] ||
+      rawMatrix[String(co.id)] ||
+      rawMatrix[`CO${idx + 1}`] ||
+      (coKeyMatch ? rawMatrix[coKeyMatch] : {}) ||
+      {};
+
+    dynamicPoHeaders.forEach((poKey) => {
+      const exactVal = rowObj[poKey];
+      const fallbackKey = Object.keys(rowObj).find(
+        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === poKey.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+               (poKey.replace(/\D/g, "") && k.replace(/\D/g, "") && Number(k.replace(/\D/g, "")) === Number(poKey.replace(/\D/g, "")))
+      );
+      const val = exactVal !== undefined ? exactVal : (fallbackKey ? rowObj[fallbackKey] : undefined);
+      scores[poKey] = typeof val === "object" && val !== null ? Number(val.correlation_level ?? val.score ?? val.level ?? 0) : Number(val || 0);
     });
     return { coCode, poScores: scores };
   });
 
-  const dynamicRationaleItems = rawCos.map((co: any) => {
-    const coCode = co.code || co.co_code;
-    const rowObj = rawMatrix[coCode] || {};
+  const dynamicRationaleItems = rawCos.map((co: any, idx: number) => {
+    const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
+    const rowObj =
+      rawMatrix[coCode] ||
+      rawMatrix[co.co_code] ||
+      rawMatrix[co.code] ||
+      rawMatrix[String(co.id)] ||
+      rawMatrix[`CO${idx + 1}`] ||
+      {};
+
     const mappedPos = Object.keys(rowObj)
-      .filter((k) => (Number(rowObj[k]?.score ?? rowObj[k]) || 0) > 0)
-      .map((k) => ({
-        id: `${coCode}-${k}`,
-        poCode: k,
-        poTitle: rowObj[k]?.po_title || k,
-        strengthText: `Strength: ${rowObj[k]?.score ?? rowObj[k]}`,
-        strengthBadgeClass: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
-        rationale: rowObj[k]?.justification || rowObj[k]?.rationale || "Aligned with syllabus outcomes.",
-      }));
+      .filter((k) => {
+        const v = rowObj[k];
+        const s = typeof v === "object" && v !== null ? (v.correlation_level ?? v.score ?? v.level ?? 0) : Number(v || 0);
+        return Number(s) > 0;
+      })
+      .map((k) => {
+        const val = rowObj[k];
+        const score = typeof val === "object" && val !== null ? (val.correlation_level ?? val.score ?? val.level ?? 0) : Number(val || 0);
+        const rationale = typeof val === "object" ? (val?.justification || val?.rationale) : undefined;
+        return {
+          id: `${coCode}-${k}`,
+          poCode: k,
+          poTitle: (typeof val === "object" && val?.po_title) || k,
+          strengthText: `Strength: ${score}`,
+          strengthBadgeClass: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
+          rationale: rationale || "Aligned with course outcome requirements.",
+        };
+      });
+
     return {
       id: coCode,
       coCode,
-      statement: co.description || co.statement || "",
+      statement: co.description || co.statement || co.title || "",
       mappedCountText: `${mappedPos.length} mapped outcomes`,
       poItems: mappedPos,
     };
@@ -2226,24 +2363,7 @@ const QuestionBank = () => {
       });
     }
 
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `ped-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      hoursText: `${u.theory_hours || 0} Hours`,
-      topicsCountText: `${(u.topics || []).length} Topics`,
-      topics: (u.topics || []).map((t: any) => ({
-        code: t.topic_code || "",
-        title: t.topic_name || "",
-        description: t.description || "",
-        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
-        hoursText: `${t.hours || 1} Hours`,
-        teachingApproaches: (t.suggested_pedagogies || [])
-          .map((p: any) => p.pedagogy_name || p.strategy_name || p.name)
-          .filter(Boolean),
-      })),
-    }));
+    return [];
   })();
 
   const dynamicLessonUnits = (() => {
@@ -2276,21 +2396,7 @@ const QuestionBank = () => {
       });
     }
 
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `lesson-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      hoursText: `${u.theory_hours || 0} Hours`,
-      topicsCountText: `${(u.topics || []).length} Topics`,
-      topics: (u.topics || []).map((t: any) => ({
-        code: t.topic_code || "",
-        title: t.topic_name || "",
-        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
-        hoursText: `${t.planned_hours || t.hours || 1} Hours`,
-        pedagogy: ["Lecture"],
-      })),
-    }));
+    return [];
   })();
 
   const dynamicLearningMaterialUnits = (() => {
@@ -2454,7 +2560,7 @@ const QuestionBank = () => {
       title: "CO-PO Mapping",
       subtitle: `${dynamicPoHeaders.length} Program Outcomes • ${dynamicOutcomes.length} COs`,
       isActive: state.selectedReferenceId === "copo",
-      isCompleted: dynamicPoHeaders.length > 0,
+      isCompleted: isCopoApproved,
     },
     {
       id: "topics",
@@ -2470,7 +2576,7 @@ const QuestionBank = () => {
       title: "Topics",
       subtitle: `${dynamicTopicUnits.length} Units • ${dynamicTopicUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Topics`,
       isActive: state.selectedReferenceId === "topics",
-      isCompleted: dynamicTopicUnits.length > 0,
+      isCompleted: isTopicsApproved,
     },
     {
       id: "pedagogy",
@@ -2486,7 +2592,7 @@ const QuestionBank = () => {
       title: "Pedagogy",
       subtitle: `${dynamicPedagogyUnits.length} Units • ${dynamicPedagogyUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Teaching Approaches`,
       isActive: state.selectedReferenceId === "pedagogy",
-      isCompleted: dynamicPedagogyUnits.length > 0,
+      isCompleted: isPedagogyApproved,
     },
     {
       id: "lesson-plan",
@@ -2502,7 +2608,7 @@ const QuestionBank = () => {
       title: "Lesson Plan",
       subtitle: `${dynamicLessonUnits.length} Units • ${dynamicLessonUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Scheduled Sessions`,
       isActive: state.selectedReferenceId === "lesson-plan",
-      isCompleted: dynamicLessonUnits.length > 0,
+      isCompleted: isLessonPlanApproved,
     },
     {
       id: "learning-materials",
@@ -2695,7 +2801,7 @@ const QuestionBank = () => {
                     approvedBy={activeApprovedBy}
                     approvedDate={activeApprovedDate}
                     unitsCountText={`${dynamicUnits.length} Units`}
-                    versionBadgeText="Active Version"
+                    versionBadgeText={activeVersionBadgeText}
                     bannerProgramme={activeProgramme}
                     bannerBatch={activeBatch}
                     bannerSemester={activeSemester}
@@ -2851,23 +2957,43 @@ const QuestionBank = () => {
 
                 {state.selectedReferenceId === "pedagogy" && (
                   <div id="pedagogy-section" className="scroll-mt-36">
-                    <PedagogyTopicsCard
-                      title="TEACHING APPROACHES OF TOPICS"
-                      subtitle="Approved teaching methods for each topic in the course."
-                      headerStatsText={`${dynamicPedagogyUnits.length} Units`}
-                      units={dynamicPedagogyUnits}
-                    />
+                    {dynamicPedagogyUnits.length > 0 ? (
+                      <PedagogyTopicsCard
+                        title="TEACHING APPROACHES OF TOPICS"
+                        subtitle="Approved teaching methods for each topic in the course."
+                        headerStatsText={`${dynamicPedagogyUnits.length} Units`}
+                        units={dynamicPedagogyUnits}
+                      />
+                    ) : (
+                      <div className="rounded-3xl border border-gray-200/80 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <GraduationCap className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">No Approved Pedagogy Recommendations</h4>
+                        <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+                          Only approved pedagogy approaches appear in course artifacts. Please approve pedagogy recommendations in the Pedagogy workspace.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {state.selectedReferenceId === "lesson-plan" && (
                   <div id="lesson-plan-section" className="scroll-mt-36">
-                    <LessonPlanTopicsCard
-                      title="LESSON PLAN OF TOPICS"
-                      subtitle="Prescribed teaching methods, textbooks and reference books for each topic."
-                      headerStatsText={`${dynamicLessonUnits.length} Units`}
-                      units={dynamicLessonUnits}
-                    />
+                    {dynamicLessonUnits.length > 0 ? (
+                      <LessonPlanTopicsCard
+                        title="LESSON PLAN OF TOPICS"
+                        subtitle="Prescribed teaching methods, textbooks and reference books for each topic."
+                        headerStatsText={`${dynamicLessonUnits.length} Units`}
+                        units={dynamicLessonUnits}
+                      />
+                    ) : (
+                      <div className="rounded-3xl border border-gray-200/80 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <Calendar className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">No Approved Lesson Plan</h4>
+                        <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+                          Only approved and active lesson plans appear in course artifacts. Please generate and approve the lesson plan in the Lesson Plan workspace.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

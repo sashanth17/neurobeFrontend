@@ -23,6 +23,7 @@ import {
   RotateCw,
   ArrowRight,
   Layers,
+  Eye,
 } from "lucide-react";
 
 type ImportType = "user" | "course";
@@ -240,6 +241,44 @@ const Syllabus = () => {
     }
   };
 
+  /** Activate a specific syllabus file version */
+  const handleActivateFileVersion = async (versionNumber: number) => {
+    if (!course_id) return;
+    try {
+      setState({ isActivatingFileVersion: true });
+      await Models.syllabus.activateFileVersion(course_id, versionNumber);
+      Success(`Syllabus v${versionNumber} is now active.`);
+      await loadFileVersions(course_id);
+      await course_data(course_id as string);
+      const updatedSid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
+      if (updatedSid) {
+        await syllabus_detail(updatedSid);
+      }
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Failed to activate version");
+    } finally {
+      setState({ isActivatingFileVersion: false });
+    }
+  };
+
+  /** Load a specific file version into review */
+  const handleLoadFileVersion = async (fv: any) => {
+    try {
+      if (!fv.is_active) {
+        await handleActivateFileVersion(fv.version_number);
+      } else {
+        const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
+        if (sid) {
+          await syllabus_detail(sid);
+        }
+      }
+      setStep(3);
+      setState({ showReview: true });
+    } catch (error: any) {
+      Failure(typeof error === "string" ? error : error?.message || "Failed to load version");
+    }
+  };
+
   /** Trigger AI extraction from a specific file version */
   const extractFromVersion = async (fileVersionId: number, versionNumber: number) => {
     if (!course_id) return;
@@ -401,10 +440,22 @@ const Syllabus = () => {
       };
     });
 
+    const lecture_hours = Number(source?.lecture_hours ?? source?.lectureHours ?? data?.lecture_hours ?? data?.lectureHours ?? 0);
+    const tutorial_hours = Number(source?.tutorial_hours ?? source?.tutorialHours ?? data?.tutorial_hours ?? data?.tutorialHours ?? 0);
+    const practical_hours = Number(source?.practical_hours ?? source?.practicalHours ?? data?.practical_hours ?? data?.practicalHours ?? 0);
+    const credits = Number(source?.credits ?? source?.total_credits ?? data?.credits ?? 0);
+
     return {
       ...data,
       ...source,
       course_data: source,
+      lecture_hours,
+      lectureHours: lecture_hours,
+      tutorial_hours,
+      tutorialHours: tutorial_hours,
+      practical_hours,
+      practicalHours: practical_hours,
+      credits,
       outcomes,
       units,
       textbooks,
@@ -911,7 +962,7 @@ const Syllabus = () => {
   };
   console.log('✌️state.course_data --->', state.courseData);
 
-  const handleUpdateLTPC = (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number }) => {
+  const handleUpdateLTPC = async (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number; credits?: number }) => {
     setState((prev: any) => ({
       jobData: {
         ...(prev.jobData || {}),
@@ -928,6 +979,22 @@ const Syllabus = () => {
         },
       },
     }));
+
+    try {
+      const sid = await getEffectiveSyllabusId();
+      if (sid) {
+        const body: any = {
+          lecture_hours: hours.lecture_hours,
+          tutorial_hours: hours.tutorial_hours,
+          practical_hours: hours.practical_hours,
+        };
+        if (hours.credits !== undefined) body.credits = hours.credits;
+        await Models.syllabus.update_syllabus(sid, body);
+        Success("L-T-P hours updated successfully");
+      }
+    } catch (error: any) {
+      console.log("update_syllabus LTPC error:", error);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -1071,39 +1138,82 @@ const Syllabus = () => {
 
               {state.fileVersions.map((fv: any) => {
                 const isExtracting = state.extractingFileVersionId === fv.id;
+                const isActive = Boolean(fv.is_active);
                 return (
                   <div
                     key={fv.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 shadow-sm transition-all ${
+                      isActive
+                        ? "border-emerald-300 bg-emerald-50/20 dark:border-emerald-800 dark:bg-emerald-950/20"
+                        : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/40">
-                        <FileText className="h-4 w-4 text-indigo-500" />
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                        isActive ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-indigo-50 dark:bg-indigo-950/40"
+                      }`}>
+                        <FileText className={`h-5 w-5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-indigo-500"}`} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                          <span className="mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+                            isActive
+                              ? "bg-emerald-600 text-white"
+                              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                          }`}>
                             v{fv.version_number}
                           </span>
-                          {fv.original_filename}
-                        </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                            {fv.original_filename}
+                          </p>
+                          {isActive ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
+                              <CheckCircle className="h-3 w-3" /> Active
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
                           {fv.uploaded_by} &bull; {fv.created_at ? new Date(fv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : ""}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled={isExtracting}
-                      onClick={() => extractFromVersion(fv.id, fv.version_number)}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-60"
-                    >
-                      {isExtracting ? (
-                        <><RotateCw className="h-3 w-3 animate-spin" /> Extracting...</>
-                      ) : (
-                        <><Sparkles className="h-3 w-3" /> Extract</>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!isActive && (
+                        <button
+                          type="button"
+                          onClick={() => handleActivateFileVersion(fv.version_number)}
+                          className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 shadow-xs hover:bg-emerald-50 active:scale-95 dark:border-emerald-700 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-slate-700"
+                        >
+                          <CheckCircle className="h-3.5 w-3.5" /> Set Active
+                        </button>
                       )}
-                    </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleLoadFileVersion(fv)}
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Review
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isExtracting}
+                        onClick={() => extractFromVersion(fv.id, fv.version_number)}
+                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-60"
+                      >
+                        {isExtracting ? (
+                          <><RotateCw className="h-3 w-3 animate-spin" /> Extracting...</>
+                        ) : (
+                          <><Sparkles className="h-3 w-3" /> Extract</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1150,6 +1260,47 @@ const Syllabus = () => {
               />
             ) : (
               <>
+                {state.fileVersions.length > 0 && (
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+                        <Layers className="h-4 w-4" />
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                          Syllabus File Versions:
+                        </span>
+                        {state.fileVersions.map((fv: any) => {
+                          const isAct = Boolean(fv.is_active);
+                          return (
+                            <button
+                              key={fv.id}
+                              type="button"
+                              onClick={() => handleLoadFileVersion(fv)}
+                              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                                isAct
+                                  ? "bg-indigo-600 text-white shadow-xs"
+                                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                              }`}
+                            >
+                              v{fv.version_number} {isAct ? "(Active)" : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep(1);
+                        setState({ showReview: false });
+                      }}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      <RotateCw className="h-3 w-3" /> Manage File Versions
+                    </button>
+                  </div>
+                )}
                 {state.currentStep === 4 ? (
                   <div className="mb-5 mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-5 py-4 dark:border-green-800 dark:bg-green-950/20">
                     <div className="flex items-center gap-3">

@@ -919,7 +919,7 @@ const COPOMapping = () => {
                   </div>
                 ),
               },
-              ...programOutcomes.map((po) => ({
+              ...programOutcomes.map((po, poIndex) => ({
                 accessor: po.code,
                 title: (
                   <div
@@ -929,7 +929,7 @@ const COPOMapping = () => {
                     <span className="font-bold text-xs">{po.code}</span>
                   </div>
                 ),
-                render: (row: any) => {
+                render: (row: any, rowIndex: number) => {
                   const cell = matrix[row.co_code]?.[po.code] || {
                     correlation_level: 0,
                     strength_label: "– No Mapping",
@@ -941,8 +941,21 @@ const COPOMapping = () => {
                   const isMappingApproved = state.approvedMappings.includes(mappingKey);
                   const score = cell.correlation_level ?? 0;
 
+                  // Top row/layer cells open downwards (top-full) so the card is never clipped by the header or top boundary
+                  const isTopRow = (rowIndex ?? 0) < 2;
+                  const isRightEdge = poIndex >= programOutcomes.length - 2;
+                  const isLeftEdge = poIndex === 0;
+
+                  const positionClass = `${isTopRow ? "top-full mt-2" : "bottom-full mb-2"} ${
+                    isRightEdge
+                      ? "right-0"
+                      : isLeftEdge
+                      ? "left-0"
+                      : "left-1/2 -translate-x-1/2"
+                  }`;
+
                   return (
-                    <div className="relative group flex items-center justify-center py-1">
+                    <div className="relative group flex items-center justify-center py-1 group-hover:z-50 hover:z-50">
                       {/* Clickable Badge: direct cycle 0 -> 1 -> 2 -> 3 -> 0 */}
                       <button
                         type="button"
@@ -969,7 +982,7 @@ const COPOMapping = () => {
                       </button>
 
                       {/* Floating Hover Card on Cell (Strength, Bloom level, and Justification without opening any dropdown or modal!) */}
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl group-hover:block dark:border-slate-700 dark:bg-slate-900">
+                      <div className={`pointer-events-none absolute z-50 hidden w-80 rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl group-hover:block dark:border-slate-700 dark:bg-slate-900 ${positionClass}`}>
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-xs text-slate-800 dark:text-slate-100">
@@ -1020,7 +1033,7 @@ const COPOMapping = () => {
                           <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                             <Sparkles className="h-3 w-3" /> Academic Rationale
                           </p>
-                          <p className="mt-1 max-h-24 overflow-y-auto text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                          <p className="mt-1 text-xs leading-relaxed text-slate-700 dark:text-slate-300 break-words whitespace-normal">
                             {cell.justification || "No rationale provided yet. Click cell to cycle strength."}
                           </p>
                         </div>

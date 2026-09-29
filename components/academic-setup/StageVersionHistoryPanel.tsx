@@ -429,7 +429,9 @@ export default function StageVersionHistoryPanel({
       <div className="mt-3 flex items-center gap-3 overflow-x-auto pb-1">
         {displayedVersions.length === 0 && !loadingVersions && (
           <div className="flex w-full items-center justify-center py-4 text-xs text-slate-400">
-            No versions generated for Extraction v{selectedExtractionVer} yet. Click Generate v{versions.length + 1} above to begin.
+            {selectedExtractionVer
+              ? `No versions generated for Extraction v${selectedExtractionVer} yet. Click Generate v${versions.length + 1} above to begin.`
+              : `No versions generated yet. Click Generate v${versions.length + 1} above to begin.`}
           </div>
         )}
 
