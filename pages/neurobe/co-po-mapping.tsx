@@ -272,8 +272,8 @@ const COPOMapping = () => {
     setState({ generatingCopo: true });
 
     let attempts = 0;
-    const maxAttempts = 15; // 15 attempts with 2-minute interval
-    const pollInterval = 120000; // 2 minutes (120,000 ms)
+    const maxAttempts = 100; // 100 attempts at 3s = 5 minutes timeout
+    const pollInterval = 3000; // 3 seconds interval for responsive status updates
 
     const checkCopoStatus = async () => {
       attempts++;
@@ -281,6 +281,12 @@ const COPOMapping = () => {
         const wfRes: any = await Models.syllabus.get_workflow_status(cid);
         const copoStep = wfRes?.workflow?.step_2_copo_mapping;
         const currentStatus = copoStep?.status;
+        const currentJobId = copoStep?.job_id;
+
+        // If we enqueued a specific new job, don't exit early on stale status from an older job
+        if (jobId && currentJobId && currentJobId !== jobId && (currentStatus === "draft" || currentStatus === "approved")) {
+          if (attempts < 5) return;
+        }
 
         if (currentStatus === "draft" || currentStatus === "approved") {
           stopPolling();
@@ -294,6 +300,10 @@ const COPOMapping = () => {
           await getCourseDetails();
           await getCOPOMatrix(sid);
           Success("CO-PO mapping generated successfully with NEURO AI!");
+        } else if (currentStatus === "failed") {
+          stopPolling();
+          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
+          Failure("CO-PO mapping generation failed. Please try again.");
         } else if (attempts >= maxAttempts) {
           stopPolling();
           setState({ generatingCopo: false, versionRefreshKey: Date.now() });
@@ -311,7 +321,8 @@ const COPOMapping = () => {
       }
     };
 
-    checkCopoStatus();
+    // First check after 1.5s so backend has registered the enqueued job
+    setTimeout(checkCopoStatus, 1500);
     pollRef.current = setInterval(checkCopoStatus, pollInterval);
   };
 
@@ -862,7 +873,21 @@ const COPOMapping = () => {
           isGenerating={state.generatingCopo}
         />
 
-        {(courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0)) && !state.loading ? (
+        {state.generatingCopo ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 dark:border-indigo-800/40 dark:bg-indigo-950/20">
+            <RotateCw className="h-10 w-10 text-indigo-600 mb-3 animate-spin dark:text-indigo-400" />
+            <h4 className="text-base font-bold text-gray-900 dark:text-white">
+              NEURO AI Mapping Generation in Progress
+            </h4>
+            <p className="mt-1 text-sm text-gray-500 max-w-md">
+              Evaluating Course Outcomes against 12 Program Outcomes with Bloom's taxonomy and generating academic justifications...
+            </p>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+              <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
+              Status: Processing in AI Worker Queue
+            </div>
+          </div>
+        ) : (courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0 && Object.keys(matrix).length === 0)) && !state.loading ? (
           <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
             <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
             <h4 className="text-base font-bold text-gray-900 dark:text-white">
