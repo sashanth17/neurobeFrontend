@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   ChevronRight,
   Sparkles,
+  Edit,
 } from "lucide-react";
 import { QuestionPaperTemplate, CandidateQuestion } from "@/types/cia-test.types";
 import FormattedMathText from "@/components/common-components/FormattedMathText";
@@ -23,6 +24,7 @@ interface BlueprintSlotsPaneProps {
   onSelectSlot: (slotId: number) => void;
   onUnassignSlot: (slotId: number) => void;
   onAssignSlot?: (slotId: number, questionId: number) => void;
+  onEditQuestion?: (question: CandidateQuestion) => void;
 }
 
 export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
@@ -33,12 +35,13 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
   onSelectSlot,
   onUnassignSlot,
   onAssignSlot,
+  onEditQuestion,
 }) => {
   const [dragOverSlotId, setDragOverSlotId] = React.useState<number | null>(null);
   const sections = template?.sections || [];
 
   return (
-    <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div className="flex flex-col h-[calc(100vh-180px)] rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       {/* Pane Header */}
       <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-700">
         <div className="flex items-center gap-2">
@@ -53,11 +56,11 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
       </div>
 
       {sections.length === 0 ? (
-        <div className="py-12 text-center text-xs text-gray-400">
+        <div className="py-12 text-center text-xs text-gray-400 flex-1">
           No sections defined for this template blueprint.
         </div>
       ) : (
-        <div className="space-y-6 overflow-y-auto pr-1">
+        <div className="space-y-6 overflow-y-auto flex-1 pr-1">
           {sections.map((sec, secIdx) => {
             const questions = sec.questions || [];
             const assignedCount = questions.filter((q) => q.actual_question_id).length;
@@ -216,17 +219,29 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                         <div className="mt-2.5">
                           {isAssigned && assignedCandidate ? (
                             <div className="rounded-lg bg-gray-50 p-2.5 text-xs text-gray-800 dark:bg-gray-900/60 dark:text-gray-200">
-                              {/* Metadata Badges */}
-                              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                                {(assignedCandidate.course_outcome || assignedCandidate.co_level) && (
-                                  <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                    {assignedCandidate.course_outcome || assignedCandidate.co_level}
-                                  </span>
-                                )}
-                                {(assignedCandidate.bloom_level || assignedCandidate.knowledge_level) && (
-                                  <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-800 dark:bg-pink-900/40 dark:text-pink-300">
-                                    {assignedCandidate.bloom_level || assignedCandidate.knowledge_level}
-                                  </span>
+                              {/* Metadata Badges & Actions */}
+                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {(assignedCandidate.course_outcome || assignedCandidate.co_level) && (
+                                    <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                      {assignedCandidate.course_outcome || assignedCandidate.co_level}
+                                    </span>
+                                  )}
+                                  {(assignedCandidate.bloom_level || assignedCandidate.knowledge_level) && (
+                                    <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-800 dark:bg-pink-900/40 dark:text-pink-300">
+                                      {assignedCandidate.bloom_level || assignedCandidate.knowledge_level}
+                                    </span>
+                                  )}
+                                </div>
+                                {onEditQuestion && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditQuestion(assignedCandidate)}
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-purple-600 transition-colors"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    <span>Edit</span>
+                                  </button>
                                 )}
                               </div>
 

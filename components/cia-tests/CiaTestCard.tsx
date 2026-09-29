@@ -14,6 +14,7 @@ import {
   FileText,
   AlertCircle,
   Sparkles,
+  Edit2,
 } from "lucide-react";
 import { CIATestItem } from "@/types/cia-test.types";
 
@@ -24,6 +25,7 @@ interface CiaTestCardProps {
   onArchive: (id: number) => void;
   onUnarchive: (id: number) => void;
   onDelete: (id: number) => void;
+  onEdit?: (id: number) => void;
 }
 
 export const CiaTestCard: React.FC<CiaTestCardProps> = ({
@@ -33,6 +35,7 @@ export const CiaTestCard: React.FC<CiaTestCardProps> = ({
   onArchive,
   onUnarchive,
   onDelete,
+  onEdit,
 }) => {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,6 +106,23 @@ export const CiaTestCard: React.FC<CiaTestCardProps> = ({
                 onClick={() => setMenuOpen(false)}
               />
               <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                {!isArchivedView && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (onEdit) {
+                        onEdit(test.id);
+                      } else {
+                        alert("Edit screen coming soon!");
+                      }
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    <Edit2 className="h-3.5 w-3.5 text-blue-500" />
+                    Edit Test
+                  </button>
+                )}
+
                 {!isArchivedView ? (
                   <button
                     onClick={() => {
@@ -200,7 +220,7 @@ export const CiaTestCard: React.FC<CiaTestCardProps> = ({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-800 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                {inst.instance_name || `Section ${inst.instance_id}`}
+                {inst.course_instance_name || inst.instance_name || `Section ${inst.course_instance_id || inst.instance_id || inst.id}`}
                 {inst.enrolled_students_count ? (
                   <span className="text-[10px] text-purple-600 dark:text-purple-400">
                     ({inst.enrolled_students_count} std)

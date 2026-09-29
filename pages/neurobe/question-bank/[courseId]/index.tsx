@@ -41,6 +41,7 @@ const CourseQuestionBankPage = () => {
 
   const [activeMainTab, setActiveMainTab] = useState<"cia-tests" | "question-bank" | "blueprints">("cia-tests");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editCiaTestId, setEditCiaTestId] = useState<number | null>(null);
 
   // Hook for CIA Tests data & actions
   const {
@@ -60,6 +61,11 @@ const CourseQuestionBankPage = () => {
     handleUnarchive,
     handleDelete,
   } = useCiaTests(validCourseId);
+
+  const handleEdit = (id: number) => {
+    setEditCiaTestId(id);
+    setIsCreateModalOpen(true);
+  };
 
   // Hook for Question Paper Templates
   const {
@@ -127,11 +133,10 @@ const CourseQuestionBankPage = () => {
       <div className="mb-6 flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
         <button
           onClick={() => setActiveMainTab("cia-tests")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-            activeMainTab === "cia-tests"
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeMainTab === "cia-tests"
               ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
               : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-          }`}
+            }`}
         >
           <FileCode className="h-4 w-4" />
           <span>CIA Assessments</span>
@@ -142,23 +147,21 @@ const CourseQuestionBankPage = () => {
 
         <button
           onClick={() => setActiveMainTab("question-bank")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-            activeMainTab === "question-bank"
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeMainTab === "question-bank"
               ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
               : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-          }`}
+            }`}
         >
-          <HelpCircle className="h-4 w-4" />
-          <span>Question Bank & Sets</span>
+          {/* <HelpCircle className="h-4 w-4" />
+          <span>Question Bank & Sets</span> */}
         </button>
 
         <button
           onClick={() => setActiveMainTab("blueprints")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-            activeMainTab === "blueprints"
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeMainTab === "blueprints"
               ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
               : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-          }`}
+            }`}
         >
           <FileCheck className="h-4 w-4" />
           <span>Blueprints & Templates</span>
@@ -177,7 +180,10 @@ const CourseQuestionBankPage = () => {
             courseTitle={courseInfo.title}
             activeCount={activeTests.length}
             archivedCount={archivedTests.length}
-            onCreateClick={() => setIsCreateModalOpen(true)}
+            onCreateClick={() => {
+              setEditCiaTestId(null);
+              setIsCreateModalOpen(true);
+            }}
           />
 
           {/* Active vs Archived Subtabs and search */}
@@ -201,7 +207,11 @@ const CourseQuestionBankPage = () => {
             onArchive={handleArchive}
             onUnarchive={handleUnarchive}
             onDelete={handleDelete}
-            onCreateClick={() => setIsCreateModalOpen(true)}
+            onEdit={handleEdit}
+            onCreateClick={() => {
+              setEditCiaTestId(null);
+              setIsCreateModalOpen(true);
+            }}
           />
         </div>
       )}
@@ -239,7 +249,11 @@ const CourseQuestionBankPage = () => {
         courseId={validCourseId}
         courseCode={courseInfo.code}
         courseTitle={courseInfo.title}
-        onClose={() => setIsCreateModalOpen(false)}
+        editTestId={editCiaTestId}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setEditCiaTestId(null);
+        }}
         onSuccess={() => {
           refreshCiaTests();
         }}

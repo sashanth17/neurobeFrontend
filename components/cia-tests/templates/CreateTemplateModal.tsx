@@ -20,13 +20,13 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
   const isEditing = Boolean(initialData);
   const [submitting, setSubmitting] = useState(false);
   const [templateName, setTemplateName] = useState("CIA-1 Standard Blueprint");
-  const [totalMarks, setTotalMarks] = useState<number>(50);
+  const [totalMarks, setTotalMarks] = useState<number>(100);
   const [status, setStatus] = useState("drafted");
   const [description, setDescription] = useState(
     "Standard CIA question paper blueprint with short and analytical sections."
   );
 
-  // Default Sections (Standard 50M: 10x2 = 20M + 2x15 = 30M)
+  // Default Sections (Standard 100M: 10x2 = 20M + 5x16 = 80M)
   const defaultSections = [
     {
       section_order: 1,
@@ -50,10 +50,13 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       section_order: 2,
       section_name: "Section B",
       section_title: "Part B - Analytical Problems",
-      allocated_marks: 30,
+      allocated_marks: 80,
       questions: [
-        { question_number: 1, max_marks: 15 },
-        { question_number: 2, max_marks: 15 },
+        { question_number: 1, max_marks: 16 },
+        { question_number: 2, max_marks: 16 },
+        { question_number: 3, max_marks: 16 },
+        { question_number: 4, max_marks: 16 },
+        { question_number: 5, max_marks: 16 },
       ],
     },
   ];
@@ -68,7 +71,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
         .replace(new RegExp(` - ${initialData.course_code}$`, "i"), "");
 
       setTemplateName(cleanName || initialData.template_name);
-      setTotalMarks(Number(initialData.total_maximum_marks) || 50);
+      setTotalMarks(Number(initialData.total_maximum_marks) || 100);
       setStatus(initialData.status || "drafted");
       setDescription(initialData.description || "");
 
@@ -90,7 +93,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       }
     } else {
       setTemplateName("CIA-1 Standard Blueprint");
-      setTotalMarks(50);
+      setTotalMarks(100);
       setStatus("drafted");
       setDescription("Standard CIA question paper blueprint with short and analytical sections.");
       setSections(defaultSections);
@@ -439,8 +442,8 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                         <div className="flex items-center gap-1">
                           <input
                             type="number"
-                            min={0.5}
-                            step={0.5}
+                            min={1}
+                            step={1}
                             value={q.max_marks}
                             onChange={(e) =>
                               handleUpdateQuestion(secIdx, qIdx, Number(e.target.value))

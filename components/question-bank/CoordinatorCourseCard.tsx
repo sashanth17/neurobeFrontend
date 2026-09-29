@@ -16,6 +16,7 @@ export const CoordinatorCourseCard: React.FC<CoordinatorCourseCardProps> = ({
   const programme = course.programme || course.degree || "Computer Science & Engineering";
   const semester = course.semester ? `Semester ${course.semester}` : "Current Semester";
   const year = course.year ? `Year ${course.year}` : "";
+  const student = course.students_count ? course.students_count : 0;
   const academicYear = course.academic_year || "2026-2027";
   const sectionsCount = course.sections_count || course.total_sections || course.instances_count || 2;
   const enrolledCount = course.enrolled_students_count || course.total_students || 120;
@@ -36,14 +37,7 @@ export const CoordinatorCourseCard: React.FC<CoordinatorCourseCardProps> = ({
             <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700">
               {code}
             </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-              {semester} {year && `• ${year}`}
-            </span>
           </div>
-
-          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">
-            {academicYear}
-          </span>
         </div>
 
         {/* Title */}
@@ -54,35 +48,10 @@ export const CoordinatorCourseCard: React.FC<CoordinatorCourseCardProps> = ({
         {/* Programme */}
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-5 flex items-center gap-1.5">
           <Award className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
-          <span className="truncate">{programme}</span>
+          <span className="truncate"> Students - {student}</span>
         </p>
 
-        {/* Metadata & Statistics Chips */}
-        <div className="grid grid-cols-2 gap-2.5 mb-5">
-          <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 p-2.5 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-750">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex-shrink-0">
-              <Users className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Sections</p>
-              <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                {sectionsCount} Sec • {enrolledCount} Std
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 p-2.5 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-750">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex-shrink-0">
-              <FileText className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Assessments</p>
-              <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                {activeTestsCount} CIA Tests
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Footer CTA */}

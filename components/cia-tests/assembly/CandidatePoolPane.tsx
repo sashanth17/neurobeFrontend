@@ -375,7 +375,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   ];
 
   return (
-    <div className="relative flex flex-col rounded-3xl border border-gray-200/80 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-all">
+    <div className="relative flex flex-col h-[calc(100vh-180px)] rounded-3xl border border-gray-200/80 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-all">
       {/* ── 1. Pane Header & Creation Actions ───────────────────────────────── */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 dark:border-gray-800">
         <div>
@@ -540,7 +540,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
 
       {/* ── 4. Questions List Grouped by Facets ──────────────────────────────── */}
       {displayedCandidates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 py-16 text-center dark:border-gray-700">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 py-16 text-center dark:border-gray-700 flex-1">
           <HelpCircle className="h-10 w-10 text-gray-400 mb-2" />
           <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">
             No Candidate Questions Found
@@ -566,7 +566,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
           </div>
         </div>
       ) : (
-        <div className="space-y-5 overflow-y-auto pr-1">
+        <div className="space-y-5 overflow-y-auto flex-1 pr-1">
           {groupedQuestions.map((group) => {
             const isCollapsed = !!collapsedGroups[group.key];
             const allSelectedInGroup = group.questions.every((q) =>
@@ -646,17 +646,16 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                           onDragEnd={() => {
                             setDraggedQuestionId(null);
                           }}
-                          className={`relative rounded-2xl border p-4 transition-all duration-150 ${
-                            draggedQuestionId === q.id
+                          className={`relative rounded-2xl border p-4 transition-all duration-150 ${draggedQuestionId === q.id
                               ? "opacity-50 ring-2 ring-purple-500 scale-[0.98]"
                               : isSelected
-                              ? "border-purple-500 bg-purple-50/20 ring-1 ring-purple-500/30 dark:border-purple-600 dark:bg-purple-950/20"
-                              : isAssigned
-                              ? "border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-900/40"
-                              : canAssign
-                              ? "border-purple-300 bg-purple-50/10 shadow-sm hover:border-purple-500 hover:shadow-md dark:border-purple-800 cursor-grab"
-                              : "border-gray-200/90 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-850 cursor-grab"
-                          }`}
+                                ? "border-purple-500 bg-purple-50/20 ring-1 ring-purple-500/30 dark:border-purple-600 dark:bg-purple-950/20"
+                                : isAssigned
+                                  ? "border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-900/40"
+                                  : canAssign
+                                    ? "border-purple-300 bg-purple-50/10 shadow-sm hover:border-purple-500 hover:shadow-md dark:border-purple-800 cursor-grab"
+                                    : "border-gray-200/90 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-850 cursor-grab"
+                            }`}
                         >
                           {/* Card Header row: Checkbox, Badges, and Action Popover */}
                           <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -697,11 +696,26 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                               )}
 
                               {/* CO Badge */}
-                              {(q.course_outcome || q.co_level) && (
+                              {/* {(q.course_outcome || q.co_level) && (
                                 <span className="rounded-lg bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">
                                   {q.course_outcome || q.co_level}
                                 </span>
-                              )}
+                              )} */}
+
+                              {/* Topic Badge */}
+                              {(q.topic_names?.length || q.topic_tags?.length) ? (
+                                <span
+                                  title={(q.topic_names || q.topic_tags || []).join(", ")}
+                                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 flex items-center gap-1 max-w-[200px]"
+                                >
+                                  <span className="truncate">{(q.topic_names || q.topic_tags || [])[0]}</span>
+                                  {(q.topic_names?.length || q.topic_tags?.length || 0) > 1 && (
+                                    <span className="text-[10px] bg-blue-200/50 dark:bg-blue-800/50 px-1 rounded-sm shrink-0">
+                                      +{(q.topic_names?.length || q.topic_tags?.length || 0) - 1}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : null}
 
                               {/* Group Tag Badge / Inline Tag Editor */}
                               {q.group_tag ? (
@@ -772,11 +786,10 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                       setOpenSlotMenuId(openSlotMenuId === q.id ? null : q.id)
                                     }
                                     disabled={actionLoadingId !== null}
-                                    className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all ${
-                                      activeSlot && marksMatch
+                                    className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all ${activeSlot && marksMatch
                                         ? "border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                                         : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800"
-                                    }`}
+                                      }`}
                                   >
                                     <Layers className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                                     <span>
@@ -849,11 +862,10 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                                 </div>
 
                                                 <span
-                                                  className={`text-[10px] font-bold ${
-                                                    isCurrentlyAssigned
+                                                  className={`text-[10px] font-bold ${isCurrentlyAssigned
                                                       ? "text-amber-600 dark:text-amber-400"
                                                       : "text-green-600 dark:text-green-400"
-                                                  }`}
+                                                    }`}
                                                 >
                                                   {isCurrentlyAssigned ? "Replace" : "Empty"}
                                                 </span>
@@ -1005,11 +1017,10 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                     ? "Cannot edit an assigned question. Unassign from slot first."
                                     : "Edit Question"
                                 }
-                                className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition-colors ${
-                                  isAssigned
+                                className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition-colors ${isAssigned
                                     ? "text-gray-300 cursor-not-allowed dark:text-gray-600"
                                     : "text-gray-600 hover:bg-gray-100 hover:text-purple-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                                }`}
+                                  }`}
                               >
                                 <Edit className="h-3.5 w-3.5" />
                                 <span className="sr-only">Edit</span>
@@ -1025,11 +1036,10 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                     ? "Cannot delete an assigned question. Unassign from slot first."
                                     : "Delete Question (Undo available for 5s)"
                                 }
-                                className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition-colors ${
-                                  isAssigned
+                                className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition-colors ${isAssigned
                                     ? "text-gray-300 cursor-not-allowed dark:text-gray-600"
                                     : "text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/30"
-                                }`}
+                                  }`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                                 <span className="sr-only">Delete</span>

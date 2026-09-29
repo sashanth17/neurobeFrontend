@@ -218,6 +218,7 @@ const QuestionAssemblyStudioPage = () => {
             onSelectSlot={(slotId) => setActiveSlotId(slotId)}
             onUnassignSlot={handleUnassignSlot}
             onAssignSlot={handleAssignSlot}
+            onEditQuestion={handleOpenEditModal}
           />
         </div>
 
