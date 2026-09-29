@@ -396,17 +396,18 @@ const LessonPlan = () => {
         res?.is_generated
       );
 
+      const hasSessions = Boolean(res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0);
       const isGen = Boolean(
-        hasActiveVersion && (
+        res?.is_generated && hasSessions && (
           isApproved ||
           res?.workspace_status === "Ready" ||
           res?.workspace_status === "Review Required" ||
-          (res?.selected_unit?.sessions && res.selected_unit.sessions.length > 0)
+          res?.workspace_status === "Approved"
         )
       );
       if (isGen) {
         setState({ recommendationsGenerated: true });
-      } else if (!hasActiveVersion && !isApproved) {
+      } else {
         setState({ recommendationsGenerated: false });
       }
 
@@ -541,17 +542,19 @@ const LessonPlan = () => {
         items: [],
       }));
     }
-    const raw = RAW_UNIT_DATA[state.activeTab] || RAW_UNIT_DATA["unit-1"];
-    if (!raw) return [];
-    return raw.topics.map((t) => ({
-      id: t.id,
-      title: `${t.id} — ${t.title}`,
-      collapsedBadge: [
-        { label: `Knowledge Level ${t.level}`, className: "bg-color2-l text-color2 font-bold" },
-        { label: t.hours, className: "bg-gray-200 text-pri font-bold" },
-      ],
-      items: [],
-    }));
+    const currentUnitTopics = state?.lession_data?.selected_unit?.topics || [];
+    if (currentUnitTopics.length > 0) {
+      return currentUnitTopics.map((t: any) => ({
+        id: t.id,
+        title: `${t.code || t.topic_code || ''} — ${t.title || t.topic_name || ''}`,
+        collapsedBadge: [
+          { label: `Knowledge Level ${t.bloom_level || t.knowledge_level || 'K2'}`, className: "bg-color2-l text-color2 font-bold" },
+          { label: `${t.hours || 2} Hours`, className: "bg-gray-200 text-pri font-bold" },
+        ],
+        items: [],
+      }));
+    }
+    return [];
   };
 
   // ── Generated: flat table columns matching the screenshot ──

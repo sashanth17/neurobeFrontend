@@ -2104,12 +2104,53 @@ const QuestionBank = () => {
       })
     : "Approved";
 
+  const isSyllabusApproved = Boolean(
+    wfObj?.step_1_syllabus_extraction?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.extraction_status?.toLowerCase() === "approved" ||
+    state.syllabusDetail?.approval_status?.toLowerCase() === "approved" ||
+    state.syllabusDetail?.extraction_status?.toLowerCase() === "approved"
+  );
+
+  const isCopoApproved = Boolean(
+    wfObj?.step_2_copo_mapping?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.copo_status?.toLowerCase() === "approved" ||
+    state.copoData?.mapping_status?.toLowerCase() === "approved" ||
+    state.copoData?.status?.toLowerCase() === "approved"
+  );
+
+  const isTopicsApproved = Boolean(
+    wfObj?.step_3_topic_hierarchy?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.hierarchy_status?.toLowerCase() === "approved"
+  );
+
+  const isPedagogyApproved = Boolean(
+    wfObj?.step_4_pedagogy_generation?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.pedagogy_status?.toLowerCase() === "approved"
+  );
+
+  const isLessonPlanApproved = Boolean(
+    wfObj?.step_5_lesson_plan_schedules?.status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.schedule_status?.toLowerCase() === "approved" ||
+    state.lessonUnits?.some((lu: any) => lu?.workspace_status === "Approved" || lu?.overall_approval_status === "Approved")
+  );
+
+  const activeStageApproved = (() => {
+    switch (state.selectedReferenceId) {
+      case "syllabus": return isSyllabusApproved;
+      case "copo": return isCopoApproved;
+      case "topics": return isTopicsApproved;
+      case "pedagogy": return isPedagogyApproved;
+      case "lesson-plan": return isLessonPlanApproved;
+      default: return false;
+    }
+  })();
+
   const activeStageStatusRaw =
     (state.selectedReferenceId === "copo"
-      ? state.copoData?.mapping_status || state.copoData?.status || state.copoData?.data?.mapping_status
+      ? (isCopoApproved ? "approved" : (state.copoData?.mapping_status || state.copoData?.status || activeStageWf?.status || "Draft"))
       : null) ||
     activeStageWf?.status ||
-    "approved";
+    (activeStageApproved ? "approved" : "Draft");
 
   const formatStatusBadgeText = (status: string, version?: number | null) => {
     const s = (status || "").toLowerCase();
@@ -2119,7 +2160,7 @@ const QuestionBank = () => {
     if (s === "redis_queued") return "Queued...";
     if (s === "not_started") return "Not Started";
     if (s === "failed") return "Failed";
-    return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Approved";
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : (activeStageApproved ? "Approved" : "Draft");
   };
 
   const activeVersionBadgeText = formatStatusBadgeText(activeStageStatusRaw, activeStageWf?.active_version);
@@ -2224,7 +2265,7 @@ const QuestionBank = () => {
         (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === poKey.toLowerCase().replace(/[^a-z0-9]/g, "")
       );
       const val = exactVal !== undefined ? exactVal : fallbackKey ? rowObj[fallbackKey] : undefined;
-      scores[poKey] = typeof val === "object" && val !== null ? Number(val.score ?? 0) : Number(val || 0);
+      scores[poKey] = typeof val === "object" && val !== null ? Number(val.correlation_level ?? val.score ?? val.level ?? 0) : Number(val || 0);
     });
     return { coCode, poScores: scores };
   });
@@ -2312,24 +2353,7 @@ const QuestionBank = () => {
       });
     }
 
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `ped-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      hoursText: `${u.theory_hours || 0} Hours`,
-      topicsCountText: `${(u.topics || []).length} Topics`,
-      topics: (u.topics || []).map((t: any) => ({
-        code: t.topic_code || "",
-        title: t.topic_name || "",
-        description: t.description || "",
-        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
-        hoursText: `${t.hours || 1} Hours`,
-        teachingApproaches: (t.suggested_pedagogies || [])
-          .map((p: any) => p.pedagogy_name || p.strategy_name || p.name)
-          .filter(Boolean),
-      })),
-    }));
+    return [];
   })();
 
   const dynamicLessonUnits = (() => {
@@ -2362,21 +2386,7 @@ const QuestionBank = () => {
       });
     }
 
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `lesson-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      hoursText: `${u.theory_hours || 0} Hours`,
-      topicsCountText: `${(u.topics || []).length} Topics`,
-      topics: (u.topics || []).map((t: any) => ({
-        code: t.topic_code || "",
-        title: t.topic_name || "",
-        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
-        hoursText: `${t.planned_hours || t.hours || 1} Hours`,
-        pedagogy: ["Lecture"],
-      })),
-    }));
+    return [];
   })();
 
   const dynamicLearningMaterialUnits = (() => {
@@ -2540,7 +2550,7 @@ const QuestionBank = () => {
       title: "CO-PO Mapping",
       subtitle: `${dynamicPoHeaders.length} Program Outcomes • ${dynamicOutcomes.length} COs`,
       isActive: state.selectedReferenceId === "copo",
-      isCompleted: dynamicPoHeaders.length > 0,
+      isCompleted: isCopoApproved,
     },
     {
       id: "topics",
@@ -2556,7 +2566,7 @@ const QuestionBank = () => {
       title: "Topics",
       subtitle: `${dynamicTopicUnits.length} Units • ${dynamicTopicUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Topics`,
       isActive: state.selectedReferenceId === "topics",
-      isCompleted: dynamicTopicUnits.length > 0,
+      isCompleted: isTopicsApproved,
     },
     {
       id: "pedagogy",
@@ -2572,7 +2582,7 @@ const QuestionBank = () => {
       title: "Pedagogy",
       subtitle: `${dynamicPedagogyUnits.length} Units • ${dynamicPedagogyUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Teaching Approaches`,
       isActive: state.selectedReferenceId === "pedagogy",
-      isCompleted: dynamicPedagogyUnits.length > 0,
+      isCompleted: isPedagogyApproved,
     },
     {
       id: "lesson-plan",
@@ -2588,7 +2598,7 @@ const QuestionBank = () => {
       title: "Lesson Plan",
       subtitle: `${dynamicLessonUnits.length} Units • ${dynamicLessonUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Scheduled Sessions`,
       isActive: state.selectedReferenceId === "lesson-plan",
-      isCompleted: dynamicLessonUnits.length > 0,
+      isCompleted: isLessonPlanApproved,
     },
     {
       id: "learning-materials",
@@ -2937,23 +2947,43 @@ const QuestionBank = () => {
 
                 {state.selectedReferenceId === "pedagogy" && (
                   <div id="pedagogy-section" className="scroll-mt-36">
-                    <PedagogyTopicsCard
-                      title="TEACHING APPROACHES OF TOPICS"
-                      subtitle="Approved teaching methods for each topic in the course."
-                      headerStatsText={`${dynamicPedagogyUnits.length} Units`}
-                      units={dynamicPedagogyUnits}
-                    />
+                    {dynamicPedagogyUnits.length > 0 ? (
+                      <PedagogyTopicsCard
+                        title="TEACHING APPROACHES OF TOPICS"
+                        subtitle="Approved teaching methods for each topic in the course."
+                        headerStatsText={`${dynamicPedagogyUnits.length} Units`}
+                        units={dynamicPedagogyUnits}
+                      />
+                    ) : (
+                      <div className="rounded-3xl border border-gray-200/80 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <GraduationCap className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">No Approved Pedagogy Recommendations</h4>
+                        <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+                          Only approved pedagogy approaches appear in course artifacts. Please approve pedagogy recommendations in the Pedagogy workspace.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {state.selectedReferenceId === "lesson-plan" && (
                   <div id="lesson-plan-section" className="scroll-mt-36">
-                    <LessonPlanTopicsCard
-                      title="LESSON PLAN OF TOPICS"
-                      subtitle="Prescribed teaching methods, textbooks and reference books for each topic."
-                      headerStatsText={`${dynamicLessonUnits.length} Units`}
-                      units={dynamicLessonUnits}
-                    />
+                    {dynamicLessonUnits.length > 0 ? (
+                      <LessonPlanTopicsCard
+                        title="LESSON PLAN OF TOPICS"
+                        subtitle="Prescribed teaching methods, textbooks and reference books for each topic."
+                        headerStatsText={`${dynamicLessonUnits.length} Units`}
+                        units={dynamicLessonUnits}
+                      />
+                    ) : (
+                      <div className="rounded-3xl border border-gray-200/80 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <Calendar className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">No Approved Lesson Plan</h4>
+                        <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+                          Only approved and active lesson plans appear in course artifacts. Please generate and approve the lesson plan in the Lesson Plan workspace.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

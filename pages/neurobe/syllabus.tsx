@@ -401,10 +401,22 @@ const Syllabus = () => {
       };
     });
 
+    const lecture_hours = Number(source?.lecture_hours ?? source?.lectureHours ?? data?.lecture_hours ?? data?.lectureHours ?? 0);
+    const tutorial_hours = Number(source?.tutorial_hours ?? source?.tutorialHours ?? data?.tutorial_hours ?? data?.tutorialHours ?? 0);
+    const practical_hours = Number(source?.practical_hours ?? source?.practicalHours ?? data?.practical_hours ?? data?.practicalHours ?? 0);
+    const credits = Number(source?.credits ?? source?.total_credits ?? data?.credits ?? 0);
+
     return {
       ...data,
       ...source,
       course_data: source,
+      lecture_hours,
+      lectureHours: lecture_hours,
+      tutorial_hours,
+      tutorialHours: tutorial_hours,
+      practical_hours,
+      practicalHours: practical_hours,
+      credits,
       outcomes,
       units,
       textbooks,
@@ -911,7 +923,7 @@ const Syllabus = () => {
   };
   console.log('✌️state.course_data --->', state.courseData);
 
-  const handleUpdateLTPC = (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number }) => {
+  const handleUpdateLTPC = async (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number; credits?: number }) => {
     setState((prev: any) => ({
       jobData: {
         ...(prev.jobData || {}),
@@ -928,6 +940,22 @@ const Syllabus = () => {
         },
       },
     }));
+
+    try {
+      const sid = await getEffectiveSyllabusId();
+      if (sid) {
+        const body: any = {
+          lecture_hours: hours.lecture_hours,
+          tutorial_hours: hours.tutorial_hours,
+          practical_hours: hours.practical_hours,
+        };
+        if (hours.credits !== undefined) body.credits = hours.credits;
+        await Models.syllabus.update_syllabus(sid, body);
+        Success("L-T-P hours updated successfully");
+      }
+    } catch (error: any) {
+      console.log("update_syllabus LTPC error:", error);
+    }
   };
 
   const handleSaveDraft = async () => {
