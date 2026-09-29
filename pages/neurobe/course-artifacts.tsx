@@ -2251,20 +2251,26 @@ const QuestionBank = () => {
   const dynamicCopoRows = rawCos.map((co: any, idx: number) => {
     const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
     const scores: Record<string, number> = {};
+    const coKeyMatch = Object.keys(rawMatrix).find(
+      (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === coCode.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+             (coCode.replace(/\D/g, "") && k.replace(/\D/g, "") && Number(k.replace(/\D/g, "")) === Number(coCode.replace(/\D/g, "")))
+    );
     const rowObj =
       rawMatrix[coCode] ||
       rawMatrix[co.co_code] ||
       rawMatrix[co.code] ||
       rawMatrix[String(co.id)] ||
       rawMatrix[`CO${idx + 1}`] ||
+      (coKeyMatch ? rawMatrix[coKeyMatch] : {}) ||
       {};
 
     dynamicPoHeaders.forEach((poKey) => {
       const exactVal = rowObj[poKey];
       const fallbackKey = Object.keys(rowObj).find(
-        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === poKey.toLowerCase().replace(/[^a-z0-9]/g, "")
+        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === poKey.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+               (poKey.replace(/\D/g, "") && k.replace(/\D/g, "") && Number(k.replace(/\D/g, "")) === Number(poKey.replace(/\D/g, "")))
       );
-      const val = exactVal !== undefined ? exactVal : fallbackKey ? rowObj[fallbackKey] : undefined;
+      const val = exactVal !== undefined ? exactVal : (fallbackKey ? rowObj[fallbackKey] : undefined);
       scores[poKey] = typeof val === "object" && val !== null ? Number(val.correlation_level ?? val.score ?? val.level ?? 0) : Number(val || 0);
     });
     return { coCode, poScores: scores };
@@ -2281,10 +2287,14 @@ const QuestionBank = () => {
       {};
 
     const mappedPos = Object.keys(rowObj)
-      .filter((k) => (Number(typeof rowObj[k] === "object" ? rowObj[k]?.score : rowObj[k]) || 0) > 0)
+      .filter((k) => {
+        const v = rowObj[k];
+        const s = typeof v === "object" && v !== null ? (v.correlation_level ?? v.score ?? v.level ?? 0) : Number(v || 0);
+        return Number(s) > 0;
+      })
       .map((k) => {
         const val = rowObj[k];
-        const score = typeof val === "object" ? val?.score : val;
+        const score = typeof val === "object" && val !== null ? (val.correlation_level ?? val.score ?? val.level ?? 0) : Number(val || 0);
         const rationale = typeof val === "object" ? (val?.justification || val?.rationale) : undefined;
         return {
           id: `${coCode}-${k}`,

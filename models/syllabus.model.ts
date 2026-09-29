@@ -408,9 +408,12 @@ const syllabus = {
         });
     },
 
-    approve_stage: (id: string | number, stage: string) => {
+    approve_stage: (id: string | number, stage: string, ver?: number) => {
         return new Promise((resolve, reject) => {
             let url = `course/courses/${id}/stages/${stage}/approve`;
+            if (ver !== undefined && ver !== null) {
+                url += `?version=${ver}`;
+            }
             commonInstance()
                 .post(url)
                 .then((res) => resolve(res.data))
