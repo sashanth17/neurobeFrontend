@@ -652,15 +652,11 @@ export default function StudentMCQTestPage() {
   const connectMcqWebSocket = () => {
     if (!testDetails) return;
 
-    const hostname = typeof window !== "undefined" ? window.location.hostname || "localhost" : "localhost";
     const codeQuery = encodeURIComponent(testDetails.secure_code || passcode);
     const emailQuery = encodeURIComponent(studentEmail);
 
     const candidateUrls = [
-      `ws://${hostname}:8080/ws/test/connect?code=${codeQuery}&token=${emailQuery}`,
-      `ws://localhost:8080/ws/test/connect?code=${codeQuery}&token=${emailQuery}`,
-      `ws://${hostname}:8005/test/connect?code=${codeQuery}&token=${emailQuery}`,
-      `ws://127.0.0.1:8080/ws/test/connect?code=${codeQuery}&token=${emailQuery}`,
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}ws/test/connect?code=${codeQuery}&token=${emailQuery}`
     ];
 
     tryConnectMcqWs(0, candidateUrls);
@@ -982,7 +978,7 @@ export default function StudentMCQTestPage() {
     const emailQuery = encodeURIComponent(studentEmail);
 
     const vivaUrls = [
-      `ws://${process.env.NEXT_PUBLIC_API_BASE_URL}:8080/ws/test/viva/connect?test_id=${testId}&token=${emailQuery}`
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}ws/test/viva/connect?test_id=${testId}&token=${emailQuery}`
     ];
 
     tryConnectVivaWs(0, vivaUrls);
@@ -1633,10 +1629,10 @@ export default function StudentMCQTestPage() {
             {/* Live Timer */}
             <div
               className={`flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-mono font-bold ${secondsRemaining < 300
-                  ? "bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse"
-                  : secondsRemaining < 600
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                    : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                ? "bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse"
+                : secondsRemaining < 600
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                 }`}
             >
               <Clock className="h-3.5 w-3.5" />
@@ -1699,8 +1695,8 @@ export default function StudentMCQTestPage() {
                       type="button"
                       onClick={() => toggleFlagQuestion(currentQIndex)}
                       className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all cursor-pointer ${isFlagged
-                          ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                          : "border-slate-800 bg-[#111625] text-slate-400 hover:text-slate-200"
+                        ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                        : "border-slate-800 bg-[#111625] text-slate-400 hover:text-slate-200"
                         }`}
                     >
                       <Flag className="h-3.5 w-3.5" />
@@ -1735,15 +1731,15 @@ export default function StudentMCQTestPage() {
                         key={oIdx}
                         onClick={() => handleSelectOption(currentQId, opt)}
                         className={`group flex items-center justify-between rounded-2xl border p-4 transition-all duration-200 cursor-pointer ${isSelected
-                            ? "border-indigo-500 bg-indigo-600/15 shadow-lg shadow-indigo-500/10"
-                            : "border-slate-800 bg-[#111625] hover:border-slate-700 hover:bg-[#161c30]"
+                          ? "border-indigo-500 bg-indigo-600/15 shadow-lg shadow-indigo-500/10"
+                          : "border-slate-800 bg-[#111625] hover:border-slate-700 hover:bg-[#161c30]"
                           }`}
                       >
                         <div className="flex items-center gap-4">
                           <span
                             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold transition-all ${isSelected
-                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                                : "bg-slate-800 text-slate-300 group-hover:bg-slate-700"
+                              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                              : "bg-slate-800 text-slate-300 group-hover:bg-slate-700"
                               }`}
                           >
                             {optionLetter}
@@ -1758,8 +1754,8 @@ export default function StudentMCQTestPage() {
 
                         <div
                           className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${isSelected
-                              ? "border-indigo-500 bg-indigo-600 text-white"
-                              : "border-slate-700 bg-slate-900"
+                            ? "border-indigo-500 bg-indigo-600 text-white"
+                            : "border-slate-700 bg-slate-900"
                             }`}
                         >
                           {isSelected && <Check className="h-3 w-3" />}
@@ -1837,8 +1833,8 @@ export default function StudentMCQTestPage() {
                     type="button"
                     onClick={() => setMcqPaletteFilter("answered")}
                     className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "answered"
-                        ? "bg-emerald-500/20 text-emerald-300"
-                        : "text-slate-400 hover:text-slate-200"
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "text-slate-400 hover:text-slate-200"
                       }`}
                   >
                     Done ({answeredCount})
@@ -1847,8 +1843,8 @@ export default function StudentMCQTestPage() {
                     type="button"
                     onClick={() => setMcqPaletteFilter("flagged")}
                     className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "flagged"
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "text-slate-400 hover:text-slate-200"
+                      ? "bg-amber-500/20 text-amber-300"
+                      : "text-slate-400 hover:text-slate-200"
                       }`}
                   >
                     Flagged ({flaggedQuestions.size})
@@ -1869,12 +1865,12 @@ export default function StudentMCQTestPage() {
                         type="button"
                         onClick={() => setCurrentQIndex(idx)}
                         className={`h-9 w-9 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${isCurrent
-                            ? "ring-2 ring-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-600/40"
-                            : isFlg
-                              ? "bg-amber-500/20 border border-amber-500/50 text-amber-300"
-                              : isAnswered
-                                ? "bg-emerald-600/25 border border-emerald-500/40 text-emerald-300"
-                                : "bg-[#0B0F19] border border-slate-800 text-slate-400 hover:border-slate-700"
+                          ? "ring-2 ring-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-600/40"
+                          : isFlg
+                            ? "bg-amber-500/20 border border-amber-500/50 text-amber-300"
+                            : isAnswered
+                              ? "bg-emerald-600/25 border border-emerald-500/40 text-emerald-300"
+                              : "bg-[#0B0F19] border border-slate-800 text-slate-400 hover:border-slate-700"
                           }`}
                       >
                         {idx + 1}
@@ -2143,8 +2139,8 @@ export default function StudentMCQTestPage() {
             {/* Global Timer Badge */}
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border ${globalSecondsLeft < 120
-                  ? "bg-red-500/20 border-red-500/40 text-red-400 animate-pulse"
-                  : "bg-[#111625] border-slate-800 text-slate-300"
+                ? "bg-red-500/20 border-red-500/40 text-red-400 animate-pulse"
+                : "bg-[#111625] border-slate-800 text-slate-300"
                 }`}
             >
               <Clock className="w-3.5 h-3.5 text-indigo-400" />
@@ -2154,8 +2150,8 @@ export default function StudentMCQTestPage() {
             {/* Question Timer Badge */}
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border ${questionSecondsLeft < 10
-                  ? "bg-amber-500/20 border-amber-500/40 text-amber-400 animate-pulse"
-                  : "bg-[#111625] border-slate-800 text-slate-300"
+                ? "bg-amber-500/20 border-amber-500/40 text-amber-400 animate-pulse"
+                : "bg-[#111625] border-slate-800 text-slate-300"
                 }`}
             >
               <Timer className="w-3.5 h-3.5 text-indigo-400" />
@@ -2375,8 +2371,8 @@ export default function StudentMCQTestPage() {
                 type="button"
                 onClick={() => setIsMicOn(!isMicOn)}
                 className={`p-3 rounded-full transition-all focus:outline-none cursor-pointer ${isMicOn
-                    ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
-                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                  ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
+                  : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                   }`}
                 title={isMicOn ? "Microphone On" : "Microphone Muted"}
               >
@@ -2387,8 +2383,8 @@ export default function StudentMCQTestPage() {
                 type="button"
                 onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
                 className={`p-3 rounded-full transition-all focus:outline-none cursor-pointer ${showHistoryDrawer
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                   }`}
                 title="Toggle Q&A History"
               >
@@ -2408,8 +2404,8 @@ export default function StudentMCQTestPage() {
                   type="button"
                   onClick={() => setActiveResponseTab("type")}
                   className={`rounded-xl px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${activeResponseTab === "type"
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                 >
                   Type Response
@@ -2418,8 +2414,8 @@ export default function StudentMCQTestPage() {
                   type="button"
                   onClick={() => setActiveResponseTab("speak")}
                   className={`rounded-xl px-4 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${activeResponseTab === "speak"
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                 >
                   <Mic className="h-3.5 w-3.5" />
@@ -2439,8 +2435,8 @@ export default function StudentMCQTestPage() {
                   type="button"
                   onClick={toggleSpeechRecording}
                   className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-all cursor-pointer ${isRecordingSpeech
-                      ? "bg-red-500 text-white shadow-[0_0_30px_rgba(239,68,68,0.6)] animate-pulse"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
+                    ? "bg-red-500 text-white shadow-[0_0_30px_rgba(239,68,68,0.6)] animate-pulse"
+                    : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
                     }`}
                 >
                   <Mic className="h-8 w-8" />
@@ -2547,8 +2543,8 @@ export default function StudentMCQTestPage() {
                     <div
                       key={msg.id}
                       className={`rounded-2xl p-3.5 text-xs leading-relaxed ${isAi
-                          ? "bg-[#0B0F19] border border-slate-800 text-slate-200"
-                          : "bg-indigo-950/40 border border-indigo-800/40 text-indigo-200 ml-6"
+                        ? "bg-[#0B0F19] border border-slate-800 text-slate-200"
+                        : "bg-indigo-950/40 border border-indigo-800/40 text-indigo-200 ml-6"
                         }`}
                     >
                       <div className="flex items-center justify-between mb-1 text-[10px] font-bold opacity-70">
@@ -2560,8 +2556,8 @@ export default function StudentMCQTestPage() {
                       {msg.evaluation && typeof msg.evaluation.accuracy === "number" && (
                         <div
                           className={`mt-2 rounded-xl p-2 text-[10px] border ${msg.evaluation.accuracy >= 0.6
-                              ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
-                              : "bg-amber-950/40 border-amber-500/30 text-amber-300"
+                            ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
+                            : "bg-amber-950/40 border-amber-500/30 text-amber-300"
                             }`}
                         >
                           Accuracy: {Math.round(msg.evaluation.accuracy * 100)}% — {msg.evaluation.reasoning}
@@ -2987,8 +2983,8 @@ export default function StudentMCQTestPage() {
                       <div
                         key={msg.id}
                         className={`rounded-2xl p-4 text-xs leading-relaxed border ${isAi
-                            ? "bg-[#111625] border-slate-800 text-slate-200"
-                            : "bg-indigo-950/40 border-indigo-800/40 text-indigo-200 ml-4"
+                          ? "bg-[#111625] border-slate-800 text-slate-200"
+                          : "bg-indigo-950/40 border-indigo-800/40 text-indigo-200 ml-4"
                           }`}
                       >
                         <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold opacity-75">
@@ -3000,8 +2996,8 @@ export default function StudentMCQTestPage() {
                         {msg.evaluation && typeof msg.evaluation.accuracy === "number" && (
                           <div
                             className={`mt-2 rounded-xl p-2.5 text-[11px] border font-medium ${msg.evaluation.accuracy >= 0.6
-                                ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
-                                : "bg-amber-950/40 border-amber-500/30 text-amber-300"
+                              ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
+                              : "bg-amber-950/40 border-amber-500/30 text-amber-300"
                               }`}
                           >
                             Accuracy: {Math.round(msg.evaluation.accuracy * 100)}% — {msg.evaluation.reasoning}
@@ -3043,10 +3039,10 @@ export default function StudentMCQTestPage() {
                       <div
                         key={q.question_id}
                         className={`rounded-3xl border p-5 space-y-3 transition-colors ${q.is_correct
-                            ? "bg-[#111625] border-emerald-500/30"
-                            : q.selected_option
-                              ? "bg-[#111625] border-red-500/30"
-                              : "bg-[#111625] border-slate-800"
+                          ? "bg-[#111625] border-emerald-500/30"
+                          : q.selected_option
+                            ? "bg-[#111625] border-red-500/30"
+                            : "bg-[#111625] border-slate-800"
                           }`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -3056,10 +3052,10 @@ export default function StudentMCQTestPage() {
                           </h4>
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${q.is_correct
-                                ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/40"
-                                : q.selected_option
-                                  ? "bg-red-950/60 text-red-400 border border-red-500/40"
-                                  : "bg-slate-800 text-slate-400 border border-slate-700"
+                              ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/40"
+                              : q.selected_option
+                                ? "bg-red-950/60 text-red-400 border border-red-500/40"
+                                : "bg-slate-800 text-slate-400 border border-slate-700"
                               }`}
                           >
                             {q.is_correct ? (
