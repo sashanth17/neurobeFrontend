@@ -2382,72 +2382,44 @@ const QuestionBank = () => {
 
   const dynamicLearningMaterialUnits = (() => {
     if (state.learningUnits && state.learningUnits.length > 0) {
-      return state.learningUnits.map((mResp: any, idx: number) => {
-        const su = mResp?.selected_unit || {};
-        const uNum = su.unit_number || idx + 1;
-        const uTitle = su.unit_title || `Unit ${uNum}`;
-        const topics = (su.topics || []).map((t: any) => ({
-          id: `mat-${t.topic_id || t.topic_code || idx}`,
-          topicCode: t.topic_code || "",
-          topicTitle: t.topic_name || "",
-          materialTitle: `${t.topic_name} — Lecture Notes & Study Guide`,
-          versionText: "v1.0",
-          approvedDateText: "Approved Curriculum",
-          details: {
-            approvedBy: activeApprovedBy,
-            approvedDate: activeApprovedDate,
-            overview: `Comprehensive academic lecture notes and curriculum guide for ${t.topic_name}. Covers theoretical foundations, architecture, and real-world implementations.`,
-            learningContent: [
-              {
-                title: "Core Concepts & Architecture",
-                items: [
-                  `Systematic breakdown of ${t.topic_name} and underlying engineering principles.`,
-                  "Protocol specifications, data encapsulation hierarchies, and interfacing requirements.",
-                  "Comparative analysis against standard industry reference implementations.",
-                ],
-              },
-              {
-                title: "Theoretical Framework",
-                items: [
-                  "Mathematical formulations and operational timing constraints.",
-                  "System components, operational characteristics, and parameter configurations.",
-                ],
-              },
-            ],
-          },
-        }));
+      return state.learningUnits
+        .map((mResp: any, idx: number) => {
+          const su = mResp?.selected_unit || {};
+          const uNum = su.unit_number || idx + 1;
+          const uTitle = su.unit_title || `Unit ${uNum}`;
+          const approvedTopics = (su.topics || []).filter(
+            (t: any) => t.status === "Approved" || t.status === "approved"
+          );
+          if (approvedTopics.length === 0) return null;
 
-        return {
-          id: `lm-unit-${uNum}`,
-          unitNumber: uNum,
-          unitCodeText: `Unit ${uNum}`,
-          title: uTitle,
-          materialsCountText: `${topics.length} Approved Materials`,
-          materials: topics,
-        };
-      });
+          const topics = approvedTopics.map((t: any) => ({
+            id: `mat-${t.topic_id || t.topic_code || idx}`,
+            topicCode: t.topic_code || "",
+            topicTitle: t.topic_name || "",
+            materialTitle: `${t.topic_name} — Lecture Notes & Study Guide`,
+            versionText: "v1.0",
+            approvedDateText: "Approved Curriculum",
+            details: {
+              approvedBy: activeApprovedBy,
+              approvedDate: activeApprovedDate,
+              overview: `Curriculum reference notes for ${t.topic_name}.`,
+              learningContent: [],
+            },
+          }));
+
+          return {
+            id: `lm-unit-${uNum}`,
+            unitNumber: uNum,
+            unitCodeText: `Unit ${uNum}`,
+            title: uTitle,
+            materialsCountText: `${topics.length} Approved Materials`,
+            materials: topics,
+          };
+        })
+        .filter(Boolean);
     }
 
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `lm-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      materialsCountText: `${(u.topics || []).length} Materials`,
-      materials: (u.topics || []).map((t: any) => ({
-        id: `mat-${t.id || t.topic_code}`,
-        topicCode: t.topic_code || "",
-        topicTitle: t.topic_name || "",
-        materialTitle: `${t.topic_name} — Lecture Notes`,
-        versionText: "v1.0",
-        approvedDateText: "Approved Curriculum",
-        details: {
-          approvedBy: activeApprovedBy,
-          approvedDate: activeApprovedDate,
-          overview: `Study materials and curriculum reference notes for ${t.topic_name}.`,
-        },
-      })),
-    }));
+    return [];
   })();
 
   const dynamicQuestionBankUnits = (() => {
@@ -2965,12 +2937,22 @@ const QuestionBank = () => {
 
                 {state.selectedReferenceId === "learning-materials" && (
                   <div id="learning-materials-section" className="scroll-mt-36">
-                    <LearningMaterialsCard
-                      title="LEARNING MATERIALS OF TOPICS"
-                      subtitle="Coordinator-approved study materials, lecture notes, and learning content."
-                      headerStatsText={`${dynamicLearningMaterialUnits.length} Units`}
-                      units={dynamicLearningMaterialUnits}
-                    />
+                    {dynamicLearningMaterialUnits.length > 0 ? (
+                      <LearningMaterialsCard
+                        title="LEARNING MATERIALS OF TOPICS"
+                        subtitle="Coordinator-approved study materials, lecture notes, and learning content."
+                        headerStatsText={`${dynamicLearningMaterialUnits.length} Units`}
+                        units={dynamicLearningMaterialUnits}
+                      />
+                    ) : (
+                      <div className="rounded-3xl border border-gray-200/80 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <BookOpen className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">No Approved Learning Materials</h4>
+                        <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+                          Only approved learning materials appear in course artifacts. Please generate and approve learning materials in the Learning Materials workspace.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

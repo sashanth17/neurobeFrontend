@@ -26,48 +26,7 @@ import KeepFilePrompt from "@/components/academic-setup/KeepFilePrompt";
 import { useSearchParams } from "next/navigation";
 import Models from "@/imports/models.import";
 
-const MATERIAL_SECTIONS: MaterialSection[] = [
-  {
-    heading: "Conceptual Overview",
-    body: "Computer networks interconnect autonomous computational devices to enable reliable resource sharing and distributed data exchange. To manage system complexity and hardware heterogeneity, modern network architectures employ hierarchical modular layering where each protocol layer performs distinct services and encapsulates data for transmission.",
-  },
-  {
-    heading: "Theoretical Foundations & Protocols",
-    body: "The Open Systems Interconnection (OSI) 7-Layer Reference Model provides the standard theoretical benchmark:",
-    bullets: [
-      {
-        label: "Physical Layer:",
-        text: "Governs unstructured bit stream transmission over physical media (voltages, frequencies, pin configurations).",
-      },
-      {
-        label: "Data Link Layer:",
-        text: "Manages node-to-node framing, physical MAC addressing, flow control, and CRC error detection.",
-      },
-      {
-        label: "Network Layer:",
-        text: "Handles logical IP addressing, packet forwarding, and dynamic subnet routing across autonomous systems.",
-      },
-      {
-        label: "Transport Layer:",
-        text: "Guarantees process-to-process communication, connection management, port multiplexing, and reliable byte-stream transmission (TCP/UDP).",
-      },
-      {
-        label: "Session Layer:",
-        text: "Manages dialogue control, token administration, and session checkpoint synchronization.",
-      },
-      {
-        label: "Presentation Layer:",
-        text: "Executes data syntax translation, compression algorithms, and cryptographic encryption.",
-      },
-      {
-        label: "Application Layer:",
-        text: "Directly interfaces with network software (HTTP/HTTPS, DNS, SMTP, SSH).",
-      },
-    ],
-    footer:
-      "The practical TCP/IP Internet Protocol Suite condenses these roles into 4 operational layers: Application, Transport, Internet, and Network Access.",
-  },
-];
+
 
 const ViewLearningMaterials = () => {
   const dispatch = useDispatch();
@@ -189,10 +148,10 @@ const ViewLearningMaterials = () => {
     return sections;
   };
 
-  // ── Get sections from materialData or use defaults ──
+  // ── Get sections from materialData ──
   const displaySections = state.materialData?.content_markdown
     ? parseMarkdownToSections(state.materialData.content_markdown)
-    : MATERIAL_SECTIONS;
+    : [];
 
   // ── Handle save content ──
   const handleSaveContent = async () => {
@@ -343,61 +302,78 @@ const ViewLearningMaterials = () => {
       )}
 
       <div className="mt-4">
-        <AccordiansStyleEditor
-          title="Learning Material Document"
-          topicCountLabel={
-            state.isEditing ? "Edit Mode" : "Review Mode (Read-Only Review)"
-          }
-          finalValue={state.final}
-          saveChanges={state.showSavePrompt}
-          sections={displaySections}
-          icon={<BookOpen className="h-4 w-4" />}
-          isEditing={state.isEditing}
-          editorValue={state.editorValue || state.materialData?.content_markdown || ""}
-          onEditorChange={(val) => setState({ editorValue: val })}
-          onSave={() => {
-            handleSaveContent();
-          }}
-          onCancelEdit={() => setState({ isEditing: false, showSavePrompt: false,final:true,  })}
-          onBack={() => router.back()}
-          actionBtn1={
-            state.materialData?.status === "approved"
-              ? undefined
-              : {
-                  label: "Approve Material",
-                  icon: <CheckCircle className="h-4 w-4" />,
-                  onClick: () => handleApproveMaterial(),
-                }
-          }
-          actionBtn2={
-            !state.isEditing
-              ? {
-                  label: "Edit Material",
-                  icon: <Edit className="h-4 w-4" />,
-                  onClick: () => setState({ isEditing: true }),
-                }
-              : undefined
-          }
+        {displaySections.length > 0 || state.isEditing ? (
+          <AccordiansStyleEditor
+            title="Learning Material Document"
+            topicCountLabel={
+              state.isEditing ? "Edit Mode" : "Review Mode (Read-Only Review)"
+            }
+            finalValue={state.final}
+            saveChanges={state.showSavePrompt}
+            sections={displaySections}
+            icon={<BookOpen className="h-4 w-4" />}
+            isEditing={state.isEditing}
+            editorValue={state.editorValue || state.materialData?.content_markdown || ""}
+            onEditorChange={(val) => setState({ editorValue: val })}
+            onSave={() => {
+              handleSaveContent();
+            }}
+            onCancelEdit={() => setState({ isEditing: false, showSavePrompt: false, final: true })}
+            onBack={() => router.back()}
+            actionBtn1={
+              state.materialData?.status === "approved"
+                ? undefined
+                : {
+                    label: "Approve Material",
+                    icon: <CheckCircle className="h-4 w-4" />,
+                    onClick: () => handleApproveMaterial(),
+                  }
+            }
+            actionBtn2={
+              !state.isEditing
+                ? {
+                    label: "Edit Material",
+                    icon: <Edit className="h-4 w-4" />,
+                    onClick: () => setState({ isEditing: true }),
+                  }
+                : undefined
+            }
 
-          final={
-            state.materialData?.status === "approved"
-              ? {
-                  label: "Next Question Bank",
-                  icon: <ArrowBigRight className="h-4 w-4" />,
-                  onClick: () => router.push("/neurobe/mcq-generation/bank"),
-                }
-              : {
-                  label: "Approve Material",
-                  icon: <CheckCircle className="h-4 w-4" />,
-                  onClick: () => handleApproveMaterial(),
-                }
-          }
-          final2={{
-            label: "Back to Learning Material",
-            icon: null,
-            onClick: () => router.back(),
-          }}
-        />
+            final={
+              state.materialData?.status === "approved"
+                ? {
+                    label: "Next Question Bank",
+                    icon: <ArrowBigRight className="h-4 w-4" />,
+                    onClick: () => router.push("/neurobe/mcq-generation/bank"),
+                  }
+                : {
+                    label: "Approve Material",
+                    icon: <CheckCircle className="h-4 w-4" />,
+                    onClick: () => handleApproveMaterial(),
+                  }
+            }
+            final2={{
+              label: "Back to Learning Material",
+              icon: null,
+              onClick: () => router.back(),
+            }}
+          />
+        ) : (
+          <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <BookOpen className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
+            <h4 className="text-lg font-bold text-slate-800 dark:text-slate-200">No Learning Material Generated</h4>
+            <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+              Learning material has not been generated for this topic yet.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-700"
+            >
+              Back to Learning Materials
+            </button>
+          </div>
+        )}
       </div>
 
     
