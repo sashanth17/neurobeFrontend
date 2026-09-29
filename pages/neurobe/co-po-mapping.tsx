@@ -366,12 +366,15 @@ const COPOMapping = () => {
   const matrix = matrixData?.matrix || {};
   const summary = matrixData?.summary;
 
-  // Filter CO-PO versions by selected extraction version (tactics identical to CourseCard)
+  // Filter CO-PO versions by selected extraction version (fallback to all CO-PO versions if none match)
   const currentExtVer = state.selectedExtractionVer;
   const matchingChildCopo = currentExtVer
-    ? (state.copoVersionsDetailed || []).filter(
-        (v: any) => Number(v.extraction_version_used ?? v.parent_version ?? 1) === Number(currentExtVer)
-      )
+    ? (() => {
+        const filtered = (state.copoVersionsDetailed || []).filter(
+          (v: any) => Number(v.extraction_version_used ?? v.parent_version ?? 1) === Number(currentExtVer)
+        );
+        return filtered.length > 0 ? filtered : (state.copoVersionsDetailed || []);
+      })()
     : state.copoVersionsDetailed || [];
 
   const activeChild =

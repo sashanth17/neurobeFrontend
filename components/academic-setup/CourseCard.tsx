@@ -156,34 +156,40 @@ export default function CourseCard(props: any) {
 
   const activeExtractionVer =
     optimisticVersions.extraction ||
-    syllabusFiles?.find((f: any) => f.is_active)?.version_number ||
     sSyllabus.ver ||
-    (syllabusFiles && syllabusFiles.length > 0 ? syllabusFiles[syllabusFiles.length - 1]?.version_number : 1);
+    syllabusFiles?.find((f: any) => f.is_active)?.version_number ||
+    1;
 
-  // Filter CO-PO versions to only children of the currently active extraction version
+  // Filter CO-PO versions to children of active extraction version, or fall back to all CO-PO versions
   const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed;
   let copoStatus = sCopo.status;
   let copoVer = optimisticVersions.copo || sCopo.ver;
   let copoTotalVers = sCopo.totalVers;
   let copoAvailableVersions = sCopo.availableVersions;
 
-  if (Array.isArray(copoDetailed)) {
+  if (Array.isArray(copoDetailed) && copoDetailed.length > 0) {
     const matchingChildCopo = copoDetailed.filter(
       (v: any) => (v.extraction_version_used ?? v.parent_version ?? 1) === activeExtractionVer
     );
-    if (matchingChildCopo.length === 0) {
-      copoStatus = "not_started";
-      copoVer = undefined;
-      copoTotalVers = 0;
-      copoAvailableVersions = [];
+    const candidates = matchingChildCopo.length > 0 ? matchingChildCopo : copoDetailed;
+    const activeMatch =
+      candidates.find((v: any) => v.is_active) || candidates[candidates.length - 1];
+
+    copoVer = optimisticVersions.copo || activeMatch?.version || sCopo.ver;
+    copoTotalVers = candidates.length;
+    copoAvailableVersions = candidates.map((v: any) => v.version);
+
+    if (sCopo.status === "generating" || sCopo.status === "redis_queued") {
+      copoStatus = sCopo.status;
+    } else if (activeMatch?.status === "approved" || sCopo.status === "approved") {
+      copoStatus = "approved";
     } else {
-      const activeMatch =
-        matchingChildCopo.find((v: any) => v.is_active) || matchingChildCopo[matchingChildCopo.length - 1];
-      copoVer = optimisticVersions.copo || activeMatch.version;
-      copoStatus = activeMatch.status === "approved" ? "approved" : "draft";
-      copoTotalVers = matchingChildCopo.length;
-      copoAvailableVersions = matchingChildCopo.map((v: any) => v.version);
+      copoStatus = activeMatch?.status || sCopo.status || "draft";
     }
+  } else if (sCopo.status === "generating" || sCopo.status === "redis_queued") {
+    copoStatus = sCopo.status;
+  } else {
+    copoStatus = sCopo.status || "not_started";
   }
 
   const sTopics = getStageInfo("hierarchy", workflowStatus?.step_3_topic_hierarchy, data?.academic_preparation?.topics?.state);
