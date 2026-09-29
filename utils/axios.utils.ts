@@ -47,16 +47,16 @@ const showTokenExpiredAlert = () => {
 // ─── Shared interceptor setup ─────────────────────────────────────────────────
 const attachInterceptors = (axiosInstance: AxiosInstance) => {
   // Request: attach bearer token
-  // axiosInstance.interceptors.request.use(
-  //   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-  //     const accessToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  //     if (accessToken && config.headers) {
-  //       config.headers["Authorization"] = `Bearer ${accessToken}`;
-  //     }
-  //     return config;
-  //   },
-  //   (error: AxiosError) => Promise.reject(error),
-  // );
+  axiosInstance.interceptors.request.use(
+    (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (accessToken && config.headers) {
+        config.headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      return config;
+    },
+    (error: AxiosError) => Promise.reject(error),
+  );
 
   // Response: handle 401 with refresh token logic
   axiosInstance.interceptors.response.use(
