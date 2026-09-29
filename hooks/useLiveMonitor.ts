@@ -134,8 +134,11 @@ export function useLiveMonitor(
       if (!mountedRef.current) return;
       try {
         const msg = JSON.parse(e.data);
-        setLastEvent(msg);
-        const type: string = msg.type || "";
+        const type: string = (msg.type || msg.event || "").toUpperCase();
+
+        if (type !== "PONG" && type !== "PING") {
+          setLastEvent(msg);
+        }
 
         switch (type) {
           case "MONITOR_READY":
@@ -155,10 +158,42 @@ export function useLiveMonitor(
             break;
 
           case "ANSWER_SUBMITTED":
+          case "STUDENT_SUBMITTED":
             updateStudentStat({
               student_email: msg.student_email,
               status: "active",
             });
+            if (msg.question_id) {
+              setQuestionStats((prev) => {
+                const idx = prev.findIndex((q) => q.question_id === msg.question_id);
+                const isCorr = Boolean(msg.is_correct);
+                if (idx >= 0) {
+                  const updated = [...prev];
+                  const cur = updated[idx];
+                  const newCorrect = cur.correct_count + (isCorr ? 1 : 0);
+                  const newIncorrect = cur.incorrect_count + (isCorr ? 0 : 1);
+                  const total = newCorrect + newIncorrect;
+                  const newPct = total > 0 ? Math.round((newCorrect / total) * 100) : 0;
+                  updated[idx] = {
+                    ...cur,
+                    correct_count: newCorrect,
+                    incorrect_count: newIncorrect,
+                    correct_pct: newPct,
+                  };
+                  return updated;
+                } else {
+                  return [
+                    ...prev,
+                    {
+                      question_id: msg.question_id,
+                      correct_count: isCorr ? 1 : 0,
+                      incorrect_count: isCorr ? 0 : 1,
+                      correct_pct: isCorr ? 100 : 0,
+                    },
+                  ];
+                }
+              });
+            }
             break;
 
           case "TAB_SWITCH_ALERT":
@@ -192,6 +227,15 @@ export function useLiveMonitor(
               }));
               setStudentStats(mapped);
               recomputeKpis(mapped, msg.total_enrolled || mapped.length);
+            }
+            if (Array.isArray(msg.per_question)) {
+              const mappedQ: QuestionStat[] = msg.per_question.map((q: any) => ({
+                question_id: q.question_id,
+                correct_count: q.correct_count || 0,
+                incorrect_count: q.incorrect_count || 0,
+                correct_pct: q.correct_pct || 0,
+              }));
+              setQuestionStats(mappedQ);
             }
             break;
 

@@ -58,6 +58,8 @@ const MCQLiveMonitor = () => {
   const [availableTests, setAvailableTests] = useState<any[]>([]);
   const [loadingTests, setLoadingTests] = useState(false);
   const [currentServerTime, setCurrentServerTime] = useState<number>(Date.now());
+  const [eventHistory, setEventHistory] = useState<any[]>([]);
+  const [eventFilter, setEventFilter] = useState<"all" | "warnings" | "submissions">("all");
 
   // 10-second ticker to re-evaluate live window dynamically
   useEffect(() => {
@@ -67,6 +69,21 @@ const MCQLiveMonitor = () => {
 
   const { isConnected, studentStats, kpis, lastEvent, sendEndTest, requestSnapshot } =
     useLiveMonitor(testId);
+
+  // Accumulate live events for parsed activity log stream
+  useEffect(() => {
+    if (!lastEvent) return;
+    setEventHistory((prev) => {
+      const isDuplicate = prev.length > 0 && JSON.stringify(prev[0]) === JSON.stringify(lastEvent);
+      if (isDuplicate) return prev;
+      const augmented = {
+        ...lastEvent,
+        _receivedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        _id: Math.random().toString(36).substring(2, 9),
+      };
+      return [augmented, ...prev.slice(0, 49)];
+    });
+  }, [lastEvent]);
 
   useEffect(() => {
     dispatch(setPageTitle("Live Monitor — MCQ Test"));
@@ -562,18 +579,110 @@ const MCQLiveMonitor = () => {
         </div>
       </div>
 
-      {/* Live Event Stream */}
-      {lastEvent && (
-        <div className="rounded-2xl border border-gray-200 bg-white px-6 py-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-2">
-            <Activity className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
-            Last Event
-          </h3>
-          <pre className="overflow-x-auto rounded-xl bg-gray-50 p-3 text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            {JSON.stringify(lastEvent, null, 2)}
-          </pre>
+      {/* Parsed Live Event Feed (Replaces Raw JSON) */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-500 animate-pulse" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+              Live Event Log Feed ({eventHistory.length} events logged)
+            </h3>
+          </div>
+
+          <div className="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
+            {(["all", "warnings", "submissions"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setEventFilter(f)}
+                className={`rounded-lg px-3 py-1 text-[11px] font-bold capitalize transition-all ${
+                  eventFilter === f
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                }`}
+              >
+                {f === "all" ? "All Activity" : f === "warnings" ? "Security Alerts" : "Submissions"}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+
+        {eventHistory.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-xs text-gray-400 dark:border-gray-800">
+            Waiting for real-time events (student joins, tab switches, submissions)...
+          </div>
+        ) : (
+          <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+            {eventHistory
+              .filter((evt) => {
+                const type = (evt.type || evt.event || "").toUpperCase();
+                if (eventFilter === "warnings") {
+                  return type.includes("TAB") || type.includes("FLAG") || type.includes("ALERT");
+                }
+                if (eventFilter === "submissions") {
+                  return type.includes("SUBMIT");
+                }
+                return true;
+              })
+              .map((evt) => {
+                const type = (evt.type || evt.event || "EVENT").toUpperCase();
+                const isTabSwitch = type.includes("TAB_SWITCH") || type.includes("FLAG");
+                const isSubmit = type.includes("SUBMIT");
+                const isJoin = type.includes("JOIN") || type.includes("CONNECT");
+                const isLeave = type.includes("LEFT") || type.includes("DISCONNECT");
+
+                let badgeColor = "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-300";
+                let icon = <Activity className="h-3.5 w-3.5 text-gray-500" />;
+                let label = type;
+
+                if (isTabSwitch) {
+                  badgeColor = "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800";
+                  icon = <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />;
+                  label = `Tab Switch Warning (${evt.switch_count || evt.tab_switch_count || 1})`;
+                } else if (isSubmit) {
+                  badgeColor = "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800";
+                  icon = <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />;
+                  label = type.includes("FORCE") ? "Auto-Submitted" : "Assessment Submitted";
+                } else if (isJoin) {
+                  badgeColor = "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800";
+                  icon = <Wifi className="h-3.5 w-3.5 text-blue-600" />;
+                  label = "Student Joined";
+                } else if (isLeave) {
+                  badgeColor = "bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400";
+                  icon = <WifiOff className="h-3.5 w-3.5 text-gray-400" />;
+                  label = "Student Disconnected";
+                }
+
+                return (
+                  <div
+                    key={evt._id || Math.random()}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3 text-xs dark:border-gray-800 dark:bg-gray-800/40 hover:border-gray-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeColor}`}>
+                        {icon}
+                        {label}
+                      </span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {evt.student_email || evt.email || "Candidate"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                      {evt.viva_score !== undefined && (
+                        <span className="font-bold text-indigo-500">Viva Score: {evt.viva_score}%</span>
+                      )}
+                      {evt.answers_count !== undefined && (
+                        <span>Answered: {evt.answers_count} Qs</span>
+                      )}
+                      <span>{evt._receivedAt || "Just now"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

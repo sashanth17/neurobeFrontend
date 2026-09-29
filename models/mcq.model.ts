@@ -256,6 +256,17 @@ const mcq = {
         return promise;
     },
 
+    get_student_test_review: (test_id: string, student_email: string) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `assessment/tests/${test_id}/student-review`;
+            commonInstance()
+                .get(url, { params: { student_email } })
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+        return promise;
+    },
+
     verify_test_code: (data: { code: string; student_email?: string }) => {
         let promise = new Promise((resolve, reject) => {
             let url = `assessment/tests/verify-code`;

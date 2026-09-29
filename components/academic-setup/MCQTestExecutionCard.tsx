@@ -109,6 +109,42 @@ const MCQTestExecutionCard: React.FC<MCQTestExecutionCardProps> = ({
     return false;
   }, [test.status, test.testWindowStart, test.testWindowEnd]);
 
+  // Formatted duration & test window calculation
+  const formattedDuration = useMemo(() => {
+    if (!test.duration) return "-";
+    const dStr = String(test.duration).trim();
+    if (dStr.toLowerCase().includes("min") || dStr.toLowerCase().includes("hr")) return dStr;
+    const num = parseInt(dStr, 10);
+    if (!isNaN(num)) {
+      if (num >= 60) {
+        const hrs = Math.floor(num / 60);
+        const mins = num % 60;
+        return mins > 0 ? `${hrs} hr ${mins} mins` : `${hrs} hr${hrs > 1 ? "s" : ""}`;
+      }
+      return `${num} Mins`;
+    }
+    return dStr;
+  }, [test.duration]);
+
+  const formattedTestWindow = useMemo(() => {
+    if (test.testWindowStart && test.testWindowEnd) {
+      try {
+        const ws = new Date(test.testWindowStart);
+        const we = new Date(test.testWindowEnd);
+        if (!isNaN(ws.getTime()) && !isNaN(we.getTime())) {
+          const dateStr = ws.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+          const startStr = ws.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+          const endStr = we.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+          return `${dateStr} (${startStr} – ${endStr})`;
+        }
+      } catch { }
+    }
+    if (test.testWindow && !test.testWindow.includes("Invalid Date")) {
+      return test.testWindow;
+    }
+    return test.isPendingWindow ? "Pending (Setup Required)" : "Not Scheduled";
+  }, [test.testWindowStart, test.testWindowEnd, test.testWindow, test.isPendingWindow]);
+
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopied(true);
@@ -206,7 +242,7 @@ const MCQTestExecutionCard: React.FC<MCQTestExecutionCardProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-pri font-medium">Test Duration:</span>
             <span className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-0.5 text-xs font-bold text-[#000] shadow-2xs dark:border-gray-600 dark:bg-gray-800 dark:text-white">
-              {test.duration}
+              {formattedDuration}
               {test.isReadOnlyDuration && (
                 <span className="rounded bg-gray-200 px-1 py-0.2 text-[10px] font-extrabold uppercase text-[#000] dark:bg-gray-700 dark:text-gray-300">
                   READ-ONLY
@@ -218,13 +254,12 @@ const MCQTestExecutionCard: React.FC<MCQTestExecutionCardProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-pri font-medium">Test Window:</span>
             <span
-              className={`font-semibold ${
-                test.isPendingWindow
+              className={`font-semibold ${test.isPendingWindow
                   ? "text-amber-600 dark:text-amber-400"
                   : "text-[#000] dark:text-white"
-              }`}
+                }`}
             >
-              {test.testWindow}
+              {formattedTestWindow}
             </span>
           </div>
         </div>
@@ -297,11 +332,10 @@ const MCQTestExecutionCard: React.FC<MCQTestExecutionCardProps> = ({
 
           {test.submissionCount && (
             <div
-              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold ${
-                isCompleted(test.status)
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold ${isCompleted(test.status)
                   ? "bg-purple-50 text-[#5C28CA] border border-purple-200 dark:bg-purple-950/40 dark:border-purple-800 dark:text-purple-300"
                   : "bg-[#ECFDF5] text-[#059669] border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
-              }`}
+                }`}
             >
               <Users className="h-4 w-4" />
               <span className="font-bold text-md">Submission Count: {test.submissionCount}</span>

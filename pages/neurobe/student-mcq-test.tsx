@@ -32,8 +32,6 @@ import {
   Download,
   RefreshCw,
   Target,
-  Video,
-  VideoOff,
   Flag,
   FileText,
   Check,
@@ -41,6 +39,7 @@ import {
   Printer,
   Volume2,
   VolumeX,
+  BookOpen,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { Success, Failure, getAuthUser } from "@/utils/function.utils";
@@ -125,7 +124,7 @@ interface ParsedVivaReport {
   topic_analysis?: TopicAnalysisItem[];
 }
 
-type TestPhase = "enter_code" | "instructions" | "mcq_active" | "viva_active" | "completed";
+type TestPhase = "enter_code" | "waiting_for_window" | "instructions" | "mcq_active" | "viva_active" | "completed";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
@@ -144,6 +143,8 @@ export default function StudentMCQTestPage() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submittingAssessment, setSubmittingAssessment] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [preWindowMsg, setPreWindowMsg] = useState("");
+  const [preWindowSeconds, setPreWindowSeconds] = useState<number>(0);
 
   // Resolves the true student email synchronously from query, auth, or localStorage
   const getEffectiveEmail = useCallback(() => {
@@ -184,6 +185,8 @@ export default function StudentMCQTestPage() {
   const [vivaStats, setVivaStats] = useState({ asked: 0, correct: 0 });
   const [vivaReport, setVivaReport] = useState<any>(null);
   const [vivaInterviewStarted, setVivaInterviewStarted] = useState(false);
+  const [vivaContextPreparing, setVivaContextPreparing] = useState(false); // context job still running on ai-worker
+  const [vivaContextError, setVivaContextError] = useState<string | null>(null); // hard/unrecoverable context error
   const [currentQuestionText, setCurrentQuestionText] = useState("");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -193,16 +196,53 @@ export default function StudentMCQTestPage() {
   const [isRecordingSpeech, setIsRecordingSpeech] = useState(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
 
+  // Student Review & Post-Test Answer Key State
+  const [studentReviewData, setStudentReviewData] = useState<any>(null);
+  const [loadingStudentReview, setLoadingStudentReview] = useState(false);
+
+  const fetchStudentReview = useCallback(async () => {
+    if (!testDetails?.test_id) return;
+    const email = getEffectiveEmail();
+    if (!email) return;
+
+    setLoadingStudentReview(true);
+    try {
+      const data: any = await Models.mcq.get_student_test_review(testDetails.test_id, email);
+      setStudentReviewData(data);
+    } catch (err) {
+      console.error("Failed to load student review:", err);
+    } finally {
+      setLoadingStudentReview(false);
+    }
+  }, [testDetails?.test_id, getEffectiveEmail]);
+
+  useEffect(() => {
+    if (phase === "completed" && testDetails?.test_id) {
+      fetchStudentReview();
+    }
+  }, [phase, testDetails?.test_id, fetchStudentReview]);
+
+  const correctCount = useMemo(() => {
+    if (studentReviewData?.score_summary?.correct_count !== undefined) {
+      return studentReviewData.score_summary.correct_count;
+    }
+    let count = 0;
+    questions.forEach((q: any) => {
+      const userAns = answers[q.question_id];
+      const correctOpt = q.correct_answer || q.metadata?.correct_answer || q.metadata?.correct_option || q.metadata?.answer;
+      if (userAns && correctOpt && String(userAns).trim().toLowerCase() === String(correctOpt).trim().toLowerCase()) {
+        count++;
+      }
+    });
+    return count;
+  }, [questions, answers, studentReviewData]);
+
   // Timers State (Aligned with InterviewScreen.jsx)
   const [globalSecondsLeft, setGlobalSecondsLeft] = useState<number>(15 * 60); // 15 mins default
   const [questionSecondsLeft, setQuestionSecondsLeft] = useState<number>(45); // 45s per question
   const [autoSubmitSignal, setAutoSubmitSignal] = useState(0);
 
-  // Camera PiP & Media
-  const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const vivaVideoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+
 
   // Sockets & Refs
   const mcqWsRef = useRef<WebSocket | null>(null);
@@ -211,6 +251,9 @@ export default function StudentMCQTestPage() {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const stopCalledRef = useRef<boolean>(false);
+  // Tracks how many times we auto-retried START_INTERVIEW while context was preparing
+  const vivaContextRetryCountRef = useRef<number>(0);
+  const vivaContextRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Setup & Fullscreen styling
@@ -260,53 +303,7 @@ export default function StudentMCQTestPage() {
     }
   }, [vivaMessages]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Camera & Device Stream Management
-  // ─────────────────────────────────────────────────────────────────────────
-  const initWebcam = useCallback(async () => {
-    try {
-      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 320 }, height: { ideal: 240 } },
-          audio: false,
-        });
-        mediaStreamRef.current = stream;
-        setCameraActive(true);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        if (vivaVideoRef.current) {
-          vivaVideoRef.current.srcObject = stream;
-        }
-      }
-    } catch (err) {
-      console.warn("Webcam access not granted or unavailable:", err);
-      setCameraActive(false);
-    }
-  }, []);
 
-  useEffect(() => {
-    if (phase === "mcq_active" || phase === "viva_active") {
-      if (!mediaStreamRef.current) {
-        initWebcam();
-      } else {
-        if (videoRef.current && !videoRef.current.srcObject) {
-          videoRef.current.srcObject = mediaStreamRef.current;
-        }
-        if (vivaVideoRef.current && !vivaVideoRef.current.srcObject) {
-          vivaVideoRef.current.srcObject = mediaStreamRef.current;
-        }
-      }
-    }
-
-    return () => {
-      if (phase === "completed" && mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-        mediaStreamRef.current = null;
-        setCameraActive(false);
-      }
-    };
-  }, [phase, initWebcam]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Fullscreen & Strict Tab Switching Enforcement
@@ -395,6 +392,25 @@ export default function StudentMCQTestPage() {
       document.removeEventListener("contextmenu", preventContextMenu);
     };
   }, [phase, reportTabSwitch]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Pre-Test Window Countdown Timer
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase === "waiting_for_window" && preWindowSeconds > 0) {
+      const timer = setInterval(() => {
+        setPreWindowSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleVerifyCode();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [phase, preWindowSeconds]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // MCQ Timer
@@ -598,7 +614,16 @@ export default function StudentMCQTestPage() {
         Success(`Test verified: ${res.title}`);
       }
     } catch (err: any) {
-      Failure(err || "Invalid or expired passcode. Please verify with your instructor.");
+      const errStr = typeof err === "string" ? err : err?.message || err?.detail || JSON.stringify(err);
+      if (errStr.includes("Assessment window has not started yet") || errStr.includes("Seconds remaining:")) {
+        const matchSec = errStr.match(/Seconds remaining:\s*(\d+)/i);
+        const secsLeft = matchSec ? parseInt(matchSec[1], 10) : 300;
+        setPreWindowSeconds(secsLeft);
+        setPreWindowMsg(errStr);
+        setPhase("waiting_for_window");
+      } else {
+        Failure(err || "Invalid or expired passcode. Please verify with your instructor.");
+      }
     } finally {
       setVerifying(false);
     }
@@ -730,16 +755,26 @@ export default function StudentMCQTestPage() {
         break;
 
       case "START_VIVA":
-        if (testDetails?.have_viva) {
-          Success(data.message || "MCQ submitted! Transitioning to live AI Viva Voce session.");
-          transitionToViva();
-        } else {
-          console.log("[student-mcq-test] Received START_VIVA but have_viva is false for this test; ignoring.");
-        }
+        Success(data.message || "MCQ submitted! Transitioning to live AI Viva Voce session.");
+        transitionToViva();
+        break;
+
+      case "VIVA_READY":
+      case "VIVA_QUESTION":
+      case "VIVA_COMPLETE":
+      case "VIVA_ERROR":
+      case "VIVA_RECONNECTED":
+      case "VIVA_INELIGIBLE":
+        handleVivaMessage(data);
         break;
 
       case "TEST_COMPLETED":
-        console.log("[student-mcq-test] Assessment completed successfully on websocket.");
+        if (data.viva_eligible === false) {
+          Failure(data.message || "MCQ completed. Viva qualification threshold not met.");
+          appendVivaMsg("system", `⚠️ ${data.message || "Viva round locked — threshold not met."}`);
+        } else {
+          console.log("[student-mcq-test] Assessment completed successfully on websocket.");
+        }
         break;
 
       default:
@@ -801,13 +836,14 @@ export default function StudentMCQTestPage() {
   };
 
   // 4b. Test Submission Handler (Closes lifecycle and saves responses)
-  const submitCompletedTest = async (finalVivaReport?: any) => {
+  // Returns full submission response from backend for score summary & viva eligibility
+  const submitCompletedTest = async (finalVivaReport?: any): Promise<any> => {
     const testIdToUse =
       testDetails?.test_id ||
       (testDetails as any)?.id ||
       (testDetails as any)?.raw_id ||
       (router.query.test_id as string);
-    if (!testIdToUse) return;
+    if (!testIdToUse) return null;
 
     let emailToUse = (studentEmail || getEffectiveEmail() || "").trim().toLowerCase();
     if (!emailToUse) {
@@ -817,7 +853,7 @@ export default function StudentMCQTestPage() {
     }
 
     try {
-      await (Models.mcq as any).submit_test(testIdToUse, {
+      const resp: any = await (Models.mcq as any).submit_test(testIdToUse, {
         student_email: emailToUse,
         answers,
         tab_switch_count: tabSwitchCount,
@@ -827,9 +863,19 @@ export default function StudentMCQTestPage() {
         viva_score: vivaStats.correct ? Math.round((vivaStats.correct / Math.max(vivaStats.asked || 1, 1)) * 100) : undefined,
       });
       Success("Assessment successfully submitted and recorded!");
+      // Return the full submission payload containing score_summary, have_viva, viva_eligible, etc.
+      return resp || null;
     } catch (err) {
       console.warn("Test submission sync note:", err);
+      return null;
     }
+  };
+
+  const getActiveVivaSocket = () => {
+    if (mcqWsRef.current && mcqWsRef.current.readyState === WebSocket.OPEN) {
+      return mcqWsRef.current;
+    }
+    return vivaWsRef.current;
   };
 
   const confirmAndSubmitTest = async () => {
@@ -844,26 +890,41 @@ export default function StudentMCQTestPage() {
         } catch {}
       }
 
-      if (testDetails?.have_viva) {
+      // 2. Submit test responses to backend to capture score summary & viva eligibility
+      const submitRes = await submitCompletedTest();
+      const scoreSummary = submitRes?.score_summary || (submitRes?.total_questions ? submitRes : null);
+      const haveViva = Boolean(testDetails?.have_viva ?? submitRes?.have_viva);
+      const threshold = Number(testDetails?.viva_threshold ?? submitRes?.viva_threshold ?? 50);
+      const vivaEligible = submitRes?.viva_eligible;
+      
+      const scorePct = Number(
+        scoreSummary?.score_pct ??
+        (questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0)
+      );
+
+      const qualifiesForViva = Boolean(
+        haveViva && (vivaEligible !== undefined ? vivaEligible : scorePct >= threshold)
+      );
+
+      if (scoreSummary) {
+        setStudentReviewData((prev: any) => ({
+          ...(prev || {}),
+          score_summary: scoreSummary,
+          viva_eligible: vivaEligible !== undefined ? vivaEligible : qualifiesForViva,
+        }));
+      }
+
+      if (qualifiesForViva) {
         setShowSubmitModal(false);
         setSubmittingAssessment(false);
         transitionToViva();
         return;
       }
 
-      // 2. Submit test responses to backend datalayer
-      await submitCompletedTest();
+      // If viva is disabled OR student did not pass the viva threshold:
       setSubmissionSuccess(true);
 
-      // 3. Gracefully stop camera media tracks and exit fullscreen
-      if (mediaStreamRef.current) {
-        try {
-          mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-          mediaStreamRef.current = null;
-        } catch {}
-        setCameraActive(false);
-      }
-
+      // Gracefully exit fullscreen
       if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
         try {
           await document.exitFullscreen();
@@ -876,34 +937,11 @@ export default function StudentMCQTestPage() {
         } catch {}
       }
 
-      const timeTakenSec = Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining);
-      const mins = Math.floor(timeTakenSec / 60);
-      const secs = timeTakenSec % 60;
-      const timeFormatted = `${mins}m ${secs}s`;
-      const answeredCount = Object.keys(answers).length;
-      const totalCount = questions.length;
-
-      // 4. Smooth, graceful navigation back to student dashboard with safe fallback
-      setTimeout(() => {
-        router.replace({
-          pathname: "/neurobe/student-dashboard",
-          query: {
-            submitted: "true",
-            title: testDetails?.title || "Assessment",
-            answered: String(answeredCount),
-            total: String(totalCount),
-            time: timeFormatted,
-            switches: String(tabSwitchCount),
-          },
-        }).catch(() => {
-          window.location.href = `/neurobe/student-dashboard?submitted=true&title=${encodeURIComponent(testDetails?.title || "Assessment")}&answered=${answeredCount}&total=${totalCount}&time=${encodeURIComponent(timeFormatted)}&switches=${tabSwitchCount}`;
-        });
-      }, 1500);
+      setPhase("completed");
     } catch (err: any) {
       console.error("Submission error:", err);
-      setTimeout(() => {
-        router.replace("/neurobe/student-dashboard?submitted=true");
-      }, 1500);
+      setSubmissionSuccess(true);
+      setPhase("completed");
     } finally {
       setSubmittingAssessment(false);
     }
@@ -922,8 +960,20 @@ export default function StudentMCQTestPage() {
   // 5. Viva Voce WebSocket Lifecycle
   // ─────────────────────────────────────────────────────────────────────────
   const transitionToViva = () => {
+    setShowSubmitModal(false);
+    setSubmittingAssessment(false);
+    setSubmissionSuccess(false);
     setPhase("viva_active");
-    connectVivaWebSocket();
+    setVivaConnected(true);
+    appendVivaMsg(
+      "system",
+      "MCQ examination completed and qualification threshold met! AI Viva Voce is ready. Click 'Begin Interview' to start."
+    );
+
+    // If unified socket is not open, establish fallback viva connection
+    if (!mcqWsRef.current || mcqWsRef.current.readyState !== WebSocket.OPEN) {
+      connectVivaWebSocket();
+    }
   };
 
   const connectVivaWebSocket = () => {
@@ -999,11 +1049,19 @@ export default function StudentMCQTestPage() {
         appendVivaMsg("system", `${data.message || "Viva session ready."} Click "Begin Interview" to start.`);
         break;
 
-      case "VIVA_QUESTION": {
+      case "VIVA_QUESTION":
+      case "VIVA_RECONNECTED": {
         setIsTransitioning(false);
         setIsSubmitting(false);
         vivaQuestionStartTimeRef.current = Date.now();
         setVivaInterviewStarted(true);
+        setVivaContextPreparing(false);   // ← context is ready, clear loading state
+        setVivaContextError(null);         // ← clear any previous error
+        vivaContextRetryCountRef.current = 0; // ← reset retry counter for future sessions
+        if (vivaContextRetryTimerRef.current) {
+          clearTimeout(vivaContextRetryTimerRef.current);
+          vivaContextRetryTimerRef.current = null;
+        }
         setQuestionSecondsLeft(45); // Reset per question
 
         if (data.topic) setVivaTopic(data.topic);
@@ -1040,10 +1098,81 @@ export default function StudentMCQTestPage() {
         setPhase("completed");
         break;
 
+      case "VIVA_INELIGIBLE":
+        setIsTransitioning(false);
+        setIsSubmitting(false);
+        Failure(data.message || "MCQ score did not meet passing threshold for viva interview.");
+        appendVivaMsg("system", `⚠️ ${data.message || "Viva round locked — threshold not met."}`);
+        setPhase("completed");
+        break;
+
+      case "VIVA_CONTEXT_PREPARING": {
+        // Context job is still running on ai-worker — show loading state and auto-retry
+        setIsTransitioning(false);
+        setIsSubmitting(false);
+        setVivaInterviewStarted(false); // Allow "Begin Interview" button to show again
+        setVivaContextPreparing(true);
+        setVivaContextError(null);
+
+        const MAX_RETRIES = 8; // max auto-retry attempts (~40s total)
+        const retryDelay = data.retry_after_ms || 5000;
+        const currentRetry = vivaContextRetryCountRef.current;
+
+        if (currentRetry < MAX_RETRIES) {
+          vivaContextRetryCountRef.current = currentRetry + 1;
+          appendVivaMsg(
+            "system",
+            `⏳ AI context preparation in progress (attempt ${currentRetry + 1}/${MAX_RETRIES})... Retrying in ${retryDelay / 1000}s.`
+          );
+          // Clear existing retry timer if any
+          if (vivaContextRetryTimerRef.current) {
+            clearTimeout(vivaContextRetryTimerRef.current);
+          }
+          vivaContextRetryTimerRef.current = setTimeout(() => {
+            const ws = getActiveVivaSocket();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ action: "START_INTERVIEW" }));
+            } else {
+              setVivaContextPreparing(false);
+              setVivaContextError("Connection lost while waiting for context. Please click 'Begin Interview' to try again.");
+            }
+          }, retryDelay);
+        } else {
+          // Exhausted retries
+          vivaContextRetryCountRef.current = 0;
+          setVivaContextPreparing(false);
+          setVivaContextError(
+            "Context preparation is taking longer than expected. Please wait a few minutes and click 'Begin Interview' to try again, or contact your instructor."
+          );
+          appendVivaMsg("system", "⚠️ Context preparation timed out after multiple retries. Please try again manually.");
+        }
+        break;
+      }
+
+      case "VIVA_CONTEXT_ERROR": {
+        // Hard unrecoverable error — context building itself failed
+        setIsTransitioning(false);
+        setIsSubmitting(false);
+        setVivaInterviewStarted(false);
+        setVivaContextPreparing(false);
+        vivaContextRetryCountRef.current = 0;
+        if (vivaContextRetryTimerRef.current) {
+          clearTimeout(vivaContextRetryTimerRef.current);
+          vivaContextRetryTimerRef.current = null;
+        }
+        const errMsg = data.message || "A critical error occurred while building your interview context.";
+        setVivaContextError(errMsg);
+        appendVivaMsg("system", `❌ ${errMsg}`);
+        Failure(errMsg);
+        break;
+      }
+
       case "VIVA_ERROR":
         setIsTransitioning(false);
         setIsSubmitting(false);
+        setVivaInterviewStarted(false); // ← KEY FIX: reset so Begin Interview shows again
         Failure(data.message || "An error occurred during viva session.");
+        appendVivaMsg("system", `⚠️ ${data.message || "An error occurred. Please try again."}`);
         break;
 
       default:
@@ -1052,21 +1181,28 @@ export default function StudentMCQTestPage() {
   };
 
   const handleStartVivaInterview = () => {
-    if (!vivaWsRef.current || vivaWsRef.current.readyState !== WebSocket.OPEN) {
-      Failure("Viva socket is still connecting. Please wait a moment.");
+    const ws = getActiveVivaSocket();
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      Failure("Viva connection not ready. Reconnecting...");
+      connectVivaWebSocket();
       return;
     }
 
-    setVivaInterviewStarted(true);
+    // Clear any previous context errors before attempting
+    setVivaContextError(null);
+    setVivaContextPreparing(false);
     setIsTransitioning(true);
-    vivaWsRef.current.send(JSON.stringify({ action: "START_INTERVIEW" }));
+    ws.send(JSON.stringify({ action: "START_INTERVIEW" }));
+    // NOTE: We do NOT set vivaInterviewStarted=true here.
+    // It is set only when we receive VIVA_QUESTION (interview actually launched).
   };
 
   const handleSendVivaAnswer = (customAnswer?: string) => {
     const answer = (customAnswer !== undefined ? customAnswer : vivaInput).trim();
     if (!answer) return;
 
-    if (!vivaWsRef.current || vivaWsRef.current.readyState !== WebSocket.OPEN) {
+    const ws = getActiveVivaSocket();
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
       Failure("Viva session disconnected. Reconnecting...");
       connectVivaWebSocket();
       return;
@@ -1093,7 +1229,7 @@ export default function StudentMCQTestPage() {
 
     appendVivaMsg("user", answer, undefined, timeTaken);
 
-    vivaWsRef.current.send(
+    ws.send(
       JSON.stringify({
         action: "SUBMIT_ANSWER",
         payload: {
@@ -1107,8 +1243,9 @@ export default function StudentMCQTestPage() {
   };
 
   const handleStopVivaInterview = () => {
-    if (vivaWsRef.current && vivaWsRef.current.readyState === WebSocket.OPEN) {
-      vivaWsRef.current.send(JSON.stringify({ action: "STOP_INTERVIEW" }));
+    const ws = getActiveVivaSocket();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action: "STOP_INTERVIEW" }));
     }
     setVivaInterviewStarted(false);
   };
@@ -1285,6 +1422,70 @@ export default function StudentMCQTestPage() {
               className="text-xs text-slate-400 hover:text-indigo-400 transition-colors"
             >
               ← Return to Student Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER: PHASE 1B — Pre-Test Window Countdown Screen
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (phase === "waiting_for_window") {
+    const hours = Math.floor(preWindowSeconds / 3600);
+    const mins = Math.floor((preWindowSeconds % 3600) / 60);
+    const secs = preWindowSeconds % 60;
+    const timeFormatted = `${hours > 0 ? `${hours}h ` : ""}${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-4 text-slate-100">
+        <Head>
+          <title>Assessment Scheduled — Neurobe</title>
+        </Head>
+
+        <div className="w-full max-w-md space-y-6 rounded-3xl border border-amber-500/30 bg-[#111625] p-8 shadow-2xl text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10">
+            <Clock className="h-8 w-8 animate-pulse" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold text-white">Assessment Opening Soon</h1>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {preWindowMsg || "The scheduled window for this assessment has not started yet. Please wait until the start time."}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Test Window Starts In</span>
+            <p className="text-4xl font-black font-mono text-amber-400 tracking-wider">
+              {timeFormatted}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              disabled={verifying || preWindowSeconds > 0}
+              onClick={() => handleVerifyCode()}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-indigo-600/20"
+            >
+              {preWindowSeconds > 0 ? (
+                <span>Auto-opening when timer reaches zero...</span>
+              ) : (
+                <span>Window Open — Click to Start Test</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPhase("enter_code");
+                setPreWindowSeconds(0);
+              }}
+              className="text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              ← Back to Code Entry
             </button>
           </div>
         </div>
@@ -1621,34 +1822,7 @@ export default function StudentMCQTestPage() {
 
           {/* Right: Docked Side Bar (Question Palette & Live Proctor Cam) — ZERO WHITE SPACE */}
           <aside className="w-full lg:w-80 xl:w-96 flex flex-col bg-[#0B0F19] border-t lg:border-t-0 lg:border-l border-slate-800/80 p-5 overflow-y-auto custom-scrollbar gap-5 shrink-0">
-            {/* Live Camera Feed Tile */}
-            <div className="rounded-2xl border border-slate-800 bg-[#111625] p-3.5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Video className="h-3.5 w-3.5 text-emerald-400" />
-                  Live Proctor Cam
-                </span>
-                <span className="text-[10px] rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-emerald-400 font-semibold">
-                  Active
-                </span>
-              </div>
-              <div className="relative aspect-video w-full rounded-xl bg-black overflow-hidden border border-slate-850 flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="h-full w-full object-cover mirror"
-                  style={{ transform: "scaleX(-1)" }}
-                />
-                {!cameraActive && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 p-3 text-center">
-                    <VideoOff className="h-6 w-6 text-slate-600 mb-1" />
-                    <span className="text-[10px] text-slate-400">Proctor camera stream standby</span>
-                  </div>
-                )}
-              </div>
-            </div>
+
 
             {/* Question Navigation Palette */}
             <div className="rounded-2xl border border-slate-800 bg-[#111625] p-4 flex flex-col justify-between flex-1">
@@ -1780,40 +1954,89 @@ export default function StudentMCQTestPage() {
                 <div>
                   <h3 className="text-xl font-bold text-white">Assessment Submitted Successfully!</h3>
                   <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                    All your responses and proctoring telemetry have been verified and recorded. Redirecting you to your student dashboard...
+                    All your responses have been recorded and evaluated. Below is your performance summary:
                   </p>
                 </div>
-                <div className="flex items-center justify-center gap-2 text-xs text-emerald-400 font-mono">
-                  <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span>Returning to dashboard...</span>
+
+                {/* Score & Correct Answer Stats Box */}
+                <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#0B0F19] p-4 border border-slate-800 text-left text-xs">
+                  <div>
+                    <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Correct Answers</span>
+                    <span className="font-mono text-base font-bold text-emerald-400">
+                      {correctCount} <span className="text-slate-600 font-normal">/ {questions.length}</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Questions Answered</span>
+                    <span className="font-mono text-base font-bold text-slate-200">
+                      {Object.keys(answers).length} <span className="text-slate-600 font-normal">/ {questions.length}</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Time Elapsed</span>
+                    <span className="font-mono text-sm font-bold text-slate-200">
+                      {Math.floor(Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining) / 60)}m {Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining) % 60}s
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Score Percentage</span>
+                    <span className="font-mono text-sm font-bold text-indigo-400">
+                      {questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0}%
+                    </span>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const timeTakenSec = Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining);
-                    const mins = Math.floor(timeTakenSec / 60);
-                    const secs = timeTakenSec % 60;
-                    const timeFormatted = `${mins}m ${secs}s`;
-                    const answeredCount = Object.keys(answers).length;
-                    const totalCount = questions.length;
-                    router.replace({
-                      pathname: "/neurobe/student-dashboard",
-                      query: {
-                        submitted: "true",
-                        title: testDetails?.title || "Assessment",
-                        answered: String(answeredCount),
-                        total: String(totalCount),
-                        time: timeFormatted,
-                        switches: String(tabSwitchCount),
-                      },
-                    }).catch(() => {
-                      window.location.href = `/neurobe/student-dashboard?submitted=true&title=${encodeURIComponent(testDetails?.title || "Assessment")}&answered=${answeredCount}&total=${totalCount}&time=${encodeURIComponent(timeFormatted)}&switches=${tabSwitchCount}`;
-                    });
-                  }}
-                  className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
-                >
-                  Return to Dashboard Now →
-                </button>
+
+                {testDetails?.have_viva && studentReviewData?.viva_eligible === false && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 text-left flex items-start gap-2.5">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Viva Round Locked</span>
+                      <p className="mt-0.5 text-amber-200/90 text-[11px] leading-relaxed">
+                        MCQ score ({questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0}%) did not meet the passing threshold ({testDetails.viva_threshold ?? 50}%) for viva interview.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/neurobe/student-report?test_id=${testDetails?.test_id}&student_email=${encodeURIComponent(studentEmail)}`)}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span>View Detailed Student Report →</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const timeTakenSec = Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining);
+                      const mins = Math.floor(timeTakenSec / 60);
+                      const secs = timeTakenSec % 60;
+                      const timeFormatted = `${mins}m ${secs}s`;
+                      const answeredCount = Object.keys(answers).length;
+                      const totalCount = questions.length;
+                      router.replace({
+                        pathname: "/neurobe/student-dashboard",
+                        query: {
+                          submitted: "true",
+                          title: testDetails?.title || "Assessment",
+                          answered: String(answeredCount),
+                          correct: String(correctCount),
+                          total: String(totalCount),
+                          time: timeFormatted,
+                          switches: String(tabSwitchCount),
+                        },
+                      }).catch(() => {
+                        window.location.href = `/neurobe/student-dashboard?submitted=true&title=${encodeURIComponent(testDetails?.title || "Assessment")}&answered=${answeredCount}&correct=${correctCount}&total=${totalCount}&time=${encodeURIComponent(timeFormatted)}&switches=${tabSwitchCount}`;
+                      });
+                    }}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition-all cursor-pointer"
+                  >
+                    Return to Dashboard
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="w-full max-w-lg rounded-3xl border border-indigo-500/30 bg-[#111625] p-6 sm:p-8 shadow-2xl text-left space-y-6">
@@ -1976,28 +2199,78 @@ export default function StudentMCQTestPage() {
 
         {/* Main Content Area */}
         <div className="flex-1 w-full max-w-5xl mx-auto flex flex-col relative px-4 sm:px-6">
-          {/* Welcome Card if Interview Not Yet Started */}
+          {/* Welcome Card / Context Status Area — shown before interview starts */}
           {!vivaInterviewStarted && (
-            <div className="mb-6 rounded-3xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 to-indigo-950/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-purple-400" />
-                  <h3 className="text-base font-bold text-white">AI Viva Voce Examiner Online</h3>
+            <div className="mb-6">
+              {/* ── CASE 1: Hard unrecoverable context error ───────────────── */}
+              {vivaContextError && !vivaContextPreparing ? (
+                <div className="rounded-3xl border border-rose-500/40 bg-gradient-to-r from-rose-950/50 to-red-950/40 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xl">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 border border-rose-500/40">
+                    <span className="text-2xl">⚠️</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-rose-300">Context Preparation Error</h3>
+                    <p className="mt-1 text-xs text-rose-400/80 leading-relaxed">{vivaContextError}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!vivaConnected}
+                    onClick={() => {
+                      setVivaContextError(null);
+                      vivaContextRetryCountRef.current = 0;
+                      handleStartVivaInterview();
+                    }}
+                    className="flex items-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-rose-500 disabled:opacity-40 transition-all cursor-pointer shrink-0"
+                  >
+                    <span>Retry</span>
+                  </button>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  Ensure your audio and microphone are connected. Click below to begin your personalized viva
-                  examination.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={!vivaConnected}
-                onClick={handleStartVivaInterview}
-                className="flex items-center gap-2 rounded-2xl bg-purple-600 px-6 py-3 text-xs font-bold text-white shadow-lg shadow-purple-600/30 hover:bg-purple-500 disabled:opacity-40 transition-all cursor-pointer shrink-0"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Begin Interview</span>
-              </button>
+              ) : vivaContextPreparing ? (
+                /* ── CASE 2: Context job is running on ai-worker — show spinner ── */
+                <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/60 to-purple-950/50 p-6 flex flex-col sm:flex-row items-center gap-5 shadow-xl">
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+                    <div className="absolute inset-0 rounded-full border-4 border-t-indigo-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+                    <span className="text-lg">🧠</span>
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <h3 className="text-sm font-bold text-indigo-300 animate-pulse">Preparing Your Interview Context…</h3>
+                    <p className="mt-1 text-xs text-slate-400 leading-relaxed">
+                      The AI is analysing your MCQ performance and building a personalised viva context.
+                      This usually takes under a minute. Retrying automatically…
+                    </p>
+                    <div className="mt-2 w-full max-w-xs bg-slate-800 rounded-full h-1 overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse" style={{ width: `${Math.min(100, (vivaContextRetryCountRef.current / 8) * 100)}%` }} />
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-500 font-mono">
+                      Attempt {vivaContextRetryCountRef.current} of 8 — do not refresh
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* ── CASE 3: Ready — show normal Begin Interview card ─────── */
+                <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 to-indigo-950/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-400" />
+                      <h3 className="text-base font-bold text-white">AI Viva Voce Examiner Online</h3>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Ensure your audio and microphone are connected. Click below to begin your personalized viva
+                      examination.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!vivaConnected}
+                    onClick={handleStartVivaInterview}
+                    className="flex items-center gap-2 rounded-2xl bg-purple-600 px-6 py-3 text-xs font-bold text-white shadow-lg shadow-purple-600/30 hover:bg-purple-500 disabled:opacity-40 transition-all cursor-pointer shrink-0"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Begin Interview</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -2072,6 +2345,18 @@ export default function StudentMCQTestPage() {
                     {currentQuestionText ||
                       "Welcome to your AI Viva Voce evaluation. Click 'Begin Interview' to initiate questions."}
                   </h2>
+                  {!vivaInterviewStarted && (
+                    <div className="mt-5">
+                      <button
+                        type="button"
+                        onClick={handleStartVivaInterview}
+                        className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <Play className="w-4 h-4 fill-white" />
+                        <span>Begin Oral Interview Now</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2080,11 +2365,34 @@ export default function StudentMCQTestPage() {
           {/* ── CallControls (Aligned with CallControls.jsx) ──────────────────────── */}
           <div className="flex items-center justify-between w-full max-w-xl px-6 py-3.5 bg-[#111625] backdrop-blur-md rounded-2xl border border-slate-800 mx-auto mt-5 shadow-xl">
             <div className="flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-              <span className="font-mono text-xs font-bold tracking-wider text-slate-300">LIVE VIVA</span>
+              <div className={`w-2.5 h-2.5 rounded-full ${vivaInterviewStarted ? "bg-red-500 animate-pulse" : "bg-indigo-400"}`} />
+              <span className="font-mono text-xs font-bold tracking-wider text-slate-300">
+                {vivaInterviewStarted ? "LIVE VIVA" : "VIVA READY"}
+              </span>
             </div>
 
             <div className="flex items-center gap-3">
+              {!vivaInterviewStarted ? (
+                <button
+                  type="button"
+                  onClick={handleStartVivaInterview}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>Begin Interview</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStopVivaInterview}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-xs font-bold transition-all cursor-pointer"
+                  title="Conclude Viva Session and generate final report"
+                >
+                  <XCircle className="w-4 h-4" />
+                  <span>Conclude Viva</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setIsMicOn(!isMicOn)}
@@ -2112,17 +2420,7 @@ export default function StudentMCQTestPage() {
               </button>
             </div>
 
-            {/* Webcam PiP in corner */}
-            <div className="relative h-10 w-14 rounded-xl bg-black overflow-hidden border border-slate-800">
-              <video
-                ref={vivaVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-cover mirror"
-                style={{ transform: "scaleX(-1)" }}
-              />
-            </div>
+
           </div>
 
           {/* ── ResponsePanel (Aligned with ResponsePanel.jsx) ───────────────────── */}
@@ -2310,9 +2608,110 @@ export default function StudentMCQTestPage() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER: PHASE 5 — Comprehensive Assessment & Viva Evaluation Report
-  // (Full Architecture & Layout Aligned with sashanth17/McqEvaluvator ReportScreen.jsx)
+  // RENDER: PHASE 5 — Assessment Completion / Evaluation Report
+  // If Viva was not conducted (MCQ-only test, or student did not pass viva threshold):
+  // Render MCQ Results Alone as requested!
   // ─────────────────────────────────────────────────────────────────────────────
+  if (!vivaReport) {
+    const scorePctCalc =
+      studentReviewData?.score_summary?.score_pct ??
+      (questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0);
+    const isPass = scorePctCalc >= 40;
+
+    return (
+      <div className="min-h-screen w-full bg-[#0B0F19] text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 pb-20 justify-center">
+        <Head>
+          <title>Assessment Complete — {testDetails?.title || "Evaluation"}</title>
+        </Head>
+
+        <div className="w-full max-w-3xl mx-auto space-y-8 my-auto py-8">
+          <div className="rounded-3xl border border-slate-800 bg-[#111625] p-8 shadow-2xl text-center space-y-6">
+            <div className="flex h-20 w-20 mx-auto items-center justify-center rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="h-10 w-10" />
+            </div>
+
+            <div>
+              <span className="font-mono text-emerald-400 text-xs tracking-widest uppercase font-semibold">
+                Examination Concluded
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+                {testDetails?.title || "MCQ Assessment"}
+              </h1>
+              <p className="text-xs text-slate-400 mt-2">
+                Candidate: <strong className="text-slate-200">{studentEmail}</strong> • Code:{" "}
+                <span className="font-mono text-indigo-400">{testDetails?.secure_code || passcode || "N/A"}</span>
+              </p>
+            </div>
+
+            {testDetails?.have_viva && studentReviewData?.viva_eligible === false && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 text-left flex items-start gap-3 max-w-lg mx-auto">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <p className="font-bold">Viva Voce Requirement Notice</p>
+                  <p className="mt-0.5 text-amber-200/90 leading-relaxed">
+                    This test included an oral viva requiring a minimum score of {testDetails.viva_threshold ?? 50}%.
+                    Your score ({scorePctCalc}%) did not meet this threshold, so the oral interview was not activated.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Score Stats Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto text-left">
+              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+                <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Score</span>
+                <span className="font-mono text-2xl font-bold text-indigo-400">{scorePctCalc}%</span>
+              </div>
+              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+                <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Correct</span>
+                <span className="font-mono text-2xl font-bold text-emerald-400">
+                  {studentReviewData?.score_summary?.correct ?? correctCount}
+                </span>
+              </div>
+              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+                <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Answered</span>
+                <span className="font-mono text-2xl font-bold text-slate-200">
+                  {Object.keys(answers).length} / {questions.length}
+                </span>
+              </div>
+              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+                <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Result</span>
+                <span className={`font-mono text-sm font-bold block mt-1 ${isPass ? "text-emerald-400" : "text-amber-400"}`}>
+                  {isPass ? "PASSED" : "NEEDS REVIEW"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 max-w-md mx-auto">
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/neurobe/student-report?test_id=${testDetails?.test_id}&student_email=${encodeURIComponent(
+                      studentEmail
+                    )}`
+                  )
+                }
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 py-3.5 px-6 text-xs font-bold text-white shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>View Full Student Report</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/neurobe/student-dashboard")}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-3.5 px-6 text-xs font-bold text-slate-300 transition-all cursor-pointer"
+              >
+                <span>Dashboard</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If vivaReport exists, render the Comprehensive Assessment & Viva Evaluation Report
   const { session_metrics, assessment_summary, topic_analysis, reasoning_profile, key_strengths, priority_improvement_areas, final_summary } = normalizedReport;
 
   const getUnderstandingBadge = (level?: string) => {
@@ -2645,6 +3044,124 @@ export default function StudentMCQTestPage() {
                 </div>
               </div>
             )}
+
+            {/* Post-Test Detailed Answer Key & Review (Timing Gated) */}
+            <div className="space-y-4 mt-6">
+              <h3 className="font-serif text-xl text-white font-bold border-b border-slate-800 pb-2 flex items-center justify-between">
+                <span>Detailed Question Review & Answer Key</span>
+                <HelpCircle className="h-5 w-5 text-indigo-400" />
+              </h3>
+
+              {loadingStudentReview ? (
+                <div className="rounded-3xl border border-slate-800 bg-[#111625] p-8 text-center space-y-3">
+                  <div className="mx-auto h-7 w-7 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent" />
+                  <p className="text-xs text-slate-400">Loading answer evaluation...</p>
+                </div>
+              ) : studentReviewData?.can_view_detailed_answers === false ? (
+                <div className="rounded-3xl border border-amber-800/40 bg-amber-950/20 p-6 shadow-xl text-center space-y-3">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
+                    <Lock className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-amber-300">Question Answer Key Locked</h4>
+                  <p className="text-xs text-amber-200/80 max-w-lg mx-auto leading-relaxed">
+                    {studentReviewData.message || "Detailed question-by-question review with correct options will unlock automatically after the test window ends for all candidates."}
+                  </p>
+                </div>
+              ) : studentReviewData?.questions && studentReviewData.questions.length > 0 ? (
+                <div className="space-y-4">
+                  {studentReviewData.questions.map((q: any) => {
+                    return (
+                      <div
+                        key={q.question_id}
+                        className={`rounded-3xl border p-5 space-y-3 transition-colors ${
+                          q.is_correct
+                            ? "bg-[#111625] border-emerald-500/30"
+                            : q.selected_option
+                            ? "bg-[#111625] border-red-500/30"
+                            : "bg-[#111625] border-slate-800"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <h4 className="text-sm font-bold text-white leading-snug">
+                            <span className="text-indigo-400 mr-2">Q{q.question_index}.</span>
+                            {q.question_string}
+                          </h4>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                              q.is_correct
+                                ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/40"
+                                : q.selected_option
+                                ? "bg-red-950/60 text-red-400 border border-red-500/40"
+                                : "bg-slate-800 text-slate-400 border border-slate-700"
+                            }`}
+                          >
+                            {q.is_correct ? (
+                              <>
+                                <CheckCircle className="h-3 w-3" /> Correct
+                              </>
+                            ) : q.selected_option ? (
+                              <>
+                                <XCircle className="h-3 w-3" /> Incorrect
+                              </>
+                            ) : (
+                              "Unanswered"
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Options List */}
+                        <div className="space-y-2 pt-1">
+                          {q.options.map((optText: string, oIdx: number) => {
+                            const isSelected = String(q.selected_option).trim().toLowerCase() === String(optText).trim().toLowerCase();
+                            const isCorrectOpt = String(q.correct_option).trim().toLowerCase() === String(optText).trim().toLowerCase();
+
+                            let optStyle = "border-slate-800 bg-slate-900/40 text-slate-300";
+                            if (isCorrectOpt) {
+                              optStyle = "border-emerald-500/50 bg-emerald-950/30 text-emerald-200 font-semibold";
+                            } else if (isSelected && !isCorrectOpt) {
+                              optStyle = "border-red-500/50 bg-red-950/30 text-red-200";
+                            }
+
+                            return (
+                              <div
+                                key={oIdx}
+                                className={`flex items-center justify-between rounded-xl border p-3 text-xs ${optStyle}`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span className="font-mono text-slate-500">{String.fromCharCode(65 + oIdx)}.</span>
+                                  <span>{optText}</span>
+                                </span>
+                                {isCorrectOpt && (
+                                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+                                    Correct Answer
+                                  </span>
+                                )}
+                                {isSelected && !isCorrectOpt && (
+                                  <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300 border border-red-500/30">
+                                    Your Choice
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {q.explanation && (
+                          <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-xs text-indigo-300">
+                            <span className="font-bold text-indigo-400 mr-1">Explanation:</span>
+                            {q.explanation}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-800 bg-[#111625] p-6 text-center text-xs text-slate-400">
+                  Question evaluation summary will appear here once finalized.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
