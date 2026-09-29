@@ -321,16 +321,8 @@ const LessonPlan = () => {
 
       const { status, job_id, active_version, total_versions } = lpStep;
       if (status === "redis_queued" || status === "generating") {
-        const jobIdStr = job_id ? String(job_id) : null;
-        if (jobIdStr && completedJobsRef.current.has(jobIdStr)) {
-          // This job is already completed; do not poll again
-          setState({ generateLoading: false, recommendationsGenerated: true });
-        } else if (job_id && pollingJobIdRef.current !== job_id) {
-          setState({ generateLoading: true });
-          job_Data(job_id);
-        } else if (!job_id) {
-          setState({ generateLoading: true });
-        }
+        setState({ generateLoading: true });
+        startPolling(cid, job_id);
       } else if (status === "approved") {
         setState({ lessonApproved: true, recommendationsGenerated: true, generateLoading: false });
       } else if (status === "draft") {
@@ -704,95 +696,66 @@ const LessonPlan = () => {
     },
   ];
 
-  const job_Data = async (id: string | number) => {
+  const startPolling = (cid: string | number, jobId?: string) => {
     stopPolling();
-    if (!id) return;
-
-    const idStr = String(id);
-    if (completedJobsRef.current.has(idStr)) {
-      setState({ generateLoading: false, recommendationsGenerated: true });
-      return;
-    }
-    pollingJobIdRef.current = id;
     setState({ generateLoading: true });
 
-    let retries = 0;
-    const maxRetries = 15;
-    const pollInterval = 5000; // 5 seconds interval for fast status updates
-    const startTime = Date.now();
-    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes timeout
+    let attempts = 0;
+    const maxAttempts = 100; // 100 attempts at 3s = 5 minutes timeout
+    const pollInterval = 3000; // 3 seconds interval for responsive status updates
 
-    const fetchOnce = async () => {
+    const checkScheduleStatus = async () => {
+      attempts++;
       try {
-        if (Date.now() - startTime > MAX_DURATION_MS) {
-          stopPolling();
-          setState({ generateLoading: false });
-          Failure("Lesson plan generation timed out after 15 minutes. Please try again.");
-          return;
+        const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+        const lpStep = wfRes?.workflow?.step_5_lesson_plan_schedules;
+        const currentStatus = lpStep?.status;
+        const currentJobId = lpStep?.job_id;
+
+        // If we enqueued a specific new job, don't exit early on stale status from an older job
+        if (jobId && currentJobId && currentJobId !== jobId && (currentStatus === "draft" || currentStatus === "approved")) {
+          if (attempts < 5) return;
         }
 
-        const res: any = await Models.job.detail(id);
-        console.log("job_Data response:", res);
-
-        const status = (
-          res?.status ||
-          res?.state?.live_redis_status ||
-          res?.result?.status ||
-          ""
-        ).toLowerCase();
-
-        if (
-          status === "complete" ||
-          status === "completed" ||
-          status === "finished" ||
-          status === "success"
-        ) {
+        if (currentStatus === "draft" || currentStatus === "approved") {
           stopPolling();
-          completedJobsRef.current.add(idStr);
-          pollingJobIdRef.current = null;
           setState({
             generateLoading: false,
-            generatedResponse: res,
+            lessonApproved: currentStatus === "approved",
             recommendationsGenerated: true,
             versionRefreshKey: Date.now(),
           });
-          const sId = getSyllabusId();
-          if (sId) {
-            await lession_data(sId, 1);
+          const sid = getSyllabusId();
+          if (sid) {
+            const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+            await lession_data(sid, activeUnitNum);
           }
-          Success("Lesson plan generated successfully!");
-        } else if (status === "failed" || status === "error") {
+          Success("Lesson plan generated successfully with NEURO AI!");
+        } else if (currentStatus === "failed") {
           stopPolling();
-          pollingJobIdRef.current = null;
-          setState({ generateLoading: false });
-          Failure(res?.message || res?.error || "Lesson plan generation job failed.");
-        } else {
-          console.log(`Job status: ${status}, continuing to poll...`);
+          setState({ generateLoading: false, versionRefreshKey: Date.now() });
+          Failure("Lesson plan generation failed. Please try again.");
+        } else if (attempts >= maxAttempts) {
+          stopPolling();
+          setState({ generateLoading: false, versionRefreshKey: Date.now() });
+          const sid = getSyllabusId();
+          if (sid) {
+            const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+            await lession_data(sid, activeUnitNum);
+          }
         }
-      } catch (error: any) {
-        console.log("job_Data error:", error);
-        const errorMsg = error?.message || error?.detail || String(error);
-        const isJobNotFound = errorMsg.includes("not found");
-
-        if (isJobNotFound && retries < maxRetries) {
-          console.log(`Job not found, retrying... (${retries + 1}/${maxRetries})`);
-          retries++;
-        } else {
+      } catch (pollErr) {
+        console.warn("Lesson plan polling error:", pollErr);
+        if (attempts >= maxAttempts) {
           stopPolling();
-          pollingJobIdRef.current = null;
-          setState({ generateLoading: false });
-          if (!isJobNotFound) {
-            Failure(errorMsg || "Error checking job status.");
-          }
+          setState({ generateLoading: false, versionRefreshKey: Date.now() });
         }
       }
     };
 
-    await fetchOnce();
-    // Only continue polling if job has not already finished
-    if (pollingJobIdRef.current === id) {
-      pollRef.current = setInterval(fetchOnce, pollInterval);
-    }
+    // First check after 1.5s so backend has registered the enqueued job
+    setTimeout(checkScheduleStatus, 1500);
+    pollRef.current = setInterval(checkScheduleStatus, pollInterval);
   };
 
   const generateLessionPlan = async (parentParams?: {
@@ -815,30 +778,8 @@ const LessonPlan = () => {
       });
       console.log("generate_timeline response:", res);
 
-      const jobId = res?.job_id || res?.jobId || res?.id || res?.result?.job_id;
-
-      if (jobId) {
-        // Poll job detail endpoint until complete or failed
-        job_Data(jobId);
-      } else {
-        const status = (res?.status || res?.result?.status || "").toLowerCase();
-        if (status === "complete" || status === "completed" || status === "success") {
-          setState({
-            generateLoading: false,
-            generatedResponse: res,
-            recommendationsGenerated: true,
-            versionRefreshKey: Date.now(),
-          });
-          const sid = getSyllabusId();
-          if (sid) {
-            await lession_data(sid, 1);
-          }
-          Success("Lesson plan generated successfully!");
-        } else {
-          setState({ generateLoading: false });
-          Failure("Failed to initiate lesson plan generation job.");
-        }
-      }
+      Success("Lesson plan generation started with NEURO AI!");
+      startPolling(course_id || syllabusId, res?.job_id);
     } catch (error: any) {
       console.log("Generate error:", error);
       setState({ generateLoading: false });
