@@ -6,6 +6,7 @@ import { Success, Failure } from "@/utils/function.utils";
 export interface UseCiaTestFormProps {
   courseId: number | string;
   courseCode: string;
+  editTestId?: number | null;
   onSuccess: () => void;
   onClose: () => void;
 }
@@ -13,6 +14,7 @@ export interface UseCiaTestFormProps {
 export const useCiaTestForm = ({
   courseId,
   courseCode,
+  editTestId,
   onSuccess,
   onClose,
 }: UseCiaTestFormProps) => {
@@ -44,9 +46,9 @@ export const useCiaTestForm = ({
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Auto-update test_code when courseCode changes
+  // Auto-update test_code when courseCode changes (only for create mode)
   useEffect(() => {
-    if (courseCode) {
+    if (courseCode && !editTestId) {
       setFormData((prev) => ({
         ...prev,
         test_code: prev.test_code.includes("-CIA")
@@ -54,7 +56,7 @@ export const useCiaTestForm = ({
           : `${courseCode}-CIA1-2026`,
       }));
     }
-  }, [courseCode]);
+  }, [courseCode, editTestId]);
 
   // Load available course instances (sections) and templates for this course
   useEffect(() => {
@@ -72,19 +74,15 @@ export const useCiaTestForm = ({
           else if (instRes.data && Array.isArray(instRes.data)) list = instRes.data;
         }
 
-        // If list is empty, create fallback candidates based on course
-        if (list.length === 0) {
-          list = [
-            { id: 101, instance_name: `${courseCode || "Course"} - Sec A`, section: "A", enrolled_students_count: 58 },
-            { id: 102, instance_name: `${courseCode || "Course"} - Sec B`, section: "B", enrolled_students_count: 62 },
-          ];
-        }
+
 
         setAvailableInstances(list);
 
-        // Auto-select all available sections by default
-        const allIds = list.map((i) => i.id);
-        setFormData((prev) => ({ ...prev, course_instance_ids: allIds }));
+        // Auto-select all available sections by default, if not in edit mode
+        if (!editTestId) {
+          const allIds = list.map((i) => i.id);
+          setFormData((prev) => ({ ...prev, course_instance_ids: allIds }));
+        }
 
         // 1. Fetch course-level question paper templates first
         const courseTemplatesRes: any = await Models.cia_test.listCourseTemplates(courseId).catch(() => []);
@@ -108,7 +106,7 @@ export const useCiaTestForm = ({
           setTemplates(parsedTpls);
 
           // Auto-select first template and set initial max_marks dynamically
-          if (parsedTpls[0]) {
+          if (parsedTpls[0] && !editTestId) {
             setFormData((prev) => ({
               ...prev,
               question_paper_template_id: parsedTpls[0].id,
@@ -116,17 +114,14 @@ export const useCiaTestForm = ({
             }));
           }
         } else {
-          const defaultTpls = [
-            { id: 1, name: `CIA-1 Standard Blueprint - ${courseCode || "CS"}`, total_maximum_marks: 50 },
-            { id: 2, name: `Anna University 100M Pattern - ${courseCode || "CS"}`, total_maximum_marks: 100 },
-            { id: 3, name: `Model Exam Comprehensive Pattern - ${courseCode || "CS"}`, total_maximum_marks: 100 },
-          ];
-          setTemplates(defaultTpls);
-          setFormData((prev) => ({
-            ...prev,
-            question_paper_template_id: defaultTpls[0].id,
-            max_marks: defaultTpls[0].total_maximum_marks,
-          }));
+          setTemplates([]);
+          if (!editTestId) {
+            setFormData((prev) => ({
+              ...prev,
+              question_paper_template_id: null,
+              max_marks: 50,
+            }));
+          }
         }
 
         // Fetch question papers from course service
@@ -139,10 +134,7 @@ export const useCiaTestForm = ({
             }))
           );
         } else {
-          setQuestionPapers([
-            { id: 101, name: `${courseCode || "Course"} CIA-1 Official Question Paper` },
-            { id: 102, name: `${courseCode || "Course"} Mid-Term Assessment Paper v2` },
-          ]);
+          setQuestionPapers([]);
         }
       } catch (err) {
         console.error("Error fetching instances or templates:", err);
@@ -151,8 +143,36 @@ export const useCiaTestForm = ({
       }
     };
 
-    fetchInstancesAndTemplates();
-  }, [courseId, courseCode]);
+    const fetchDetails = async () => {
+      if (!editTestId) return;
+      try {
+        const res: any = await Models.cia_test.details(editTestId);
+        setFormData((prev) => ({
+          ...prev,
+          test_name: res.test_name || "",
+          test_code: res.test_code || "",
+          test_type: res.test_type || "CIA",
+          branch: res.branch || "CSE",
+          academic_year: res.academic_year || "2026-2027",
+          year: res.year || 3,
+          semester: res.semester || 5,
+          test_date: res.test_date || "",
+          start_time: res.start_time || "",
+          end_time: res.end_time || "",
+          duration_minutes: res.duration_minutes || 90,
+          max_marks: res.max_marks || 50,
+          question_paper_template_id: res.question_paper_template_id || null,
+          question_paper_id: res.question_paper_id || null,
+          question_paper_file_url: res.question_paper_file_url || null,
+          course_instance_ids: res.assigned_instances?.map((i: any) => i.course_instance_id || i.id) || [],
+        }));
+      } catch (err) {
+        console.error("Failed to load CIA test details for edit", err);
+      }
+    };
+
+    fetchInstancesAndTemplates().then(fetchDetails);
+  }, [courseId, courseCode, editTestId]);
 
   const updateField = (field: keyof CreateCIATestPayload, value: any) => {
     if (field === "question_paper_template_id") {
@@ -240,17 +260,21 @@ export const useCiaTestForm = ({
           ? Number(formData.question_paper_id)
           : null,
       };
-
-      await Models.cia_test.create(courseId, payload);
-      Success(`CIA test "${formData.test_name}" created successfully!`);
+      if (editTestId) {
+        await Models.cia_test.update(editTestId, payload);
+        Success(`CIA test "${formData.test_name}" updated successfully!`);
+      } else {
+        await Models.cia_test.create(courseId, payload);
+        Success(`CIA test "${formData.test_name}" created successfully!`);
+      }
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error("Failed to create CIA test:", err);
+      console.error(editTestId ? "Failed to update CIA test:" : "Failed to create CIA test:", err);
       const errorMsg =
         err?.detail ||
         err?.message ||
-        "Failed to create CIA test. Check if test code is already in use.";
+        (editTestId ? "Failed to update CIA test." : "Failed to create CIA test. Check if test code is already in use.");
       Failure(errorMsg);
     } finally {
       setSubmitting(false);

@@ -62,7 +62,7 @@ export const CiaTestsHeader: React.FC<CiaTestsHeaderProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
+        {/* <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
             <Clock className="h-4 w-4" />
           </div>
@@ -70,9 +70,9 @@ export const CiaTestsHeader: React.FC<CiaTestsHeaderProps> = ({
             <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Evaluation Phase</p>
             <p className="text-sm font-bold text-gray-900 dark:text-white">Active</p>
           </div>
-        </div>
+        </div> */}
 
-        <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
+        {/* <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
             <Award className="h-4 w-4" />
           </div>
@@ -80,7 +80,7 @@ export const CiaTestsHeader: React.FC<CiaTestsHeaderProps> = ({
             <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Multi-Section</p>
             <p className="text-sm font-bold text-gray-900 dark:text-white">Enabled</p>
           </div>
-        </div>
+        </div> */}
 
         <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">

@@ -11,6 +11,7 @@ interface CiaTestListProps {
   onArchive: (id: number) => void;
   onUnarchive: (id: number) => void;
   onDelete: (id: number) => void;
+  onEdit?: (id: number) => void;
   onCreateClick: () => void;
 }
 
@@ -22,6 +23,7 @@ export const CiaTestList: React.FC<CiaTestListProps> = ({
   onArchive,
   onUnarchive,
   onDelete,
+  onEdit,
   onCreateClick,
 }) => {
   if (loading) {
@@ -91,6 +93,7 @@ export const CiaTestList: React.FC<CiaTestListProps> = ({
           onArchive={onArchive}
           onUnarchive={onUnarchive}
           onDelete={onDelete}
+          onEdit={onEdit}
         />
       ))}
     </div>

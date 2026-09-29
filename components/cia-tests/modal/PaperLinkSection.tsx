@@ -48,7 +48,7 @@ export const PaperLinkSection: React.FC<PaperLinkSectionProps> = ({
         </div>
 
         {/* Question Paper Selector */}
-        <div>
+        {/* <div>
           <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
             Structured Question Paper
@@ -70,10 +70,10 @@ export const PaperLinkSection: React.FC<PaperLinkSectionProps> = ({
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
 
         {/* Physical File / MinIO Storage URL */}
-        <div className="sm:col-span-2">
+        {/* <div className="sm:col-span-2">
           <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
             <LinkIcon className="h-3.5 w-3.5 text-gray-400" />
             Physical Question Paper PDF Storage URL (MinIO/S3)
@@ -85,7 +85,7 @@ export const PaperLinkSection: React.FC<PaperLinkSectionProps> = ({
             placeholder="e.g. s3://neurobe-bucket/cia/cs301_cia1_qp.pdf"
             className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-mono text-gray-800 transition-colors focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
-        </div>
+        </div> */}
       </div>
     </div>
   );

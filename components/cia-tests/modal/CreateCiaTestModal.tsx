@@ -11,6 +11,7 @@ interface CreateCiaTestModalProps {
   courseId: number | string;
   courseCode: string;
   courseTitle: string;
+  editTestId?: number | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -20,6 +21,7 @@ export const CreateCiaTestModal: React.FC<CreateCiaTestModalProps> = ({
   courseId,
   courseCode,
   courseTitle,
+  editTestId,
   onClose,
   onSuccess,
 }) => {
@@ -38,6 +40,7 @@ export const CreateCiaTestModal: React.FC<CreateCiaTestModalProps> = ({
   } = useCiaTestForm({
     courseId,
     courseCode,
+    editTestId,
     onSuccess,
     onClose,
   });
@@ -62,7 +65,7 @@ export const CreateCiaTestModal: React.FC<CreateCiaTestModalProps> = ({
                 {courseCode || "CS301"}
               </span>
               <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-                Create CIA Assessment
+                {editTestId ? "Edit CIA Assessment" : "Create CIA Assessment"}
               </h3>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -139,12 +142,12 @@ export const CreateCiaTestModal: React.FC<CreateCiaTestModalProps> = ({
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Creating Test...</span>
+                  <span>{editTestId ? "Updating Test..." : "Creating Test..."}</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  <span>Create Assessment</span>
+                  <span>{editTestId ? "Update Assessment" : "Create Assessment"}</span>
                 </>
               )}
             </button>
