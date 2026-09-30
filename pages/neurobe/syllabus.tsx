@@ -291,13 +291,13 @@ const Syllabus = () => {
         if (targetSid) {
           setState({ lastLoadedSyllabusId: targetSid });
           try { sessionStorage.setItem(syllabusKey, String(targetSid)); } catch { }
-          await syllabus_detail(targetSid);
           uploded_file(targetSid);
-        } else if (dataToNormalize && (dataToNormalize.outcomes || dataToNormalize.units || dataToNormalize.courseOutcomes)) {
+        }
+        if (dataToNormalize && (dataToNormalize.outcomes || dataToNormalize.units || dataToNormalize.courseOutcomes)) {
           const normData = normalizeSyllabusData(dataToNormalize);
           setState({ jobData: normData, syllabusData: normData });
-          const fallbackSid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-          if (fallbackSid) uploded_file(fallbackSid);
+        } else if (targetSid) {
+          await syllabus_detail(targetSid);
         } else {
           const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
           if (sid) {
@@ -681,42 +681,9 @@ const Syllabus = () => {
 
       const normalizedDetail = normalizeSyllabusData(res);
 
-      setState((prev: any) => {
-        const existingData = prev.jobData;
-        const hasDbContent =
-          (normalizedDetail?.outcomes && normalizedDetail.outcomes.length > 0) ||
-          (normalizedDetail?.units && normalizedDetail.units.length > 0) ||
-          (normalizedDetail?.laboratory_experiments && normalizedDetail.laboratory_experiments.length > 0);
-
-        if (hasDbContent || !existingData) {
-          const mergedUnits = (normalizedDetail?.units || []).map((u: any) => {
-            if (!u.topics || u.topics.length === 0) {
-              const matched = existingData?.units?.find(
-                (eu: any) => (eu.unit_number === u.unit_number || eu.unitNumber === u.unitNumber || eu.id === u.id)
-              );
-              if (matched?.topics && matched.topics.length > 0) {
-                return { ...u, topics: matched.topics };
-              }
-            }
-            return u;
-          });
-          return { jobData: { ...normalizedDetail, units: mergedUnits } };
-        } else {
-          // Keep existing extracted jobData but merge DB metadata like id, etc.
-          return {
-            jobData: {
-              ...existingData,
-              ...res,
-              outcomes: existingData.outcomes?.length > 0 ? existingData.outcomes : normalizedDetail.outcomes,
-              units: existingData.units?.length > 0 ? existingData.units : normalizedDetail.units,
-              textbooks: existingData.textbooks?.length > 0 ? existingData.textbooks : normalizedDetail.textbooks,
-              reference_books: existingData.reference_books?.length > 0 ? existingData.reference_books : normalizedDetail.reference_books,
-              laboratory_experiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
-              laboratoryExperiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
-              experiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
-            },
-          };
-        }
+      setState({
+        jobData: normalizedDetail,
+        syllabusData: normalizedDetail,
       });
     } catch (error) {
       console.log("syllabus_detail error", error);
@@ -1005,15 +972,16 @@ const Syllabus = () => {
       }
 
       // 2. Approve the workflow stage so downstream steps (CO-PO mapping, topics) unlock
+      const verToApprove = state.loadedVersionNumber || undefined;
       if (course_id) {
         try {
-          await (Models.syllabus as any).approve_stage(course_id, "extraction");
+          await (Models.syllabus as any).approve_stage(course_id, "extraction", verToApprove);
         } catch (stgErr) {
           console.warn("approve_stage warning:", stgErr);
         }
       } else if (sid) {
         try {
-          await (Models.syllabus as any).approve_stage(sid, "extraction");
+          await (Models.syllabus as any).approve_stage(sid, "extraction", verToApprove);
         } catch (stgErr) {
           console.warn("approve_stage warning:", stgErr);
         }

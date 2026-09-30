@@ -883,6 +883,8 @@ const Pedagogy = () => {
 
   const handleVersionActivated = async (newVer: number) => {
     setLoadedVersion(newVer);
+    setAcceptedIds(new Set());
+    setState({ unitDetailsMap: {} });
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
       state.unitsList?.[0]?.syllabus_id ||
