@@ -225,6 +225,18 @@ const cia_test = {
     });
   },
 
+  // 12b. Fetch question paper details by ID
+  // GET /course/cia-papers/{paperId}
+  getQuestionPaperDetail: (paperId: number | string) => {
+    return new Promise((resolve, reject) => {
+      if (!paperId) return resolve(null);
+      commonInstance()
+        .get(`course/cia-papers/${paperId}`)
+        .then((res) => resolve(res.data))
+        .catch((error) => reject(error?.response?.data || error));
+    });
+  },
+
   // 13. Section-Partitioned Student Marksheets
   // GET /api/v1/cia-tests/{ciaTestId}/instances/{instanceId}/students
   getInstanceStudents: (testId: number | string, instanceId: number | string) => {

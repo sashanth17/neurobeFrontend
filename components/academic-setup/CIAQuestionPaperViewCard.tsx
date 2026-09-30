@@ -150,17 +150,17 @@ const DEFAULT_PART_B: PartBQuestionPair[] = [
 const CIAQuestionPaperViewCard: React.FC<CIAQuestionPaperViewCardProps> = ({
   department = "DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING",
   assessmentTitle = "CONTINUOUS INTERNAL ASSESSMENT – I",
-  courseCodeTitle = "CS309 – Computer Networks",
-  programme = "B.Tech Computer Science and Engineering",
-  semester = "Semester 3",
-  academicYear = "2026–2027 (Batch A)",
+  courseCodeTitle = "Course Assessment",
+  programme = "B.Tech",
+  semester = "Semester 1",
+  academicYear = "Current Academic Year",
   maxMarks = "50",
   duration = "90 Minutes",
-  date = "28 Aug 2026",
-  noteText = "Note: Answer ALL questions in Part A and Part B according to the instructions provided. Draw neat diagrams wherever necessary.",
-  partAQuestions = DEFAULT_PART_A,
-  partBQuestions = DEFAULT_PART_B,
-  approvalFooterText = "Approved on 25 Aug 2026 by Course Coordinator (Dr. Arun Kumar) - CONTINUOUS INTERNAL ASSESSMENT - I",
+  date = "Current",
+  noteText = "Note: Answer ALL questions according to the instructions provided. Draw neat diagrams wherever necessary.",
+  partAQuestions = [],
+  partBQuestions = [],
+  approvalFooterText = "Approved Question Paper",
 }) => {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -246,80 +246,83 @@ const CIAQuestionPaperViewCard: React.FC<CIAQuestionPaperViewCardProps> = ({
       </div>
 
       {/* 4. PART A Section */}
-      <div className="mt-8 space-y-4">
-        {/* Part A Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
-          <h4 className="text-base font-bold text-[#000] dark:text-white">
-            PART A
-          </h4>
-          <span className="text-sm font-bold text-[#000] dark:text-white">
-            Answer ALL Questions (5 x 2 = 10 Marks)
-          </span>
-        </div>
+      {partAQuestions.length > 0 && (
+        <div className="mt-8 space-y-4">
+          {/* Part A Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
+            <h4 className="text-base font-bold text-[#000] dark:text-white">
+              PART A
+            </h4>
+            <span className="text-sm font-bold text-[#000] dark:text-white">
+              Answer ALL Questions ({partAQuestions.length} Questions)
+            </span>
+          </div>
 
-        {/* Part A List */}
-        <div className="space-y-4 pt-1">
-          {partAQuestions.map((q) => (
-            <div
-              key={q.id}
-              className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-sm text-[#000] dark:text-gray-200 print-avoid-break"
-            >
-              <div className="flex items-start gap-3 flex-1">
-                <span className="w-6 shrink-0 font-bold text-[#000] dark:text-white">
-                  {q.qNo}
-                </span>
-                <p className="leading-relaxed font-medium">{q.question}</p>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-4 self-end sm:self-start">
-                <span className="inline-flex items-center rounded-md border border-gray-200 bg-[#F1F5F9] px-2.5 py-1 text-xs font-semibold text-[#000] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                  {q.coTag}
-                </span>
-                <span className="w-16 text-right font-bold text-[#000] dark:text-white">
-                  {q.marks}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 5. PART B Section */}
-      <div className="mt-10 space-y-6">
-        {/* Part B Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
-          <h4 className="text-base font-bold text-[#000] dark:text-white">
-            PART B
-          </h4>
-          <span className="text-sm font-bold text-[#000] dark:text-white">
-            Answer ALL Questions (Either / Or Pattern) (5 x 8 = 40 Marks)
-          </span>
-        </div>
-
-        {/* Part B List */}
-        <div className="space-y-6 pt-1">
-          {partBQuestions.map((pair) => (
-            <div key={pair.id} className="space-y-5 print-avoid-break">
-              {/* Question A */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-sm text-[#000] dark:text-gray-200">
+          {/* Part A List */}
+          <div className="space-y-4 pt-1">
+            {partAQuestions.map((q) => (
+              <div
+                key={q.id}
+                className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-sm text-[#000] dark:text-gray-200 print-avoid-break"
+              >
                 <div className="flex items-start gap-3 flex-1">
-                  <span className="w-10 shrink-0 font-bold text-[#000] dark:text-white">
-                    {pair.qNoA}
+                  <span className="w-6 shrink-0 font-bold text-[#000] dark:text-white">
+                    {q.qNo}
                   </span>
-                  <p className="leading-relaxed font-medium">
-                    {pair.questionA}
-                  </p>
+                  <p className="leading-relaxed font-medium">{q.question}</p>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-4 self-end sm:self-start">
                   <span className="inline-flex items-center rounded-md border border-gray-200 bg-[#F1F5F9] px-2.5 py-1 text-xs font-semibold text-[#000] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                    {pair.coTagA}
+                    {q.coTag}
                   </span>
                   <span className="w-16 text-right font-bold text-[#000] dark:text-white">
-                    {pair.marksA}
+                    {q.marks}
                   </span>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. PART B Section */}
+      {partBQuestions.length > 0 && (
+        <div className="mt-10 space-y-6">
+          {/* Part B Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
+            <h4 className="text-base font-bold text-[#000] dark:text-white">
+              PART B
+            </h4>
+            <span className="text-sm font-bold text-[#000] dark:text-white">
+              Answer ALL Questions ({partBQuestions.length} Questions)
+            </span>
+          </div>
+
+          {/* Part B List */}
+          <div className="space-y-6 pt-1">
+            {partBQuestions.map((pair) => (
+              <div key={pair.id} className="space-y-5 print-avoid-break">
+                {/* Question A */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-sm text-[#000] dark:text-gray-200">
+                  <div className="flex items-start gap-3 flex-1">
+                    <span className="w-10 shrink-0 font-bold text-[#000] dark:text-white">
+                      {pair.qNoA}
+                    </span>
+                    <p className="leading-relaxed font-medium">
+                      {pair.questionA}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-4 self-end sm:self-start">
+                    <span className="inline-flex items-center rounded-md border border-gray-200 bg-[#F1F5F9] px-2.5 py-1 text-xs font-semibold text-[#000] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      {pair.coTagA}
+                    </span>
+                    <span className="w-16 text-right font-bold text-[#000] dark:text-white">
+                      {pair.marksA}
+                    </span>
+                  </div>
+                </div>
 
               {/* OR Divider */}
               <div className="relative flex items-center justify-center my-4">
@@ -353,6 +356,7 @@ const CIAQuestionPaperViewCard: React.FC<CIAQuestionPaperViewCardProps> = ({
           ))}
         </div>
       </div>
+      )}
 
       {/* 6. Footer Section */}
       <div className="mt-8 border-t border-gray-200 pt-5 text-center dark:border-gray-700 space-y-1.5 print-avoid-break">

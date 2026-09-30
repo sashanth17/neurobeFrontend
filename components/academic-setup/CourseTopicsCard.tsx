@@ -10,8 +10,8 @@ export interface MainTopicData {
   code: string;
   title: string;
   description?: string;
-  hoursText: string;
-  levelText: string;
+  hoursText?: string;
+  levelText?: string;
   subtopics?: SubtopicData[];
 }
 
@@ -20,18 +20,20 @@ export interface UnitTopicData {
   unitNumber: number;
   unitCodeText: string;
   title: string;
-  hoursText: string;
+  hoursText?: string;
   topicsCountText: string;
   topics: MainTopicData[];
 }
 
 export interface CourseTopicsCardProps {
   units?: UnitTopicData[];
+  showTiming?: boolean;
   className?: string;
 }
 
 const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
   units = [],
+  showTiming = false,
   className = "",
 }) => {
   const [openUnits, setOpenUnits] = useState<Record<string, boolean>>({});
@@ -186,8 +188,12 @@ const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold shrink-0">
-                  <span className="text-pri font-medium">{unit.hoursText}</span>
-                  <span className="text-pri dark:text-[#000]">•</span>
+                  {showTiming && unit.hoursText && (
+                    <>
+                      <span className="text-pri font-medium">{unit.hoursText}</span>
+                      <span className="text-pri dark:text-[#000]">•</span>
+                    </>
+                  )}
                   <span className="text-color2">{unit.topicsCountText}</span>
                 </div>
               </button>
@@ -219,12 +225,16 @@ const CourseTopicsCard: React.FC<CourseTopicsCardProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-[#000] dark:bg-gray-800 dark:text-gray-300">
-                            {topic.hoursText}
-                          </span>
-                          <span className="rounded-full bg-[#f5f3ff] px-3 py-1 text-xs font-bold text-color2 dark:bg-purple-950/60 dark:text-purple-300">
-                            {topic.levelText}
-                          </span>
+                          {showTiming && topic.hoursText && (
+                            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-[#000] dark:bg-gray-800 dark:text-gray-300">
+                              {topic.hoursText}
+                            </span>
+                          )}
+                          {topic.levelText && (
+                            <span className="rounded-full bg-[#f5f3ff] px-3 py-1 text-xs font-bold text-color2 dark:bg-purple-950/60 dark:text-purple-300">
+                              {topic.levelText}
+                            </span>
+                          )}
                         </div>
                       </div>
 
