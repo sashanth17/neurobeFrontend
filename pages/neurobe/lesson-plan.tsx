@@ -429,7 +429,11 @@ const LessonPlan = () => {
     try {
       const vToUse = verNum !== undefined ? verNum : loadedVersion;
       const res: any = await Models.lession_plan.detail(syllabus_id, unit, vToUse);
-      const isApproved = res?.overall_approval_status === "Approved" || res?.workspace_status === "Approved";
+      const isApproved =
+        res?.version_status === "approved" ||
+        res?.overall_approval_status === "Approved" ||
+        res?.workspace_status === "Approved" ||
+        res?.status === "approved";
       
       const vListVersion = res?.version ? Number(res.version) : (res?.active_version ? Number(res.active_version) : null);
       if (verNum !== undefined && verNum !== null) {
@@ -459,9 +463,7 @@ const LessonPlan = () => {
         setState({ recommendationsGenerated: true });
       }
 
-      if (isApproved) {
-        setState({ lessonApproved: true });
-      }
+      setState({ lessonApproved: Boolean(isApproved) });
 
       const topicsCount =
         res?.metrics?.topics?.value ??

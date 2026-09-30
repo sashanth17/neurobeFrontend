@@ -225,10 +225,14 @@ const COPOMapping = () => {
       const res: any = await Models.COPOMap.copo_map(sid, vToUse);
       if (res && (res.matrix || res.data?.matrix)) {
         const matrixObj = res.matrix ? res : res.data;
-        const isApprovedStatus = matrixObj?.mapping_status === "Approved";
+        const isApprovedStatus =
+          matrixObj?.version_status === "approved" ||
+          matrixObj?.mapping_status === "Approved" ||
+          matrixObj?.overall_approval_status === "Approved" ||
+          matrixObj?.status === "approved";
         setState({
           copoMatrix: matrixObj,
-          mappingApproved: isApprovedStatus,
+          mappingApproved: Boolean(isApprovedStatus),
           loading: false,
         });
       } else {

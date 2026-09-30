@@ -517,21 +517,22 @@ const Pedagogy = () => {
 
       const topicsList = data?.selected_unit?.topics || data?.topics || [];
       const hasGeneratedPedagogies = topicsList.some((t: any) => Array.isArray(t.suggested_pedagogies) && t.suggested_pedagogies.length > 0);
-      if (hasGeneratedPedagogies) {
-        setState({ recommendationsGenerated: true });
-      }
+      const isVerApproved = (data?.version_status === "approved") || (data?.status === "approved") || (data?.pedagogy_status === "approved") || (data?.overall_approval_status === "Approved");
+      setState((prev: any) => ({
+        ...prev,
+        pedagogyApproved: Boolean(isVerApproved),
+        recommendationsGenerated: hasGeneratedPedagogies || prev.recommendationsGenerated,
+      }));
 
-      setAcceptedIds((prev) => {
-        const next = new Set(prev);
-        topicsList.forEach((t: any) => {
-          (t.suggested_pedagogies || []).forEach((p: any) => {
-            if (p.is_selected) {
-              next.add(p.id);
-            }
-          });
+      const nextAccepted = new Set<number | string>();
+      topicsList.forEach((t: any) => {
+        (t.suggested_pedagogies || []).forEach((p: any) => {
+          if (p.is_selected) {
+            nextAccepted.add(p.id);
+          }
         });
-        return next;
       });
+      setAcceptedIds(nextAccepted);
     } catch (error: any) {
       console.log("error fetching unit detail", error);
       setState({ loadingUnitDetail: false });

@@ -264,9 +264,13 @@ const Syllabus = () => {
       setState({ loadedVersionNumber: versionNumber });
       await loadFileVersions(course_id);
       await course_data(course_id as string);
-      const updatedSid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-      if (updatedSid) {
-        await syllabus_detail(updatedSid);
+      const wfRes: any = await Models.syllabus.get_workflow_status(course_id);
+      const activeSid = wfRes?.syllabus_id || state.courseData?.latest_syllabus?.id;
+      if (activeSid) {
+        setState({ lastLoadedSyllabusId: activeSid });
+        try { sessionStorage.setItem(syllabusKey, String(activeSid)); } catch { }
+        await syllabus_detail(activeSid);
+        uploded_file(activeSid);
       }
     } catch (error: any) {
       Failure(typeof error === "string" ? error : error?.message || "Failed to activate version");
@@ -283,22 +287,32 @@ const Syllabus = () => {
       try {
         const specRes: any = await Models.syllabus.get_specific_version(course_id!, "extraction", fv.version_number);
         const dataToNormalize = specRes?.data_ai_gave || specRes?.data || specRes;
-        if (dataToNormalize && (dataToNormalize.outcomes || dataToNormalize.units || dataToNormalize.courseOutcomes)) {
+        const targetSid = specRes?.syllabus_id || fv.syllabus_id;
+        if (targetSid) {
+          setState({ lastLoadedSyllabusId: targetSid });
+          try { sessionStorage.setItem(syllabusKey, String(targetSid)); } catch { }
+          await syllabus_detail(targetSid);
+          uploded_file(targetSid);
+        } else if (dataToNormalize && (dataToNormalize.outcomes || dataToNormalize.units || dataToNormalize.courseOutcomes)) {
           const normData = normalizeSyllabusData(dataToNormalize);
           setState({ jobData: normData, syllabusData: normData });
+          const fallbackSid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
+          if (fallbackSid) uploded_file(fallbackSid);
         } else {
           const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-          if (sid) await syllabus_detail(sid);
+          if (sid) {
+            setState({ lastLoadedSyllabusId: sid });
+            await syllabus_detail(sid);
+            uploded_file(sid);
+          }
         }
       } catch {
         const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-        if (sid) await syllabus_detail(sid);
-      }
-
-      // 2. Load PDF file for this version
-      const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-      if (sid) {
-        uploded_file(sid);
+        if (sid) {
+          setState({ lastLoadedSyllabusId: sid });
+          await syllabus_detail(sid);
+          uploded_file(sid);
+        }
       }
 
       setStep(3);
@@ -746,7 +760,8 @@ const Syllabus = () => {
     try {
       const res = await Models.syllabus.create_unit_topic(unitId, body);
       Success("Topics added");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
     } catch (error: any) {
       console.log("create_unit_topic error", error);
       throw error;
@@ -757,7 +772,8 @@ const Syllabus = () => {
     try {
       const res = await Models.syllabus.delete_unit_topic(id);
       Success("Topics deleted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
 
       console.log("syllabus_status →", res);
     } catch (error) {
@@ -774,7 +790,8 @@ const Syllabus = () => {
     publication_year: number;
   }) => {
     try {
-      const res = await Models.syllabus.create_unit_textbook(body.syllabus_id, {
+      const targetSid = body.syllabus_id || state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      const res = await Models.syllabus.create_unit_textbook(targetSid, {
         title: body.title,
         authors: body.authors,
         edition: body.edition,
@@ -782,7 +799,7 @@ const Syllabus = () => {
         publication_year: body.publication_year,
       });
       Success("Textbook added");
-      if (body.syllabus_id) syllabus_detail(body.syllabus_id);
+      if (targetSid) syllabus_detail(targetSid);
     } catch (error: any) {
       console.log("create_unit_textbook error", error);
       throw error;
@@ -800,8 +817,9 @@ const Syllabus = () => {
     console.log("✌️reference body --->", body);
 
     try {
+      const targetSid = body.syllabus_id || state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
       const res = await Models.syllabus.create_unit_reference_book(
-        body.syllabus_id,
+        targetSid,
         {
           title: body.title,
           authors: body.authors,
@@ -811,7 +829,7 @@ const Syllabus = () => {
         }
       );
       Success("Reference book added");
-      if (body.syllabus_id) syllabus_detail(body.syllabus_id);
+      if (targetSid) syllabus_detail(targetSid);
     } catch (error: any) {
       console.log("create_unit_reference_book error", error);
       throw error;
@@ -822,7 +840,8 @@ const Syllabus = () => {
     try {
       const res = await Models.syllabus.delete_unit_textbook(id);
       Success("Textbook deleted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
     } catch (error) {
       console.log("delete_unit_textbook error", error);
     }
@@ -832,7 +851,8 @@ const Syllabus = () => {
     try {
       const res = await Models.syllabus.delete_unit_reference_book(id);
       Success("Reference book deleted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
     } catch (error) {
       console.log("delete_unit_reference_book error", error);
     }
@@ -855,7 +875,8 @@ const Syllabus = () => {
         description: description.trim(),
       });
       Success("Outcome updated");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
     } catch (error: any) {
       console.log("edit_unit_outcome error (preserved in draft):", error);
     }
@@ -875,7 +896,8 @@ const Syllabus = () => {
     try {
       await Models.syllabus.accept_outcome(id);
       Success("Outcome accepted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
     } catch (error: any) {
       console.log("accept_outcome error (preserved in draft):", error);
     }
@@ -897,7 +919,8 @@ const Syllabus = () => {
         knowledge_level: value,
       });
       Success("Knowledge level updated");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) syllabus_detail(sid);
     } catch (error: any) {
       console.log("update_knw_level_outcome error (preserved in draft):", error);
     }
@@ -917,8 +940,9 @@ const Syllabus = () => {
     try {
       await Models.syllabus.update_unit(unitId, { theory_hours: hours });
       Success("Unit hours updated");
-      if (state.courseData?.latest_syllabus?.id) {
-        syllabus_detail(state.courseData.latest_syllabus.id);
+      const sid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (sid) {
+        syllabus_detail(sid);
       }
     } catch (error: any) {
       console.log("update_unit hours error (preserved in draft):", error);
@@ -939,8 +963,9 @@ const Syllabus = () => {
     try {
       await Models.syllabus.update_unit(unitId, { unit_title: title });
       Success("Unit title updated");
-      if (state.courseData?.latest_syllabus?.id) {
-        syllabus_detail(state.courseData.latest_syllabus.id);
+      const effectiveSid = state.lastLoadedSyllabusId || state.courseData?.latest_syllabus?.id;
+      if (effectiveSid) {
+        syllabus_detail(effectiveSid);
       }
     } catch (error: any) {
       console.log("update_unit title error (preserved in draft):", error);
@@ -948,10 +973,10 @@ const Syllabus = () => {
   };
 
   const getEffectiveSyllabusId = async (): Promise<string | number | null> => {
-    if (state.courseData?.latest_syllabus?.id) return state.courseData.latest_syllabus.id;
     if (state.lastLoadedSyllabusId) return state.lastLoadedSyllabusId;
     if (state.jobData?.syllabus_id) return state.jobData.syllabus_id;
     if (state.jobData?.id) return state.jobData.id;
+    if (state.courseData?.latest_syllabus?.id) return state.courseData.latest_syllabus.id;
     const saved = getSavedSyllabusId();
     if (saved) return saved;
     if (course_id) {
