@@ -257,24 +257,40 @@ const MCQTestExecution = () => {
           }))),
       ];
 
+      const courseCode = courseObj.course_code || courseObj.code;
+
+      // Helper function to safely parse response arrays
+      const parseResponseArray = (res: any, keys: string[] = ['items', 'sets', 'questions', 'data']) => {
+        if (!res) return [];
+        if (Array.isArray(res)) return res;
+        for (const key of keys) {
+          if (res[key] && Array.isArray(res[key])) return res[key];
+        }
+        if (res.data) {
+          if (Array.isArray(res.data)) return res.data;
+          for (const key of keys) {
+            if (res.data[key] && Array.isArray(res.data[key])) return res.data[key];
+          }
+        }
+        return [];
+      };
+
       // 2b. Fetch Question Sets from backend
-      const setsRes: any = await Models.mcq.list_sets({ course_id: courseKey }).catch(() => []);
-      let setsList: QuestionSetItem[] = [];
-      if (setsRes) {
-        if (Array.isArray(setsRes)) setsList = setsRes;
-        else if (setsRes.items && Array.isArray(setsRes.items)) setsList = setsRes.items;
-        else if (setsRes.sets && Array.isArray(setsRes.sets)) setsList = setsRes.sets;
-        else if (setsRes.data && Array.isArray(setsRes.data)) setsList = setsRes.data;
+      let setsRes: any = await Models.mcq.list_sets({ course_id: courseKey }).catch(() => []);
+      let setsList: QuestionSetItem[] = parseResponseArray(setsRes, ['items', 'sets']);
+
+      if (setsList.length === 0 && courseCode && String(courseKey) !== String(courseCode)) {
+        const fallbackSetsRes: any = await Models.mcq.list_sets({ course_id: courseCode }).catch(() => []);
+        setsList = parseResponseArray(fallbackSetsRes, ['items', 'sets']);
       }
 
       // 2c. Fetch History Questions for this course
-      const qRes: any = await Models.mcq.history_questions({ course_id: courseKey }).catch(() => []);
-      let rawQuestions: any[] = [];
-      if (qRes) {
-        if (Array.isArray(qRes)) rawQuestions = qRes;
-        else if (qRes.items && Array.isArray(qRes.items)) rawQuestions = qRes.items;
-        else if (qRes.questions && Array.isArray(qRes.questions)) rawQuestions = qRes.questions;
-        else if (qRes.data && Array.isArray(qRes.data)) rawQuestions = qRes.data;
+      let qRes: any = await Models.mcq.history_questions({ course_id: courseKey }).catch(() => []);
+      let rawQuestions: any[] = parseResponseArray(qRes, ['items', 'questions']);
+
+      if (rawQuestions.length === 0 && courseCode && String(courseKey) !== String(courseCode)) {
+        const fallbackQRes: any = await Models.mcq.history_questions({ course_id: courseCode }).catch(() => []);
+        rawQuestions = parseResponseArray(fallbackQRes, ['items', 'questions']);
       }
 
       // 2d. Fetch tests from backend API
