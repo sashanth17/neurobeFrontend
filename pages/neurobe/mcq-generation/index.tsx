@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import {
@@ -7,9 +7,25 @@ import {
   ChevronDown,
   FileCheck2,
   X,
+  Eye,
+  Activity,
+  Plus,
+  Search,
+  BookOpen,
+  Calendar,
+  Layers,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, getAuthUser, isLimitExhaustion, showLimitExhaustedModal, LIMIT_EXHAUSTED_MESSAGE, getErrorMessage } from "@/utils/function.utils";
+import {
+  useSetState,
+  Success,
+  Failure,
+  getAuthUser,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+  getErrorMessage,
+} from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import useDebounce from "@/hook/useDebounce";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
@@ -19,23 +35,27 @@ import ViewQuestionModal from "@/components/question-bank/ViewQuestionModal";
 import { CreateQuestionSetModal } from "@/components/question-bank/CreateQuestionSetModal";
 import CourseQuestionBankTab from "@/components/question-bank/CourseQuestionBankTab";
 import ConfigureTestScheduleModal from "@/components/academic-setup/ConfigureTestScheduleModal";
+import MCQTestExecutionCard, {
+  MCQTestExecutionItem,
+} from "@/components/academic-setup/MCQTestExecutionCard";
+import PreviewQuestionsModal from "@/components/academic-setup/PreviewQuestionsModal";
+import EditTestScheduleModal from "@/components/academic-setup/EditTestScheduleModal";
 
 import {
   CourseItem,
   MCQQuestion,
-  TopicRow,
-  FALLBACK_COURSES,
   UNITS_CONFIG,
-  newRow,
   normalizeMCQ,
   CourseSelectorView,
   MCQStatsBanner,
-  MCQStudioWorkspace,
-  ScopeMode,
-  DistributionMode,
-  KnowledgeLevelBreakdown,
-  PEDAGOGICAL_PRESETS,
+  QuestionReviewPool,
 } from "@/components/mcq-generation";
+import {
+  SimplifiedMCQGenerator,
+  HierarchyUnitItem,
+} from "@/components/mcq-generation/SimplifiedMCQGenerator";
+
+type MCQTabKey = "generator" | "questions" | "bank" | "tests";
 
 const MCQGenerationIndexPage = () => {
   const dispatch = useDispatch();
@@ -47,48 +67,11 @@ const MCQGenerationIndexPage = () => {
     loading: false,
     courses: [] as CourseItem[],
     selectedCourse: null as CourseItem | null,
-    activeTab: "generator" as "generator" | "bank",
-    courseUnits: [] as any[],
+    activeTab: "generator" as MCQTabKey,
 
-    /* Scope & Granularity */
-    scopeMode: "all_units" as ScopeMode,
-    selectedUnitIds: [1, 2, 3, 4, 5] as (string | number)[],
-    selectedSingleUnitId: 1 as string | number,
-    microTopics: [] as string[],
-
-    /* Dynamic builder state */
-    topicRows: [newRow()] as TopicRow[],
-
-    /* Distribution Mode & Blueprint */
-    distributionMode: "none" as DistributionMode,
-    targetQuestionCount: 5 as number,
-    knowledgeBreakdown: {
-      K1: 2,
-      K2: 2,
-      K3: 1,
-      K4: 0,
-      K5: 0,
-      K6: 0,
-    } as KnowledgeLevelBreakdown,
-
-    /* 2D breakdown: K-level × difficulty */
-    breakdown: {
-      K1: { easy: 1, medium: 0, hard: 0 },
-      K2: { easy: 1, medium: 1, hard: 0 },
-      K3: { easy: 0, medium: 1, hard: 0 },
-      K4: { easy: 0, medium: 0, hard: 1 },
-      K5: { easy: 0, medium: 0, hard: 0 },
-      K6: { easy: 0, medium: 0, hard: 0 },
-    } as Record<string, Record<string, number>>,
-
-    /* Pedagogical Focus */
-    description: "",
-    activePresetId: null as string | null,
-
-    /* Output Specifications */
-    includeExplanation: true,
-    shuffleOptions: true,
-    marksPerQuestion: "2",
+    /* Topic hierarchy version data */
+    hierarchyUnits: [] as HierarchyUnitItem[],
+    loadingHierarchy: false,
 
     /* Questions pool */
     courseQuestions: {} as Record<string, MCQQuestion[]>,
@@ -96,6 +79,12 @@ const MCQGenerationIndexPage = () => {
     recentQuestionIds: [] as string[],
     isGeneratingAI: false,
     generationToast: null as null | { type: "success" | "error"; msg: string },
+
+    /* Tests & Execution */
+    tests: [] as MCQTestExecutionItem[],
+    loadingTests: false,
+    testSearch: "",
+    testStatusFilter: "all" as string,
 
     /* Modals & Accordion */
     expandedQuestionIds: [] as string[],
@@ -108,15 +97,44 @@ const MCQGenerationIndexPage = () => {
     configureModalData: null as any,
   });
 
+  // Modal states for tests
+  const [previewTestModal, setPreviewTestModal] = useState<{
+    open: boolean;
+    test: MCQTestExecutionItem | null;
+    questions: any[];
+  }>({
+    open: false,
+    test: null,
+    questions: [],
+  });
+
+  const [editTestModal, setEditTestModal] = useState<{
+    open: boolean;
+    data: MCQTestExecutionItem | null;
+  }>({
+    open: false,
+    data: null,
+  });
+
   const debouncedSearch = useDebounce(state.search, 300);
 
   useEffect(() => {
-    dispatch(setPageTitle("MCQ Generation"));
+    dispatch(setPageTitle("MCQ"));
   }, [dispatch]);
 
   useEffect(() => {
     fetchAssignedCourses();
   }, []);
+
+  // Handle URL query parameters
+  useEffect(() => {
+    if (router.query.tab) {
+      const tabParam = String(router.query.tab) as MCQTabKey;
+      if (["generator", "questions", "bank", "tests"].includes(tabParam)) {
+        setState({ activeTab: tabParam });
+      }
+    }
+  }, [router.query.tab]);
 
   useEffect(() => {
     if (router.query.course_id && state.courses.length > 0) {
@@ -132,64 +150,15 @@ const MCQGenerationIndexPage = () => {
 
   useEffect(() => {
     if (state.selectedCourse) {
-      fetchCourseUnits(state.selectedCourse.id);
-      fetchQuestions(state.selectedCourse.code || state.selectedCourse.id);
+      const courseId = state.selectedCourse.id;
+      const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+      fetchTopicHierarchyUnits(courseId);
+      fetchQuestions(courseKey);
+      fetchTests(courseId);
     }
   }, [state.selectedCourse]);
 
-  /* ── Data fetching ────────────────────────────────────────────────── */
-  const fetchQuestions = async (courseKey: string | number) => {
-    try {
-      const res: any = await Models.mcq.history_questions({ course_id: courseKey }).catch((err) => {
-        console.error("fetchQuestions error:", err);
-        return null;
-      });
-      let rawList: any[] = [];
-      if (res) {
-        if (Array.isArray(res)) rawList = res;
-        else if (res.items && Array.isArray(res.items)) rawList = res.items;
-        else if (res.questions && Array.isArray(res.questions)) rawList = res.questions;
-        else if (res.data && Array.isArray(res.data)) rawList = res.data;
-      }
-      const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
-      setState({ courseQuestions: { ...state.courseQuestions, [courseKey]: fetched } });
-    } catch (err) {
-      console.error("Failed to fetch questions:", err);
-    }
-  };
-
-  const fetchCourseUnits = async (courseId: string | number) => {
-    try {
-      const res: any = await Models.syllabus.get_units(courseId, { topic_status: "approved" });
-      const arr = Array.isArray(res) ? res : (res?.units || []);
-      if (arr.length > 0) {
-        const mapped = arr.map((u: any, idx: number) => ({
-          unitId: u.id || idx + 1,
-          label: `Unit ${u.unit_number || idx + 1}`,
-          title: u.unit_title || u.title || u.name || `Unit ${idx + 1}`,
-          topics: u.topics ? u.topics.map((t: any) => t.topic_name || t.title || t.name || t) : ["General Topic"],
-        }));
-        setState({
-          courseUnits: mapped,
-          selectedUnitIds: mapped.map((u: any) => u.unitId),
-          selectedSingleUnitId: mapped[0]?.unitId || 1,
-        });
-      } else {
-        setState({
-          courseUnits: UNITS_CONFIG,
-          selectedUnitIds: UNITS_CONFIG.map((u) => u.unitId),
-          selectedSingleUnitId: UNITS_CONFIG[0]?.unitId || 1,
-        });
-      }
-    } catch {
-      setState({
-        courseUnits: UNITS_CONFIG,
-        selectedUnitIds: UNITS_CONFIG.map((u) => u.unitId),
-        selectedSingleUnitId: UNITS_CONFIG[0]?.unitId || 1,
-      });
-    }
-  };
-
+  /* ── 1. Fetch Assigned Courses ─────────────────────────────────────── */
   const fetchAssignedCourses = async () => {
     try {
       setState({ loading: true });
@@ -234,19 +203,346 @@ const MCQGenerationIndexPage = () => {
     }
   };
 
-  /* ── Derived calculations ─────────────────────────────────────────── */
-  const filteredCourses = state.courses.filter((course) => {
-    const s = (debouncedSearch || "").toLowerCase().trim();
-    const code = (course.code || course.course_code || "").toLowerCase();
-    const title = (course.title || course.course_title || "").toLowerCase();
-    const matchesSearch = !s || code.includes(s) || title.includes(s);
-    const matchesRole =
-      state.roleFilter === "all" ||
-      (state.roleFilter === "coordinator" && course.role_type === "coordinator") ||
-      (state.roleFilter === "instructor" && course.role_type !== "coordinator");
-    return matchesSearch && matchesRole;
-  });
+  /* ── 2. Fetch Topic Hierarchy from Generated Versions ──────────────── */
+  const fetchTopicHierarchyUnits = async (courseId: string | number) => {
+    try {
+      setState({ loadingHierarchy: true });
 
+      // Step A: Check workflow status for active hierarchy version
+      const wfRes: any = await Models.syllabus.get_workflow_status(courseId).catch(() => null);
+      const wfObj = wfRes?.workflow || wfRes;
+      const step3 = wfObj?.step_3_topic_hierarchy;
+      const activeVersion =
+        step3?.active_version || (Number(step3?.total_versions) > 0 ? step3.total_versions : 1);
+
+      let rawUnits: any[] = [];
+
+      if (activeVersion) {
+        const hierSnap: any = await Models.syllabus
+          .get_specific_version(courseId, "hierarchy", activeVersion)
+          .catch(() => null);
+
+        rawUnits =
+          hierSnap?.data_ai_gave?.units ||
+          hierSnap?.data_ai_gave ||
+          hierSnap?.units ||
+          [];
+      }
+
+      // If version data exists, map topics and subtopics
+      if (Array.isArray(rawUnits) && rawUnits.length > 0) {
+        const mapped: HierarchyUnitItem[] = rawUnits.map((u: any, uIdx: number) => ({
+          unit_number: Number(u.unitNumber || u.unit_number || uIdx + 1),
+          unit_title: u.unitTitle || u.title || `Unit ${uIdx + 1}`,
+          topics: (u.topics || []).map((t: any, tIdx: number) => ({
+            id: String(t.topicId || t.code || `${uIdx + 1}.${tIdx + 1}`),
+            code: String(t.code || t.topicId || `${uIdx + 1}.${tIdx + 1}`),
+            title: t.title || t.topicName || t.topic_name || `Topic ${tIdx + 1}`,
+            subtopics: (t.subtopics || []).map((st: any, stIdx: number) => ({
+              id: String(st.subtopicId || st.code || `${uIdx + 1}.${tIdx + 1}.${stIdx + 1}`),
+              code: String(st.code || st.subtopicId || `${uIdx + 1}.${tIdx + 1}.${stIdx + 1}`),
+              title:
+                typeof st === "string"
+                  ? st
+                  : st.title || st.subtopicName || st.subtopic_name || `Subtopic ${stIdx + 1}`,
+            })),
+          })),
+        }));
+
+        setState({ hierarchyUnits: mapped, loadingHierarchy: false });
+        return;
+      }
+
+      // Fallback: Fetch approved units from syllabus
+      const unitsRes: any = await Models.syllabus.get_units(courseId, { topic_status: "approved" }).catch(() => null);
+      const arr = Array.isArray(unitsRes) ? unitsRes : unitsRes?.units || [];
+      if (arr.length > 0) {
+        const fallbackMapped: HierarchyUnitItem[] = arr.map((u: any, idx: number) => ({
+          unit_number: Number(u.unit_number || idx + 1),
+          unit_title: u.unit_title || u.title || `Unit ${idx + 1}`,
+          topics: (u.topics || []).map((t: any, tIdx: number) => {
+            const title = typeof t === "string" ? t : t.topic_name || t.title || t.name || `Topic ${tIdx + 1}`;
+            const rawSub = t.subtopics || [];
+            return {
+              id: String(idx + 1) + "." + String(tIdx + 1),
+              code: String(idx + 1) + "." + String(tIdx + 1),
+              title,
+              subtopics: rawSub.map((st: any, sIdx: number) => ({
+                id: `${idx + 1}.${tIdx + 1}.${sIdx + 1}`,
+                title: typeof st === "string" ? st : st.title || st.subtopic_name || st.name || `Subtopic ${sIdx + 1}`,
+              })),
+            };
+          }),
+        }));
+        setState({ hierarchyUnits: fallbackMapped, loadingHierarchy: false });
+        return;
+      }
+
+      // Default fallback
+      setState({
+        hierarchyUnits: UNITS_CONFIG.map((u) => ({
+          unit_number: Number(u.unitId),
+          unit_title: u.title,
+          topics: (u.topics || []).map((t, tidx) => ({
+            id: `${u.unitId}.${tidx + 1}`,
+            title: t,
+            subtopics: [],
+          })),
+        })),
+        loadingHierarchy: false,
+      });
+    } catch (err) {
+      console.error("Failed to load topic hierarchy units:", err);
+      setState({ loadingHierarchy: false });
+    }
+  };
+
+  /* ── 3. Fetch Questions Pool ───────────────────────────────────────── */
+  const fetchQuestions = async (courseKey: string | number) => {
+    try {
+      const res: any = await Models.mcq.history_questions({ course_id: courseKey }).catch((err) => {
+        console.error("fetchQuestions error:", err);
+        return null;
+      });
+      let rawList: any[] = [];
+      if (res) {
+        if (Array.isArray(res)) rawList = res;
+        else if (res.items && Array.isArray(res.items)) rawList = res.items;
+        else if (res.questions && Array.isArray(res.questions)) rawList = res.questions;
+        else if (res.data && Array.isArray(res.data)) rawList = res.data;
+      }
+      const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
+      setState({ courseQuestions: { ...state.courseQuestions, [courseKey]: fetched } });
+    } catch (err) {
+      console.error("Failed to fetch questions:", err);
+    }
+  };
+
+  /* ── 4. Fetch Tests Execution ──────────────────────────────────────── */
+  const fetchTests = async (courseId: string | number) => {
+    try {
+      setState({ loadingTests: true });
+      const testsRes: any = await Models.mcq.list_tests({ course_id: courseId }).catch(() => null);
+      let backendTests: MCQTestExecutionItem[] = [];
+
+      if (testsRes && Array.isArray(testsRes) && testsRes.length > 0) {
+        const courseCode = state.selectedCourse?.code || "MCQ";
+        backendTests = testsRes.map((t: any) => {
+          const startT = t.test_window_start ? new Date(t.test_window_start) : null;
+          const endT = t.test_window_end ? new Date(t.test_window_end) : null;
+          const now = new Date();
+          let status: any = "upcoming";
+          let statusLabel = "Upcoming Test";
+          const s = (t.status || "").toLowerCase();
+          if (s === "cancelled" || s === "canceled") {
+            status = "cancelled";
+            statusLabel = "Cancelled";
+          } else if (s === "completed") {
+            status = "completed";
+            statusLabel = "Completed Session";
+          } else if (s === "draft") {
+            status = "setup_required";
+            statusLabel = "Access Setup Required";
+          } else if (startT && endT && now >= startT && now <= endT) {
+            status = "live";
+            statusLabel = "• Live Assessment";
+          } else if (s === "live") {
+            status = "live";
+            statusLabel = "• Live Assessment";
+          } else if (endT && now > endT) {
+            status = "completed";
+            statusLabel = "Completed Session";
+          } else {
+            status = "upcoming";
+            statusLabel = "Upcoming Test";
+          }
+
+          const formatDateGB = (d: Date) => {
+            const day = String(d.getDate()).padStart(2, "0");
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+          };
+
+          const rawDateStr = startT ? formatDateGB(startT) : undefined;
+          const rawStartTimeStr = startT
+            ? startT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+            : undefined;
+          const rawEndTimeStr = endT
+            ? endT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+            : undefined;
+
+          return {
+            id: t.test_id,
+            testCode: t.test_code || `MCQ-${courseCode}-T`,
+            title: t.title || "MCQ Test",
+            status,
+            statusLabel,
+            unitLabel: t.unit_name || "Unit 1",
+            questionsCount: t.question_count || 10,
+            duration: `${t.duration_minutes || 30} Minutes`,
+            testWindow:
+              startT && endT
+                ? `${startT.toLocaleDateString()} ${startT.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })} – ${endT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                : status === "setup_required"
+                ? "Pending (Setup Required)"
+                : "Not Scheduled",
+            isPendingWindow: !startT,
+            topics: Array.isArray(t.topics) ? t.topics.join("; ") : t.topics || "",
+            secureCode: t.secure_code,
+            questionSetId: t.question_set_id,
+            questionSetName: undefined,
+            maxTabSwitches: t.max_tab_switches,
+            randomizeQuestions: t.randomize_questions,
+            randomizeOptions: t.randomize_options,
+            haveViva: t.have_viva,
+            rawTestDate: rawDateStr,
+            rawStartTime: rawStartTimeStr,
+            rawEndTime: rawEndTimeStr,
+            testWindowStart: t.test_window_start,
+            testWindowEnd: t.test_window_end,
+          };
+        });
+      }
+
+      setState({ tests: backendTests, loadingTests: false });
+    } catch {
+      setState({ loadingTests: false });
+    }
+  };
+
+  /* ── 5. AI Generation Handler ──────────────────────────────────────── */
+  const showToast = (type: "success" | "error", msg: string) => {
+    setState({ generationToast: { type, msg } });
+    setTimeout(() => setState({ generationToast: null }), 5000);
+  };
+
+  const pollJobStatus = (jobId: string, requestedCount: number) => {
+    const interval = setInterval(async () => {
+      try {
+        const res: any = await Models.mcq.status(jobId);
+        if (res.status === "completed" || res.status === "complete") {
+          clearInterval(interval);
+          setState({ isGeneratingAI: false });
+          if (state.selectedCourse) {
+            const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+            const existingIds = new Set((state.courseQuestions[courseKey] || []).map((q) => q.id));
+            const freshRes: any = await Models.mcq
+              .history_questions({ course_id: courseKey, limit: 100 })
+              .catch(() => null);
+            let rawList: any[] = [];
+            if (freshRes) {
+              if (Array.isArray(freshRes)) rawList = freshRes;
+              else if (freshRes.items) rawList = freshRes.items;
+              else if (freshRes.questions) rawList = freshRes.questions;
+              else if (freshRes.data) rawList = freshRes.data;
+            }
+            const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
+            const newlyCreated = fetched.filter((q) => !existingIds.has(q.id)).map((q) => q.id);
+            const recentIds =
+              newlyCreated.length > 0 ? newlyCreated : fetched.slice(0, requestedCount).map((q) => q.id);
+
+            setState({
+              courseQuestions: { ...state.courseQuestions, [courseKey]: fetched },
+              recentQuestionIds: recentIds,
+              selectedBannerFilter: "recent",
+              activeTab: "questions", // Automatically switch to Generated Questions view!
+            });
+          }
+          showToast("success", "✓ MCQ Generation complete! Switched to Generated Questions.");
+        } else if (res.status === "failed") {
+          clearInterval(interval);
+          setState({ isGeneratingAI: false });
+          const errorMsg = res.error || res.message || res.detail || "";
+          if (isLimitExhaustion(res) || isLimitExhaustion(errorMsg)) {
+            showLimitExhaustedModal(errorMsg);
+            showToast("error", LIMIT_EXHAUSTED_MESSAGE);
+          } else {
+            showToast("error", errorMsg || "Generation failed. Please try again.");
+          }
+        }
+      } catch {
+        clearInterval(interval);
+        setState({ isGeneratingAI: false });
+        showToast("error", "Lost connection while polling job status.");
+      }
+    }, 5000);
+  };
+
+  const handleSimplifiedGenerate = async (genData: {
+    selectedUnits: HierarchyUnitItem[];
+    bloomCounts: Record<string, number>;
+    totalQuestions: number;
+    activePresetId: string | null;
+    activePresetDescription: string;
+    includeExplanation: boolean;
+    shuffleOptions: boolean;
+  }) => {
+    if (!state.selectedCourse) return;
+
+    setState({ isGeneratingAI: true });
+
+    try {
+      const units = genData.selectedUnits.map((u) => ({
+        unit_number: u.unit_number,
+        unit_title: u.unit_title,
+        topics: u.topics.map((t) => ({
+          topic_id: t.code || t.id || t.title,
+          topic_name: t.title,
+          subtopics: (t.subtopics || []).map((st) => ({
+            subtopic_id: st.code || st.id || st.title,
+            subtopic_name: st.title,
+          })),
+        })),
+      }));
+
+      const payload: any = {
+        syllabus: {
+          course_id: String(state.selectedCourse.code || state.selectedCourse.id),
+          units,
+        },
+        question_count: genData.totalQuestions,
+        type: "mcq",
+        language: "en",
+        include_explanation: genData.includeExplanation,
+        shuffle_options: genData.shuffleOptions,
+        distribution_mode: "knowledge_level",
+        knowledge_level_breakdown: genData.bloomCounts,
+      };
+
+      if (genData.activePresetDescription) {
+        payload.description = genData.activePresetDescription;
+      }
+
+      const res: any = await Models.mcq.generate(payload).catch((err) => {
+        console.error("Generate API Error:", err);
+        if (isLimitExhaustion(err)) {
+          showLimitExhaustedModal(getErrorMessage(err));
+          showToast("error", LIMIT_EXHAUSTED_MESSAGE);
+        } else {
+          showToast("error", `Error: ${getErrorMessage(err, "Unknown Error")}`);
+        }
+        return null;
+      });
+
+      const jobId = res?.job_id || res?.data?.job_id || res?.id;
+      if (jobId) {
+        pollJobStatus(jobId, genData.totalQuestions);
+      } else {
+        setState({ isGeneratingAI: false });
+        showToast("error", "Failed to start generation job. No job_id returned.");
+      }
+    } catch (err) {
+      console.error("Generate error:", err);
+      setState({ isGeneratingAI: false });
+      showToast("error", "Unexpected error during generation.");
+    }
+  };
+
+  /* ── 6. Question Actions ───────────────────────────────────────────── */
   const currentCourseKey = state.selectedCourse?.code || state.selectedCourse?.course_code || "";
   const currentQuestions = state.courseQuestions[currentCourseKey] || [];
 
@@ -275,455 +571,6 @@ const MCQGenerationIndexPage = () => {
     }
     return list;
   }, [currentQuestions, state.selectedBannerFilter, state.recentQuestionIds]);
-
-  const activeUnits = state.courseUnits.length > 0 ? state.courseUnits : UNITS_CONFIG;
-
-  /* ── Validation & Calculations ─────────────────────────────────────── */
-  const totalTopicQuestions = state.topicRows.reduce((s, r) => s + (Number(r.questionCount) || 0), 0);
-
-  const total1D = Object.values(state.knowledgeBreakdown || {}).reduce(
-    (acc: number, val: any) => acc + (Number(val) || 0),
-    0
-  );
-
-  const total2D: number = Object.values(state.breakdown || {}).reduce<number>(
-    (sum: number, diffObj: any) =>
-      sum +
-      Object.values(diffObj || {}).reduce<number>((s: number, v: any) => s + (Number(v) || 0), 0),
-    0
-  );
-
-  // Dynamic validation error
-  let validationError: string | null = null;
-  if (state.distributionMode === "knowledge_level" && total1D !== state.targetQuestionCount) {
-    validationError = `Bloom's 1D total (${total1D}) must equal target questions (${state.targetQuestionCount}). Click a preset or adjust counts.`;
-  } else if (state.distributionMode === "knowledge_and_difficulty" && total2D !== state.targetQuestionCount) {
-    validationError = `2D Matrix total (${total2D}) must equal target questions (${state.targetQuestionCount}). Click Auto-Balance or adjust cells.`;
-  } else if (state.scopeMode === "all_units" && state.selectedUnitIds.length === 0) {
-    validationError = "Please select at least one syllabus unit to include.";
-  } else if (state.scopeMode === "dynamic_topics" && state.topicRows.some((r) => !r.topicName)) {
-    validationError = "Please select a topic for every row in Dynamic Topic Selection.";
-  } else if (state.scopeMode === "micro_topics" && state.microTopics.length === 0) {
-    validationError = "Please enter at least one micro-topic tag or concept.";
-  }
-
-  const canGenerate = !validationError && state.targetQuestionCount >= 1;
-
-  /* ── Handlers ─────────────────────────────────────────────────────── */
-  const handleManageQuestions = (course: CourseItem) => {
-    setState({ selectedCourse: course, activeTab: "generator" });
-    router.replace({ pathname: router.pathname, query: { course_id: course.code || course.id } }, undefined, {
-      shallow: true,
-    });
-  };
-
-  const handleBackToCourses = () => {
-    setState({ selectedCourse: null });
-    router.replace({ pathname: router.pathname, query: {} }, undefined, { shallow: true });
-  };
-
-  // Scope handlers
-  const handleToggleUnitSelection = (unitId: string | number) => {
-    const exists = state.selectedUnitIds.some((id) => String(id) === String(unitId));
-    if (exists) {
-      if (state.selectedUnitIds.length === 1) return;
-      setState({ selectedUnitIds: state.selectedUnitIds.filter((id) => String(id) !== String(unitId)) });
-    } else {
-      setState({ selectedUnitIds: [...state.selectedUnitIds, unitId] });
-    }
-  };
-
-  const handleSelectAllUnits = () => {
-    if (state.selectedUnitIds.length === activeUnits.length) {
-      setState({ selectedUnitIds: [activeUnits[0]?.unitId || 1] });
-    } else {
-      setState({ selectedUnitIds: activeUnits.map((u) => u.unitId) });
-    }
-  };
-
-  const addTopicRow = () => setState({ topicRows: [...state.topicRows, newRow()] });
-
-  const removeTopicRow = (id: string) => {
-    if (state.topicRows.length === 1) return;
-    setState({ topicRows: state.topicRows.filter((r) => r.id !== id) });
-  };
-
-  const updateRow = (id: string, patch: Partial<TopicRow>) => {
-    setState({
-      topicRows: state.topicRows.map((r) => {
-        if (r.id !== id) return r;
-        const updated = { ...r, ...patch };
-        if (patch.unitId !== undefined) {
-          const unit = activeUnits.find((u) => String(u.unitId) === String(patch.unitId));
-          updated.topicName = unit?.topics?.[0] || "";
-        }
-        return updated;
-      }),
-    });
-  };
-
-  const handleAddMicroTopic = (topic: string) => {
-    if (!state.microTopics.includes(topic)) {
-      setState({ microTopics: [...state.microTopics, topic] });
-    }
-  };
-
-  const handleRemoveMicroTopic = (topic: string) => {
-    setState({ microTopics: state.microTopics.filter((t) => t !== topic) });
-  };
-
-  // Distribution handlers
-  const updateBreakdown2D = (kLevel: string, diff: string, value: number) => {
-    setState({
-      breakdown: {
-        ...state.breakdown,
-        [kLevel]: { ...state.breakdown[kLevel], [diff]: Math.max(0, value) },
-      },
-    });
-  };
-
-  const updateKnowledgeBreakdown1D = (kLevel: string, count: number) => {
-    setState({
-      knowledgeBreakdown: {
-        ...state.knowledgeBreakdown,
-        [kLevel]: Math.max(0, count),
-      },
-    });
-  };
-
-  const handleApplyKnowledgePreset = (preset: "balanced" | "foundational" | "advanced") => {
-    const total = state.targetQuestionCount || 5;
-    const res: Record<string, number> = { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 };
-    if (preset === "foundational") {
-      const k1 = Math.ceil(total * 0.5);
-      res.K1 = k1;
-      res.K2 = total - k1;
-    } else if (preset === "advanced") {
-      const k3 = Math.floor(total * 0.35);
-      const k4 = Math.floor(total * 0.35);
-      const k5 = Math.floor(total * 0.15);
-      res.K3 = k3;
-      res.K4 = k4;
-      res.K5 = k5;
-      res.K6 = total - (k3 + k4 + k5);
-    } else {
-      const k1 = Math.floor(total * 0.25);
-      const k2 = Math.floor(total * 0.35);
-      const k3 = Math.floor(total * 0.25);
-      res.K1 = k1;
-      res.K2 = k2;
-      res.K3 = k3;
-      res.K4 = total - (k1 + k2 + k3);
-    }
-    setState({ knowledgeBreakdown: res });
-  };
-
-  const handleAutoBalance2D = () => {
-    const total = state.targetQuestionCount || 5;
-    const base: Record<string, Record<string, number>> = {
-      K1: { easy: 0, medium: 0, hard: 0 },
-      K2: { easy: 0, medium: 0, hard: 0 },
-      K3: { easy: 0, medium: 0, hard: 0 },
-      K4: { easy: 0, medium: 0, hard: 0 },
-      K5: { easy: 0, medium: 0, hard: 0 },
-      K6: { easy: 0, medium: 0, hard: 0 },
-    };
-    const slots: Array<[string, "easy" | "medium" | "hard"]> = [
-      ["K2", "medium"],
-      ["K1", "easy"],
-      ["K2", "easy"],
-      ["K3", "medium"],
-      ["K1", "medium"],
-      ["K3", "hard"],
-      ["K4", "medium"],
-      ["K4", "hard"],
-      ["K2", "hard"],
-      ["K5", "hard"],
-    ];
-    let rem = total;
-    let slotIdx = 0;
-    while (rem > 0) {
-      const [k, d] = slots[slotIdx % slots.length];
-      base[k][d] += 1;
-      rem -= 1;
-      slotIdx += 1;
-    }
-    setState({ breakdown: base });
-  };
-
-  // Pedagogical preset selection
-  const handleSelectPedagogicalPreset = (presetId: string) => {
-    const preset = PEDAGOGICAL_PRESETS.find((p) => p.id === presetId);
-    if (!preset) return;
-    if (state.activePresetId === presetId) {
-      setState({ activePresetId: null, description: "" });
-    } else {
-      setState({ activePresetId: presetId, description: preset.description });
-    }
-  };
-
-  const showToast = (type: "success" | "error", msg: string) => {
-    setState({ generationToast: { type, msg } });
-    setTimeout(() => setState({ generationToast: null }), 5000);
-  };
-
-  const pollJobStatus = (jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res: any = await Models.mcq.status(jobId);
-        if (res.status === "completed" || res.status === "complete") {
-          clearInterval(interval);
-          setState({ isGeneratingAI: false });
-          if (state.selectedCourse) {
-            const courseKey = state.selectedCourse.code || state.selectedCourse.id;
-            const existingIds = new Set((state.courseQuestions[courseKey] || []).map((q) => q.id));
-            const freshRes: any = await Models.mcq
-              .history_questions({ course_id: courseKey, limit: 100 })
-              .catch(() => null);
-            let rawList: any[] = [];
-            if (freshRes) {
-              if (Array.isArray(freshRes)) rawList = freshRes;
-              else if (freshRes.items) rawList = freshRes.items;
-              else if (freshRes.questions) rawList = freshRes.questions;
-              else if (freshRes.data) rawList = freshRes.data;
-            }
-            const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
-            const newlyCreated = fetched.filter((q) => !existingIds.has(q.id)).map((q) => q.id);
-            const recentIds =
-              newlyCreated.length > 0 ? newlyCreated : fetched.slice(0, state.targetQuestionCount).map((q) => q.id);
-            setState({
-              courseQuestions: { ...state.courseQuestions, [courseKey]: fetched },
-              recentQuestionIds: recentIds,
-              selectedBannerFilter: "recent",
-            });
-          }
-          showToast("success", "✓ MCQ Generation complete! Showing recently generated questions.");
-          setTimeout(() => {
-            document.getElementById("questions-section")?.scrollIntoView({ behavior: "smooth" });
-          }, 350);
-        } else if (res.status === "failed") {
-          clearInterval(interval);
-          setState({ isGeneratingAI: false });
-          const errorMsg = res.error || res.message || res.detail || "";
-          if (isLimitExhaustion(res) || isLimitExhaustion(errorMsg)) {
-            showLimitExhaustedModal(errorMsg);
-            showToast("error", LIMIT_EXHAUSTED_MESSAGE);
-          } else {
-            showToast("error", errorMsg || "Generation failed. Please try again.");
-          }
-        }
-      } catch {
-        clearInterval(interval);
-        setState({ isGeneratingAI: false });
-        showToast("error", "Lost connection while polling job status.");
-      }
-    }, 5000);
-  };
-
-  /* ── Payload Builder across all 4 Dimensions ───────────────────────── */
-  const buildGeneratePayload = () => {
-    // 1. Build syllabus based on scope mode
-    let units: any[] = [];
-    if (state.scopeMode === "all_units") {
-      units = activeUnits
-        .filter((u) => state.selectedUnitIds.some((id) => String(id) === String(u.unitId)))
-        .map((u) => ({
-          unit_number: Number(u.unitId) || 1,
-          unit_title: u.title || `Unit ${u.unitId}`,
-          topics: (u.topics || []).map((t: string, idx: number) => ({
-            topic_id: String(idx + 1),
-            topic_name: t,
-            subtopics: [],
-          })),
-        }));
-    } else if (state.scopeMode === "single_unit") {
-      const unit =
-        activeUnits.find((u) => String(u.unitId) === String(state.selectedSingleUnitId)) || activeUnits[0];
-      units = [
-        {
-          unit_number: Number(unit.unitId) || 1,
-          unit_title: unit.title || `Unit ${unit.unitId}`,
-          topics: (unit.topics || []).map((t: string, idx: number) => ({
-            topic_id: String(idx + 1),
-            topic_name: t,
-            subtopics: [],
-          })),
-        },
-      ];
-    } else if (state.scopeMode === "dynamic_topics") {
-      const unitMap: Record<string, { unit_number: number; unit_title: string; topics: any[] }> = {};
-      state.topicRows.forEach((row) => {
-        const uid = String(row.unitId);
-        const unit = activeUnits.find((u) => String(u.unitId) === uid);
-        if (!unitMap[uid]) {
-          unitMap[uid] = {
-            unit_number: Number(uid) || 1,
-            unit_title: unit?.title || `Unit ${uid}`,
-            topics: [],
-          };
-        }
-        unitMap[uid].topics.push({
-          topic_id: String(unitMap[uid].topics.length + 1),
-          topic_name: row.topicName,
-          subtopics: [],
-        });
-      });
-      units = Object.values(unitMap);
-    } else if (state.scopeMode === "micro_topics") {
-      units = [
-        {
-          unit_number: 1,
-          unit_title: "Micro-Topic Laser Focus",
-          topics: state.microTopics.map((mt, idx) => ({
-            topic_id: String(idx + 1),
-            topic_name: mt,
-            subtopics: [],
-          })),
-        },
-      ];
-    }
-
-    if (units.length === 0) {
-      units = [
-        {
-          unit_number: 1,
-          unit_title: activeUnits[0]?.title || "Unit 1",
-          topics: (activeUnits[0]?.topics || ["General Topic"]).map((t: string, idx: number) => ({
-            topic_id: String(idx + 1),
-            topic_name: t,
-            subtopics: [],
-          })),
-        },
-      ];
-    }
-
-    // 2. Base payload
-    const payload: any = {
-      syllabus: {
-        course_id: String(state.selectedCourse?.code || currentCourseKey),
-        units,
-      },
-      question_count: state.targetQuestionCount,
-      type: "mcq",
-      language: "en", // Explicitly fixed to "en", language option hidden as instructed
-      include_explanation: state.includeExplanation,
-      shuffle_options: state.shuffleOptions,
-      distribution_mode: state.distributionMode,
-    };
-
-    // 3. Distribution mode specific fields
-    if (state.distributionMode === "knowledge_level") {
-      payload.knowledge_level_breakdown = state.knowledgeBreakdown;
-    } else if (state.distributionMode === "knowledge_and_difficulty") {
-      const filteredBreakdown: Record<string, Record<string, number>> = {};
-      Object.entries(state.breakdown).forEach(([k, diffObj]) => {
-        const nonZero = Object.entries(diffObj).filter(([, v]) => (Number(v) || 0) > 0);
-        if (nonZero.length > 0) filteredBreakdown[k] = Object.fromEntries(nonZero);
-      });
-      payload.knowledge_difficulty_breakdown = filteredBreakdown;
-    }
-
-    // 4. Description / Pedagogical focus
-    if (state.description.trim()) {
-      payload.description = state.description.trim();
-    }
-
-    return payload;
-  };
-
-  const handleGenerateQuestions = async () => {
-    if (!state.selectedCourse) return;
-    if (!canGenerate) {
-      alert(validationError || "Please check your configuration before generating.");
-      return;
-    }
-
-    setState({ isGeneratingAI: true });
-
-    try {
-      const payload = buildGeneratePayload();
-      const res: any = await Models.mcq.generate(payload).catch((err) => {
-        console.error("Generate API Error:", err);
-        if (isLimitExhaustion(err)) {
-          showLimitExhaustedModal(getErrorMessage(err));
-          showToast("error", LIMIT_EXHAUSTED_MESSAGE);
-        } else {
-          showToast("error", `Error from server: ${getErrorMessage(err, "Unknown Error")}`);
-        }
-        return null;
-      });
-
-      const jobId = res?.job_id || res?.data?.job_id || res?.id;
-      if (jobId) {
-        pollJobStatus(jobId);
-      } else {
-        setState({ isGeneratingAI: false });
-        showToast("error", "Failed to start generation job. No job_id returned.");
-      }
-    } catch (err) {
-      console.error("Generate error:", err);
-      setState({ isGeneratingAI: false });
-      showToast("error", "Unexpected error during generation.");
-    }
-  };
-
-  const handleGenerateBackground = async () => {
-    if (!state.selectedCourse) return;
-    if (!canGenerate) {
-      alert(validationError || "Please check your configuration before generating.");
-      return;
-    }
-
-    try {
-      const payload = buildGeneratePayload();
-      const res: any = await Models.mcq.generate(payload).catch((err) => {
-        if (isLimitExhaustion(err)) {
-          showLimitExhaustedModal(getErrorMessage(err));
-          showToast("error", LIMIT_EXHAUSTED_MESSAGE);
-        } else {
-          showToast("error", `Failed to start background job: ${getErrorMessage(err, "Unknown Error")}`);
-        }
-        return null;
-      });
-
-      const jobId = res?.job_id || res?.data?.job_id || res?.id;
-      if (jobId) {
-        showToast(
-          "success",
-          `✓ AI generation started in background (Job: ${String(jobId).slice(0, 8)}...). You can continue working.`
-        );
-
-        // Quiet background watcher
-        let checks = 0;
-        const bgTimer = setInterval(async () => {
-          checks += 1;
-          if (checks > 35) {
-            clearInterval(bgTimer);
-            return;
-          }
-          const checkRes: any = await Models.mcq.status(jobId).catch(() => null);
-          if (checkRes?.status === "completed" || checkRes?.status === "complete") {
-            clearInterval(bgTimer);
-            showToast("success", "🎉 Background MCQ Generation completed! Question bank updated.");
-            if (state.selectedCourse) {
-              fetchQuestions(state.selectedCourse.code || state.selectedCourse.id);
-            }
-          } else if (checkRes?.status === "failed") {
-            clearInterval(bgTimer);
-            const errorMsg = checkRes?.error || checkRes?.message || checkRes?.detail || "";
-            if (isLimitExhaustion(checkRes) || isLimitExhaustion(errorMsg)) {
-              showLimitExhaustedModal(errorMsg);
-              showToast("error", LIMIT_EXHAUSTED_MESSAGE);
-            } else {
-              showToast("error", errorMsg || "Background generation job failed.");
-            }
-          }
-        }, 8000);
-      }
-    } catch {
-      showToast("error", "Failed to start background generation.");
-    }
-  };
 
   const handleToggleApprove = async (questionId: string) => {
     const question = currentQuestions.find((q) => q.id === questionId);
@@ -781,7 +628,109 @@ const MCQGenerationIndexPage = () => {
     setState({ expandedQuestionIds: isAll ? [] : allIds });
   };
 
-  /* ─── RENDER ────────────────────────────────────────────────────────── */
+  /* ── 7. Tests Filter & Action Handlers ─────────────────────────────── */
+  const filteredTests = useMemo(() => {
+    return state.tests.filter((test) => {
+      const q = state.testSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        test.title.toLowerCase().includes(q) ||
+        test.testCode.toLowerCase().includes(q) ||
+        (test.topics && test.topics.toLowerCase().includes(q));
+
+      const matchesStatus =
+        state.testStatusFilter === "all" ||
+        (state.testStatusFilter === "live" && test.status === "live") ||
+        (state.testStatusFilter === "upcoming" && test.status === "upcoming") ||
+        (state.testStatusFilter === "setup_required" && test.status === "setup_required") ||
+        (state.testStatusFilter === "completed" && test.status === "completed");
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [state.tests, state.testSearch, state.testStatusFilter]);
+
+  const handlePreviewQuestions = async (testItem: MCQTestExecutionItem) => {
+    setPreviewTestModal({
+      open: true,
+      test: testItem,
+      questions: currentQuestions.slice(0, Number(testItem.questionsCount) || 10),
+    });
+  };
+
+  const handleCancelTest = async (testId: string) => {
+    try {
+      await Models.mcq.update_test(testId, { status: "cancelled" });
+      Success("Test cancelled successfully.");
+      if (state.selectedCourse) fetchTests(state.selectedCourse.id);
+    } catch {
+      Failure("Failed to cancel test.");
+    }
+  };
+
+  const handleCompleteTest = async (testId: string) => {
+    try {
+      await Models.mcq.update_test(testId, { status: "completed" });
+      Success("Test marked as completed.");
+      if (state.selectedCourse) fetchTests(state.selectedCourse.id);
+    } catch {
+      Failure("Failed to complete test.");
+    }
+  };
+
+  const handleDeleteTest = async (testId: string) => {
+    try {
+      await Models.mcq.delete_test(testId);
+      Success("Test deleted successfully.");
+      if (state.selectedCourse) fetchTests(state.selectedCourse.id);
+    } catch {
+      Failure("Failed to delete test.");
+    }
+  };
+
+  const handleMonitorLive = (testId: string) => {
+    const courseId = state.selectedCourse?.id || state.selectedCourse?.code || "";
+    router.push(`/neurobe/ins-live-test-monitor?test_id=${testId}&course_id=${courseId}`);
+  };
+
+  const handleViewReport = (testId: string) => {
+    const courseId = state.selectedCourse?.id || state.selectedCourse?.code || "";
+    router.push(`/neurobe/ins-live-test-monitor?test_id=${testId}&course_id=${courseId}`);
+  };
+
+  const handleCopyCode = (code: string) => {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(code);
+      Success("Secure access code copied to clipboard!");
+    }
+  };
+
+  const handleManageQuestions = (course: CourseItem) => {
+    setState({ selectedCourse: course, activeTab: "generator" });
+    router.replace(
+      { pathname: router.pathname, query: { course_id: course.code || course.id } },
+      undefined,
+      { shallow: true }
+    );
+  };
+
+  const handleBackToCourses = () => {
+    setState({ selectedCourse: null });
+    router.replace({ pathname: router.pathname, query: {} }, undefined, { shallow: true });
+  };
+
+  const filteredCourses = state.courses.filter((course) => {
+    const s = (debouncedSearch || "").toLowerCase().trim();
+    const code = (course.code || course.course_code || "").toLowerCase();
+    const title = (course.title || course.course_title || "").toLowerCase();
+    const matchesSearch = !s || code.includes(s) || title.includes(s);
+    const matchesRole =
+      state.roleFilter === "all" ||
+      (state.roleFilter === "coordinator" && course.role_type === "coordinator") ||
+      (state.roleFilter === "instructor" && course.role_type !== "coordinator");
+    return matchesSearch && matchesRole;
+  });
+
+  /* ── 8. Render ─────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen pb-14">
       {/* Toast Notification */}
@@ -798,7 +747,7 @@ const MCQGenerationIndexPage = () => {
         </div>
       )}
 
-      {/* VIEW 1: ASSIGNED COURSES LIST */}
+      {/* VIEW 1: ASSIGNED COURSES SELECTOR */}
       {!state.selectedCourse ? (
         <CourseSelectorView
           courses={state.courses}
@@ -811,9 +760,9 @@ const MCQGenerationIndexPage = () => {
           onManageQuestions={handleManageQuestions}
         />
       ) : (
-        /* VIEW 2: QUESTION GENERATION WORKSPACE */
+        /* VIEW 2: MCQ WORKSPACE */
         <div>
-          {/* Top nav bar */}
+          {/* Top navigation */}
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -847,10 +796,11 @@ const MCQGenerationIndexPage = () => {
             </div>
           </div>
 
+          {/* Course Banner */}
           <CourseBanner
             courseCode={state.selectedCourse.code || state.selectedCourse.course_code || "CS309"}
             courseTitle={state.selectedCourse.title || state.selectedCourse.course_title || "Course"}
-            description="AI MCQ Generation Studio — Build dynamic question sets aligned to your syllabus units and topics."
+            description="Comprehensive MCQ Studio — Generate questions from topic hierarchy, create question banks, and schedule & monitor student assessments."
             programme={state.selectedCourse.programme || "B.Tech CSE"}
             batch={state.selectedCourse.batch || "2024–2028"}
             academicYear={`${state.selectedCourse.semester || "Semester 5"}`}
@@ -870,45 +820,67 @@ const MCQGenerationIndexPage = () => {
             onBack={handleBackToCourses}
           />
 
-          {/* STATS BANNER */}
-          <MCQStatsBanner
-            questions={currentQuestions}
-            selectedFilter={state.selectedBannerFilter}
-            onSelectFilter={(selectedBannerFilter) => setState({ selectedBannerFilter })}
-          />
-
-          {/* Workspace Tabs */}
+          {/* Unified 4-Step Lifecycle Workspace Tabs */}
           <div className="mb-6 flex flex-wrap items-center justify-between border-b border-gray-200 dark:border-gray-800 gap-3">
-            <div className="flex">
-              {(["generator", "bank"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setState({ activeTab: tab })}
-                  className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
-                    state.activeTab === tab
-                      ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                  }`}
-                >
-                  {tab === "generator" ? (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      <span>AI Generation Studio</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileCheck2 className="h-4 w-4" />
-                      <span>Course Question Bank</span>
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                        {currentQuestions.length}
+            <div className="flex flex-wrap gap-1 sm:gap-2">
+              {[
+                { id: "generator", label: "Generate Questions", icon: Sparkles, badge: null },
+                {
+                  id: "questions",
+                  label: "Generated Questions",
+                  icon: Eye,
+                  badge: currentQuestions.length,
+                },
+                { id: "bank", label: "Question Banks", icon: FileCheck2, badge: null },
+                {
+                  id: "tests",
+                  label: "Tests & Execution",
+                  icon: Activity,
+                  badge: state.tests.length > 0 ? state.tests.length : null,
+                },
+              ].map((tab) => {
+                const IconComp = tab.icon;
+                const isActive = state.activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setState({ activeTab: tab.id as MCQTabKey });
+                      router.replace(
+                        {
+                          pathname: router.pathname,
+                          query: { ...router.query, tab: tab.id },
+                        },
+                        undefined,
+                        { shallow: true }
+                      );
+                    }}
+                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors cursor-pointer ${
+                      isActive
+                        ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
+                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    <IconComp className="h-4 w-4" />
+                    <span>{tab.label}</span>
+                    {tab.badge !== null && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                          isActive
+                            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                        }`}
+                      >
+                        {tab.badge}
                       </span>
-                    </>
-                  )}
-                </button>
-              ))}
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
+            {/* Quick Action: Schedule Test button */}
             <div className="pb-2">
               <button
                 type="button"
@@ -928,82 +900,67 @@ const MCQGenerationIndexPage = () => {
                     },
                   });
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-color2 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-xl bg-color1 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
               >
-                <Sparkles className="h-4 w-4" />
-                <span>Create Test</span>
+                <Plus className="h-4 w-4" />
+                <span>Schedule Test</span>
               </button>
             </div>
           </div>
 
-          {/* TAB 1: AI GENERATION STUDIO */}
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 1: SIMPLIFIED STEP-BY-STEP GENERATOR
+              ══════════════════════════════════════════════════════════════ */}
           {state.activeTab === "generator" && (
-            <MCQStudioWorkspace
-              scopeMode={state.scopeMode}
-              onScopeModeChange={(scopeMode) => setState({ scopeMode })}
-              activeUnits={activeUnits}
-              selectedUnitIds={state.selectedUnitIds}
-              onToggleUnitSelection={handleToggleUnitSelection}
-              onSelectAllUnits={handleSelectAllUnits}
-              selectedSingleUnitId={state.selectedSingleUnitId}
-              onSingleUnitChange={(selectedSingleUnitId) => setState({ selectedSingleUnitId })}
-              topicRows={state.topicRows}
-              onAddTopicRow={addTopicRow}
-              onRemoveTopicRow={removeTopicRow}
-              onUpdateTopicRow={updateRow}
-              totalTopicQuestions={totalTopicQuestions}
-              microTopics={state.microTopics}
-              onAddMicroTopic={handleAddMicroTopic}
-              onRemoveMicroTopic={handleRemoveMicroTopic}
-
-              distributionMode={state.distributionMode}
-              onDistributionModeChange={(distributionMode) => setState({ distributionMode })}
-              targetQuestionCount={state.targetQuestionCount}
-              onTargetQuestionCountChange={(targetQuestionCount) => setState({ targetQuestionCount })}
-              knowledgeBreakdown={state.knowledgeBreakdown}
-              onUpdateKnowledgeBreakdown={updateKnowledgeBreakdown1D}
-              onApplyKnowledgePreset={handleApplyKnowledgePreset}
-              breakdown2D={state.breakdown}
-              onUpdateBreakdown2D={updateBreakdown2D}
-              onAutoBalance2D={handleAutoBalance2D}
-
-              description={state.description}
-              onDescriptionChange={(description) => setState({ description, activePresetId: null })}
-              activePresetId={state.activePresetId}
-              onSelectPreset={handleSelectPedagogicalPreset}
-
-              includeExplanation={state.includeExplanation}
-              onToggleExplanation={() => setState({ includeExplanation: !state.includeExplanation })}
-              shuffleOptions={state.shuffleOptions}
-              onToggleShuffle={() => setState({ shuffleOptions: !state.shuffleOptions })}
-              marksPerQuestion={state.marksPerQuestion}
-              onMarksChange={(marksPerQuestion) => setState({ marksPerQuestion })}
-
+            <SimplifiedMCQGenerator
+              courseCode={state.selectedCourse.code || state.selectedCourse.course_code || ""}
+              courseTitle={state.selectedCourse.title || state.selectedCourse.course_title || ""}
+              hierarchyUnits={state.hierarchyUnits}
+              loadingHierarchy={state.loadingHierarchy}
+              onGenerate={handleSimplifiedGenerate}
               isGeneratingAI={state.isGeneratingAI}
-              canGenerate={canGenerate}
-              validationError={validationError}
-              onGenerateForeground={handleGenerateQuestions}
-              onGenerateBackground={handleGenerateBackground}
-
-              currentQuestions={currentQuestions}
-              displayedQuestions={displayedQuestions}
-              selectedBannerFilter={state.selectedBannerFilter}
-              onSelectBannerFilter={(selectedBannerFilter) => setState({ selectedBannerFilter })}
-              recentQuestionIds={state.recentQuestionIds}
-              expandedQuestionIds={state.expandedQuestionIds}
-              onToggleExpandOne={handleToggleExpandOne}
-              onToggleExpandAll={handleToggleExpandAll}
-              onToggleApprove={handleToggleApprove}
-              onToggleArchive={handleToggleArchive}
-              onEditQuestion={(q) => setState({ editingQuestion: q, isEditModalOpen: true })}
-              onViewQuestion={(q) => setState({ viewQuestion: q, isViewModalOpen: true })}
-              onDeleteQuestion={handleDeleteQuestion}
-              onApproveAll={handleApproveAll}
-              onCreateQuestionSet={() => setState({ isSetModalOpen: true })}
             />
           )}
 
-          {/* TAB 2: COURSE QUESTION BANK */}
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 2: GENERATED QUESTIONS & REVIEW POOL
+              ══════════════════════════════════════════════════════════════ */}
+          {state.activeTab === "questions" && (
+            <div className="space-y-6">
+              {/* Filter Pills Banner */}
+              <MCQStatsBanner
+                questions={currentQuestions}
+                selectedFilter={state.selectedBannerFilter}
+                onSelectFilter={(selectedBannerFilter) => setState({ selectedBannerFilter })}
+              />
+
+              {/* Questions Pool */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <QuestionReviewPool
+                  currentQuestions={currentQuestions}
+                  displayedQuestions={displayedQuestions}
+                  selectedBannerFilter={state.selectedBannerFilter}
+                  onSelectBannerFilter={(selectedBannerFilter) => setState({ selectedBannerFilter })}
+                  recentQuestionIds={state.recentQuestionIds}
+                  expandedQuestionIds={state.expandedQuestionIds}
+                  onToggleExpandOne={handleToggleExpandOne}
+                  onToggleExpandAll={handleToggleExpandAll}
+                  onToggleApprove={handleToggleApprove}
+                  onToggleArchive={handleToggleArchive}
+                  onEditQuestion={(q) => setState({ editingQuestion: q, isEditModalOpen: true })}
+                  onViewQuestion={(q) => setState({ viewQuestion: q, isViewModalOpen: true })}
+                  onDeleteQuestion={handleDeleteQuestion}
+                  onApproveAll={handleApproveAll}
+                  onCreateQuestionSet={() => setState({ isSetModalOpen: true })}
+                  isGeneratingAI={state.isGeneratingAI}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 3: QUESTION BANKS
+              ══════════════════════════════════════════════════════════════ */}
           {state.activeTab === "bank" && (
             <CourseQuestionBankTab
               courseKey={currentCourseKey}
@@ -1015,7 +972,12 @@ const MCQGenerationIndexPage = () => {
                   : "Course Question Bank"
               }
               courseQuestions={currentQuestions}
-              courseUnits={state.courseUnits}
+              courseUnits={state.hierarchyUnits.map((u) => ({
+                unitId: u.unit_number,
+                label: `Unit ${u.unit_number}`,
+                title: u.unit_title,
+                topics: u.topics.map((t) => t.title),
+              }))}
               onRefreshQuestions={() => {
                 if (state.selectedCourse) {
                   fetchQuestions(
@@ -1026,7 +988,125 @@ const MCQGenerationIndexPage = () => {
             />
           )}
 
-          {/* Modals */}
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 4: TESTS & EXECUTION
+              ══════════════════════════════════════════════════════════════ */}
+          {state.activeTab === "tests" && (
+            <div className="space-y-6">
+              {/* Controls bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={state.testSearch}
+                    onChange={(e) => setState({ testSearch: e.target.value })}
+                    placeholder="Search test code, title, topics..."
+                    className="h-10 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-xs text-gray-900 placeholder:text-gray-400 focus:border-indigo-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Status filter pill buttons */}
+                  {(["all", "live", "upcoming", "setup_required", "completed"] as const).map((st) => {
+                    const labels: Record<string, string> = {
+                      all: "All Statuses",
+                      live: "Live",
+                      upcoming: "Upcoming",
+                      setup_required: "Needs Setup",
+                      completed: "Completed",
+                    };
+                    const isSelected = state.testStatusFilter === st;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setState({ testStatusFilter: st })}
+                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        {labels[st]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Test Cards List */}
+              <div className="space-y-4">
+                {state.loadingTests ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="h-40 animate-pulse rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-800/40"
+                      />
+                    ))}
+                  </div>
+                ) : filteredTests.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
+                    <BookOpen className="h-10 w-10 text-gray-300 dark:text-gray-600" />
+                    <h4 className="mt-3 text-base font-bold text-gray-900 dark:text-white">
+                      No Scheduled MCQ Tests Found
+                    </h4>
+                    <p className="mt-1 max-w-sm text-xs text-gray-500 dark:text-gray-400">
+                      {state.testSearch
+                        ? `No tests match "${state.testSearch}". Try clearing your search.`
+                        : "No tests scheduled yet for this course. Click 'Schedule Test' to set up a live student assessment from your question banks."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const c = state.selectedCourse;
+                        setState({
+                          isConfigureModalOpen: true,
+                          configureModalData: {
+                            testCode: `MCQ-${c?.code || "TEST"}-${Date.now().toString().slice(-4)}`,
+                            courseCodeTitle: c ? `${c.code || c.course_code} — ${c.title || c.course_title}` : "Course MCQ Test",
+                            testName: "Unit Assessment / MCQ Quiz",
+                            unitLabel: "Unit 1",
+                            topics: "Selected Question Bank Topics",
+                            questionsCount: currentQuestions.length > 0 ? Math.min(currentQuestions.length, 10) : 10,
+                            duration: "30 Minutes",
+                            secureCode: `SEC-${Math.floor(1000 + Math.random() * 9000)}`,
+                          },
+                        });
+                      }}
+                      className="mt-4 flex items-center gap-1.5 rounded-xl bg-color1 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Schedule New Test</span>
+                    </button>
+                  </div>
+                ) : (
+                  filteredTests.map((testItem) => (
+                    <MCQTestExecutionCard
+                      key={testItem.id}
+                      test={testItem}
+                      onPreviewQuestions={handlePreviewQuestions}
+                      onEditSettings={(t) => setEditTestModal({ open: true, data: t })}
+                      onConfigureTest={(t) => setEditTestModal({ open: true, data: t })}
+                      onViewResults={(t) => handleViewReport(t.id)}
+                      onCopyCode={handleCopyCode}
+                      onMonitorLive={(t) => handleMonitorLive(t.id)}
+                      onViewReport={(t) => handleViewReport(t.id)}
+                      onCancelTest={(t) => handleCancelTest(t.id)}
+                      onCompleteTest={(t) => handleCompleteTest(t.id)}
+                      onDeleteTest={(t) => handleDeleteTest(t.id)}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              MODALS
+              ══════════════════════════════════════════════════════════════ */}
+          {/* Edit Question Modal */}
           <EditQuestionModal
             open={state.isEditModalOpen}
             onClose={() => setState({ isEditModalOpen: false, editingQuestion: null })}
@@ -1100,6 +1180,7 @@ const MCQGenerationIndexPage = () => {
             }
           />
 
+          {/* View Question Modal */}
           {state.viewQuestion && (
             <ViewQuestionModal
               open={state.isViewModalOpen}
@@ -1126,6 +1207,7 @@ const MCQGenerationIndexPage = () => {
             />
           )}
 
+          {/* Create Question Set Modal */}
           {state.isSetModalOpen && (
             <CreateQuestionSetModal
               open={state.isSetModalOpen}
@@ -1133,13 +1215,17 @@ const MCQGenerationIndexPage = () => {
               availableQuestions={currentQuestions}
               courseId={state.selectedCourse?.code || state.selectedCourse?.id}
               courseTitle={state.selectedCourse?.title || state.selectedCourse?.course_title}
-              units={UNITS_CONFIG.map((u) => ({ unit_number: u.unitId, title: u.title }))}
+              units={state.hierarchyUnits.map((u) => ({
+                unit_number: u.unit_number,
+                title: u.unit_title,
+              }))}
               onCreated={() => {
                 fetchQuestions(state.selectedCourse?.code || state.selectedCourse?.id);
               }}
             />
           )}
 
+          {/* Configure Test Schedule Modal */}
           {state.isConfigureModalOpen && (
             <ConfigureTestScheduleModal
               open={state.isConfigureModalOpen}
@@ -1155,9 +1241,47 @@ const MCQGenerationIndexPage = () => {
               secureCode={state.configureModalData?.secureCode}
               onSave={() => {
                 Success("Test schedule configured successfully!");
-                setState({ isConfigureModalOpen: false, configureModalData: null });
-                const cId = state.selectedCourse?.id || state.selectedCourse?.code || "";
-                router.push(`/neurobe/ins-mcq-test-execution?course_id=${cId}`);
+                setState({ isConfigureModalOpen: false, configureModalData: null, activeTab: "tests" });
+                if (state.selectedCourse) fetchTests(state.selectedCourse.id);
+              }}
+            />
+          )}
+
+          {/* Preview Test Questions Modal */}
+          {previewTestModal.open && (
+            <PreviewQuestionsModal
+              open={previewTestModal.open}
+              onClose={() => setPreviewTestModal({ open: false, test: null, questions: [] })}
+              testTitle={previewTestModal.test?.title}
+              testCode={previewTestModal.test?.testCode}
+              unitLabel={previewTestModal.test?.unitLabel}
+              questions={previewTestModal.questions}
+            />
+          )}
+
+          {/* Edit Test Schedule Modal */}
+          {editTestModal.open && editTestModal.data && (
+            <EditTestScheduleModal
+              open={editTestModal.open}
+              onClose={() => setEditTestModal({ open: false, data: null })}
+              testData={editTestModal.data ? {
+                testCode: editTestModal.data.testCode,
+                testName: editTestModal.data.title,
+                unitLabel: editTestModal.data.unitLabel,
+                topics: editTestModal.data.topics,
+                questionsCount: editTestModal.data.questionsCount,
+                duration: editTestModal.data.duration,
+                testDate: editTestModal.data.rawTestDate,
+                startTime: editTestModal.data.rawStartTime,
+                endTime: editTestModal.data.rawEndTime,
+                secureCode: editTestModal.data.secureCode,
+                maxTabSwitches: editTestModal.data.maxTabSwitches,
+                haveViva: editTestModal.data.haveViva,
+              } : null}
+              onSave={() => {
+                Success("Test schedule updated successfully!");
+                setEditTestModal({ open: false, data: null });
+                if (state.selectedCourse) fetchTests(state.selectedCourse.id);
               }}
             />
           )}

@@ -182,20 +182,8 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "MCQ Generation",
+      label: "MCQ",
       href: "/neurobe/mcq-generation",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "MCQ Test Execution",
-      href: "/neurobe/mcq-test-execution",
-    },
-    {
-      type: "link",
-      icon: "IconMenuCharts",
-      label: "Live Test Monitor",
-      href: "/neurobe/ins-mcq-live-monitor",
     },
     {
       type: "link",
@@ -260,22 +248,8 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "MCQ Generation",
+      label: "MCQ",
       href: "/neurobe/mcq-generation",
-    },
-
-    {
-      type: "link",
-      icon: "IconMenuTables",
-      label: "MCQ Test Execution",
-      href: "/neurobe/ins-mcq-test-execution",
-      notifyKey: "new_application_count",
-    },
-    {
-      type: "link",
-      icon: "IconMenuCharts",
-      label: "Live Test Monitor",
-      href: "/neurobe/ins-mcq-live-monitor",
     },
     {
       type: "link",
@@ -327,20 +301,8 @@ OwnmenuConfig.FACULTY = [
   {
     type: "link",
     icon: "IconMenuNotes",
-    label: "MCQ Generation",
+    label: "MCQ",
     href: "/neurobe/mcq-generation",
-  },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "MCQ Test Execution",
-    href: "/neurobe/ins-mcq-test-execution",
-  },
-  {
-    type: "link",
-    icon: "IconMenuCharts",
-    label: "Live Test Monitor",
-    href: "/neurobe/ins-mcq-live-monitor",
   },
   {
     type: "link",
