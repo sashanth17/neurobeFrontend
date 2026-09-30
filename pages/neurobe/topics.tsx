@@ -271,6 +271,9 @@ const Topics = () => {
     loadingUnitDetail: false,
     upstreamNotApproved: false,
     approvingTopics: false,
+    versionsLoaded: false,
+    hasVersions: false,
+    versionRefreshKey: Date.now(),
   });
 
   const course_id = useSearchParams().get("course_id");
@@ -1342,7 +1345,7 @@ const Topics = () => {
         console.warn("approve_stage hierarchy warning:", e);
       }
       Success("Topic hierarchy approved successfully");
-      setState({ topicsApproved: true });
+      setState({ topicsApproved: true, versionRefreshKey: Date.now() });
       if (sid) {
         await getUnits(sid, loadedVersion);
         await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
@@ -1767,36 +1770,189 @@ const Topics = () => {
         icon={<BookOpenCheck className="h-5 w-5 text-color2" />}
       />
 
-      {/* ── Stat cards — hidden after generation ── */}
-
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-        {statTabs.map((tab) => (
-          <StatTabCard
-            key={tab.key}
-            icon={tab.icon}
-            label={tab.label}
-            subLabel={tab.subLabel}
-            count={tab.count}
-            active={state.activeStatTab === tab.key}
-            onClick={() => setState({ activeStatTab: tab.key })}
-          />
-        ))}
-      </div>
+      {state.hasVersions && (
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {statTabs.map((tab) => (
+            <StatTabCard
+              key={tab.key}
+              icon={tab.icon}
+              label={tab.label}
+              subLabel={tab.subLabel}
+              count={tab.count}
+              active={state.activeStatTab === tab.key}
+              onClick={() => setState({ activeStatTab: tab.key })}
+            />
+          ))}
+        </div>
+      )}
 
       {course_id && (
         <StageVersionHistoryPanel
           stage="hierarchy"
           stageLabel="Topic Hierarchy"
           courseId={course_id}
+          key={state.versionRefreshKey}
+          refreshTrigger={state.versionRefreshKey}
           onVersionActivated={handleVersionActivated}
           onVersionLoad={handleVersionActivated}
           onGenerateNew={handleGenerateTopics}
           isGenerating={state.generatingTopics}
+          onVersionsLoaded={(count) => setState({ versionsLoaded: true, hasVersions: count > 0 })}
         />
       )}
 
+      {/* ── Empty state OR full content ── */}
+      {state.generatingTopics ? (
+        <div className="panel flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 dark:border-indigo-800/40 dark:bg-indigo-950/20">
+          <RefreshCw className="h-10 w-10 text-indigo-600 mb-3 animate-spin dark:text-indigo-400" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">NEURO AI Topic Generation in Progress</h4>
+          <p className="mt-1 text-sm text-gray-500 max-w-md">Decomposing syllabus units into topics and subtopics with Knowledge Level calibration...</p>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
+            Status: Processing in AI Worker Queue
+          </div>
+        </div>
+      ) : !state.hasVersions && !state.loadingUnits ? (
+        <div className="panel flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+          <Sparkles className="h-12 w-12 text-indigo-500 mb-4 animate-pulse" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">No Topic Hierarchy Generated Yet</h4>
+          <p className="mt-2 text-sm text-gray-500 max-w-sm">
+            Use the version panel above to generate your first AI-assisted topic hierarchy from the approved syllabus.
+          </p>
+          <button
+            type="button"
+            onClick={() => handleGenerateTopics()}
+            disabled={state.generatingTopics || state.upstreamNotApproved}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Topic Hierarchy
+          </button>
+        </div>
+      ) : state.hasVersions ? (
+        <div className="mt-4">
+          {/* ── Section title ── */}
+          <TableTitle
+            title="Topics from Approved Syllabus"
+            label={`${totalUnits} Units`}
+            subLabel={`${totalTopics} Topics`}
+          />
 
-      {/* ── Progress bar — shown after generation ── */}
+          {/* ── Unit tabs + accordion ── */}
+          <div className="mt-4">
+            <GenericTabs
+              tabs={unitTabs}
+              activeKey={state.activeTab}
+              onChange={(unit) => handleTabChange(unit)}
+              rightContent={
+                (state.loadingUnits || state.loadingUnitDetail) ? (
+                  <div className="flex items-center gap-1.5 text-xs text-color2 font-semibold">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Loading unit details...
+                  </div>
+                ) : null
+              }
+            />
+
+            <AccordiansStyle
+              loading={state.topicsLoading || (state.loadingUnitDetail && !activeUnitDetail)}
+              loadingMessage={state.topicsLoading ? "Processing topic hierarchy with NEURO AI... (Status: Processing · Polling every 2m)" : "Loading unit details..."}
+              expandable={state.topicsGenerated || buildInitialTopics().some((t: any) => t.items && t.items.length > 0)}
+              topics={state.topicsGenerated ? buildGeneratedTopics() : buildInitialTopics()}
+              title={currentUnitTitle}
+              subtitle={
+                state.topicsGenerated
+                  ? "Click a topic to expand and review subtopics."
+                  : (activeUnitDetail?.callout_message ||
+                    activeUnitDetail?.selected_unit?.unit_overview ||
+                    activeUnitFromList?.unit_overview ||
+                    "NEURO AI will use these approved syllabus topics to create a Unit -> Topic -> Subtopics structure.")
+              }
+              topicCount={apiTopics?.length ?? activeUnitFromList?.topics_count ?? (state.topicsGenerated ? buildGeneratedTopics()?.length : buildInitialTopics()?.length)}
+              onAddTopic={() => setAddTopicModal(true)}
+              expandedSectionLabel={
+                <><BookOpen className="h-3.5 w-3.5" /> Subtopics</>
+              }
+              footerContent={
+                state.topicsGenerated ? (
+                  <><Sparkles className="h-3.5 w-3.5 text-color2" /> Review generated topics and subtopics. Edit or add topics if needed, then click 'Approve Topics' to finalize the hierarchy.</>
+                ) : (
+                  <><Sparkles className="h-4 w-4" /> {activeUnitDetail?.callout_message || "NEURO AI will use these approved syllabus topics to create a Unit -> Topic -> Subtopics structure."}</>
+                )
+              }
+            />
+
+            {/* ── Footer ── */}
+            {state.topicsGenerated ? (
+              <PageFooter
+                content1={state.topicsApproved ? "Status: Topics Hierarchy Approved" : `${totalTopics} Topics · ${computedTotalSubtopics} Subtopics`}
+                content2={
+                  activeUnitDetail?.course_display_tag ||
+                  (state.courseDetail
+                    ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
+                    : "")
+                }
+                batch
+                actionBtn1={
+                  state.topicsApproved
+                    ? {
+                      label: "Next: Pedagogy",
+                      icon: <Check className="h-4 w-4" />,
+                      onClick: () => {
+                        const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id || activeUnitDetail?.course_id;
+                        router.push(cid ? `/neurobe/pedagogy?course_id=${cid}` : "/neurobe/pedagogy");
+                      },
+                      className: "create-btn",
+                    }
+                    : {
+                      label: state.approvingTopics
+                        ? "Approving..."
+                        : state.upstreamNotApproved
+                          ? "Requires Syllabus Approval"
+                          : (activeUnitDetail?.bottom_bar?.actions?.approve_topics?.label || "Approve Topics"),
+                      icon: state.approvingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
+                      onClick: handleApproveTopics,
+                      disabled: state.approvingTopics || state.upstreamNotApproved,
+                    }
+                }
+                actionBtn2={{
+                  label: state.savingDraft ? "Saving..." : (activeUnitDetail?.bottom_bar?.actions?.save_draft?.label || "Save Draft"),
+                  icon: state.savingDraft ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />,
+                  onClick: handleSaveDraft,
+                  disabled: state.savingDraft,
+                }}
+              />
+            ) : (
+              <PageFooter
+                content1={
+                  activeUnitDetail?.course_display_tag ||
+                  (state.courseDetail
+                    ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
+                    : "")
+                }
+                content2={`${totalContactHours} Contact Hours · ${totalUnits} Units`}
+                actionBtn1={{
+                  label: state.generatingTopics
+                    ? "Generating Topics..."
+                    : (activeUnitDetail?.cta_action?.label || "Generate Topics with NEURO AI"),
+                  icon: state.generatingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />,
+                  onClick: handleGenerateTopics,
+                  disabled: state.generatingTopics || (activeUnitDetail?.cta_action ? !activeUnitDetail.cta_action.enabled : false),
+                  className: "create-btn",
+                }}
+                actionBtn2={{
+                  label: state.savingDraft ? "Saving..." : (activeUnitDetail?.bottom_bar?.actions?.save_draft?.label || "Save Draft"),
+                  icon: state.savingDraft ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />,
+                  onClick: handleSaveDraft,
+                  disabled: state.savingDraft,
+                }}
+              />
+            )}
+          </div>
+        </div>
+      ) : null}
+
+
+      {/* ── Progress bar (commented out) ── */}
       {/* {state.topicsGenerated && (
         <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <div className="flex items-center justify-between">
@@ -1818,14 +1974,14 @@ const Topics = () => {
       )} */}
 
       {/* ── Section title ── */}
-      <TableTitle
+      {/* <TableTitle
         title="Topics from Approved Syllabus"
         label={`${totalUnits} Units`}
         subLabel={`${totalTopics} Topics`}
-      />
+      /> */}
 
       {/* ── Unit tabs + accordion ── */}
-      <div className="mt-4">
+      {/* <div className="mt-4">
         <GenericTabs
           tabs={unitTabs}
           activeKey={state.activeTab}
@@ -1837,9 +1993,9 @@ const Topics = () => {
               </div>
             ) : null
           }
-        />
+        /> */}
 
-        <AccordiansStyle
+      {/* <AccordiansStyle
           loading={state.topicsLoading || (state.loadingUnitDetail && !activeUnitDetail)}
           loadingMessage={state.topicsLoading ? "Processing topic hierarchy with NEURO AI... (Status: Processing · Polling every 2m)" : "Loading unit details..."}
           expandable={state.topicsGenerated || buildInitialTopics().some((t: any) => t.items && t.items.length > 0)}
@@ -1865,10 +2021,10 @@ const Topics = () => {
               <><Sparkles className="h-4 w-4" /> {activeUnitDetail?.callout_message || "NEURO AI will use these approved syllabus topics to create a Unit -> Topic -> Subtopics structure."}</>
             )
           }
-        />
+        /> */}
 
-        {/* ── Footer ── */}
-        {state.topicsGenerated ? (
+      {/* ── Footer ── */}
+      {/* {state.topicsGenerated ? (
           <PageFooter
             content1={state.topicsApproved ? "Status: Topics Hierarchy Approved" : `${totalTopics} Topics · ${computedTotalSubtopics} Subtopics`}
             content2={
@@ -1933,7 +2089,7 @@ const Topics = () => {
             }}
           />
         )}
-      </div>
+      </div> */}
 
       {/* ── Add Topic modal ── */}
       <AddTopicModal

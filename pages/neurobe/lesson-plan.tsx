@@ -293,6 +293,8 @@ const LessonPlan = () => {
     upstreamNotApproved: false,
     approvingLesson: false,
     savingDraft: false,
+    versionsLoaded: false,
+    hasVersions: false,
   });
   const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
@@ -866,175 +868,196 @@ const LessonPlan = () => {
         icon={<ClipboardList className="h-5 w-5 text-color2" />}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-        {state.matrix?.map((tab) => (
-          <StatTabCard
-            key={tab.key}
-            icon={tab.icon}
-            label={tab.label}
-            subLabel={tab.subLabel}
-            count={tab.count}
-            active={state.activeTab === tab.key}
-          />
-        ))}
-      </div>
-
-      {course_id && (
-        <StageVersionHistoryPanel
-          key={state.versionRefreshKey}
-          stage="schedule"
-          stageLabel="Lesson Plan & Schedules"
-          courseId={course_id}
-          onVersionActivated={handleVersionActivated}
-          onVersionLoad={handleVersionLoad}
-          onGenerateNew={generateLessionPlan}
-          isGenerating={state.generateLoading}
-          refreshTrigger={state.versionRefreshKey}
-        />
-      )}
-
-      <TableTitle
-        title={hasSessions ? "Generated Lesson Plan & Schedules" : "Topics from Approved Syllabus"}
-        label={`${state?.lession_data?.unit_tabs?.length || 5} Units`}
-        subLabel={`${hasSessions ? (state?.lession_data?.selected_unit?.sessions?.length ?? 0) : (state?.lession_data?.selected_unit?.topics_count ?? state?.lession_data?.selected_unit?.topics?.length ?? 0)} ${hasSessions ? "Sessions" : "Topics"}`}
-      />
-
-      <div className="mt-4">
-        <GenericTabsData
-          tabs={
-            state?.lession_data?.unit_tabs?.map((unit: any) => ({
-              key: `unit-${unit.unit_number}`,
-              label: `Unit ${unit.unit_number}`,
-            })) || [
-              { key: "unit-1", label: "Unit 1" },
-              { key: "unit-2", label: "Unit 2" },
-              { key: "unit-3", label: "Unit 3" },
-              { key: "unit-4", label: "Unit 4" },
-              { key: "unit-5", label: "Unit 5" },
-            ]
-          }
-          activeKey={state.activeTab}
-          onChange={(unit) => {
-            setState({ activeTab: unit as string });
-            const unitNumber = parseInt((unit as string).split("-")[1], 10) || 1;
-            lession_data(getSyllabusId(), unitNumber, loadedVersion ?? undefined);
-          }}
-        />
-
-        {hasSessions ? (
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 mb-5">
-            <div className="flex items-center justify-between bg-[#111238] px-4 py-3 text-white">
-              <div>
-                <h3 className="text-lg font-bold">{state?.lession_data?.selected_unit?.unit_title}</h3>
-                <p className="mt-0.5 text-sm text-white/70">
-                  {state?.lession_data?.selected_unit?.subtitle}
-                </p>
-              </div>
-              <span className="rounded bg-white/15 px-4 py-1 text-sm font-semibold">
-                {state?.lession_data?.selected_unit?.hours_badge}
-              </span>
-            </div>
-            <TableComponent
-              records={state?.lession_data?.selected_unit?.sessions?.map((session: any) => ({
-                id: session.slot_id,
-                slot_id: session.slot_id,
-                topic_id: session.topic_id,
-                seq: session.seq,
-                title: session.topic_name,
-                subtopic: session.subtopic || "",
-                level: session.level,
-                textbook: session.textbook,
-                reference: session.reference_book,
-                hours: session.hours_display || (session.hours ? `${session.hours} Hour${Number(session.hours) > 1 ? 's' : ''}` : "1 Hour"),
-                pedagogy: session.pedagogy,
-                status: session.status || session.status_display || "Scheduled",
-                status_display: session.status_display || session.status || "Scheduled",
-                status_badge: session.status_badge,
-              })) ?? []}
-              columns={lessonPlanColumns}
+      {/* ── Stat cards — only when versions exist ── */}
+      {state.hasVersions && (
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {state.matrix?.map((tab) => (
+            <StatTabCard
+              key={tab.key}
+              icon={tab.icon}
+              label={tab.label}
+              subLabel={tab.subLabel}
+              count={tab.count}
+              active={state.activeTab === tab.key}
             />
-          </div>
-        ) : (
-          <AccordiansStyle
-            expandable={false}
-            topics={buildInitialTopics()}
-            title={state?.lession_data?.selected_unit?.unit_title || "Unit 1 — Approved Topics"}
-            subtitle={state?.lession_data?.selected_unit?.subtitle || "Approved topic sequencing and teaching methods"}
-            topicCount={state?.lession_data?.selected_unit?.topics_count || state?.lession_data?.selected_unit?.topics?.length}
-            footerContent={
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-2 text-sm text-gray-500">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse flex-shrink-0" />
-                  <span>NEURO AI will sequence all topics, assign textbook chapters, calibrate session hours, and link pedagogy methods.</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => generateLessionPlan()}
-                  disabled={state.generateLoading}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50 flex-shrink-0"
-                >
-                  {state.generateLoading ? (
-                    <>
-                      <RotateCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Generating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Generate Lesson Plan with NEURO AI</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            }
-          />
-        )}
-      </div>
-
-      {hasSessions ? (
-        <PageFooter
-          content1={`Unit Topics: ${state?.lession_data?.selected_unit?.topics_count ?? 0}`}
-          content2={`Course: ${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
-          batch
-          actionBtn1={
-            state.lessonApproved
-              ? {
-                label: "Next: Learning Material",
-                icon: <Check className="h-4 w-4" />,
-                onClick: () => router.push(course_id ? `/neurobe/learning-materials?course_id=${course_id}` : "/neurobe/learning-materials"),
-                className: "create-btn",
-              }
-              : {
-                label: state.approvingLesson
-                  ? "Approving..."
-                  : state.upstreamNotApproved
-                  ? "Requires Pedagogy Approval"
-                  : "Approve Lesson Plan",
-                icon: state.approvingLesson ? <RotateCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
-                onClick: handleApproveLessonPlan,
-                disabled: state.approvingLesson || state.upstreamNotApproved,
-              }
-          }
-          actionBtn2={{
-            label: state.savingDraft ? "Saving..." : "Save Draft",
-            icon: <Save className="h-4 w-4" />,
-            onClick: handleSaveDraft,
-            disabled: state.savingDraft,
-          }}
-        />
-      ) : (
-        <PageFooter
-          content1={`Curriculum: ${state?.lession_data?.summary?.total_topics ?? state?.lession_data?.metrics?.topics?.value ?? 28} Topics across ${state?.lession_data?.unit_tabs?.length ?? 5} Units`}
-          content2={`Course: ${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
-          actionBtn1={{
-            label: state.generateLoading ? "Generating..." : "Generate Lesson Plan with NEURO AI",
-            icon: state.generateLoading ? null : <Sparkles className="h-4 w-4" />,
-            onClick: () => generateLessionPlan(),
-            className: "create-btn",
-            disabled: state.generateLoading,
-          }}
-        />
+          ))}
+        </div>
       )}
+
+      {/* ── Empty state OR full content ── */}
+      {state.generateLoading ? (
+        <div className="panel flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 dark:border-indigo-800/40 dark:bg-indigo-950/20">
+          <RotateCw className="h-10 w-10 text-indigo-600 mb-3 animate-spin dark:text-indigo-400" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">NEURO AI Lesson Plan Generation in Progress</h4>
+          <p className="mt-1 text-sm text-gray-500 max-w-md">Sequencing topics, assigning textbook chapters, calibrating session hours, and linking pedagogy methods...</p>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
+            Status: Processing in AI Worker Queue
+          </div>
+        </div>
+      ) : !state.hasVersions && !state.generateLoading ? (
+        <div className="panel flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+          <Sparkles className="h-12 w-12 text-indigo-500 mb-4 animate-pulse" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">No Lesson Plan Generated Yet</h4>
+          <p className="mt-2 text-sm text-gray-500 max-w-sm">
+            Use the version panel above to generate a session-by-session lesson plan from the approved topics, books, hours, and pedagogies.
+          </p>
+          <button
+            type="button"
+            onClick={() => generateLessionPlan()}
+            disabled={state.generateLoading || state.upstreamNotApproved}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Lesson Plan
+          </button>
+        </div>
+      ) : state.hasVersions ? (
+        <div className="mt-4">
+          <TableTitle
+            title={hasSessions ? "Generated Lesson Plan & Schedules" : "Topics from Approved Syllabus"}
+            label={`${state?.lession_data?.unit_tabs?.length || 5} Units`}
+            subLabel={`${hasSessions ? (state?.lession_data?.selected_unit?.sessions?.length ?? 0) : (state?.lession_data?.selected_unit?.topics_count ?? state?.lession_data?.selected_unit?.topics?.length ?? 0)} ${hasSessions ? "Sessions" : "Topics"}`}
+          />
+
+          <div className="mt-4">
+            <GenericTabsData
+              tabs={
+                state?.lession_data?.unit_tabs?.map((unit: any) => ({
+                  key: `unit-${unit.unit_number}`,
+                  label: `Unit ${unit.unit_number}`,
+                })) || [
+                  { key: "unit-1", label: "Unit 1" },
+                  { key: "unit-2", label: "Unit 2" },
+                  { key: "unit-3", label: "Unit 3" },
+                  { key: "unit-4", label: "Unit 4" },
+                  { key: "unit-5", label: "Unit 5" },
+                ]
+              }
+              activeKey={state.activeTab}
+              onChange={(unit) => {
+                setState({ activeTab: unit as string });
+                const unitNumber = parseInt((unit as string).split("-")[1], 10) || 1;
+                lession_data(getSyllabusId(), unitNumber, loadedVersion ?? undefined);
+              }}
+            />
+
+            {hasSessions ? (
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 mb-5">
+                <div className="flex items-center justify-between bg-[#111238] px-4 py-3 text-white">
+                  <div>
+                    <h3 className="text-lg font-bold">{state?.lession_data?.selected_unit?.unit_title}</h3>
+                    <p className="mt-0.5 text-sm text-white/70">
+                      {state?.lession_data?.selected_unit?.subtitle}
+                    </p>
+                  </div>
+                  <span className="rounded bg-white/15 px-4 py-1 text-sm font-semibold">
+                    {state?.lession_data?.selected_unit?.hours_badge}
+                  </span>
+                </div>
+                <TableComponent
+                  records={state?.lession_data?.selected_unit?.sessions?.map((session: any) => ({
+                    id: session.slot_id,
+                    slot_id: session.slot_id,
+                    topic_id: session.topic_id,
+                    seq: session.seq,
+                    title: session.topic_name,
+                    subtopic: session.subtopic || "",
+                    level: session.level,
+                    textbook: session.textbook,
+                    reference: session.reference_book,
+                    hours: session.hours_display || (session.hours ? `${session.hours} Hour${Number(session.hours) > 1 ? 's' : ''}` : "1 Hour"),
+                    pedagogy: session.pedagogy,
+                    status: session.status || session.status_display || "Scheduled",
+                    status_display: session.status_display || session.status || "Scheduled",
+                    status_badge: session.status_badge,
+                  })) ?? []}
+                  columns={lessonPlanColumns}
+                />
+              </div>
+            ) : (
+              <AccordiansStyle
+                expandable={false}
+                topics={buildInitialTopics()}
+                title={state?.lession_data?.selected_unit?.unit_title || "Unit 1 — Approved Topics"}
+                subtitle={state?.lession_data?.selected_unit?.subtitle || "Approved topic sequencing and teaching methods"}
+                topicCount={state?.lession_data?.selected_unit?.topics_count || state?.lession_data?.selected_unit?.topics?.length}
+                footerContent={
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-2 text-sm text-gray-500">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse flex-shrink-0" />
+                      <span>NEURO AI will sequence all topics, assign textbook chapters, calibrate session hours, and link pedagogy methods.</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => generateLessionPlan()}
+                      disabled={state.generateLoading}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50 flex-shrink-0"
+                    >
+                      {state.generateLoading ? (
+                        <>
+                          <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>Generate Lesson Plan with NEURO AI</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                }
+              />
+            )}
+          </div>
+
+          {hasSessions ? (
+            <PageFooter
+              content1={`Unit Topics: ${state?.lession_data?.selected_unit?.topics_count ?? 0}`}
+              content2={`Course: ${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
+              batch
+              actionBtn1={
+                state.lessonApproved
+                  ? {
+                    label: "Next: Learning Material",
+                    icon: <Check className="h-4 w-4" />,
+                    onClick: () => router.push(course_id ? `/neurobe/learning-materials?course_id=${course_id}` : "/neurobe/learning-materials"),
+                    className: "create-btn",
+                  }
+                  : {
+                    label: state.approvingLesson
+                      ? "Approving..."
+                      : state.upstreamNotApproved
+                      ? "Requires Pedagogy Approval"
+                      : "Approve Lesson Plan",
+                    icon: state.approvingLesson ? <RotateCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
+                    onClick: handleApproveLessonPlan,
+                    disabled: state.approvingLesson || state.upstreamNotApproved,
+                  }
+              }
+              actionBtn2={{
+                label: state.savingDraft ? "Saving..." : "Save Draft",
+                icon: <Save className="h-4 w-4" />,
+                onClick: handleSaveDraft,
+                disabled: state.savingDraft,
+              }}
+            />
+          ) : (
+            <PageFooter
+              content1={`Curriculum: ${state?.lession_data?.summary?.total_topics ?? state?.lession_data?.metrics?.topics?.value ?? 28} Topics across ${state?.lession_data?.unit_tabs?.length ?? 5} Units`}
+              content2={`Course: ${state.courseData?.course_code || state.lession_data?.course_code || ""} - ${state.courseData?.course_title || state.lession_data?.course_title || ""}`}
+              actionBtn1={{
+                label: state.generateLoading ? "Generating..." : "Generate Lesson Plan with NEURO AI",
+                icon: state.generateLoading ? null : <Sparkles className="h-4 w-4" />,
+                onClick: () => generateLessionPlan(),
+                className: "create-btn",
+                disabled: state.generateLoading,
+              }}
+            />
+          )}
+        </div>
+      ) : null}
 
       {/* Avoided generation popup modal per user requirement */}
 

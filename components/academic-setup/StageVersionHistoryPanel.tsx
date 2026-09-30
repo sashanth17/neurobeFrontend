@@ -40,6 +40,8 @@ interface StageVersionHistoryPanelProps {
   isGenerating?: boolean;
   refreshTrigger?: any;
   onExtractionChange?: (ver: number | null) => void;
+  /** Fires after every version-list fetch. count = number of versions available. */
+  onVersionsLoaded?: (count: number) => void;
 }
 
 export default function StageVersionHistoryPanel({
@@ -52,6 +54,7 @@ export default function StageVersionHistoryPanel({
   isGenerating = false,
   refreshTrigger,
   onExtractionChange,
+  onVersionsLoaded,
 }: StageVersionHistoryPanelProps) {
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [activeVersion, setActiveVersion] = useState<number>(1);
@@ -82,8 +85,10 @@ export default function StageVersionHistoryPanel({
       const actVer = res?.active_version || 1;
       setActiveVersion(actVer);
       setLoadedVersion((prev) => (prev !== null ? prev : actVer));
+      onVersionsLoaded?.(vList.length);
     } catch (err) {
       console.error(`Failed to load versions for ${stage}:`, err);
+      onVersionsLoaded?.(0);
     } finally {
       setLoadingVersions(false);
     }

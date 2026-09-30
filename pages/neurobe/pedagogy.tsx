@@ -55,6 +55,9 @@ const Pedagogy = () => {
     pollingJob: false,
     upstreamNotApproved: false,
     approvingPedagogy: false,
+    versionsLoaded: false,
+    hasVersions: false,
+    versionRefreshKey: Date.now(),
   });
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -829,7 +832,7 @@ const Pedagogy = () => {
       setState({ approvingPedagogy: true });
       await Models.syllabus.approve_stage(course_id || sid, "pedagogy");
       Success("Pedagogy approved successfully");
-      setState({ pedagogyApproved: true });
+      setState({ pedagogyApproved: true, versionRefreshKey: Date.now() });
       if (sid) {
         await getUnits(sid, loadedVersion);
         await getUnitDetail(sid, activeUnitNum, loadedVersion);
@@ -1057,15 +1060,18 @@ const Pedagogy = () => {
           stage="pedagogy"
           stageLabel="Pedagogy Suggestions"
           courseId={course_id}
+          key={state.versionRefreshKey}
+          refreshTrigger={state.versionRefreshKey}
           onVersionActivated={handleVersionActivated}
           onVersionLoad={handleVersionActivated}
           onGenerateNew={handleGenerateRecommendations}
           isGenerating={state.generatingRecommendations}
+          onVersionsLoaded={(count) => setState({ versionsLoaded: true, hasVersions: count > 0 })}
         />
       )}
 
-      {/* ── Stat tabs — shown only before recommendations are generated ── */}
-      {!state.recommendationsGenerated && (
+      {/* ── Stat tabs — only when no versions AND not generating ── */}
+      {!state.hasVersions && !state.generatingRecommendations && (
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
           {STAT_TABS.map((tab) => (
             <StatTabCard
@@ -1080,8 +1086,8 @@ const Pedagogy = () => {
         </div>
       )}
 
-      {/* ── Progress bar — shown after recommendations are generated ── */}
-      {state.recommendationsGenerated && (
+      {/* ── Progress bar — only when versions exist ── */}
+      {state.hasVersions && (
         <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <div className="flex items-center justify-between">
             <div>
@@ -1101,300 +1107,328 @@ const Pedagogy = () => {
         </div>
       )}
 
-        <div className="flex items-center justify-between mb-2">
-          <TableTitle
-            title="Approved Topics"
-            label={`${computedTotalUnits} Units`}
-            subLabel={`${computedTotalTopics} Topics`}
-          />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const firstTopic = currentTopics[0];
-                setAddModal({
-                  open: true,
-                  topicId: firstTopic?.id,
-                  topicLabel: firstTopic?.topic_name || firstTopic?.title || `Topic ${activeUnitNum}.1`,
-                });
-              }}
-              className="flex items-center gap-1.5 rounded-lg bg-color2 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 shadow-sm transition active:scale-95 cursor-pointer"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Teaching Method
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={state.refreshing}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition active:scale-95 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${state.refreshing ? "animate-spin text-color2" : ""}`} />
-              {state.refreshing ? "Refreshing..." : "Refresh"}
-            </button>
+      {/* ── Empty state OR full content ── */}
+      {state.generatingRecommendations ? (
+        <div className="panel flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 dark:border-indigo-800/40 dark:bg-indigo-950/20">
+          <RefreshCw className="h-10 w-10 text-indigo-600 mb-3 animate-spin dark:text-indigo-400" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">NEURO AI Pedagogy Generation in Progress</h4>
+          <p className="mt-1 text-sm text-gray-500 max-w-md">Analysing topics, Knowledge Levels, and durations to recommend up to 3 suitable teaching methods per topic...</p>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
+            Status: Processing in AI Worker Queue
           </div>
         </div>
-
-      <div className="mt-4">
-        <GenericTabs
-          tabs={unitTabs}
-          activeKey={state.activeTab}
-          onChange={(unit) => handleTabChange(unit)}
-        />
-
-        
-
-        <AccordiansStyle
-          expandable={state.recommendationsGenerated}
-          topics={state.recommendationsGenerated ? buildTopics() : buildInitialTopics()}
-          title={
-            activeUnitDetail?.selected_unit?.unit_title ||
-            activeUnitDetail?.unit_title ||
-            state.unitsList.find((u: any) => u.unit_number === activeUnitNum)?.unit_title ||
-            `Unit ${activeUnitNum}`
-          }
-          subtitle={
-            state.recommendationsGenerated
-              ? "Click a topic to expand and view recommended teaching methods."
-              : "Approved syllabus topics ready for pedagogy assignment."
-          }
-          onAddTopic={() => {
-            const firstTopic = currentTopics[0];
-            setAddModal({
-              open: true,
-              topicId: firstTopic?.id,
-              topicLabel: firstTopic?.topic_name || firstTopic?.title || `Topic ${activeUnitNum}.1`,
-            });
-          }}
-          onAddTopicLabel="Add Teaching Method"
-          expandedSectionLabel={<><Sparkles className="h-3.5 w-3.5" /> Recommended Teaching Methods</>}
-          footerContent={
-            state.recommendationsGenerated ? (
-              <><RefreshCw className="h-3 w-3" /> Review the recommendations above and select the methods that best fit this topic.</>
-            ) : (
-              <><Sparkles className="h-4 w-4" /> NEURO AI will use each topic, its Knowledge Level, and duration to recommend up to 3 suitable teaching methods.</>
-            )
-          }
-          renderModals={() => (
-            <>
-              <AddPedagogyModal
-                open={addModal.open}
-                onClose={() => setAddModal((p) => ({ ...p, open: false }))}
-                topicLabel={addModal.topicLabel}
-                topicId={addModal.topicId}
-                availableTopics={currentTopics.map((t: any) => ({
-                  id: t.id,
-                  title: t.topic_name || t.title || `Topic ${t.topic_code || t.id}`,
-                }))}
-                onAdd={handleAddPedagogy}
-              />
-              <EditPedagogyModal
-                open={editModal.open}
-                onClose={() => setEditModal((p) => ({ ...p, open: false }))}
-                topicLabel={editModal.topicLabel}
-                initialTitle={editModal.title}
-                initialDescription={editModal.description}
-                onSave={handleSavePedagogyEdit}
-              />
-              <ReplacePedagogyModal
-                open={replaceModal.open}
-                onClose={() => setReplaceModal((p) => ({ ...p, open: false }))}
-                topicLabel={replaceModal.topicLabel}
-                currentTitle={replaceModal.currentTitle}
-                options={replaceModal.options}
-                onSelect={handleSelectPedagogyReplace}
-              />
-            </>
-          )}
-        />
-
-        {/* ── Post-Pedagogy Options / Downstream Stages ── */}
-        <div className="mt-6 mb-5 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-white p-5 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-color2 text-xs font-bold text-white">
-                  ✓
-                </span>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-white">
-                  Post-Pedagogy Options & Next Stages
-                </h4>
-              </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Continue through the academic setup pipeline to generate timetable sessions, question banks, and internal test papers.
-              </p>
-            </div>
+      ) : !state.hasVersions && !state.loadingUnits ? (
+        <div className="panel flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+          <Sparkles className="h-12 w-12 text-indigo-500 mb-4 animate-pulse" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">No Pedagogy Suggestions Generated Yet</h4>
+          <p className="mt-2 text-sm text-gray-500 max-w-sm">
+            Use the version panel above to generate teaching method recommendations for all approved topics.
+          </p>
+          <button
+            type="button"
+            onClick={() => handleGenerateRecommendations()}
+            disabled={state.generatingRecommendations || state.upstreamNotApproved}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Pedagogy Suggestions
+          </button>
+        </div>
+      ) : state.hasVersions ? (
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <TableTitle
+              title="Approved Topics"
+              label={`${computedTotalUnits} Units`}
+              subLabel={`${computedTotalTopics} Topics`}
+            />
             <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              <button
+                type="button"
+                onClick={() => {
+                  const firstTopic = currentTopics[0];
+                  setAddModal({
+                    open: true,
+                    topicId: firstTopic?.id,
+                    topicLabel: firstTopic?.topic_name || firstTopic?.title || `Topic ${activeUnitNum}.1`,
+                  });
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-color2 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 shadow-sm transition active:scale-95 cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Teaching Method
+              </button>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={state.refreshing}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition active:scale-95 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${state.refreshing ? "animate-spin text-color2" : ""}`} />
+                {state.refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+          </div>
+
+          <GenericTabs
+            tabs={unitTabs}
+            activeKey={state.activeTab}
+            onChange={(unit) => handleTabChange(unit)}
+          />
+
+          <AccordiansStyle
+            expandable={state.recommendationsGenerated}
+            topics={state.recommendationsGenerated ? buildTopics() : buildInitialTopics()}
+            title={
+              activeUnitDetail?.selected_unit?.unit_title ||
+              activeUnitDetail?.unit_title ||
+              state.unitsList.find((u: any) => u.unit_number === activeUnitNum)?.unit_title ||
+              `Unit ${activeUnitNum}`
+            }
+            subtitle={
+              state.recommendationsGenerated
+                ? "Click a topic to expand and view recommended teaching methods."
+                : "Approved syllabus topics ready for pedagogy assignment."
+            }
+            onAddTopic={() => {
+              const firstTopic = currentTopics[0];
+              setAddModal({
+                open: true,
+                topicId: firstTopic?.id,
+                topicLabel: firstTopic?.topic_name || firstTopic?.title || `Topic ${activeUnitNum}.1`,
+              });
+            }}
+            onAddTopicLabel="Add Teaching Method"
+            expandedSectionLabel={<><Sparkles className="h-3.5 w-3.5" /> Recommended Teaching Methods</>}
+            footerContent={
+              state.recommendationsGenerated ? (
+                <><RefreshCw className="h-3 w-3" /> Review the recommendations above and select the methods that best fit this topic.</>
+              ) : (
+                <><Sparkles className="h-4 w-4" /> NEURO AI will use each topic, its Knowledge Level, and duration to recommend up to 3 suitable teaching methods.</>
+              )
+            }
+            renderModals={() => (
+              <>
+                <AddPedagogyModal
+                  open={addModal.open}
+                  onClose={() => setAddModal((p) => ({ ...p, open: false }))}
+                  topicLabel={addModal.topicLabel}
+                  topicId={addModal.topicId}
+                  availableTopics={currentTopics.map((t: any) => ({
+                    id: t.id,
+                    title: t.topic_name || t.title || `Topic ${t.topic_code || t.id}`,
+                  }))}
+                  onAdd={handleAddPedagogy}
+                />
+                <EditPedagogyModal
+                  open={editModal.open}
+                  onClose={() => setEditModal((p) => ({ ...p, open: false }))}
+                  topicLabel={editModal.topicLabel}
+                  initialTitle={editModal.title}
+                  initialDescription={editModal.description}
+                  onSave={handleSavePedagogyEdit}
+                />
+                <ReplacePedagogyModal
+                  open={replaceModal.open}
+                  onClose={() => setReplaceModal((p) => ({ ...p, open: false }))}
+                  topicLabel={replaceModal.topicLabel}
+                  currentTitle={replaceModal.currentTitle}
+                  options={replaceModal.options}
+                  onSelect={handleSelectPedagogyReplace}
+                />
+              </>
+            )}
+          />
+
+          {/* ── Post-Pedagogy Options / Downstream Stages ── */}
+          <div className="mt-6 mb-5 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-white p-5 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-color2 text-xs font-bold text-white">
+                    ✓
+                  </span>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                    Post-Pedagogy Options &amp; Next Stages
+                  </h4>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Continue through the academic setup pipeline to generate timetable sessions, question banks, and internal test papers.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  state.pedagogyApproved
+                    ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                }`}>
+                  {state.pedagogyApproved ? "Pedagogy Approved" : `${reviewedCourseTopics}/${totalCourseTopics} Reviewed`}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Stage 5: Lesson Plan */}
+              <div
+                onClick={() => {
+                  const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                  router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
+                }}
+                className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                      <Calendar className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-semibold text-color2">Stage 5</span>
+                  </div>
+                  <h5 className="mt-2 text-xs font-bold text-gray-900 dark:text-white group-hover:text-color2 transition">
+                    Lesson Plan &amp; Schedules
+                  </h5>
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    Generate session-by-session teaching plans and map pedagogical activities to hours.
+                  </p>
+                </div>
+                <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <span className="text-[11px] font-semibold text-color2 flex items-center gap-1 group-hover:underline">
+                    Proceed to Lesson Plan <ArrowRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Stage 6: Question Bank */}
+              <div
+                onClick={() => {
+                  const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                  router.push(cid ? `/neurobe/mcq-generation/bank?course_id=${cid}` : "/neurobe/mcq-generation/bank");
+                }}
+                className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
+                      <HelpCircle className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-semibold text-purple-600">Stage 6</span>
+                  </div>
+                  <h5 className="mt-2 text-xs font-bold text-gray-900 dark:text-white group-hover:text-color2 transition">
+                    Question Bank
+                  </h5>
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    Access Bloom-level categorized questions and assessment items for all topics.
+                  </p>
+                </div>
+                <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <span className="text-[11px] font-semibold text-purple-600 flex items-center gap-1 group-hover:underline">
+                    Open Question Bank <ArrowRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Stage 7: CIA Question Paper */}
+              <div
+                onClick={() => {
+                  const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                  router.push(cid ? `/neurobe/cia-question-paper?course_id=${cid}` : "/neurobe/cia-question-paper");
+                }}
+                className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                      <FileText className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-semibold text-emerald-600">Stage 7</span>
+                  </div>
+                  <h5 className="mt-2 text-xs font-bold text-gray-900 dark:text-white group-hover:text-color2 transition">
+                    CIA Question Paper
+                  </h5>
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    Assemble internal assessment exam papers with blueprint-aligned CO/PO weightages.
+                  </p>
+                </div>
+                <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 group-hover:underline">
+                    Generate CIA Paper <ArrowRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {state.recommendationsGenerated ? (
+            <PageFooter
+              content1={state.pedagogyApproved ? "Status: Pedagogy Approved" : `${totalCourseTopics} Topics · Teaching Methods Ready`}
+              content2={
+                state.courseDetail
+                  ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
+                  : (activeUnitDetail?.course_display_tag || "")
+              }
+              batch
+              actionBtn1={
                 state.pedagogyApproved
-                  ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-              }`}>
-                {state.pedagogyApproved ? "Pedagogy Approved" : `${reviewedCourseTopics}/${totalCourseTopics} Reviewed`}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Stage 5: Lesson Plan */}
-            <div
-              onClick={() => {
-                const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
+                  ? {
+                      label: activeUnitDetail?.bottom_bar?.actions?.next?.label || "Next: Lesson Plan",
+                      icon: <Check className="h-4 w-4" />,
+                      onClick: () => {
+                        const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                        router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
+                      },
+                      className: "create-btn",
+                    }
+                  : {
+                      label: state.approvingPedagogy
+                        ? "Approving..."
+                        : state.upstreamNotApproved
+                        ? "Requires Topics Approval"
+                        : (activeUnitDetail?.bottom_bar?.actions?.approve?.label || "Approve Pedagogy"),
+                      icon: state.approvingPedagogy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
+                      onClick: handleApprovePedagogy,
+                      disabled: state.approvingPedagogy || state.upstreamNotApproved,
+                    }
+              }
+              actionBtn2={{
+                label: "Next: Lesson Plan →",
+                icon: <ArrowRight className="h-4 w-4" />,
+                onClick: () => {
+                  const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                  router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
+                },
               }}
-              className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-                    <Calendar className="h-4 w-4" />
-                  </span>
-                  <span className="text-[11px] font-semibold text-color2">Stage 5</span>
-                </div>
-                <h5 className="mt-2 text-xs font-bold text-gray-900 dark:text-white group-hover:text-color2 transition">
-                  Lesson Plan & Schedules
-                </h5>
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                  Generate session-by-session teaching plans and map pedagogical activities to hours.
-                </p>
-              </div>
-              <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                <span className="text-[11px] font-semibold text-color2 flex items-center gap-1 group-hover:underline">
-                  Proceed to Lesson Plan <ArrowRight className="h-3 w-3" />
-                </span>
-              </div>
-            </div>
-
-            {/* Stage 6: Question Bank */}
-            <div
-              onClick={() => {
-                const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                router.push(cid ? `/neurobe/mcq-generation/bank?course_id=${cid}` : "/neurobe/mcq-generation/bank");
+            />
+          ) : (
+            <PageFooter
+              content1={
+                state.courseDetail
+                  ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
+                  : (activeUnitDetail?.course_display_tag || "")
+              }
+              content2={activeUnitDetail?.bottom_bar?.subtitle || ""}
+              actionBtn1={{
+                label: state.generatingRecommendations || state.pollingJob
+                  ? "Generating..."
+                  : (activeUnitDetail?.cta_action?.label || "Generate Recommendations with NEURO AI"),
+                icon: state.generatingRecommendations || state.pollingJob
+                  ? <RefreshCw className="h-4 w-4 animate-spin" />
+                  : <Sparkles className="h-4 w-4" />,
+                onClick: handleGenerateRecommendations,
+                disabled: state.generatingRecommendations || state.pollingJob,
+                className: "create-btn",
               }}
-              className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
-                    <HelpCircle className="h-4 w-4" />
-                  </span>
-                  <span className="text-[11px] font-semibold text-purple-600">Stage 6</span>
-                </div>
-                <h5 className="mt-2 text-xs font-bold text-gray-900 dark:text-white group-hover:text-color2 transition">
-                  Question Bank
-                </h5>
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                  Access Bloom-level categorized questions and assessment items for all topics.
-                </p>
-              </div>
-              <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                <span className="text-[11px] font-semibold text-purple-600 flex items-center gap-1 group-hover:underline">
-                  Open Question Bank <ArrowRight className="h-3 w-3" />
-                </span>
-              </div>
-            </div>
-
-            {/* Stage 7: CIA Question Paper */}
-            <div
-              onClick={() => {
-                const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                router.push(cid ? `/neurobe/cia-question-paper?course_id=${cid}` : "/neurobe/cia-question-paper");
+              actionBtn2={{
+                label: "Next: Lesson Plan →",
+                icon: <ArrowRight className="h-4 w-4" />,
+                onClick: () => {
+                  const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                  router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
+                },
               }}
-              className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3.5 hover:border-color2 hover:shadow-md transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-                    <FileText className="h-4 w-4" />
-                  </span>
-                  <span className="text-[11px] font-semibold text-emerald-600">Stage 7</span>
-                </div>
-                <h5 className="mt-2 text-xs font-bold text-gray-900 dark:text-white group-hover:text-color2 transition">
-                  CIA Question Paper
-                </h5>
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                  Assemble internal assessment exam papers with blueprint-aligned CO/PO weightages.
-                </p>
-              </div>
-              <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 group-hover:underline">
-                  Generate CIA Paper <ArrowRight className="h-3 w-3" />
-                </span>
-              </div>
-            </div>
-          </div>
+            />
+          )}
         </div>
-
-        {state.recommendationsGenerated ? (
-          <PageFooter
-            content1={state.pedagogyApproved ? "Status: Pedagogy Approved" : `${totalCourseTopics} Topics · Teaching Methods Ready`}
-            content2={
-              state.courseDetail
-                ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
-                : (activeUnitDetail?.course_display_tag || "")
-            }
-            batch
-            actionBtn1={
-              state.pedagogyApproved
-                ? {
-                    label: activeUnitDetail?.bottom_bar?.actions?.next?.label || "Next: Lesson Plan",
-                    icon: <Check className="h-4 w-4" />,
-                    onClick: () => {
-                      const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                      router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
-                    },
-                    className: "create-btn",
-                  }
-                : {
-                    label: state.approvingPedagogy
-                      ? "Approving..."
-                      : state.upstreamNotApproved
-                      ? "Requires Topics Approval"
-                      : (activeUnitDetail?.bottom_bar?.actions?.approve?.label || "Approve Pedagogy"),
-                    icon: state.approvingPedagogy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />,
-                    onClick: handleApprovePedagogy,
-                    disabled: state.approvingPedagogy || state.upstreamNotApproved,
-                  }
-            }
-            actionBtn2={{
-              label: "Next: Lesson Plan →",
-              icon: <ArrowRight className="h-4 w-4" />,
-              onClick: () => {
-                const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
-              },
-            }}
-          />
-        ) : (
-          <PageFooter
-            content1={
-              state.courseDetail
-                ? `Course: ${state.courseDetail.course_code} — ${state.courseDetail.course_title}`
-                : (activeUnitDetail?.course_display_tag || "")
-            }
-            content2={activeUnitDetail?.bottom_bar?.subtitle || ""}
-            actionBtn1={{
-              label: state.generatingRecommendations || state.pollingJob
-                ? "Generating..."
-                : (activeUnitDetail?.cta_action?.label || "Generate Recommendations with NEURO AI"),
-              icon: state.generatingRecommendations || state.pollingJob
-                ? <RefreshCw className="h-4 w-4 animate-spin" />
-                : <Sparkles className="h-4 w-4" />,
-              onClick: handleGenerateRecommendations,
-              disabled: state.generatingRecommendations || state.pollingJob,
-              className: "create-btn",
-            }}
-            actionBtn2={{
-              label: "Next: Lesson Plan →",
-              icon: <ArrowRight className="h-4 w-4" />,
-              onClick: () => {
-                const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
-              },
-            }}
-          />
-        )}
-      </div>
+      ) : null}
     </div>
   );
 };

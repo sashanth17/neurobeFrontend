@@ -131,6 +131,8 @@ const COPOMapping = () => {
     selectedExtractionVer: null as number | null,
     copoVersionsDetailed: [] as any[],
     extractionNotApproved: false,
+    versionsLoaded: false,
+    hasVersions: false,
   });
 
   const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
@@ -837,29 +839,33 @@ const COPOMapping = () => {
 
       <PageHeader
         title="CO–PO Mapping"
-        records={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
+        records={state.hasVersions && matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : undefined}
         subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Hover over any cell to see strength & rationale, or click to cycle strength."
         icon={<Cable className="h-5 w-5 text-color2" />}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-        {TABS.map((tab) => (
-          <StatTabCard
-            key={tab.key}
-            icon={tab.icon}
-            label={tab.label}
-            subLabel={tab.subLabel}
-            count={tab.count}
-            active={state.activeTab === tab.key}
-            onClick={() => setState({ activeTab: tab.key })}
-          />
-        ))}
-      </div>
+      {state.hasVersions && (
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {TABS.map((tab) => (
+            <StatTabCard
+              key={tab.key}
+              icon={tab.icon}
+              label={tab.label}
+              subLabel={tab.subLabel}
+              count={tab.count}
+              active={state.activeTab === tab.key}
+              onClick={() => setState({ activeTab: tab.key })}
+            />
+          ))}
+        </div>
+      )}
 
-      <KeepFilePrompt
-        icon={<Info className="text-color2 h-4 w-4" />}
-        title="Hover over any cell to inspect correlation strength, Bloom level, and NEURO AI rationale. Click any cell to cycle strength directly."
-      />
+      {state.hasVersions && (
+        <KeepFilePrompt
+          icon={<Info className="text-color2 h-4 w-4" />}
+          title="Hover over any cell to inspect correlation strength, Bloom level, and NEURO AI rationale. Click any cell to cycle strength directly."
+        />
+      )}
 
       {course_id && (
         <StageVersionHistoryPanel
@@ -873,23 +879,12 @@ const COPOMapping = () => {
           isGenerating={state.generatingCopo}
           refreshTrigger={state.versionRefreshKey}
           onExtractionChange={(extVer) => setState({ selectedExtractionVer: extVer })}
+          onVersionsLoaded={(count) => setState({ versionsLoaded: true, hasVersions: count > 0 })}
         />
       )}
 
       {/* CO-PO Mapping Matrix */}
       <div className="panel">
-        <MappingMatrixHeader
-          title={
-            courseOutcomes.length > 0 && programOutcomes.length > 0
-              ? `${courseOutcomes[0]?.co_code}–${courseOutcomes[courseOutcomes.length - 1]?.co_code} × ${programOutcomes[0]?.code}–${programOutcomes[programOutcomes.length - 1]?.code} Mapping Matrix`
-              : "CO–PO Mapping Matrix"
-          }
-          version={matrixData?.po_version || "PO 2025 v1"}
-          status={displayStatus}
-          onGenerate={() => handleGenerateCopo()}
-          isGenerating={state.generatingCopo}
-        />
-
         {state.generatingCopo ? (
           <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 dark:border-indigo-800/40 dark:bg-indigo-950/20">
             <RotateCw className="h-10 w-10 text-indigo-600 mb-3 animate-spin dark:text-indigo-400" />
@@ -904,36 +899,60 @@ const COPOMapping = () => {
               Status: Processing in AI Worker Queue
             </div>
           </div>
-        ) : (courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0 && Object.keys(matrix).length === 0)) && !state.loading ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
-            <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
+        ) : !state.hasVersions && !state.loading ? (
+          <div className="flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+            <Sparkles className="h-12 w-12 text-indigo-500 mb-4 animate-pulse" />
             <h4 className="text-base font-bold text-gray-900 dark:text-white">
-              {state.selectedExtractionVer && matchingChildCopo.length === 0
-                ? `No CO-PO Mapping Generated Yet for Extraction v${state.selectedExtractionVer}`
-                : "No CO-PO Mapping Generated Yet"}
+              No CO-PO Mapping Generated Yet
             </h4>
-            <p className="mt-1 text-sm text-gray-500 max-w-md">
-              Generate AI-assisted mapping between approved Course Outcomes from Extraction v{state.selectedExtractionVer || 1} and Program Outcomes with academic rationales.
+            <p className="mt-2 text-sm text-gray-500 max-w-sm">
+              Use the version panel above to generate your first AI-assisted CO-PO mapping between Course Outcomes and Program Outcomes.
             </p>
             <button
               type="button"
               onClick={() => handleGenerateCopo({ extraction_version: state.selectedExtractionVer || 1 })}
               disabled={state.generatingCopo}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
             >
-              {state.generatingCopo ? (
-                <>
-                  <RotateCw className="h-4 w-4 animate-spin" />
-                  <span>Generating Mapping with AI...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  <span>Generate CO-PO Mapping (Extraction v{state.selectedExtractionVer || 1})</span>
-                </>
-              )}
+              <Sparkles className="h-4 w-4" />
+              Generate CO-PO Mapping
             </button>
           </div>
+        ) : state.hasVersions ? (
+          <>
+            <MappingMatrixHeader
+              title={
+                courseOutcomes.length > 0 && programOutcomes.length > 0
+                  ? `${courseOutcomes[0]?.co_code}–${courseOutcomes[courseOutcomes.length - 1]?.co_code} × ${programOutcomes[0]?.code}–${programOutcomes[programOutcomes.length - 1]?.code} Mapping Matrix`
+                  : "CO–PO Mapping Matrix"
+              }
+              version={matrixData?.po_version || undefined}
+              status={displayStatus}
+              onGenerate={() => handleGenerateCopo()}
+              isGenerating={state.generatingCopo}
+            />
+
+            {(courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0 && Object.keys(matrix).length === 0)) && !state.loading ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
+                <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
+                <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                  {state.selectedExtractionVer && matchingChildCopo.length === 0
+                    ? `No CO-PO Mapping for Extraction v${state.selectedExtractionVer} yet`
+                    : "No CO-PO Mapping Generated Yet"}
+                </h4>
+                <p className="mt-1 text-sm text-gray-500 max-w-md">
+                  Generate AI-assisted mapping between approved Course Outcomes from Extraction v{state.selectedExtractionVer || 1} and Program Outcomes.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleGenerateCopo({ extraction_version: state.selectedExtractionVer || 1 })}
+                  disabled={state.generatingCopo}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate CO-PO Mapping (Extraction v{state.selectedExtractionVer || 1})</span>
+                </button>
+              </div>
         ) : (
           <TableComponent
             records={filteredRecords}
@@ -1092,8 +1111,10 @@ const COPOMapping = () => {
                 },
               })),
             ]}
-          />
-        )}
+              />
+            )}
+          </>
+        ) : null}
       </div>
 
       {state.mappingModal && (
@@ -1119,58 +1140,60 @@ const COPOMapping = () => {
         />
       )}
 
-      <div className="mt-4">
-        <PageFooter
-          batch={!allMapped && displayStatus !== "Approved"}
-          status={{
-            label: displayStatus,
-            color: displayStatus === "Approved" ? "#16a34a" : "#ea580c",
-          }}
-          content1={
-            state.courseDetail?.course_code
-              ? `Course: ${state.courseDetail?.course_code} – ${state.courseDetail?.course_title || ""}`
-              : ""
-          }
-          content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
-          actionBtn1={
-            displayStatus === "Approved"
-              ? {
-                  label: "Next: Topic",
-                  icon: <ArrowRight className="h-4 w-4" />,
-                  onClick: () => {
-                    const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                    router.push(cid ? `/neurobe/topics?course_id=${cid}` : "/neurobe/topics");
-                  },
-                  className: "create-btn",
-                }
-              : {
-                  label: state.approvingMap
-                    ? "Approving..."
-                    : state.extractionNotApproved
-                    ? "Requires Syllabus Approval"
-                    : "Approve Mapping",
-                  icon: <Check className="h-4 w-4" />,
-                  onClick: handleApproveMapping,
-                  disabled: state.approvingMap || state.extractionNotApproved,
-                }
-          }
-          actionBtn2={
-            displayStatus === "Approved"
-              ? {
-                  label: "Mapping Approved",
-                  icon: <Check className="h-4 w-4" />,
-                  onClick: () => {},
-                  className: "create-btn !bg-green-600 cursor-default",
-                }
-              : {
-                  label: state.savingDraft ? "Saving..." : "Save Draft",
-                  icon: <Save className="h-4 w-4" />,
-                  onClick: handleSaveDraft,
-                  disabled: state.savingDraft,
-                }
-          }
-        />
-      </div>
+      {state.hasVersions && (
+        <div className="mt-4">
+          <PageFooter
+            batch={!allMapped && displayStatus !== "Approved"}
+            status={{
+              label: displayStatus,
+              color: displayStatus === "Approved" ? "#16a34a" : "#ea580c",
+            }}
+            content1={
+              state.courseDetail?.course_code
+                ? `Course: ${state.courseDetail?.course_code} – ${state.courseDetail?.course_title || ""}`
+                : ""
+            }
+            content2={state.hasVersions && matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : ""}
+            actionBtn1={
+              displayStatus === "Approved"
+                ? {
+                    label: "Next: Topic",
+                    icon: <ArrowRight className="h-4 w-4" />,
+                    onClick: () => {
+                      const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                      router.push(cid ? `/neurobe/topics?course_id=${cid}` : "/neurobe/topics");
+                    },
+                    className: "create-btn",
+                  }
+                : {
+                    label: state.approvingMap
+                      ? "Approving..."
+                      : state.extractionNotApproved
+                      ? "Requires Syllabus Approval"
+                      : "Approve Mapping",
+                    icon: <Check className="h-4 w-4" />,
+                    onClick: handleApproveMapping,
+                    disabled: state.approvingMap || state.extractionNotApproved,
+                  }
+            }
+            actionBtn2={
+              displayStatus === "Approved"
+                ? {
+                    label: "Mapping Approved",
+                    icon: <Check className="h-4 w-4" />,
+                    onClick: () => {},
+                    className: "create-btn !bg-green-600 cursor-default",
+                  }
+                : {
+                    label: state.savingDraft ? "Saving..." : "Save Draft",
+                    icon: <Save className="h-4 w-4" />,
+                    onClick: handleSaveDraft,
+                    disabled: state.savingDraft,
+                  }
+            }
+          />
+        </div>
+      )}
     </div>
   );
 };
