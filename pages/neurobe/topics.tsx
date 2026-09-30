@@ -1361,6 +1361,34 @@ const Topics = () => {
     }
   };
 
+  const handleDisapproveTopics = async () => {
+    try {
+      setState({ approvingTopics: true });
+      const sid = state.courseDetail?.latest_syllabus?.id || state.selectedCourse?.syllabus_id || activeUnitDetail?.syllabus_id;
+      
+      try {
+        await Models.syllabus.reject_stage(course_id || sid, "hierarchy");
+      } catch (e) {
+        console.warn("reject_stage hierarchy warning:", e);
+      }
+      
+      Success("Topic hierarchy disapproved successfully");
+      setState({ topicsApproved: false, versionRefreshKey: Date.now() });
+      if (sid) {
+        await getUnits(sid, loadedVersion);
+        await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
+      }
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
+    } catch (error: any) {
+      console.log("disapprove_topics error:", error);
+      Failure(getErrorMessage(error, "Failed to disapprove topics"));
+    } finally {
+      setState({ approvingTopics: false });
+    }
+  };
+
   const handleGenerateTopics = async (parentParams?: { extraction_version?: number }) => {
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
@@ -1914,12 +1942,20 @@ const Topics = () => {
                       disabled: state.approvingTopics || state.upstreamNotApproved,
                     }
                 }
-                actionBtn2={{
-                  label: state.savingDraft ? "Saving..." : (activeUnitDetail?.bottom_bar?.actions?.save_draft?.label || "Save Draft"),
-                  icon: state.savingDraft ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />,
-                  onClick: handleSaveDraft,
-                  disabled: state.savingDraft,
-                }}
+                actionBtn2={
+                  state.topicsApproved ? {
+                    label: state.approvingTopics ? "Disapproving..." : "Disapprove Topics",
+                    icon: state.approvingTopics ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />,
+                    onClick: handleDisapproveTopics,
+                    className: "create-btn !bg-amber-600 hover:!bg-amber-700",
+                    disabled: state.approvingTopics,
+                  } : {
+                    label: state.savingDraft ? "Saving..." : (activeUnitDetail?.bottom_bar?.actions?.save_draft?.label || "Save Draft"),
+                    icon: state.savingDraft ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />,
+                    onClick: handleSaveDraft,
+                    disabled: state.savingDraft,
+                  }
+                }
               />
             ) : (
               <PageFooter
