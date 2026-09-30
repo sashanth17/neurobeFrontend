@@ -77,6 +77,7 @@ export interface AssignedCourseCardProps {
   programme: string;
   batch: string;
   semester: string | number;
+  enrolledStudents?: number | string;
   allocation?: string;
   allocationTag?: string;
   credits?: number | string;
@@ -96,7 +97,7 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   programme,
   batch,
   semester,
-  enrolledStudents,
+  enrolledStudents = 0,
   allocation,
   allocationTag,
   credits,
