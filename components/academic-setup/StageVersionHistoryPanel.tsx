@@ -188,38 +188,18 @@ export default function StageVersionHistoryPanel({
     }
   };
 
-  const handleApprove = async (ver: number) => {
+  const handleActivate = async (ver: number) => {
     if (activatingVersion !== null) return;
     try {
       setActivatingVersion(ver);
-      await Models.syllabus.approve_stage(courseId, stage, ver);
-      if (stage !== "extraction") {
-        await Models.syllabus.activate_version(courseId, stage, ver);
-      }
-      Success(`Approved Version ${ver} for ${stageLabel} (Active for instructors)`);
+      await Models.syllabus.activate_version(courseId, stage, ver);
+      Success(`Activated Version ${ver} for ${stageLabel} (Active for instructors)`);
       setActiveVersion(ver);
       setLoadedVersion(ver);
       await loadVersions();
       await onVersionActivated(ver);
     } catch (err: any) {
-      Failure(typeof err === "string" ? err : err?.message || `Failed to approve Version ${ver}`);
-    } finally {
-      setActivatingVersion(null);
-    }
-  };
-
-  const handleDisapprove = async (ver: number) => {
-    if (activatingVersion !== null) return;
-    try {
-      setActivatingVersion(ver);
-      await Models.syllabus.reject_stage(courseId, stage, ver);
-      Success(`Disapproved Version ${ver} for ${stageLabel}`);
-      await loadVersions();
-      if (onVersionLoad && loadedVersion === ver) {
-        await onVersionLoad(ver);
-      }
-    } catch (err: any) {
-      Failure(typeof err === "string" ? err : err?.message || `Failed to disapprove Version ${ver}`);
+      Failure(typeof err === "string" ? err : err?.message || `Failed to activate Version ${ver}`);
     } finally {
       setActivatingVersion(null);
     }
@@ -558,39 +538,32 @@ export default function StageVersionHistoryPanel({
                   )}
                 </button>
 
-                {/* Button 2: Approve / Disapprove */}
-                {isApproved ? (
-                  <button
-                    type="button"
-                    disabled={isActivating || isLoadingThis || deletingVersionId !== null}
-                    title={`Disapprove v${ver.version}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDisapprove(ver.version);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 text-[11px] font-bold text-amber-700 shadow-xs transition-all hover:bg-amber-100 hover:text-amber-800 active:scale-95 disabled:opacity-50 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                {/* Button 2: Set Active */}
+                {isActive ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+                    title={`v${ver.version} is active for instructors`}
                   >
-                    {isActivating ? (
-                      <RotateCw className="h-3 w-3 animate-spin" />
-                    ) : (
-                      "Disapprove"
-                    )}
-                  </button>
+                    <CheckCircle className="h-3 w-3" />
+                    Active
+                  </span>
                 ) : (
                   <button
                     type="button"
                     disabled={isActivating || isLoadingThis || deletingVersionId !== null}
-                    title={`Approve v${ver.version} for instructors`}
+                    title={`Activate v${ver.version} for instructors`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleApprove(ver.version);
+                      handleActivate(ver.version);
                     }}
-                    className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-500"
                   >
                     {isActivating ? (
-                      <RotateCw className="h-3 w-3 animate-spin" />
+                      <span className="flex items-center gap-1">
+                        <RotateCw className="h-3 w-3 animate-spin" />
+                      </span>
                     ) : (
-                      "Approve"
+                      "Set Active"
                     )}
                   </button>
                 )}

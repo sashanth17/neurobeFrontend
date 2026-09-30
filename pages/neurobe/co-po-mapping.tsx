@@ -674,6 +674,7 @@ const COPOMapping = () => {
 
       const payload = {
         comments,
+        version: state.loadedVersion || state.copoMatrix?.version_number,
       };
 
       console.log("Calling approve_map with syllabus_id:", sid, "payload:", payload);
@@ -695,6 +696,33 @@ const COPOMapping = () => {
       console.log("error approving map", error);
       setState({ approvingMap: false });
       Failure(getErrorMessage(error, "Failed to approve CO-PO mapping"));
+    }
+  };
+
+  const handleDisapproveMapping = async () => {
+    try {
+      setState({ approvingMap: true });
+      const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
+
+      const payload = {
+        version: state.loadedVersion || state.copoMatrix?.version_number,
+      };
+
+      console.log("Calling reject_map with syllabus_id:", sid, "payload:", payload);
+      await Models.COPOMap.reject_map(sid, payload);
+
+      Success("CO-PO mapping disapproved successfully");
+      setState({ mappingApproved: false, approvingMap: false, versionRefreshKey: Date.now() });
+      if (course_id) {
+        await loadCopoVersions(course_id);
+        await restoreWorkflowState(course_id);
+      }
+      await getCourseDetails();
+      await getCOPOMatrix(sid);
+    } catch (error: any) {
+      console.log("error disapproving map", error);
+      setState({ approvingMap: false });
+      Failure(getErrorMessage(error, "Failed to disapprove CO-PO mapping"));
     }
   };
 
@@ -1179,10 +1207,11 @@ const COPOMapping = () => {
             actionBtn2={
               displayStatus === "Approved"
                 ? {
-                    label: "Mapping Approved",
-                    icon: <Check className="h-4 w-4" />,
-                    onClick: () => {},
-                    className: "create-btn !bg-green-600 cursor-default",
+                    label: state.approvingMap ? "Disapproving..." : "Disapprove Mapping",
+                    icon: <RotateCw className={state.approvingMap ? "h-4 w-4 animate-spin" : "h-4 w-4"} />,
+                    onClick: handleDisapproveMapping,
+                    className: "create-btn !bg-amber-600 hover:!bg-amber-700",
+                    disabled: state.approvingMap,
                   }
                 : {
                     label: state.savingDraft ? "Saving..." : "Save Draft",

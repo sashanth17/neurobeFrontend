@@ -146,6 +146,31 @@ copo_map: (syllabus_id?: any, version_number?: any) => {
         return promise;
     },
 
+    reject_map : (syllabus_id?: any, body?: any) => { 
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/syllabi/${syllabus_id}/copo-matrix/reject`;
+
+            const config: any = {};
+            if (body instanceof FormData) {
+                config.headers = { "Content-Type": "multipart/form-data" };
+            }
+
+            commonInstance()
+                 .post(url, body || {}, config)
+                 .then((res) => {
+                     resolve(res.data);
+                 })
+                 .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
+                    } else {
+                        reject(error?.message || error);
+                    }
+                 });
+         });
+         return promise;
+    },
+
     get_matrix: (id: string | number) => {
         return new Promise((resolve, reject) => {
             let url = `course/syllabi/${id}/matrix`;
