@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
+import { setPageTitle } from "@/store/themeConfigSlice";
 import {
   BookOpen,
   BookOpenCheck,
@@ -14,19 +15,18 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, Dropdown } from "@/utils/function.utils";
+import {
+  useSetState,
+  Success,
+  Failure,
+  Dropdown,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+  getErrorMessage,
+} from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
-
-const getErrorMessage = (error: any, fallback: string) => {
-  if (!error) return fallback;
-  if (typeof error === "string") return error;
-  if (typeof error?.message === "string") return error.message;
-  if (typeof error?.detail === "string") return error.detail;
-  if (typeof error?.error === "string") return error.error;
-  return fallback;
-};
 import StepHeader from "@/components/academic-setup/StepHeader";
 import StatTabCard from "@/components/academic-setup/StatTabCard";
 import TableTitle from "@/components/common-components/TableTitle";
@@ -627,11 +627,19 @@ const Topics = () => {
           Success("Topic hierarchy generated successfully!");
         } else if (rawStatus === "failed" || rawStatus === "error") {
           stopPolling();
+          const errDetail = res?.message || res?.error || res?.state?.error || "";
+          const isLimit = isLimitExhaustion(errDetail) || isLimitExhaustion(res);
           setState({
             jobStatus: "failed",
             topicsLoading: false,
+            limitExhausted: isLimit,
           });
-          Failure(res?.message || res?.error || "Topic generation job failed");
+          if (isLimit) {
+            showLimitExhaustedModal(errDetail);
+            Failure(LIMIT_EXHAUSTED_MESSAGE);
+          } else {
+            Failure(errDetail || "Topic generation job failed");
+          }
         } else {
           // Still processing in Redis/background
           setState({

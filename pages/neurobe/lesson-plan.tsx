@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useDispatch } from "react-redux";
+import { setPageTitle } from "@/store/themeConfigSlice";
 import {
   Hourglass,
   Check,
@@ -10,8 +11,16 @@ import {
   ClipboardList,
   RotateCw,
 } from "lucide-react";
-import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Success, Failure, useSetState } from "@/utils/function.utils";
+import {
+  Dropdown,
+  Success,
+  Failure,
+  useSetState,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+  getErrorMessage,
+} from "@/utils/function.utils";
 import TableComponent from "@/components/common-components/TableComponent";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
@@ -734,7 +743,16 @@ const LessonPlan = () => {
         } else if (currentStatus === "failed") {
           stopPolling();
           setState({ generateLoading: false, versionRefreshKey: Date.now() });
-          Failure("Lesson plan generation failed. Please try again.");
+          const errDetail =
+            lpStep?.error ||
+            wfRes?.error ||
+            "";
+          if (lpStep?.is_limit_exhausted || isLimitExhaustion(errDetail) || isLimitExhaustion(wfRes)) {
+            showLimitExhaustedModal(errDetail);
+            Failure(LIMIT_EXHAUSTED_MESSAGE);
+          } else {
+            Failure("Lesson plan generation failed. Please try again.");
+          }
         } else if (attempts >= maxAttempts) {
           stopPolling();
           setState({ generateLoading: false, versionRefreshKey: Date.now() });
@@ -783,7 +801,12 @@ const LessonPlan = () => {
     } catch (error: any) {
       console.log("Generate error:", error);
       setState({ generateLoading: false });
-      Failure(error?.message || "Error generating lesson plan.");
+      if (isLimitExhaustion(error)) {
+        showLimitExhaustedModal(error?.response?.data?.detail || error?.message);
+        Failure(LIMIT_EXHAUSTED_MESSAGE);
+      } else {
+        Failure(getErrorMessage(error, "Error generating lesson plan."));
+      }
     }
   };
 

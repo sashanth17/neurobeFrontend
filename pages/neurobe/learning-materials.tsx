@@ -10,7 +10,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Failure, Success, useSetState } from "@/utils/function.utils";
+import { Dropdown, Failure, Success, useSetState, getErrorMessage } from "@/utils/function.utils";
 import TableComponent from "@/components/common-components/TableComponent";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
@@ -651,8 +651,7 @@ const LearningMeterials = () => {
       }
 
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.detail || error?.message || "Failed to generate learning material";
-      Failure(errorMsg);
+      Failure(getErrorMessage(error, "Failed to generate learning material"), error);
     } finally {
       setState({ generateLoading: false });
     }

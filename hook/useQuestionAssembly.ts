@@ -7,6 +7,7 @@ import {
   ExamPaperPreviewData,
 } from "@/types/cia-test.types";
 import { toast } from "react-toastify";
+import { isLimitExhaustion, showLimitExhaustedModal, LIMIT_EXHAUSTED_MESSAGE } from "@/utils/function.utils";
 
 export interface CandidateFilters {
   marks: number | null;
@@ -141,8 +142,15 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
         }
         console.error("AI Generation error:", err);
         const errMsg = err.message || err.response?.data?.detail || "Question generation failed";
-        setGenerationError(errMsg);
-        toast.error(`Question generation failed: ${errMsg}`);
+        const isLimit = isLimitExhaustion(err) || isLimitExhaustion(errMsg);
+        const finalMsg = isLimit ? LIMIT_EXHAUSTED_MESSAGE : errMsg;
+        setGenerationError(finalMsg);
+        if (isLimit) {
+          showLimitExhaustedModal(errMsg);
+          toast.error(LIMIT_EXHAUSTED_MESSAGE);
+        } else {
+          toast.error(`Question generation failed: ${errMsg}`);
+        }
       } finally {
         setIsGenerating(false);
         setActiveJobId(null);
@@ -307,8 +315,15 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
     } catch (err: any) {
       console.error("AI Generation error:", err);
       const errMsg = err.message || err.response?.data?.detail || "Question generation failed";
-      setGenerationError(errMsg);
-      toast.error(`Question generation failed: ${errMsg}`);
+      const isLimit = isLimitExhaustion(err) || isLimitExhaustion(errMsg);
+      const finalMsg = isLimit ? LIMIT_EXHAUSTED_MESSAGE : errMsg;
+      setGenerationError(finalMsg);
+      if (isLimit) {
+        showLimitExhaustedModal(errMsg);
+        toast.error(LIMIT_EXHAUSTED_MESSAGE);
+      } else {
+        toast.error(`Question generation failed: ${errMsg}`);
+      }
       setIsGenerating(false);
       throw err;
     }

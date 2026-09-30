@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { ArrowLeft, ChevronDown, Sparkles, X } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState } from "@/utils/function.utils";
+import { useSetState, isLimitExhaustion, showLimitExhaustedModal, LIMIT_EXHAUSTED_MESSAGE, getErrorMessage } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import Models from "@/imports/models.import";
@@ -433,7 +433,13 @@ const MCQGenerationStudioPage = () => {
         } else if (res.status === "failed") {
           clearInterval(interval);
           setState({ isGeneratingAI: false });
-          showToast("error", "Generation failed. Please try again.");
+          const errorMsg = res.error || res.message || res.detail || "";
+          if (isLimitExhaustion(res) || isLimitExhaustion(errorMsg)) {
+            showLimitExhaustedModal(errorMsg);
+            showToast("error", LIMIT_EXHAUSTED_MESSAGE);
+          } else {
+            showToast("error", errorMsg || "Generation failed. Please try again.");
+          }
         }
       } catch {
         clearInterval(interval);
@@ -563,7 +569,12 @@ const MCQGenerationStudioPage = () => {
       const payload = buildGeneratePayload();
       const res: any = await Models.mcq.generate(payload).catch((err) => {
         console.error("Generate API Error:", err);
-        showToast("error", `Error from server: ${err?.message || "Unknown Error"}`);
+        if (isLimitExhaustion(err)) {
+          showLimitExhaustedModal(getErrorMessage(err));
+          showToast("error", LIMIT_EXHAUSTED_MESSAGE);
+        } else {
+          showToast("error", `Error from server: ${getErrorMessage(err, "Unknown Error")}`);
+        }
         return null;
       });
 
@@ -591,7 +602,12 @@ const MCQGenerationStudioPage = () => {
     try {
       const payload = buildGeneratePayload();
       const res: any = await Models.mcq.generate(payload).catch((err) => {
-        showToast("error", `Failed to start background job: ${err?.message || "Unknown Error"}`);
+        if (isLimitExhaustion(err)) {
+          showLimitExhaustedModal(getErrorMessage(err));
+          showToast("error", LIMIT_EXHAUSTED_MESSAGE);
+        } else {
+          showToast("error", `Failed to start background job: ${getErrorMessage(err, "Unknown Error")}`);
+        }
         return null;
       });
 
@@ -618,7 +634,13 @@ const MCQGenerationStudioPage = () => {
             }
           } else if (checkRes?.status === "failed") {
             clearInterval(bgTimer);
-            showToast("error", "Background generation job failed.");
+            const errorMsg = checkRes?.error || checkRes?.message || checkRes?.detail || "";
+            if (isLimitExhaustion(checkRes) || isLimitExhaustion(errorMsg)) {
+              showLimitExhaustedModal(errorMsg);
+              showToast("error", LIMIT_EXHAUSTED_MESSAGE);
+            } else {
+              showToast("error", errorMsg || "Background generation job failed.");
+            }
           }
         }, 8000);
       }

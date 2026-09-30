@@ -2,7 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { ArrowRight, BookOpen, Calendar, Check, EditIcon, FileText, HelpCircle, Hourglass, Lightbulb, Plus, Presentation, RefreshCw, ReplaceAll, Save, Sparkles, Trash2 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, Dropdown } from "@/utils/function.utils";
+import {
+  useSetState,
+  Success,
+  Failure,
+  Dropdown,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+  getErrorMessage,
+} from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import StepHeader from "@/components/academic-setup/StepHeader";
@@ -18,14 +27,6 @@ import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHi
 import Models from "@/imports/models.import";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-const getErrorMessage = (error: any, fallback: string) => {
-  if (!error) return fallback;
-  if (typeof error === "string") return error;
-  if (typeof error?.message === "string") return error.message;
-  if (typeof error?.detail === "string") return error.detail;
-  if (typeof error?.error === "string") return error.error;
-  return fallback;
-};
 const Pedagogy = () => {
   const dispatch = useDispatch();
   const router = useRouter();

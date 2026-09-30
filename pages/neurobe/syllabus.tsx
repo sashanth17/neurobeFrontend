@@ -1,7 +1,16 @@
 import { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Success, Failure, useSetState } from "@/utils/function.utils";
+import {
+  Dropdown,
+  Success,
+  Failure,
+  useSetState,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+  getErrorMessage,
+} from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import SyllabusStepper from "@/components/academic-setup/SyllabusStepper";
@@ -315,7 +324,12 @@ const Syllabus = () => {
         job_Data(res.job_id);
       }
     } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Extraction failed to start");
+      if (isLimitExhaustion(error)) {
+        showLimitExhaustedModal(error?.response?.data?.detail || error?.message);
+        Failure(LIMIT_EXHAUSTED_MESSAGE);
+      } else {
+        Failure(getErrorMessage(error, "Extraction failed to start"));
+      }
     } finally {
       setState({ extractingFileVersionId: null });
     }
@@ -608,7 +622,18 @@ const Syllabus = () => {
           stopPolling();
         } else if (res?.status === "failed" || wfExtraction?.status === "failed") {
           console.log("Job marked as failed");
-          setState({ isJobLoading: false, extractionError: "failed" });
+          const errorMsg = res?.error || res?.message || res?.state?.error || wfExtraction?.error || "";
+          const isLimit = isLimitExhaustion(errorMsg) || isLimitExhaustion(res) || isLimitExhaustion(wfExtraction);
+          if (isLimit) {
+            showLimitExhaustedModal(errorMsg);
+          }
+          setState({
+            isJobLoading: false,
+            extractionError: isLimit ? "limit_exhausted" : "failed",
+            extractionErrorMessage: isLimit
+              ? LIMIT_EXHAUSTED_MESSAGE
+              : errorMsg || "The AI extraction encountered an error.",
+          });
           stopPolling();
         } else if (
           wfExtraction?.status?.startsWith("cancelled")
@@ -1095,17 +1120,45 @@ const Syllabus = () => {
 
             {/* Extraction error / cancelled banner */}
             {state.extractionError && (
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50/70 p-3.5 dark:border-red-800/50 dark:bg-red-950/30">
+              <div
+                className={`mt-3 flex items-center justify-between gap-3 rounded-xl border p-3.5 ${
+                  state.extractionError === "limit_exhausted"
+                    ? "border-amber-300 bg-amber-50/90 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+                    : "border-red-200 bg-red-50/70 dark:border-red-800/50 dark:bg-red-950/30"
+                }`}
+              >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <RotateCw className="h-5 w-5 shrink-0 text-red-500" />
+                  <RotateCw
+                    className={`h-5 w-5 shrink-0 ${
+                      state.extractionError === "limit_exhausted"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-red-500"
+                    }`}
+                  />
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-red-800 dark:text-red-200">
-                      {state.extractionError === "failed"
+                    <p
+                      className={`text-xs font-bold ${
+                        state.extractionError === "limit_exhausted"
+                          ? "text-amber-900 dark:text-amber-200"
+                          : "text-red-800 dark:text-red-200"
+                      }`}
+                    >
+                      {state.extractionError === "limit_exhausted"
+                        ? "Generation Limit Exhausted"
+                        : state.extractionError === "failed"
                         ? "Extraction Failed"
                         : "Extraction Cancelled"}
                     </p>
-                    <p className="text-[11px] text-red-600 dark:text-red-400 truncate">
-                      {state.extractionError === "failed"
+                    <p
+                      className={`text-[11px] truncate ${
+                        state.extractionError === "limit_exhausted"
+                          ? "text-amber-800 dark:text-amber-300 font-medium"
+                          : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {state.extractionError === "limit_exhausted"
+                        ? "Your generation limit is exhausted so ask your admin to request for more."
+                        : state.extractionError === "failed"
                         ? "The AI extraction encountered an error. Please try again with the same or a new file."
                         : "The extraction was cancelled. You can retry by clicking Extract on any file below."}
                     </p>
@@ -1114,7 +1167,11 @@ const Syllabus = () => {
                 <button
                   type="button"
                   onClick={() => setState({ extractionError: null })}
-                  className="shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 shadow-sm hover:bg-red-50 active:scale-95 dark:border-red-700 dark:bg-red-950 dark:text-red-300"
+                  className={`shrink-0 rounded-lg border bg-white px-3 py-1.5 text-xs font-bold shadow-sm active:scale-95 ${
+                    state.extractionError === "limit_exhausted"
+                      ? "border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-200"
+                      : "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:bg-red-950 dark:text-red-300"
+                  }`}
                 >
                   Dismiss
                 </button>

@@ -14,7 +14,16 @@ import {
   Edit3,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Dropdown, Failure } from "@/utils/function.utils";
+import {
+  useSetState,
+  Success,
+  Dropdown,
+  Failure,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+  getErrorMessage,
+} from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import StatTabCard from "@/components/academic-setup/StatTabCard";
@@ -65,15 +74,6 @@ export interface COPOMatrixResponse {
   course_outcomes: CourseOutcome[];
   matrix: Record<string, Record<string, MappingCell>>;
 }
-
-const getErrorMessage = (error: any, fallback: string) => {
-  if (!error) return fallback;
-  if (typeof error === "string") return error;
-  if (typeof error?.message === "string") return error.message;
-  if (typeof error?.detail === "string") return error.detail;
-  if (typeof error?.error === "string") return error.error;
-  return fallback;
-};
 
 const COPOMapping = () => {
   const dispatch = useDispatch();
@@ -303,7 +303,16 @@ const COPOMapping = () => {
         } else if (currentStatus === "failed") {
           stopPolling();
           setState({ generatingCopo: false, versionRefreshKey: Date.now() });
-          Failure("CO-PO mapping generation failed. Please try again.");
+          const errDetail =
+            copoStep?.error ||
+            wfRes?.error ||
+            "";
+          if (copoStep?.is_limit_exhausted || isLimitExhaustion(errDetail) || isLimitExhaustion(wfRes)) {
+            showLimitExhaustedModal(errDetail);
+            Failure(LIMIT_EXHAUSTED_MESSAGE);
+          } else {
+            Failure("CO-PO mapping generation failed. Please try again.");
+          }
         } else if (attempts >= maxAttempts) {
           stopPolling();
           setState({ generatingCopo: false, versionRefreshKey: Date.now() });
@@ -342,7 +351,12 @@ const COPOMapping = () => {
       startPolling(course_id || sid, res?.job_id);
     } catch (error: any) {
       console.error("Error generating CO-PO mapping:", error);
-      Failure(getErrorMessage(error, "Failed to generate CO-PO mapping"));
+      if (isLimitExhaustion(error)) {
+        showLimitExhaustedModal(error?.response?.data?.detail || error?.message);
+        Failure(LIMIT_EXHAUSTED_MESSAGE);
+      } else {
+        Failure(getErrorMessage(error, "Failed to generate CO-PO mapping"));
+      }
       setState({ generatingCopo: false });
     }
   };

@@ -182,20 +182,129 @@ export const Success = (message: string) => {
   });
 };
 
-export const Failure = (message: string) => {
+export const LIMIT_EXHAUSTED_MESSAGE =
+  "Your generation limit is exhausted so ask your admin to request for more.";
+
+export const isLimitExhaustion = (error: any): boolean => {
+  if (!error) return false;
+
+  // Check HTTP 429 status
+  if (
+    error?.response?.status === 429 ||
+    error?.status === 429 ||
+    error?.statusCode === 429
+  ) {
+    return true;
+  }
+
+  // Check text content across various fields
+  const candidates: string[] = [
+    typeof error === "string" ? error : "",
+    error?.message || "",
+    error?.response?.data?.detail || "",
+    error?.response?.data?.message || "",
+    error?.data?.detail || "",
+    error?.data?.message || "",
+    error?.detail || "",
+    error?.error || "",
+    error?.state?.error || "",
+  ];
+
+  const fullText = candidates.filter(Boolean).join(" ").toLowerCase();
+  const limitKeywords = [
+    "limit exhausted",
+    "generation limit",
+    "limit exceed",
+    "quota exceeded",
+    "maximum allowed generations",
+    "organization generation limit",
+    "course generation limit",
+    "generation limit exhausted",
+    "too many requests",
+    "rate limit",
+  ];
+
+  return limitKeywords.some((keyword) => fullText.includes(keyword));
+};
+
+export const showLimitExhaustedModal = (detail?: string) => {
+  return Swal.fire({
+    icon: "warning",
+    title: "Generation Limit Exhausted",
+    html: `
+      <div style="text-align: left; font-size: 14px; line-height: 1.6; color: #374151;">
+        <p style="margin-bottom: 12px; font-weight: 600; color: #b45309;">
+          ⚠️ Your AI generation limit has been reached.
+        </p>
+        <p style="margin-bottom: 8px;">
+          <strong>Reason:</strong> You or your organization have consumed the allotted quota for this action.
+        </p>
+        <p style="margin-bottom: 12px; background: #fef3c7; padding: 10px 14px; border-radius: 8px; border-left: 4px solid #f59e0b; color: #92400e; font-weight: 500;">
+          💡 <strong>Solution:</strong> Your generation limit is exhausted so ask your admin to request for more.
+        </p>
+        ${
+          detail && typeof detail === "string" && !detail.includes("<")
+            ? `<details style="margin-top: 8px; font-size: 12px; color: #6b7280; cursor: pointer;">
+                 <summary>Technical Details</summary>
+                 <pre style="white-space: pre-wrap; word-break: break-all; margin-top: 4px; padding: 6px; background: #f3f4f6; border-radius: 4px;">${detail}</pre>
+               </details>`
+            : ""
+        }
+      </div>
+    `,
+    confirmButtonText: "Understood",
+    confirmButtonColor: "#f59e0b",
+    customClass: {
+      popup: "sweet-alerts",
+      confirmButton: "btn btn-warning px-5 py-2 font-semibold text-white",
+    },
+  });
+};
+
+export const getErrorMessage = (
+  error: any,
+  fallback: string = "Operation failed"
+): string => {
+  if (isLimitExhaustion(error)) {
+    return LIMIT_EXHAUSTED_MESSAGE;
+  }
+  if (!error) return fallback;
+  if (typeof error === "string") return error;
+  if (error?.response?.data?.detail) {
+    const d = error.response.data.detail;
+    return typeof d === "string" ? d : JSON.stringify(d);
+  }
+  if (error?.response?.data?.message) return String(error.response.data.message);
+  if (error?.message) return String(error.message);
+  if (error?.detail) return String(error.detail);
+  return fallback;
+};
+
+export const Failure = (message: string, error?: any) => {
+  const isLimit = isLimitExhaustion(error || message);
+  const finalMessage = isLimit ? LIMIT_EXHAUSTED_MESSAGE : message;
+
   const toast = Swal.mixin({
     toast: true,
     position: "top-end",
-
     showConfirmButton: false,
-    timer: 3000,
+    timer: isLimit ? 6000 : 3000,
+    timerProgressBar: true,
   });
 
   toast.fire({
-    icon: "error",
-    title: message,
+    icon: isLimit ? "warning" : "error",
+    title: finalMessage,
     padding: "10px 20px",
   });
+
+  if (isLimit) {
+    showLimitExhaustedModal(
+      typeof error === "string"
+        ? error
+        : error?.response?.data?.detail || error?.message || message
+    );
+  }
 };
 
 export const truncateText = (text: string, maxLength: number = 25) => {
