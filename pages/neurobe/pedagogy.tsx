@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { ArrowRight, BookOpen, Calendar, Check, EditIcon, FileText, HelpCircle, Hourglass, Lightbulb, Plus, Presentation, RefreshCw, ReplaceAll, Save, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, Calendar, Check, EditIcon, FileText, HelpCircle, Hourglass, Lightbulb, Plus, Presentation, RefreshCw, ReplaceAll, RotateCw, Save, Sparkles, Trash2 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import {
   useSetState,
@@ -565,7 +565,7 @@ const Pedagogy = () => {
           const jobRes: any = await Models.pedagogy.jobStatus(targetJobId);
           const status = jobRes?.status ?? jobRes?.state?.live_redis_status ?? jobRes?.result?.status;
           if (status === "complete" || status === "completed" || status === "success" || status === "finished") {
-            setState({ generatingRecommendations: false, pollingJob: false, recommendationsGenerated: true, pedagogyApproved: false, jobId: null });
+            setState((prev: any) => ({ generatingRecommendations: false, pollingJob: false, recommendationsGenerated: true, pedagogyApproved: false, jobId: null, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
             Success("Pedagogy recommendations generated successfully!");
           } else if (status === "failed" || status === "error") {
             setState({ generatingRecommendations: false, pollingJob: false, jobId: null });
@@ -608,7 +608,7 @@ const Pedagogy = () => {
         setState({ jobId, generatingRecommendations: true });
         Success("Pedagogy generation started. Click Refresh to check status.");
       } else {
-        setState({ generatingRecommendations: false, recommendationsGenerated: true, pedagogyApproved: false });
+        setState((prev: any) => ({ generatingRecommendations: false, recommendationsGenerated: true, pedagogyApproved: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
         Success(res?.message || "Pedagogy recommendations generated successfully");
         getUnitDetail(sid, activeUnitNum);
       }
@@ -816,6 +816,38 @@ const Pedagogy = () => {
     }
   };
 
+  const handleDisapprovePedagogy = async () => {
+    const sid =
+      state.courseDetail?.latest_syllabus?.id ||
+      state.unitsList?.[0]?.syllabus_id ||
+      activeUnitDetail?.syllabus_id ||
+      course_id;
+
+    if (state.upstreamNotApproved) {
+      Failure("Cannot disapprove pedagogy: Topic hierarchy must be approved first.");
+      return;
+    }
+
+    try {
+      setState({ approvingPedagogy: true });
+      await Models.syllabus.reject_stage(course_id || sid, "pedagogy");
+      Success("Pedagogy disapproved successfully");
+      setState((prev: any) => ({ pedagogyApproved: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
+      if (sid) {
+        await getUnits(sid, loadedVersion);
+        await getUnitDetail(sid, activeUnitNum, loadedVersion);
+      }
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
+    } catch (error: any) {
+      console.error("disapprove_pedagogy error:", error);
+      Failure(getErrorMessage(error, "Failed to disapprove pedagogy"));
+    } finally {
+      setState({ approvingPedagogy: false });
+    }
+  };
+
   const handleApprovePedagogy = async () => {
     const sid =
       state.courseDetail?.latest_syllabus?.id ||
@@ -832,7 +864,7 @@ const Pedagogy = () => {
       setState({ approvingPedagogy: true });
       await Models.syllabus.approve_stage(course_id || sid, "pedagogy");
       Success("Pedagogy approved successfully");
-      setState({ pedagogyApproved: true, versionRefreshKey: Date.now() });
+      setState((prev: any) => ({ pedagogyApproved: true, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
       if (sid) {
         await getUnits(sid, loadedVersion);
         await getUnitDetail(sid, activeUnitNum, loadedVersion);
@@ -1060,7 +1092,6 @@ const Pedagogy = () => {
           stage="pedagogy"
           stageLabel="Pedagogy Suggestions"
           courseId={course_id}
-          key={state.versionRefreshKey}
           refreshTrigger={state.versionRefreshKey}
           onVersionActivated={handleVersionActivated}
           onVersionLoad={handleVersionActivated}
@@ -1389,14 +1420,22 @@ const Pedagogy = () => {
                       disabled: state.approvingPedagogy || state.upstreamNotApproved,
                     }
               }
-              actionBtn2={{
-                label: "Next: Lesson Plan →",
-                icon: <ArrowRight className="h-4 w-4" />,
-                onClick: () => {
-                  const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                  router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
-                },
-              }}
+              actionBtn2={
+                state.pedagogyApproved ? {
+                  label: state.approvingPedagogy ? "Disapproving..." : "Disapprove Pedagogy",
+                  icon: state.approvingPedagogy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />,
+                  onClick: handleDisapprovePedagogy,
+                  className: "create-btn !bg-amber-600 hover:!bg-amber-700",
+                  disabled: state.approvingPedagogy,
+                } : {
+                  label: "Next: Lesson Plan →",
+                  icon: <ArrowRight className="h-4 w-4" />,
+                  onClick: () => {
+                    const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
+                    router.push(cid ? `/neurobe/lesson-plan?course_id=${cid}` : "/neurobe/lesson-plan");
+                  },
+                }
+              }
             />
           ) : (
             <PageFooter

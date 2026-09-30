@@ -347,6 +347,33 @@ const LessonPlan = () => {
     }
   };
 
+  const handleDisapproveLessonPlan = async () => {
+    const sid = getSyllabusId();
+    if (!sid) return;
+
+    if (state.upstreamNotApproved) {
+      Failure("Cannot disapprove lesson plan: Pedagogy recommendations must be approved first.");
+      return;
+    }
+
+    try {
+      setState({ approvingLesson: true });
+      await Models.syllabus.reject_stage(course_id || sid, "schedule", loadedVersion ?? undefined);
+      Success("Lesson plan disapproved successfully");
+      setState((prev: any) => ({ lessonApproved: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
+      if (course_id) {
+        await restoreWorkflowState(course_id);
+      }
+      const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
+      await lession_data(sid, activeUnitNum, loadedVersion ?? undefined);
+    } catch (error: any) {
+      console.log("Disapprove error:", error);
+      Failure(typeof error === "string" ? error : error?.message || "Failed to disapprove lesson plan");
+    } finally {
+      setState({ approvingLesson: false });
+    }
+  };
+
   const handleApproveLessonPlan = async () => {
     const sid = getSyllabusId();
     if (state.upstreamNotApproved) {
@@ -367,7 +394,7 @@ const LessonPlan = () => {
         console.warn("approve_stage schedule warning:", e);
       }
       Success("Lesson plan review completed successfully");
-      setState({ lessonApproved: true, versionRefreshKey: Date.now() });
+      setState((prev: any) => ({ lessonApproved: true, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
       if (course_id) {
         await restoreWorkflowState(course_id);
       }
@@ -730,12 +757,12 @@ const LessonPlan = () => {
 
         if (currentStatus === "draft" || currentStatus === "approved") {
           stopPolling();
-          setState({
+          setState((prev: any) => ({
             generateLoading: false,
             lessonApproved: currentStatus === "approved",
             recommendationsGenerated: true,
-            versionRefreshKey: Date.now(),
-          });
+            versionRefreshKey: (prev.versionRefreshKey || 0) + 1,
+          }));
           const sid = getSyllabusId();
           if (sid) {
             const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
@@ -744,7 +771,7 @@ const LessonPlan = () => {
           Success("Lesson plan generated successfully with NEURO AI!");
         } else if (currentStatus === "failed") {
           stopPolling();
-          setState({ generateLoading: false, versionRefreshKey: Date.now() });
+          setState((prev: any) => ({ generateLoading: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
           const errDetail =
             lpStep?.error ||
             wfRes?.error ||
@@ -757,7 +784,7 @@ const LessonPlan = () => {
           }
         } else if (attempts >= maxAttempts) {
           stopPolling();
-          setState({ generateLoading: false, versionRefreshKey: Date.now() });
+          setState((prev: any) => ({ generateLoading: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
           const sid = getSyllabusId();
           if (sid) {
             const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
@@ -768,7 +795,7 @@ const LessonPlan = () => {
         console.warn("Lesson plan polling error:", pollErr);
         if (attempts >= maxAttempts) {
           stopPolling();
-          setState({ generateLoading: false, versionRefreshKey: Date.now() });
+          setState((prev: any) => ({ generateLoading: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
         }
       }
     };
@@ -814,7 +841,7 @@ const LessonPlan = () => {
 
   const handleVersionActivated = async (newVer: number) => {
     setLoadedVersion(newVer);
-    setState({ recommendationsGenerated: true, versionRefreshKey: Date.now() });
+    setState((prev: any) => ({ recommendationsGenerated: true, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
     const syllabusId = getSyllabusId();
     if (syllabusId) {
       const activeUnitNum = parseInt(state.activeTab?.split("-")[1] || "1", 10) || 1;
@@ -868,8 +895,22 @@ const LessonPlan = () => {
         icon={<ClipboardList className="h-5 w-5 text-color2" />}
       />
 
+      {course_id && (
+        <StageVersionHistoryPanel
+          stage="schedule"
+          stageLabel="Lesson Plan & Schedule"
+          courseId={course_id}
+          refreshTrigger={state.versionRefreshKey}
+          onVersionActivated={handleVersionActivated}
+          onVersionLoad={handleVersionLoad}
+          onGenerateNew={generateLessionPlan}
+          isGenerating={state.generateLoading}
+          onVersionsLoaded={(count) => setState({ versionsLoaded: true, hasVersions: count > 0 })}
+        />
+      )}
+
       {/* ── Stat cards — only when versions exist ── */}
-      {state.hasVersions && (
+      {state.hasVersions && !state.generateLoading && (
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
           {state.matrix?.map((tab) => (
             <StatTabCard
@@ -1036,12 +1077,20 @@ const LessonPlan = () => {
                     disabled: state.approvingLesson || state.upstreamNotApproved,
                   }
               }
-              actionBtn2={{
-                label: state.savingDraft ? "Saving..." : "Save Draft",
-                icon: <Save className="h-4 w-4" />,
-                onClick: handleSaveDraft,
-                disabled: state.savingDraft,
-              }}
+              actionBtn2={
+                state.lessonApproved ? {
+                  label: state.approvingLesson ? "Disapproving..." : "Disapprove Lesson Plan",
+                  icon: state.approvingLesson ? <RotateCw className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />,
+                  onClick: handleDisapproveLessonPlan,
+                  className: "create-btn !bg-amber-600 hover:!bg-amber-700",
+                  disabled: state.approvingLesson,
+                } : {
+                  label: state.savingDraft ? "Saving..." : "Save Draft",
+                  icon: <Save className="h-4 w-4" />,
+                  onClick: handleSaveDraft,
+                  disabled: state.savingDraft,
+                }
+              }
             />
           ) : (
             <PageFooter
