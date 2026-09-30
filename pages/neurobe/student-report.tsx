@@ -9,27 +9,29 @@ import {
   XCircle,
   AlertTriangle,
   Lock,
-  Download,
   Printer,
   Sparkles,
   Brain,
   MessageSquare,
-  ArrowRight,
   RefreshCw,
   Clock,
   HelpCircle,
   BookOpen,
-  Volume2,
   TrendingUp,
-  FileBarChart,
   Calendar,
   Check,
   X,
+  Target,
+  Layers,
+  FileText,
+  User,
+  Info,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import PrivateRouter from "@/hook/privateRouter";
 import Models from "@/imports/models.import";
 import { getAuthUser } from "@/utils/function.utils";
+import VivaResultComponent from "@/components/viva_result_component";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -37,23 +39,66 @@ import { getAuthUser } from "@/utils/function.utils";
 
 interface EvaluatedQuestion {
   question_id: string;
-  question_index: number;
-  question_string: string;
-  options: string[];
-  selected_option: string | null;
+  question_index?: number;
+  question_string?: string;
+  options?: string[];
+  selected_option?: string | null;
   correct_option?: string | null;
-  is_correct: boolean;
-  explanation?: string;
+  is_correct?: boolean;
+  explanation?: string | null;
 }
 
 interface ScoreSummary {
-  total_questions: number;
-  answered_count: number;
-  correct_count: number;
-  incorrect_count: number;
-  unanswered_count: number;
-  score_pct: number;
-  passed: boolean;
+  total_questions?: number;
+  correct_count?: number;
+  unanswered_count?: number;
+  score_pct?: number;
+  passed?: boolean;
+}
+
+interface TopicAnalysisItem {
+  topic?: string;
+  depth?: string;
+  understanding_level?: string;
+  feedback?: string;
+  strengths?: string[];
+  knowledge_gaps?: string[];
+  misconceptions?: string[];
+  concept_breakdown?: string[];
+  mcq_questions_asked?: number;
+  mcq_questions_correct?: number;
+  mcq_interview_consistency?: string;
+}
+
+interface VivaReportData {
+  final_summary?: string;
+  key_strengths?: string[];
+  topic_analysis?: TopicAnalysisItem[];
+  session_metrics?: {
+    total_questions_asked?: number;
+    total_answered_correctly?: number;
+    total_topics?: number;
+    viva_score?: number;
+  };
+  reasoning_profile?: {
+    summary?: string;
+    reasoning_depth?: string;
+  };
+  assessment_summary?: {
+    summary?: string;
+    overall_understanding?: string;
+    communication_skills?: {
+      confidence?: string;
+      articulation?: string;
+    };
+  };
+  priority_improvement_areas?: string[];
+  dialogue_history?: Array<{
+    role?: string;
+    speaker?: string;
+    content?: string;
+    text?: string;
+  }>;
 }
 
 interface StudentReviewData {
@@ -72,9 +117,76 @@ interface StudentReviewData {
   score_summary: ScoreSummary;
   questions?: EvaluatedQuestion[] | null;
   viva_score?: number | null;
-  viva_report?: any | null;
+  viva_report?: VivaReportData | any | null;
   evaluation_summary?: string | null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers for safe value display (show "—" on any missing data)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const valOrDash = (val: any): string => {
+  if (val === null || val === undefined) return "—";
+  const s = String(val).trim();
+  return s === "" ? "—" : s;
+};
+
+const renderBulletList = (arr?: string[] | null) => {
+  if (!arr || !Array.isArray(arr) || arr.length === 0) {
+    return <span className="font-mono text-gray-400 dark:text-gray-500">—</span>;
+  }
+  const filtered = arr.filter((x) => x && String(x).trim() !== "");
+  if (filtered.length === 0) {
+    return <span className="font-mono text-gray-400 dark:text-gray-500">—</span>;
+  }
+  return (
+    <ul className="space-y-1.5">
+      {filtered.map((item, idx) => (
+        <li key={idx} className="flex items-start gap-2 text-xs text-gray-700 dark:text-gray-300">
+          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+          <span className="leading-relaxed">{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const getUnderstandingBadge = (level?: string) => {
+  const norm = String(level || "").toLowerCase().trim();
+  if (norm === "weak") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+        Weak
+      </span>
+    );
+  }
+  if (norm === "basic" || norm === "moderate") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+        {norm}
+      </span>
+    );
+  }
+  if (norm === "strong" || norm === "good") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+        Strong
+      </span>
+    );
+  }
+  if (norm === "excellent") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300">
+        Excellent
+      </span>
+    );
+  }
+  return <span className="font-mono text-xs text-gray-400 dark:text-gray-500">{valOrDash(level)}</span>;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
 
 const StudentReportPage = () => {
   const router = useRouter();
@@ -140,7 +252,7 @@ const StudentReportPage = () => {
 
   // Format date helper
   const formatDateTime = (isoStr?: string | null) => {
-    if (!isoStr) return "N/A";
+    if (!isoStr) return "—";
     try {
       const d = new Date(isoStr);
       if (isNaN(d.getTime())) return isoStr;
@@ -157,69 +269,20 @@ const StudentReportPage = () => {
     }
   };
 
-  // Safe normalized Viva Report parser (prevents React crashes)
-  const normalizedVivaReport = useMemo(() => {
+  // Safe normalized Viva Report parser
+  const parsedVivaReport = useMemo<VivaReportData | null>(() => {
     const raw = reportData?.viva_report;
-    const base = {
-      session_metrics: {
-        total_questions_asked: '-',
-        total_answered_correctly: '-',
-        total_topics: '-',
-        viva_score: '-',
-      },
-      assessment_summary: {
-        overall_understanding: "-",
-        summary: "-",
-        communication_skills: {
-          articulation: "-",
-          confidence: "-",
-        },
-      },
-      reasoning_profile: {
-        reasoning_depth: "-",
-        summary: "-",
-      },
-      key_strengths: ["-"],
-      priority_improvement_areas: ["-"],
-      topic_analysis: [] as any[],
-      dialogue_history: [] as any[],
-    };
-
-    if (!raw) return base;
-    const parsed = typeof raw === "object" ? raw.report || raw : {};
-
-    if (parsed.assessment_summary) base.assessment_summary = parsed.assessment_summary;
-    if (parsed.session_metrics) base.session_metrics = { ...base.session_metrics, ...parsed.session_metrics };
-    if (parsed.reasoning_profile) base.reasoning_profile = parsed.reasoning_profile;
-    if (Array.isArray(parsed.key_strengths) && parsed.key_strengths.length) base.key_strengths = parsed.key_strengths;
-    if (Array.isArray(parsed.priority_improvement_areas) && parsed.priority_improvement_areas.length) {
-      base.priority_improvement_areas = parsed.priority_improvement_areas;
+    if (!raw) return null;
+    let obj = raw;
+    if (typeof raw === "string") {
+      try {
+        obj = JSON.parse(raw);
+      } catch {
+        return null;
+      }
     }
-    if (Array.isArray(parsed.topic_analysis)) base.topic_analysis = parsed.topic_analysis;
-    if (Array.isArray(parsed.dialogue_history)) base.dialogue_history = parsed.dialogue_history;
-
-    return base;
-  }, [reportData]);
-
-  // Filtered questions
-  const filteredQuestions = useMemo(() => {
-    const list = reportData?.questions || [];
-    if (questionFilter === "incorrect") {
-      return list.filter((q) => !q.is_correct && q.selected_option !== null);
-    }
-    if (questionFilter === "correct") {
-      return list.filter((q) => q.is_correct);
-    }
-    if (questionFilter === "unanswered") {
-      return list.filter((q) => q.selected_option === null || q.selected_option === "");
-    }
-    return list;
-  }, [reportData?.questions, questionFilter]);
-
-  // Determine if Viva tab should be available
-  const hasVivaTab = Boolean(
-    reportData?.have_viva && (reportData?.viva_report || reportData?.viva_eligible)
-  );
+    return typeof obj === "object" && obj?.report ? obj.report : obj;
+  }, [reportData?.viva_report]);
 
   // Strict double check: ensure answers only unlock after test window has officially ended
   const isWindowStillActive = useMemo(() => {
@@ -232,6 +295,26 @@ const StudentReportPage = () => {
       return false;
     }
   }, [reportData?.test_window_end]);
+
+  // Determine if Viva tab should be available
+  const hasVivaTab = Boolean(
+    reportData?.have_viva && (parsedVivaReport || reportData?.viva_eligible || reportData?.viva_score !== null)
+  );
+
+  // Filtered questions
+  const filteredQuestions = useMemo(() => {
+    const list = reportData?.questions || [];
+    if (questionFilter === "incorrect") {
+      return list.filter((q) => !q.is_correct && q.selected_option !== null && String(q.selected_option).trim() !== "");
+    }
+    if (questionFilter === "correct") {
+      return list.filter((q) => q.is_correct);
+    }
+    if (questionFilter === "unanswered") {
+      return list.filter((q) => q.selected_option === null || q.selected_option === undefined || String(q.selected_option).trim() === "");
+    }
+    return list;
+  }, [reportData?.questions, questionFilter]);
 
   // Loading state
   if (loading) {
@@ -280,9 +363,14 @@ const StudentReportPage = () => {
     );
   }
 
-  const { score_summary, test_window_end } = reportData;
-  const isPassed = score_summary?.passed ?? false;
-  const scorePct = score_summary?.score_pct ?? 0;
+  const { score_summary } = reportData;
+  const totalQuestions = score_summary?.total_questions ?? (reportData.questions?.length ?? 0);
+  const correctCount = score_summary?.correct_count ?? 0;
+  const unansweredCount = score_summary?.unanswered_count ?? 0;
+  // Derive incorrect answers: total - correct - unanswered
+  const incorrectCount = Math.max(0, totalQuestions - correctCount - unansweredCount);
+  const scorePct = score_summary?.score_pct;
+  const isPassed = score_summary?.passed;
 
   const can_view_detailed_answers = Boolean(
     reportData.can_view_detailed_answers && !isWindowStillActive && (reportData.questions?.length || 0) > 0
@@ -296,81 +384,149 @@ const StudentReportPage = () => {
 
       <div className="space-y-6">
         {/* ── Top Header Card ────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white px-6 py-5 shadow-xs dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-start sm:items-center gap-4">
-            <button
-              type="button"
-              onClick={() => router.push("/neurobe/student-dashboard")}
-              className="rounded-xl border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors cursor-pointer mt-1 sm:mt-0"
-              title="Return to Dashboard"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                  Student Evaluation Report
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${isPassed
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                      : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
-                    }`}
-                >
-                  {isPassed ? "Passed" : "Needs Review"}
-                </span>
-                <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 font-mono dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
-                  {reportData.test_code || "TEST"}
-                </span>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 space-y-4">
+          <div className="flex flex-wrap items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-4">
+              <button
+                type="button"
+                onClick={() => router.push("/neurobe/student-dashboard")}
+                className="rounded-xl border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors cursor-pointer mt-1 sm:mt-0"
+                title="Return to Dashboard"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    Student Evaluation Report
+                  </span>
+                  <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 font-mono dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+                    {valOrDash(reportData.test_code)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${reportData.status?.toLowerCase() === "completed"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                        : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                      }`}
+                  >
+                    {valOrDash(reportData.status)}
+                  </span>
+                  {isPassed !== undefined && (
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${isPassed
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                          : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                        }`}
+                    >
+                      {isPassed ? "Passed" : "Needs Review"}
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                  {valOrDash(reportData.title)}
+                </h1>
               </div>
+            </div>
 
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                {reportData.title || "Academic Assessment"}
-              </h1>
-
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Candidate: <strong className="text-gray-700 dark:text-gray-200">{studentEmail}</strong> • Window Closes:{" "}
-                <span className="font-mono text-gray-600 dark:text-gray-300">{formatDateTime(test_window_end)}</span>
-              </p>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer shadow-xs"
+              >
+                <Printer className="h-4 w-4" />
+                <span>Print / Export</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/neurobe/student-dashboard")}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-5 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+              >
+                <span>Dashboard</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer shadow-xs"
-            >
-              <Printer className="h-4 w-4" />
-              <span>Print / Export</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/neurobe/student-dashboard")}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-5 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
-            >
-              <span>Dashboard</span>
-            </button>
+          {/* Sub-bar with Test Window & Metadata */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-gray-100 dark:border-gray-800 text-xs">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400 shrink-0" />
+              <span className="text-gray-500 dark:text-gray-400">Candidate:</span>
+              <strong className="text-gray-800 dark:text-gray-200 font-mono truncate">
+                {valOrDash(reportData.student_email)}
+              </strong>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
+              <span className="text-gray-500 dark:text-gray-400">Window Start:</span>
+              <span className="text-gray-800 dark:text-gray-200 font-mono">
+                {formatDateTime(reportData.test_window_start)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gray-400 shrink-0" />
+              <span className="text-gray-500 dark:text-gray-400">Window End:</span>
+              <span className="text-gray-800 dark:text-gray-200 font-mono">
+                {formatDateTime(reportData.test_window_end)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-gray-500 dark:text-gray-400">Viva Round:</span>
+              <span className="text-gray-800 dark:text-gray-200 font-medium">
+                {!reportData.have_viva ? (
+                  "—"
+                ) : reportData.viva_eligible ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Eligible (Req. {valOrDash(reportData.viva_threshold)}%)</span>
+                ) : (
+                  <span className="text-amber-600 dark:text-amber-400 font-semibold">Threshold Not Met (Req. {valOrDash(reportData.viva_threshold)}%)</span>
+                )}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* ── Viva Ineligibility Notice (if viva was configured but student didn't qualify) ─ */}
+        {/* ── System / API Message Banner ─────────────────────────────────── */}
+        {reportData.message && (
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 text-xs text-indigo-950 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-200 flex items-start gap-3">
+            <Info className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400 mt-0.5" />
+            <p className="leading-relaxed">{reportData.message}</p>
+          </div>
+        )}
+
+        {/* ── Evaluation Summary Banner (if provided) ─────────────────────── */}
+        {reportData.evaluation_summary && (
+          <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 text-xs text-purple-950 dark:border-purple-900/40 dark:bg-purple-950/20 dark:text-purple-200 flex items-start gap-3">
+            <Brain className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400 mt-0.5" />
+            <div>
+              <p className="font-bold text-[11px] uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                Evaluation Summary
+              </p>
+              <p className="mt-0.5 leading-relaxed">{reportData.evaluation_summary}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Viva Ineligibility Notice (if viva configured but threshold not met) ─ */}
         {reportData.have_viva && !reportData.viva_eligible && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
               <p className="font-bold">Viva Voce Round Notice</p>
               <p className="mt-0.5 text-amber-800 dark:text-amber-300/90 leading-relaxed">
-                This assessment was configured with an AI Viva Voce session requiring a minimum score of{" "}
-                <strong>{reportData.viva_threshold ?? 50}%</strong>. Your evaluated score was{" "}
-                <strong>{scorePct}%</strong>. As the passing threshold was not met, the viva round was not conducted and
-                your evaluation is based on your MCQ responses alone.
+                This assessment was configured with an AI Viva Voce session requiring a minimum MCQ score of{" "}
+                <strong>{valOrDash(reportData.viva_threshold)}%</strong>. Your evaluated MCQ score was{" "}
+                <strong>{scorePct !== undefined && scorePct !== null ? `${scorePct}%` : "—"}</strong>. As the passing threshold was not met, the viva round was not conducted and your evaluation is based on your MCQ responses alone.
               </p>
             </div>
           </div>
         )}
 
-        {/* ── Mode Toggle: Shown ONLY if Viva is Enabled and Conducted ── */}
+        {/* ── Mode Toggle: Shown if Viva is Enabled ──────────────────────── */}
         {hasVivaTab && (
           <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl border border-gray-200 dark:bg-gray-900 dark:border-gray-800 w-fit">
             <button
@@ -382,7 +538,7 @@ const StudentReportPage = () => {
                 }`}
             >
               <BookOpen className="h-4 w-4" />
-              <span>MCQ Results</span>
+              <span>MCQ Assessment</span>
             </button>
             <button
               type="button"
@@ -393,13 +549,13 @@ const StudentReportPage = () => {
                 }`}
             >
               <Sparkles className="h-4 w-4 text-amber-500" />
-              <span>Viva Voce Results</span>
+              <span>AI Viva Voce Report</span>
             </button>
           </div>
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* VIEW 1: MCQ Results View (Default & Single view if Viva Disabled)  */}
+        {/* VIEW 1: MCQ Results View                                           */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "mcq" && (
           <div className="space-y-6">
@@ -415,16 +571,18 @@ const StudentReportPage = () => {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 font-mono">
-                    {scorePct}%
+                    {scorePct !== undefined && scorePct !== null ? `${scorePct}%` : "—"}
                   </span>
-                  <span className={`text-xs font-bold ${isPassed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                    {isPassed ? "Passed" : "Needs Review"}
-                  </span>
+                  {isPassed !== undefined && (
+                    <span className={`text-xs font-bold ${isPassed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                      {isPassed ? "Passed" : "Needs Review"}
+                    </span>
+                  )}
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full mt-3 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${isPassed ? "bg-emerald-500" : "bg-amber-500"}`}
-                    style={{ width: `${Math.min(100, Math.max(0, scorePct))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, scorePct ?? 0))}%` }}
                   />
                 </div>
               </div>
@@ -439,10 +597,12 @@ const StudentReportPage = () => {
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-300 font-mono">
-                    {score_summary?.correct_count ?? 0}
+                    {score_summary?.correct_count !== undefined && score_summary?.correct_count !== null
+                      ? score_summary.correct_count
+                      : "—"}
                   </span>
                   <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70 font-mono">
-                    / {score_summary?.total_questions ?? 0}
+                    / {totalQuestions}
                   </span>
                 </div>
                 <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2">Verified correct selections</p>
@@ -458,10 +618,10 @@ const StudentReportPage = () => {
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-extrabold text-rose-700 dark:text-rose-300 font-mono">
-                    {score_summary?.incorrect_count ?? 0}
+                    {score_summary ? incorrectCount : "—"}
                   </span>
                   <span className="text-xs text-rose-600/70 dark:text-rose-400/70 font-mono">
-                    / {score_summary?.total_questions ?? 0}
+                    / {totalQuestions}
                   </span>
                 </div>
                 <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-2">Wrong option selected</p>
@@ -477,9 +637,11 @@ const StudentReportPage = () => {
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-extrabold text-gray-800 dark:text-gray-200 font-mono">
-                    {score_summary?.unanswered_count ?? 0}
+                    {score_summary?.unanswered_count !== undefined && score_summary?.unanswered_count !== null
+                      ? score_summary.unanswered_count
+                      : "—"}
                   </span>
-                  <span className="text-xs text-gray-500 font-mono">/ {score_summary?.total_questions ?? 0}</span>
+                  <span className="text-xs text-gray-500 font-mono">/ {totalQuestions}</span>
                 </div>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">Skipped or unattempted</p>
               </div>
@@ -527,7 +689,7 @@ const StudentReportPage = () => {
                           : "text-gray-600 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400"
                         }`}
                     >
-                      Incorrect ({score_summary?.incorrect_count || 0})
+                      Incorrect ({incorrectCount})
                     </button>
                     <button
                       type="button"
@@ -537,13 +699,23 @@ const StudentReportPage = () => {
                           : "text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
                         }`}
                     >
-                      Correct ({score_summary?.correct_count || 0})
+                      Correct ({correctCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuestionFilter("unanswered")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${questionFilter === "unanswered"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 font-bold"
+                          : "text-gray-600 hover:text-amber-600 dark:text-gray-400 dark:hover:text-amber-400"
+                        }`}
+                    >
+                      Unanswered ({unansweredCount})
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* ── Case A: Window is Still Open (Answers Locked) ─────────── */}
+              {/* Case A: Window is Still Open (Answers Locked) */}
               {!can_view_detailed_answers && (
                 <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-8 text-center space-y-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
                   <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400">
@@ -558,13 +730,13 @@ const StudentReportPage = () => {
                       explanations will unlock automatically after the scheduled test window closes.
                     </p>
                     <div className="rounded-xl bg-white border border-indigo-100 px-4 py-2 mt-3 inline-block font-mono text-xs font-semibold text-indigo-700 dark:bg-gray-800 dark:border-gray-700 dark:text-indigo-300 shadow-xs">
-                      Unlocks on: {formatDateTime(test_window_end)}
+                      Unlocks on: {formatDateTime(reportData.test_window_end)}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* ── Case B: Window is Closed (Detailed Answers Unlocked) ───── */}
+              {/* Case B: Window is Closed (Detailed Answers Unlocked) */}
               {can_view_detailed_answers && (
                 <div className="space-y-4">
                   {filteredQuestions.length === 0 ? (
@@ -573,7 +745,10 @@ const StudentReportPage = () => {
                     </div>
                   ) : (
                     filteredQuestions.map((q, idx) => {
-                      const isUnanswered = !q.selected_option;
+                      const isUnanswered =
+                        q.selected_option === null ||
+                        q.selected_option === undefined ||
+                        String(q.selected_option).trim() === "";
                       return (
                         <div
                           key={q.question_id || idx}
@@ -587,7 +762,7 @@ const StudentReportPage = () => {
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-2">
                               <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-800 font-mono text-xs font-bold text-gray-700 dark:text-gray-300">
-                                {q.question_index || idx + 1}
+                                {q.question_index ?? idx + 1}
                               </span>
                               <span
                                 className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${q.is_correct
@@ -603,12 +778,12 @@ const StudentReportPage = () => {
                           </div>
 
                           <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-relaxed">
-                            {q.question_string}
+                            {valOrDash(q.question_string)}
                           </h3>
 
                           {/* Options Grid */}
                           <div className="space-y-2 pt-1">
-                            {q.options.map((optText, oIdx) => {
+                            {(q.options || []).map((optText, oIdx) => {
                               const isSelected =
                                 String(q.selected_option || "").trim().toLowerCase() ===
                                 String(optText).trim().toLowerCase();
@@ -635,7 +810,7 @@ const StudentReportPage = () => {
                                     <span className="font-mono text-gray-400 dark:text-gray-500">
                                       {String.fromCharCode(65 + oIdx)}.
                                     </span>
-                                    <span>{optText}</span>
+                                    <span>{valOrDash(optText)}</span>
                                   </span>
 
                                   <div className="flex items-center gap-2">
@@ -656,14 +831,12 @@ const StudentReportPage = () => {
                           </div>
 
                           {/* Explanation Box */}
-                          {q.explanation && (
-                            <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 text-xs text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-200 leading-relaxed">
-                              <strong className="text-indigo-700 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] block mb-1">
-                                Rationale & Concept Explanation:
-                              </strong>
-                              {q.explanation}
-                            </div>
-                          )}
+                          <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 text-xs text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-200 leading-relaxed">
+                            <strong className="text-indigo-700 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] block mb-1">
+                              Rationale & Explanation:
+                            </strong>
+                            <span>{valOrDash(q.explanation)}</span>
+                          </div>
                         </div>
                       );
                     })
@@ -675,144 +848,31 @@ const StudentReportPage = () => {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* VIEW 2: Viva Results View (Shown when toggled & viva report exists) */}
+        {/* VIEW 2: AI Viva Voce Report View                                   */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "viva" && hasVivaTab && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column: Qualitative Metrics */}
-            <div className="lg:col-span-5 space-y-6">
-              {/* Viva Metrics */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-                  <span>Oral Examination Metrics</span>
-                  <Award className="h-4 w-4 text-amber-500" />
-                </h3>
-
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">Oral Questions Evaluated</span>
-                    <span className="font-mono text-base font-bold text-gray-900 dark:text-white">
-                      {normalizedVivaReport.session_metrics.total_questions_asked || 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-t border-gray-100 dark:border-gray-800 pt-2.5">
-                    <span className="text-gray-500 dark:text-gray-400">Correct Articulations</span>
-                    <span className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">
-                      {normalizedVivaReport.session_metrics.total_answered_correctly || 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-t border-gray-100 dark:border-gray-800 pt-2.5">
-                    <span className="text-gray-500 dark:text-gray-400">Viva Score Evaluated</span>
-                    <span className="font-mono text-base font-bold text-indigo-600 dark:text-indigo-400">
-                      {normalizedVivaReport.session_metrics.viva_score || reportData.viva_score || 0}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Overall Understanding */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 space-y-3">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-2">
-                  Conceptual Understanding
-                </h3>
-                <div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    Level: {normalizedVivaReport.assessment_summary.overall_understanding.replace("_", " ")}
-                  </span>
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 text-xs leading-relaxed">
-                  {normalizedVivaReport.assessment_summary.summary}
-                </p>
-              </div>
-
-              {/* Communication Skills */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-2">
-                  Communication & Presentation
-                </h3>
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <h4 className="font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider text-[10px] mb-0.5">
-                      Articulation
-                    </h4>
-                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {normalizedVivaReport.assessment_summary.communication_skills.articulation}
-                    </p>
-                  </div>
-                  <div className="border-t border-gray-100 dark:border-gray-800 pt-2.5">
-                    <h4 className="font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-[10px] mb-0.5">
-                      Confidence & Poise
-                    </h4>
-                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {normalizedVivaReport.assessment_summary.communication_skills.confidence}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Strengths & Improvement Areas */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* Strengths & Improvement */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="rounded-2xl border border-emerald-200 bg-white p-6 shadow-xs dark:border-emerald-900/40 dark:bg-gray-900 space-y-3">
-                  <h3 className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4" /> Demonstrated Strengths
-                  </h3>
-                  <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-300">
-                    {normalizedVivaReport.key_strengths.map((s: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-emerald-500 font-bold">•</span>
-                        <span>{s}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl border border-amber-200 bg-white p-6 shadow-xs dark:border-amber-900/40 dark:bg-gray-900 space-y-3">
-                  <h3 className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" /> Focus Areas
-                  </h3>
-                  <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-300">
-                    {normalizedVivaReport.priority_improvement_areas.map((p: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-amber-500 font-bold">•</span>
-                        <span>{p}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Dialogue History / Q&A Transcript */}
-              {normalizedVivaReport.dialogue_history?.length > 0 && (
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 space-y-4">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-indigo-500" />
-                    <span>Interview Dialogue Transcript</span>
-                  </h3>
-
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                    {normalizedVivaReport.dialogue_history.map((d: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className={`rounded-xl p-3.5 text-xs space-y-1 ${d.role === "assistant" || d.speaker === "ai"
-                            ? "bg-indigo-50/60 border border-indigo-100 text-indigo-900 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-200"
-                            : "bg-gray-50 border border-gray-100 text-gray-800 dark:bg-gray-800/40 dark:border-gray-700 dark:text-gray-200"
-                          }`}
-                      >
-                        <span className="font-bold uppercase tracking-wider text-[10px] text-gray-500 dark:text-gray-400 block">
-                          {d.role === "assistant" || d.speaker === "ai" ? "AI Interviewer" : "Student Candidate"}
-                        </span>
-                        <p className="leading-relaxed">{d.content || d.text || ""}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="flex-1 flex flex-col w-full">
+            <VivaResultComponent
+              report={{
+                ...(parsedVivaReport || (typeof reportData?.viva_report === "object" ? reportData?.viva_report : {})),
+                session_metrics: {
+                  ...(parsedVivaReport?.session_metrics || {}),
+                  viva_score: reportData?.viva_score ?? parsedVivaReport?.session_metrics?.viva_score,
+                },
+              }}
+              testDetails={{
+                title: reportData?.title,
+                secure_code: reportData?.test_code,
+                test_id: reportData?.test_id,
+              }}
+              studentEmail={studentEmail}
+              dialogueMessages={parsedVivaReport?.dialogue_history}
+              loading={loading}
+              onBackToDashboard={() => router.push("/neurobe/student-dashboard")}
+            />
           </div>
         )}
+
       </div>
     </div>
   );

@@ -21,8 +21,9 @@ interface StudentReport {
   student_email: string;
   score_pct: number;
   correct: number;
-  incorrect: number;
   unanswered: number;
+  incorrect?: number;
+  total_questions?: number;
   tab_switch_count: number;
   time_taken_seconds: number;
   auto_submitted: boolean;
@@ -37,8 +38,8 @@ interface QuestionReport {
   options?: string[];
   correct_answer?: string;
   correct_count: number;
-  incorrect_count: number;
   unanswered_count: number;
+  incorrect_count?: number;
   total_attempts?: number;
   correct_pct: number;
 }
@@ -117,9 +118,9 @@ const MCQTestReport = () => {
 
   const filteredStudents = useMemo(() => {
     if (!report) return [];
-    // Only show students who actually submitted (answered at least 1 question)
+    // Only show students who actually submitted (answered at least 1 question or spent time)
     const attended = report.students.filter(
-      (st) => (st.correct + st.incorrect + st.unanswered) > 0 || st.time_taken_seconds > 0
+      (st) => (st.correct + (st.incorrect ?? 0) + st.unanswered) > 0 || st.time_taken_seconds > 0 || (st.per_question?.length || 0) > 0
     );
     if (!search.trim()) return attended;
     const s = search.toLowerCase();
@@ -131,7 +132,7 @@ const MCQTestReport = () => {
   const nonAttendingStudents = useMemo(() => {
     if (!report) return [];
     return report.students.filter(
-      (st) => (st.correct + st.incorrect + st.unanswered) === 0 && st.time_taken_seconds === 0
+      (st) => (st.correct + (st.incorrect ?? 0) + st.unanswered) === 0 && st.time_taken_seconds === 0 && (st.per_question?.length || 0) === 0
     );
   }, [report]);
 
@@ -290,7 +291,7 @@ const MCQTestReport = () => {
                           {s.correct}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-red-500 dark:text-red-400">
-                          {s.incorrect}
+                          {s.incorrect ?? Math.max(0, (report?.questions?.length || s.total_questions || 0) - s.correct - s.unanswered)}
                         </td>
                         <td className="px-4 py-3 text-center text-gray-500">
                           {s.unanswered}

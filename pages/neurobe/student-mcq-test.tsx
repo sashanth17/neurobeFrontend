@@ -45,6 +45,7 @@ import { setPageTitle } from "@/store/themeConfigSlice";
 import { Success, Failure, getAuthUser } from "@/utils/function.utils";
 import Models from "@/imports/models.import";
 import BlankLayout from "@/components/Layouts/BlankLayout";
+import VivaResultComponent from "@/components/viva_result_component";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -185,6 +186,7 @@ export default function StudentMCQTestPage() {
   const [vivaStats, setVivaStats] = useState({ asked: 0, correct: 0 });
   const [vivaReport, setVivaReport] = useState<any>(null);
   const [vivaInterviewStarted, setVivaInterviewStarted] = useState(false);
+  const [concludingViva, setConcludingViva] = useState(false);
   const [vivaContextPreparing, setVivaContextPreparing] = useState(false); // context job still running on ai-worker
   const [vivaContextError, setVivaContextError] = useState<string | null>(null); // hard/unrecoverable context error
   const [currentQuestionText, setCurrentQuestionText] = useState("");
@@ -1076,9 +1078,14 @@ export default function StudentMCQTestPage() {
         break;
       }
 
-      case "VIVA_COMPLETE":
+      case "VIVA_COMPLETE": {
         setIsTransitioning(false);
         setIsSubmitting(false);
+        setConcludingViva(false);
+        // Update vivaStats with authoritative final totals from backend
+        const finalAsked = data.total_questions_asked || 0;
+        const finalCorrect = data.total_answered_correctly || 0;
+        setVivaStats({ asked: finalAsked, correct: finalCorrect });
         appendVivaMsg(
           "system",
           `🎉 ${data.message || "Viva interview concluded!"} Reason: ${data.stop_reason || "Completed"}`
@@ -1089,10 +1096,12 @@ export default function StudentMCQTestPage() {
         await submitCompletedTest(reportObj);
         setPhase("completed");
         break;
+      }
 
       case "VIVA_INELIGIBLE":
         setIsTransitioning(false);
         setIsSubmitting(false);
+        setConcludingViva(false);
         Failure(data.message || "MCQ score did not meet passing threshold for viva interview.");
         appendVivaMsg("system", `⚠️ ${data.message || "Viva round locked — threshold not met."}`);
         setPhase("completed");
@@ -1162,6 +1171,7 @@ export default function StudentMCQTestPage() {
       case "VIVA_ERROR":
         setIsTransitioning(false);
         setIsSubmitting(false);
+        setConcludingViva(false);
         setVivaInterviewStarted(false); // ← KEY FIX: reset so Begin Interview shows again
         Failure(data.message || "An error occurred during viva session.");
         appendVivaMsg("system", `⚠️ ${data.message || "An error occurred. Please try again."}`);
@@ -1235,11 +1245,11 @@ export default function StudentMCQTestPage() {
   };
 
   const handleStopVivaInterview = () => {
+    setConcludingViva(true);
     const ws = getActiveVivaSocket();
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ action: "STOP_INTERVIEW" }));
     }
-    setVivaInterviewStarted(false);
   };
 
   const appendVivaMsg = (
@@ -1286,10 +1296,14 @@ export default function StudentMCQTestPage() {
   const normalizedReport: ParsedVivaReport = useMemo(() => {
     const base: ParsedVivaReport = {
       session_metrics: {
-        total_questions_asked: vivaStats.asked || questions.length || 0,
-        total_answered_correctly: vivaStats.correct || Object.keys(answers).length || 0,
+        total_questions_asked: vivaStats.asked || 0,
+        // Use actual viva correct count — never fall back to MCQ answer count as that is meaningless here
+        total_answered_correctly: vivaStats.correct || 0,
         total_topics: (testDetails?.topics || []).length || 1,
-        mcq_score_pct: Math.round(((vivaStats.correct || Object.keys(answers).length) / Math.max(questions.length || 1, 1)) * 100),
+        // Viva score = correct viva answers / total viva questions asked (not MCQ)
+        mcq_score_pct: vivaStats.asked > 0
+          ? Math.round((vivaStats.correct / vivaStats.asked) * 100)
+          : 0,
       },
       assessment_summary: {
         overall_understanding: "moderate",
@@ -1996,21 +2010,31 @@ export default function StudentMCQTestPage() {
                       const mins = Math.floor(timeTakenSec / 60);
                       const secs = timeTakenSec % 60;
                       const timeFormatted = `${mins}m ${secs}s`;
-                      const answeredCount = Object.keys(answers).length;
+                      const clientAnsweredCount = Object.keys(answers).length;
                       const totalCount = questions.length;
+                      // Use backend-verified correct & unanswered count from score_summary (available immediately after submit)
+                      const authorativeCorrect =
+                        studentReviewData?.score_summary?.correct_count ??
+                        studentReviewData?.score_summary?.correct ??
+                        correctCount;
+                      const authorativeUnanswered =
+                        studentReviewData?.score_summary?.unanswered_count;
+                      const answeredCount = authorativeUnanswered !== undefined
+                        ? Math.max(0, totalCount - authorativeUnanswered)
+                        : clientAnsweredCount;
                       router.replace({
                         pathname: "/neurobe/student-dashboard",
                         query: {
                           submitted: "true",
                           title: testDetails?.title || "Assessment",
                           answered: String(answeredCount),
-                          correct: String(correctCount),
+                          correct: String(authorativeCorrect),
                           total: String(totalCount),
                           time: timeFormatted,
                           switches: String(tabSwitchCount),
                         },
                       }).catch(() => {
-                        window.location.href = `/neurobe/student-dashboard?submitted=true&title=${encodeURIComponent(testDetails?.title || "Assessment")}&answered=${answeredCount}&correct=${correctCount}&total=${totalCount}&time=${encodeURIComponent(timeFormatted)}&switches=${tabSwitchCount}`;
+                        window.location.href = `/neurobe/student-dashboard?submitted=true&title=${encodeURIComponent(testDetails?.title || "Assessment")}&answered=${answeredCount}&correct=${authorativeCorrect}&total=${totalCount}&time=${encodeURIComponent(timeFormatted)}&switches=${tabSwitchCount}`;
                       });
                     }}
                     className="w-full rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition-all cursor-pointer"
@@ -2158,14 +2182,24 @@ export default function StudentMCQTestPage() {
               <span>Q Timer: {formatQuestionTime(questionSecondsLeft)}</span>
             </div>
 
-            {/* End & View Report Button */}
-            <button
-              type="button"
-              onClick={handleStopVivaInterview}
-              className="px-3.5 py-1 bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 rounded-full text-xs font-medium transition-colors cursor-pointer"
-            >
-              End & View Report
-            </button>
+            {/* End & View Report Button — only visible once interview is live */}
+            {vivaInterviewStarted && (
+              <button
+                type="button"
+                disabled={concludingViva}
+                onClick={handleStopVivaInterview}
+                className="flex items-center gap-1.5 px-3.5 py-1 bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 disabled:opacity-50 rounded-full text-xs font-medium transition-colors cursor-pointer"
+              >
+                {concludingViva ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    <span>Concluding...</span>
+                  </>
+                ) : (
+                  <span>End & View Report</span>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="w-full sm:w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -2227,27 +2261,21 @@ export default function StudentMCQTestPage() {
                   </div>
                 </div>
               ) : (
-                /* ── CASE 3: Ready — show normal Begin Interview card ─────── */
-                <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 to-indigo-950/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                /* ── CASE 3: Ready — Informational status card ─────── */
+                <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 to-purple-950/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-purple-400" />
+                      <Sparkles className="h-5 w-5 text-indigo-400" />
                       <h3 className="text-base font-bold text-white">AI Viva Voce Examiner Online</h3>
                     </div>
                     <p className="mt-1 text-xs text-slate-400">
-                      Ensure your audio and microphone are connected. Click below to begin your personalized viva
-                      examination.
+                      Audio and speech synthesis are connected. Click <strong className="text-indigo-300">Begin Oral Interview</strong> below to initiate the evaluation.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!vivaConnected}
-                    onClick={handleStartVivaInterview}
-                    className="flex items-center gap-2 rounded-2xl bg-purple-600 px-6 py-3 text-xs font-bold text-white shadow-lg shadow-purple-600/30 hover:bg-purple-500 disabled:opacity-40 transition-all cursor-pointer shrink-0"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    <span>Begin Interview</span>
-                  </button>
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Examiner Ready</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -2317,17 +2345,18 @@ export default function StudentMCQTestPage() {
                 <div className="mt-auto w-full max-h-full overflow-y-auto pr-2 custom-scrollbar">
                   <h2 className="font-serif text-xl sm:text-2xl md:text-3xl text-slate-100 leading-snug drop-shadow-md">
                     {currentQuestionText ||
-                      "Welcome to your AI Viva Voce evaluation. Click 'Begin Interview' to initiate questions."}
+                      "Welcome to your AI Viva Voce evaluation. Click below to begin your personalized oral assessment."}
                   </h2>
                   {!vivaInterviewStarted && (
-                    <div className="mt-5">
+                    <div className="mt-6">
                       <button
                         type="button"
+                        disabled={!vivaConnected || vivaContextPreparing}
                         onClick={handleStartVivaInterview}
-                        className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
+                        className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white text-sm sm:text-base font-bold shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
                       >
                         <Play className="w-4 h-4 fill-white" />
-                        <span>Begin Oral Interview Now</span>
+                        <span>Begin Oral Interview</span>
                       </button>
                     </div>
                   )}
@@ -2347,23 +2376,28 @@ export default function StudentMCQTestPage() {
 
             <div className="flex items-center gap-3">
               {!vivaInterviewStarted ? (
-                <button
-                  type="button"
-                  onClick={handleStartVivaInterview}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  <Play className="w-4 h-4 fill-white" />
-                  <span>Begin Interview</span>
-                </button>
+                <span className="text-xs font-mono text-slate-400 bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl">
+                  Awaiting Start
+                </span>
               ) : (
                 <button
                   type="button"
+                  disabled={concludingViva}
                   onClick={handleStopVivaInterview}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-xs font-bold transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   title="Conclude Viva Session and generate final report"
                 >
-                  <XCircle className="w-4 h-4" />
-                  <span>Conclude Viva</span>
+                  {concludingViva ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Concluding...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4" />
+                      <span>Conclude Viva</span>
+                    </>
+                  )}
                 </button>
               )}
 
@@ -2391,8 +2425,6 @@ export default function StudentMCQTestPage() {
                 <MessageSquare className="w-4 h-4" />
               </button>
             </div>
-
-
           </div>
 
           {/* ── ResponsePanel (Aligned with ResponsePanel.jsx) ───────────────────── */}
@@ -2570,6 +2602,19 @@ export default function StudentMCQTestPage() {
             </div>
           )}
         </div>
+
+        {/* Fullscreen Overlay when Concluding Viva & Generating Report */}
+        {concludingViva && (
+          <div className="fixed inset-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+            <div className="w-14 h-14 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-5 shadow-lg shadow-indigo-500/20" />
+            <h3 className="font-serif text-2xl sm:text-3xl text-white font-medium mb-3">
+              Concluding Viva Examination
+            </h3>
+            <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed animate-pulse">
+              Synthesizing your assessment report and compiling topic-wise analysis. Please wait...
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -2679,479 +2724,153 @@ export default function StudentMCQTestPage() {
   }
 
   // If vivaReport exists, render the Comprehensive Assessment & Viva Evaluation Report
-  const { session_metrics, assessment_summary, topic_analysis, reasoning_profile, key_strengths, priority_improvement_areas, final_summary } = normalizedReport;
-
-  const getUnderstandingBadge = (level?: string) => {
-    switch ((level || "").toLowerCase()) {
-      case "strong":
-        return "text-emerald-300 border-emerald-500/40 bg-emerald-500/10";
-      case "moderate":
-        return "text-indigo-300 border-indigo-500/40 bg-indigo-500/10";
-      case "weak":
-        return "text-red-400 border-red-500/40 bg-red-500/10";
-      default:
-        return "text-slate-300 border-slate-700 bg-slate-800";
-    }
-  };
-
   return (
     <div className="min-h-screen w-full bg-[#0B0F19] text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 pb-20">
       <Head>
         <title>Assessment Report — {testDetails?.title || "Evaluation"}</title>
       </Head>
 
-      <div className="w-full max-w-6xl mx-auto space-y-8">
-        {/* Top Header Card */}
-        <div className="rounded-3xl border border-slate-800 bg-[#111625] p-8 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-mono text-indigo-400 text-xs tracking-widest uppercase">
-                Step 03 — Final Evaluation Report
-              </span>
-              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                Verified
-              </span>
-            </div>
-            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl text-white font-bold">
-              {testDetails?.title || "Academic Assessment Report"}
-            </h1>
-            <p className="mt-1 text-xs text-slate-400">
-              Student: <strong className="text-slate-200">{studentEmail}</strong> • Code:{" "}
-              <strong className="text-indigo-400 font-mono">{testDetails?.secure_code || passcode || "N/A"}</strong>
-            </p>
-          </div>
+      <VivaResultComponent
+        report={normalizedReport}
+        testDetails={{
+          title: testDetails?.title,
+          secure_code: testDetails?.secure_code,
+          passcode: passcode,
+          test_id: testDetails?.test_id,
+          topics: testDetails?.topics,
+        }}
+        studentEmail={studentEmail}
+        dialogueMessages={vivaMessages}
+        mode="dark"
+        showHeaderCard={true}
+        showFooterActions={true}
+        onBackToDashboard={() => router.push("/neurobe/student-dashboard")}
+        detailedReviewSlot={
+          <div className="space-y-4 mt-6">
+            <h3 className="font-serif text-xl text-white font-bold border-b border-slate-800 pb-2 flex items-center justify-between">
+              <span>Detailed Question Review & Answer Key</span>
+              <HelpCircle className="h-5 w-5 text-indigo-400" />
+            </h3>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-[#0B0F19] px-4 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-800 transition-all cursor-pointer"
-            >
-              <Printer className="h-4 w-4" />
-              <span>Print Report</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/neurobe/student-dashboard")}
-              className="flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-            >
-              <span>Return to Dashboard</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Report Content Grid (Aligned with ReportScreen.jsx) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          {/* Left Column: Metrics & Qualitative Summary */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            {/* MCQ Summary Card */}
-            {session_metrics && (
-              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-xl">
-                <h3 className="font-serif text-lg font-bold mb-4 border-b border-slate-800 pb-2 text-white flex items-center justify-between">
-                  <span>Assessment Metrics</span>
-                  <Award className="h-5 w-5 text-amber-400" />
-                </h3>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-400">Questions Answered</span>
-                    <p className="text-2xl font-mono">
-                      <span className="text-emerald-400 font-bold">{session_metrics.total_answered_correctly || 0}</span>
-                      <span className="text-slate-600 mx-1.5">/</span>
-                      <span className="text-slate-400 text-lg">{session_metrics.total_questions_asked || 0}</span>
-                    </p>
-                  </div>
-
-                  <div className="flex justify-between items-center border-t border-slate-800/60 pt-3">
-                    <span className="text-xs text-slate-400">Evaluated Accuracy</span>
-                    <span className="text-xl font-mono text-indigo-400 font-bold">
-                      {session_metrics.mcq_score_pct || 0}%
-                    </span>
-                  </div>
-
-                  {session_metrics.total_topics && (
-                    <div className="flex justify-between items-center border-t border-slate-800/60 pt-3">
-                      <span className="text-xs text-slate-400">Total Core Topics</span>
-                      <span className="text-sm font-mono text-purple-400 font-semibold">
-                        {session_metrics.total_topics} Evaluated
-                      </span>
-                    </div>
-                  )}
+            {loadingStudentReview ? (
+              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-8 text-center space-y-3">
+                <div className="mx-auto h-7 w-7 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent" />
+                <p className="text-xs text-slate-400">Loading answer evaluation...</p>
+              </div>
+            ) : studentReviewData?.can_view_detailed_answers === false ? (
+              <div className="rounded-3xl border border-amber-800/40 bg-amber-950/20 p-6 shadow-xl text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
+                  <Lock className="h-6 w-6" />
                 </div>
-              </div>
-            )}
-
-            {/* Overall Understanding */}
-            {assessment_summary && (
-              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-xl space-y-3">
-                <h3 className="font-serif text-lg font-bold border-b border-slate-800 pb-2 text-white">
-                  Overall Understanding
-                </h3>
-                <div>
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getUnderstandingBadge(
-                      assessment_summary.overall_understanding
-                    )}`}
-                  >
-                    Level: {assessment_summary.overall_understanding.replace("_", " ")}
-                  </span>
-                </div>
-                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">{assessment_summary.summary}</p>
-              </div>
-            )}
-
-            {/* Communication Skills */}
-            {assessment_summary?.communication_skills && (
-              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-xl space-y-3">
-                <h3 className="font-serif text-lg font-bold border-b border-slate-800 pb-2 text-white">
-                  Communication Skills
-                </h3>
-                <div className="space-y-3">
-                  {assessment_summary.communication_skills.articulation && (
-                    <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 mb-1">Articulation</h4>
-                      <p className="text-slate-300 text-xs leading-relaxed">
-                        {assessment_summary.communication_skills.articulation}
-                      </p>
-                    </div>
-                  )}
-                  {assessment_summary.communication_skills.confidence && (
-                    <div className="border-t border-slate-800/60 pt-2">
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 mb-1">Confidence</h4>
-                      <p className="text-slate-300 text-xs leading-relaxed">
-                        {assessment_summary.communication_skills.confidence}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Reasoning Profile */}
-            {reasoning_profile && (
-              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-xl space-y-3">
-                <h3 className="font-serif text-lg font-bold border-b border-slate-800 pb-2 text-white">
-                  Reasoning Profile
-                </h3>
-                <div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border text-indigo-300 border-indigo-500/30 bg-indigo-500/10">
-                    Depth: {reasoning_profile.reasoning_depth || "Standard"}
-                  </span>
-                </div>
-                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">{reasoning_profile.summary}</p>
-              </div>
-            )}
-
-            {/* Key Strengths */}
-            {key_strengths && key_strengths.length > 0 && (
-              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-xl space-y-3">
-                <h3 className="font-serif text-lg font-bold border-b border-slate-800 pb-2 text-white flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <span>Key Strengths</span>
-                </h3>
-                <ul className="space-y-2.5">
-                  {key_strengths.map((str, idx) => (
-                    <li key={idx} className="text-xs text-slate-300 flex items-start gap-2.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                      <span>{str}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Priority Improvements */}
-            {priority_improvement_areas && priority_improvement_areas.length > 0 && (
-              <div className="rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-xl space-y-3">
-                <h3 className="font-serif text-lg font-bold border-b border-slate-800 pb-2 text-white flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                  <span>Priority Improvements</span>
-                </h3>
-                <ul className="space-y-2.5">
-                  {priority_improvement_areas.map((imp, idx) => (
-                    <li key={idx} className="text-xs text-slate-300 flex items-start gap-2.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
-                      <span>{imp}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Topic Breakdown & Conclusion */}
-          <div className="lg:col-span-7 flex flex-col gap-6">
-            {/* Final Conclusion Card */}
-            {final_summary && (
-              <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 to-[#111625] p-6 shadow-xl">
-                <h3 className="font-serif text-lg font-bold mb-3 flex items-center gap-2 text-white">
-                  <Target className="w-5 h-5 text-indigo-400" />
-                  <span>Executive Conclusion</span>
-                </h3>
-                <p className="text-slate-200 italic font-serif text-base sm:text-lg leading-relaxed">
-                  "{final_summary}"
+                <h4 className="text-base font-bold text-amber-300">Question Answer Key Locked</h4>
+                <p className="text-xs text-amber-200/80 max-w-lg mx-auto leading-relaxed">
+                  {studentReviewData.message ||
+                    "Detailed question-by-question review with correct options will unlock automatically after the test window ends for all candidates."}
                 </p>
               </div>
-            )}
-
-            {/* Topic Analysis Cards */}
-            <div className="space-y-4">
-              <h3 className="font-serif text-xl text-white font-bold border-b border-slate-800 pb-2">
-                Curriculum Topic Breakdown
-              </h3>
-
-              {topic_analysis && topic_analysis.length > 0 ? (
-                topic_analysis.map((topic, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-3xl border border-slate-800 bg-[#111625] p-6 relative overflow-hidden shadow-xl hover:border-slate-700 transition-colors"
-                  >
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-500 to-purple-500" />
-                    <h4 className="text-base font-bold text-white mb-3">{topic.topic}</h4>
-
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${getUnderstandingBadge(
-                          topic.understanding_level
-                        )}`}
-                      >
-                        {topic.understanding_level.replace("_", " ")}
-                      </span>
-                      <span className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border text-slate-300 border-slate-700 bg-slate-800/60">
-                        Depth: {topic.depth || "Standard"}
-                      </span>
-                      <span className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border text-purple-300 border-purple-800 bg-purple-950/40">
-                        Consistency: {topic.mcq_interview_consistency || "High"}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-300 leading-relaxed mb-4">{topic.feedback}</p>
-
-                    {(topic.knowledge_gaps.length > 0 || topic.misconceptions.length > 0) && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-800/60 pt-3">
-                        {topic.knowledge_gaps.length > 0 && (
-                          <div>
-                            <h5 className="text-[11px] font-bold text-red-400 mb-1.5">Knowledge Gaps</h5>
-                            <ul className="space-y-1">
-                              {topic.knowledge_gaps.map((g, i) => (
-                                <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
-                                  <span className="text-red-400">•</span> {g}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {topic.misconceptions.length > 0 && (
-                          <div>
-                            <h5 className="text-[11px] font-bold text-indigo-400 mb-1.5">Misconceptions</h5>
-                            <ul className="space-y-1">
-                              {topic.misconceptions.map((m, i) => (
-                                <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
-                                  <span className="text-indigo-400">•</span> {m}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-slate-800 bg-[#111625] p-6 text-center text-xs text-slate-400">
-                  Comprehensive topic analysis has been recorded and submitted to your course faculty.
-                </div>
-              )}
-            </div>
-
-            {/* Viva Dialogue Transcript Breakdown (if messages exist) */}
-            {vivaMessages.length > 0 && (
+            ) : studentReviewData?.questions && studentReviewData.questions.length > 0 ? (
               <div className="space-y-4">
-                <h3 className="font-serif text-xl text-white font-bold border-b border-slate-800 pb-2 flex items-center justify-between">
-                  <span>Viva Voce Dialogue History</span>
-                  <MessageSquare className="h-5 w-5 text-indigo-400" />
-                </h3>
-
-                <div className="space-y-3">
-                  {vivaMessages.map((msg) => {
-                    const isAi = msg.sender === "ai";
-                    if (msg.sender === "system") return null;
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`rounded-2xl p-4 text-xs leading-relaxed border ${isAi
-                          ? "bg-[#111625] border-slate-800 text-slate-200"
-                          : "bg-indigo-950/40 border-indigo-800/40 text-indigo-200 ml-4"
-                          }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold opacity-75">
-                          <span>{isAi ? "AI Examiner Question" : "Candidate Response"}</span>
-                          <span>{msg.timestamp}</span>
-                        </div>
-                        <p>{msg.text}</p>
-
-                        {msg.evaluation && typeof msg.evaluation.accuracy === "number" && (
-                          <div
-                            className={`mt-2 rounded-xl p-2.5 text-[11px] border font-medium ${msg.evaluation.accuracy >= 0.6
-                              ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
-                              : "bg-amber-950/40 border-amber-500/30 text-amber-300"
-                              }`}
-                          >
-                            Accuracy: {Math.round(msg.evaluation.accuracy * 100)}% — {msg.evaluation.reasoning}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Post-Test Detailed Answer Key & Review (Timing Gated) */}
-            <div className="space-y-4 mt-6">
-              <h3 className="font-serif text-xl text-white font-bold border-b border-slate-800 pb-2 flex items-center justify-between">
-                <span>Detailed Question Review & Answer Key</span>
-                <HelpCircle className="h-5 w-5 text-indigo-400" />
-              </h3>
-
-              {loadingStudentReview ? (
-                <div className="rounded-3xl border border-slate-800 bg-[#111625] p-8 text-center space-y-3">
-                  <div className="mx-auto h-7 w-7 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent" />
-                  <p className="text-xs text-slate-400">Loading answer evaluation...</p>
-                </div>
-              ) : studentReviewData?.can_view_detailed_answers === false ? (
-                <div className="rounded-3xl border border-amber-800/40 bg-amber-950/20 p-6 shadow-xl text-center space-y-3">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
-                    <Lock className="h-6 w-6" />
-                  </div>
-                  <h4 className="text-base font-bold text-amber-300">Question Answer Key Locked</h4>
-                  <p className="text-xs text-amber-200/80 max-w-lg mx-auto leading-relaxed">
-                    {studentReviewData.message || "Detailed question-by-question review with correct options will unlock automatically after the test window ends for all candidates."}
-                  </p>
-                </div>
-              ) : studentReviewData?.questions && studentReviewData.questions.length > 0 ? (
-                <div className="space-y-4">
-                  {studentReviewData.questions.map((q: any) => {
-                    return (
-                      <div
-                        key={q.question_id}
-                        className={`rounded-3xl border p-5 space-y-3 transition-colors ${q.is_correct
+                {studentReviewData.questions.map((q: any) => {
+                  return (
+                    <div
+                      key={q.question_id}
+                      className={`rounded-3xl border p-5 space-y-3 transition-colors ${
+                        q.is_correct
                           ? "bg-[#111625] border-emerald-500/30"
                           : q.selected_option
-                            ? "bg-[#111625] border-red-500/30"
-                            : "bg-[#111625] border-slate-800"
-                          }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <h4 className="text-sm font-bold text-white leading-snug">
-                            <span className="text-indigo-400 mr-2">Q{q.question_index}.</span>
-                            {q.question_string}
-                          </h4>
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${q.is_correct
+                          ? "bg-[#111625] border-red-500/30"
+                          : "bg-[#111625] border-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h4 className="text-sm font-bold text-white leading-snug">
+                          <span className="text-indigo-400 mr-2">Q{q.question_index}.</span>
+                          {q.question_string}
+                        </h4>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                            q.is_correct
                               ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/40"
                               : q.selected_option
-                                ? "bg-red-950/60 text-red-400 border border-red-500/40"
-                                : "bg-slate-800 text-slate-400 border border-slate-700"
-                              }`}
-                          >
-                            {q.is_correct ? (
-                              <>
-                                <CheckCircle className="h-3 w-3" /> Correct
-                              </>
-                            ) : q.selected_option ? (
-                              <>
-                                <XCircle className="h-3 w-3" /> Incorrect
-                              </>
-                            ) : (
-                              "Unanswered"
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Options List */}
-                        <div className="space-y-2 pt-1">
-                          {q.options.map((optText: string, oIdx: number) => {
-                            const isSelected = String(q.selected_option).trim().toLowerCase() === String(optText).trim().toLowerCase();
-                            const isCorrectOpt = String(q.correct_option).trim().toLowerCase() === String(optText).trim().toLowerCase();
-
-                            let optStyle = "border-slate-800 bg-slate-900/40 text-slate-300";
-                            if (isCorrectOpt) {
-                              optStyle = "border-emerald-500/50 bg-emerald-950/30 text-emerald-200 font-semibold";
-                            } else if (isSelected && !isCorrectOpt) {
-                              optStyle = "border-red-500/50 bg-red-950/30 text-red-200";
-                            }
-
-                            return (
-                              <div
-                                key={oIdx}
-                                className={`flex items-center justify-between rounded-xl border p-3 text-xs ${optStyle}`}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span className="font-mono text-slate-500">{String.fromCharCode(65 + oIdx)}.</span>
-                                  <span>{optText}</span>
-                                </span>
-                                {isCorrectOpt && (
-                                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
-                                    Correct Answer
-                                  </span>
-                                )}
-                                {isSelected && !isCorrectOpt && (
-                                  <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300 border border-red-500/30">
-                                    Your Choice
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {q.explanation && (
-                          <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-xs text-indigo-300">
-                            <span className="font-bold text-indigo-400 mr-1">Explanation:</span>
-                            {q.explanation}
-                          </div>
-                        )}
+                              ? "bg-red-950/60 text-red-400 border border-red-500/40"
+                              : "bg-slate-800 text-slate-400 border border-slate-700"
+                          }`}
+                        >
+                          {q.is_correct ? (
+                            <>
+                              <CheckCircle className="h-3 w-3" /> Correct
+                            </>
+                          ) : q.selected_option ? (
+                            <>
+                              <XCircle className="h-3 w-3" /> Incorrect
+                            </>
+                          ) : (
+                            "Unanswered"
+                          )}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-slate-800 bg-[#111625] p-6 text-center text-xs text-slate-400">
-                  Question evaluation summary will appear here once finalized.
-                </div>
-              )}
-            </div>
+
+                      {/* Options List */}
+                      <div className="space-y-2 pt-1">
+                        {q.options.map((optText: string, oIdx: number) => {
+                          const isSelected =
+                            String(q.selected_option).trim().toLowerCase() === String(optText).trim().toLowerCase();
+                          const isCorrectOpt =
+                            String(q.correct_option).trim().toLowerCase() === String(optText).trim().toLowerCase();
+
+                          let optStyle = "border-slate-800 bg-slate-900/40 text-slate-300";
+                          if (isCorrectOpt) {
+                            optStyle = "border-emerald-500/50 bg-emerald-950/30 text-emerald-200 font-semibold";
+                          } else if (isSelected && !isCorrectOpt) {
+                            optStyle = "border-red-500/50 bg-red-950/30 text-red-200";
+                          }
+
+                          return (
+                            <div
+                              key={oIdx}
+                              className={`flex items-center justify-between rounded-xl border p-3 text-xs ${optStyle}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className="font-mono text-slate-500">{String.fromCharCode(65 + oIdx)}.</span>
+                                <span>{optText}</span>
+                              </span>
+                              {isCorrectOpt && (
+                                <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+                                  Correct Answer
+                                </span>
+                              )}
+                              {isSelected && !isCorrectOpt && (
+                                <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300 border border-red-500/30">
+                                  Your Choice
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {q.explanation && (
+                        <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-xs text-indigo-300">
+                          <span className="font-bold text-indigo-400 mr-1">Explanation:</span>
+                          {q.explanation}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-800 bg-[#111625] p-6 text-center text-xs text-slate-400">
+                Question evaluation summary will appear here once finalized.
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800 pt-8 mt-12">
-          <button
-            type="button"
-            onClick={() => router.push("/neurobe/student-dashboard")}
-            className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-[#111625] px-6 py-3 text-xs font-bold text-slate-300 hover:bg-slate-800 transition-all cursor-pointer"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span>Back to Dashboard</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-8 py-3 text-xs font-bold text-white shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
-          >
-            <Download className="h-4 w-4" />
-            <span>Download & Save Report</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Attach BlankLayout to bypass DefaultLayout (removes dashboard sidebar & white borders)

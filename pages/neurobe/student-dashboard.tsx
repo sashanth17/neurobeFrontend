@@ -904,9 +904,30 @@ const StudentDashboard = () => {
                   {Math.max(0, Number(completionReport.total) - Number(completionReport.answered))}
                 </span>
               </div>
+              <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/30 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Incorrect</span>
+                <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">
+                  {Math.max(0, Number(completionReport.answered) - Number(completionReport.correct))}
+                </span>
+              </div>
+            </div>
+            {/* Time + Tab Switches row */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-4 text-center">
                 <span className="block text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">Time Taken</span>
                 <span className="text-lg font-black text-gray-700 dark:text-gray-200">{completionReport.time}</span>
+              </div>
+              <div className="rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/30 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-rose-600 dark:text-rose-400 mb-1">Tab Switches</span>
+                <span className={`text-2xl font-black ${
+                  Number(completionReport.switches) === 0
+                    ? 'text-emerald-700 dark:text-emerald-300'
+                    : Number(completionReport.switches) >= 2
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                }`}>
+                  {completionReport.switches}
+                </span>
               </div>
             </div>
 
