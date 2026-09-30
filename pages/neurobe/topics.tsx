@@ -11,6 +11,7 @@ import {
   Hourglass,
   Plus,
   RefreshCw,
+  RotateCw,
   Save,
   Sparkles,
   Trash2,
@@ -621,13 +622,14 @@ const Topics = () => {
             await getUnitDetail(targetSid, currentUnitNum);
           }
 
-          setState({
+          setState((prev: any) => ({
             jobStatus: "complete",
             topicsLoading: false,
             topicsGenerated: true,
+            generatingTopics: false,
             topicsApproved: false,
-            versionRefreshKey: Date.now(),
-          });
+            versionRefreshKey: (prev.versionRefreshKey || 0) + 1,
+          }));
           Success("Topic hierarchy generated successfully!");
         } else if (rawStatus === "failed" || rawStatus === "error") {
           stopPolling();
@@ -1346,7 +1348,7 @@ const Topics = () => {
         console.warn("approve_stage hierarchy warning:", e);
       }
       Success("Topic hierarchy approved successfully");
-      setState({ topicsApproved: true, versionRefreshKey: Date.now() });
+      setState((prev: any) => ({ topicsApproved: true, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
       if (sid) {
         await getUnits(sid, loadedVersion);
         await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
@@ -1366,15 +1368,15 @@ const Topics = () => {
     try {
       setState({ approvingTopics: true });
       const sid = state.courseDetail?.latest_syllabus?.id || state.selectedCourse?.syllabus_id || activeUnitDetail?.syllabus_id;
-      
+
       try {
         await Models.syllabus.reject_stage(course_id || sid, "hierarchy");
       } catch (e) {
         console.warn("reject_stage hierarchy warning:", e);
       }
-      
+
       Success("Topic hierarchy disapproved successfully");
-      setState({ topicsApproved: false, versionRefreshKey: Date.now() });
+      setState((prev: any) => ({ topicsApproved: false, versionRefreshKey: (prev.versionRefreshKey || 0) + 1 }));
       if (sid) {
         await getUnits(sid, loadedVersion);
         await getUnitDetail(sid, state.activeUnitNumber || 1, loadedVersion);
@@ -1398,18 +1400,14 @@ const Topics = () => {
       course_id ||
       9;
     try {
-      setState({ generatingTopics: true });
+      setState({ generatingTopics: true, showGenerateModal: true, jobStatus: "processing", topicsLoading: true });
       const res: any = await Models.topics.generate_hierarchy(sid, {
         extraction_version: parentParams?.extraction_version,
       });
       console.log("generate response", res);
       Success(res?.message || "Topic hierarchy generation job enqueued");
       setState({
-        generatingTopics: false,
-        showGenerateModal: true,
         jobId: res.job_id,
-        jobStatus: "processing",
-        topicsLoading: true,
         topicsApproved: false,
       });
       if (res?.job_id) {
@@ -1420,6 +1418,7 @@ const Topics = () => {
       Failure(getErrorMessage(error, "Failed to generate topics"));
       setState({
         generatingTopics: false,
+        topicsLoading: false,
       });
     }
   };
@@ -1820,7 +1819,6 @@ const Topics = () => {
           stage="hierarchy"
           stageLabel="Topic Hierarchy"
           courseId={course_id}
-          key={state.versionRefreshKey}
           refreshTrigger={state.versionRefreshKey}
           onVersionActivated={handleVersionActivated}
           onVersionLoad={handleVersionActivated}
