@@ -39,7 +39,13 @@ const ExtractedDataPanel = (props: any) => {
   const getInitL = () => String(data?.lectureHours ?? data?.lecture_hours ?? data?.course_data?.lecture_hours ?? courseData?.latest_syllabus?.lecture_hours ?? courseData?.lecture_hours ?? 3);
   const getInitT = () => String(data?.tutorialHours ?? data?.tutorial_hours ?? data?.course_data?.tutorial_hours ?? courseData?.latest_syllabus?.tutorial_hours ?? courseData?.tutorial_hours ?? 0);
   const getInitP = () => String(data?.practicalHours ?? data?.practical_hours ?? data?.course_data?.practical_hours ?? courseData?.latest_syllabus?.practical_hours ?? courseData?.practical_hours ?? 0);
-  const getInitC = () => String(courseData?.credits ?? courseData?.latest_syllabus?.credits ?? data?.credits ?? 0);
+  const getInitC = () => {
+    const extC = data?.credits ?? data?.course_data?.credits ?? data?.total_credits;
+    if (extC !== undefined && extC !== null && Number(extC) > 0) return String(extC);
+    const crsC = courseData?.credits ?? courseData?.latest_syllabus?.credits;
+    if (crsC !== undefined && crsC !== null && Number(crsC) > 0) return String(crsC);
+    return String(extC ?? crsC ?? 0);
+  };
 
   const [L, setL] = useState(getInitL);
   const [T, setT] = useState(getInitT);
@@ -60,6 +66,7 @@ const ExtractedDataPanel = (props: any) => {
       lecture_hours: numVal,
       tutorial_hours: parseFloat(T) || 0,
       practical_hours: parseFloat(P) || 0,
+      credits: parseFloat(C) || 0,
     });
   };
 
@@ -70,6 +77,7 @@ const ExtractedDataPanel = (props: any) => {
       lecture_hours: parseFloat(L) || 0,
       tutorial_hours: numVal,
       practical_hours: parseFloat(P) || 0,
+      credits: parseFloat(C) || 0,
     });
   };
 
@@ -80,6 +88,18 @@ const ExtractedDataPanel = (props: any) => {
       lecture_hours: parseFloat(L) || 0,
       tutorial_hours: parseFloat(T) || 0,
       practical_hours: numVal,
+      credits: parseFloat(C) || 0,
+    });
+  };
+
+  const handleCChange = (val: string) => {
+    setC(val);
+    const numVal = parseFloat(val) || 0;
+    onUpdateLTPC?.({
+      lecture_hours: parseFloat(L) || 0,
+      tutorial_hours: parseFloat(T) || 0,
+      practical_hours: parseFloat(P) || 0,
+      credits: numVal,
     });
   };
 
@@ -232,12 +252,15 @@ const ExtractedDataPanel = (props: any) => {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-pri block text-xs font-semibold">Credits (C):</label>
-                <span className="text-[10px] text-gray-400 font-medium">Locked</span>
+                <span className="text-[10px] text-color2 font-medium">Editable</span>
               </div>
               <input
-                disabled
+                type="number"
+                min="0"
+                step="1"
                 value={C}
-                className="w-full rounded-lg border border-gray-200 bg-gray-100/80 px-3 py-2 text-sm font-semibold text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+                onChange={(e) => handleCChange(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
             </div>
           </div>

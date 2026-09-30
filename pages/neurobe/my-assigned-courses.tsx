@@ -529,6 +529,8 @@ const MyAssignedCourses = () => {
                   0
                 }
                 allocation={card.allocation || "Primary Allocation"}
+                credits={card.credits}
+                formattedCredits={card.formatted_credits}
                 onOpenCourse={() => onInstructorAction(card)}
                 onTriggerStage={(stageKey) => {
                   const courseId = card.id || card.course_id;

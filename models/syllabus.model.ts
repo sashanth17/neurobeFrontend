@@ -62,6 +62,25 @@ const syllabus = {
         return promise;
     },
 
+    patch_syllabus: (syllabus_id: string | number, data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/syllabi/${syllabus_id}`;
+            commonInstance()
+                .patch(url, data)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
+
     
 
     uploded_file: (syllabus_id: string | number) => {

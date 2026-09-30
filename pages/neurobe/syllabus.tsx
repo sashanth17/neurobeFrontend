@@ -1014,12 +1014,14 @@ const Syllabus = () => {
       jobData: {
         ...(prev.jobData || {}),
         ...hours,
+        credits: hours.credits !== undefined ? hours.credits : prev.jobData?.credits,
         lectureHours: hours.lecture_hours,
         tutorialHours: hours.tutorial_hours,
         practicalHours: hours.practical_hours,
       },
       courseData: {
         ...(prev.courseData || {}),
+        credits: hours.credits !== undefined ? hours.credits : prev.courseData?.credits,
         latest_syllabus: {
           ...(prev.courseData?.latest_syllabus || {}),
           ...hours,
@@ -1029,16 +1031,20 @@ const Syllabus = () => {
 
     try {
       const sid = await getEffectiveSyllabusId();
+      const body: any = {
+        lecture_hours: hours.lecture_hours,
+        tutorial_hours: hours.tutorial_hours,
+        practical_hours: hours.practical_hours,
+      };
+      if (hours.credits !== undefined) body.credits = hours.credits;
+
       if (sid) {
-        const body: any = {
-          lecture_hours: hours.lecture_hours,
-          tutorial_hours: hours.tutorial_hours,
-          practical_hours: hours.practical_hours,
-        };
-        if (hours.credits !== undefined) body.credits = hours.credits;
-        await Models.syllabus.update_syllabus(sid, body);
-        Success("L-T-P hours updated successfully");
+        await (Models.syllabus as any).patch_syllabus(sid, body).catch(() => Models.syllabus.update_syllabus(sid, body));
       }
+      if (course_id) {
+        await Models.course.update(course_id, body).catch(() => {});
+      }
+      Success("Credits and hours updated successfully");
     } catch (error: any) {
       console.log("update_syllabus LTPC error:", error);
     }

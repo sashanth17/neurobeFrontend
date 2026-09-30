@@ -77,9 +77,10 @@ export interface AssignedCourseCardProps {
   programme: string;
   batch: string;
   semester: string | number;
-  enrolledStudents: string | number;
   allocation?: string;
   allocationTag?: string;
+  credits?: number | string;
+  formattedCredits?: string;
   workflowStatus?: CourseWorkflow | null;
   onOpenCourse?: () => void;
   onTriggerStage?: (stageKey: string, activeVersion: number) => void;
@@ -98,6 +99,8 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   enrolledStudents,
   allocation,
   allocationTag,
+  credits,
+  formattedCredits,
   workflowStatus: incomingWorkflow,
   onOpenCourse,
   onTriggerStage,
@@ -175,6 +178,11 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
             {finalAllocation && (
               <span className="inline-flex items-center rounded-lg bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                 {finalAllocation}
+              </span>
+            )}
+            {(formattedCredits || credits) && (
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                {formattedCredits || `${credits} Credits`}
               </span>
             )}
           </div>

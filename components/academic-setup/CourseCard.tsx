@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Plus,
   Lock,
+  Pencil,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useCourseWorkflowStatus, StageWorkflowData } from "@/hook/useCourseWorkflowStatus";
@@ -97,6 +98,35 @@ export default function CourseCard(props: any) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [optimisticVersions, setOptimisticVersions] = useState<Record<string, number>>({});
+  const [isEditingCredits, setIsEditingCredits] = useState(false);
+  const [editCreds, setEditCreds] = useState<number>(data?.credits ?? credits);
+  const [editL, setEditL] = useState<number>(data?.lecture_hours ?? 3);
+  const [editT, setEditT] = useState<number>(data?.tutorial_hours ?? 0);
+  const [editP, setEditP] = useState<number>(data?.practical_hours ?? 0);
+  const [isSavingCredits, setIsSavingCredits] = useState(false);
+  const [localFormattedCredits, setLocalFormattedCredits] = useState<string | null>(null);
+
+  const handleSaveCredits = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setIsSavingCredits(true);
+      const payload = {
+        credits: Number(editCreds),
+        lecture_hours: Number(editL),
+        tutorial_hours: Number(editT),
+        practical_hours: Number(editP),
+      };
+      await Models.course.update(targetCourseId, payload);
+      setLocalFormattedCredits(`${payload.credits} Credits • L: ${payload.lecture_hours} • T: ${payload.tutorial_hours} • P: ${payload.practical_hours}`);
+      Success("Course credits updated successfully!");
+      setIsEditingCredits(false);
+      refetch?.();
+    } catch (err: any) {
+      Failure(typeof err === "string" ? err : err?.message || "Failed to update credits");
+    } finally {
+      setIsSavingCredits(false);
+    }
+  };
 
   const getRolesList = (roleData: any): string[] => {
     if (!roleData) return [];
@@ -440,9 +470,99 @@ export default function CourseCard(props: any) {
               {courseCode}
             </span>
           )}
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {data?.formatted_credits || credits || ""}
-          </span>
+          <div className="relative flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              {localFormattedCredits || data?.formatted_credits || (credits ? `${credits} Credits` : "4 Credits")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditingCredits(!isEditingCredits)}
+              className="inline-flex items-center justify-center p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+              title="Edit Course Credits & L-T-P"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+
+            {isEditingCredits && (
+              <div
+                className="absolute left-0 top-full mt-2 z-50 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2 dark:border-slate-700">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                    Edit Course Credits
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCredits(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Credits</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      value={editCreds}
+                      onChange={(e) => setEditCreds(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-500 mb-1">L</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editL}
+                      onChange={(e) => setEditL(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-500 mb-1">T</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editT}
+                      onChange={(e) => setEditT(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-500 mb-1">P</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editP}
+                      onChange={(e) => setEditP(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCredits(false)}
+                    className="rounded px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingCredits}
+                    onClick={handleSaveCredits}
+                    className="rounded bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {isSavingCredits ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-1">
           {rolesList.length > 0 ? (
