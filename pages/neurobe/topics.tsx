@@ -626,6 +626,7 @@ const Topics = () => {
             topicsLoading: false,
             topicsGenerated: true,
             topicsApproved: false,
+            versionRefreshKey: Date.now(),
           });
           Success("Topic hierarchy generated successfully!");
         } else if (rawStatus === "failed" || rawStatus === "error") {
