@@ -192,16 +192,19 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       total_maximum_marks: Number(totalMarks),
       status,
       description: description.trim(),
-      sections: sections.map((s, sIdx) => ({
-        section_order: sIdx + 1,
-        section_name: s.section_name,
-        section_title: s.section_title,
-        allocated_marks: Number(s.allocated_marks),
-        questions: s.questions.map((q, qIdx) => ({
-          question_number: qIdx + 1,
-          max_marks: Number(q.max_marks),
-        })),
-      })),
+      sections: sections.map((s, sIdx) => {
+        const prevCount = sections.slice(0, sIdx).reduce((acc, prevSec) => acc + prevSec.questions.length, 0);
+        return {
+          section_order: sIdx + 1,
+          section_name: s.section_name,
+          section_title: s.section_title,
+          allocated_marks: Number(s.allocated_marks),
+          questions: s.questions.map((q, qIdx) => ({
+            question_number: prevCount + qIdx + 1,
+            max_marks: Number(q.max_marks),
+          })),
+        };
+      }),
     };
 
     const success = await onSubmit(payload, initialData?.id);
@@ -433,12 +436,14 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
                   {/* Questions Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                    {sec.questions.map((q, qIdx) => (
-                      <div
-                        key={qIdx}
-                        className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-800"
-                      >
-                        <span className="font-bold text-gray-500">Q{qIdx + 1}</span>
+                    {sec.questions.map((q, qIdx) => {
+                      const prevCount = sections.slice(0, secIdx).reduce((acc, prevSec) => acc + prevSec.questions.length, 0);
+                      return (
+                        <div
+                          key={qIdx}
+                          className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-800"
+                        >
+                          <span className="font-bold text-gray-500">Q{prevCount + qIdx + 1}</span>
                         <div className="flex items-center gap-1">
                           <input
                             type="number"
@@ -462,7 +467,8 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                           )}
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 </div>
               );

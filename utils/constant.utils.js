@@ -10,7 +10,7 @@ export const CLIENT_ID =
  * only when the var is absent (local docker-compose dev setup).
  */
 export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:80/";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:80/";
 
 export const FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";

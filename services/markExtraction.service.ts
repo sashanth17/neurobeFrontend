@@ -42,12 +42,54 @@ export interface CiaTestStatus {
   last_run_completed_at: string | null;
 }
 
+export interface QuestionMark {
+  question_key:        string;
+  section_name?:       string;
+  max_marks_assigned:  number;
+  system_read?:        number;
+  final_mark:          number;
+  confidence?:         number;
+  status:              'VERIFIED' | 'NEEDS_REVIEW' | 'NEEDS_CORRECTION' | 'CORRECTED' | string;
+}
+
+export interface StudentMarks {
+  student_marks_id:             number;
+  register_number?:             string;
+  system_detected_reg_no?:      string;
+  actual_reg_number?:           string;
+  student_name?:                string;
+  verification_status:          'READY_TO_VERIFY' | 'NEEDS_REVIEW' | 'VERIFIED' | string;
+  mapping_status:               'AUTO_MAPPED' | 'NEEDS_REVIEW' | 'UNMAPPED' | 'NO_STUDENT_FOUND' | string;
+  paper_total_entered?:         number;
+  total_marks_system_detected?: number;
+  final_total_mark:             number;
+  actual_max_mark:              number;
+  total_mismatch_flag?:         boolean;
+  total_selection_option?:      string;
+  is_locked?:                   boolean;
+  source_pages:                 number[];
+  marks:                        QuestionMark[];
+}
+
+export interface ExtractionVerificationSummary {
+  total_students:        number;
+  verified_count:        number;
+  ready_to_verify_count: number;
+  needs_review_count:    number;
+  remaining_count:       number;
+}
+
 export interface LatestExtractionResults {
-  image_base_url:     string;
-  template_questions: any[];
-  students:           any[];
-  unmapped:           any[];
-  duplicates:         any[][];
+  job_id?:              number;
+  cia_test_id?:         number;
+  course_code?:         string;
+  course_name?:         string;
+  image_base_url:       string;
+  summary:              ExtractionVerificationSummary;
+  students:             StudentMarks[];
+  template_questions?:  any[];
+  unmapped?:            any[];
+  duplicates?:          any[][];
 }
 
 export const MarkExtractionService = {
@@ -168,7 +210,20 @@ export const MarkExtractionService = {
 
   // ── 8. Build image URL for answer-sheet page ─────────────────────────────
   buildImageUrl: (batchId: number, pageNumber: number): string => {
-    return `${BACKEND_URL}${COURSE_API_BASE}/answer-sheet-batches/${batchId}/pages/${pageNumber}/image`;
+    const base = BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`;
+    return `${base}${COURSE_API_BASE}/answer-sheet-batches/${batchId}/pages/${pageNumber}/image`;
+  },
+
+  resolvePageImageUrl: (imageBaseUrl?: string, pageNumber?: number): string => {
+    if (!imageBaseUrl || !pageNumber) return "";
+    let base = imageBaseUrl.trim();
+    if (base.startsWith("http://") || base.startsWith("https://")) {
+      const trimmed = base.endsWith("/") ? base : `${base}/`;
+      return trimmed.endsWith("/image") ? `${trimmed}${pageNumber}` : `${trimmed}${pageNumber}/image`;
+    }
+    const host = BACKEND_URL.endsWith("/") ? BACKEND_URL : `${BACKEND_URL}/`;
+    const cleanPath = base.replace(/^\/?(course\/)?/, "").replace(/\/$/, "");
+    return `${host}course/${cleanPath}/${pageNumber}/image`;
   },
 
   // ── 9. Update student marks ───────────────────────────────────────────────
@@ -190,6 +245,10 @@ export const MarkExtractionService = {
       { is_verified: true }
     );
     return res.data;
+  },
+
+  verifyAndLockStudentMarks: async (studentMarksId: number) => {
+    return MarkExtractionService.verifyStudentMarks(studentMarksId);
   },
 
   // ── 11. Verified marks for result export ─────────────────────────────────

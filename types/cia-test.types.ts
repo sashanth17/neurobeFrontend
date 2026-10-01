@@ -11,9 +11,12 @@ export interface CourseInstanceOption {
 }
 
 export interface CIATestAssignedInstance {
-  instance_id: number;
-  instance_name: string;
-  enrolled_students_count: number;
+  instance_id?: number;
+  instance_name?: string;
+  course_instance_name?: string;
+  course_instance_id?: number;
+  id?: number;
+  enrolled_students_count?: number;
 }
 
 export interface CIATestItem {
