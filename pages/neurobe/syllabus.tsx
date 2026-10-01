@@ -229,9 +229,14 @@ const Syllabus = () => {
 
   /** 4. Save Draft Changes */
   const handleSaveDraft = async () => {
+    if (!courseIdParam || !reviewFileVersion) return;
     try {
       setIsSavingDraft(true);
-      // Optional draft update
+      await (Models.syllabus as any).updateFileVersionExtraction(
+        courseIdParam,
+        reviewFileVersion.version_number,
+        reviewExtractionData
+      );
       Success("Draft saved successfully.");
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save draft"));
@@ -246,6 +251,17 @@ const Syllabus = () => {
     try {
       setIsApproving(true);
       const extVer = reviewFileVersion.extraction_version || 1;
+
+      // Auto-save any pending changes to extraction snapshot before approving
+      if (reviewExtractionData) {
+        await (Models.syllabus as any)
+          .updateFileVersionExtraction(
+            courseIdParam,
+            reviewFileVersion.version_number,
+            reviewExtractionData
+          )
+          .catch(() => null);
+      }
 
       await Models.syllabus.approve_stage(courseIdParam, "extraction", extVer);
       Success("Syllabus Extraction Approved! You can now proceed to CO-PO Mapping.");
@@ -423,6 +439,9 @@ const Syllabus = () => {
               <ExtractedDataPanel
                 data={reviewExtractionData}
                 courseData={courseData}
+                courseId={courseIdParam}
+                versionNumber={reviewFileVersion.version_number}
+                onChangeData={(updatedData) => setReviewExtractionData(updatedData)}
                 onUpdateLTPC={handleUpdateLTPC}
               />
             </div>

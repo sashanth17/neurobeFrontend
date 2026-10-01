@@ -562,6 +562,16 @@ const syllabus = {
         });
     },
 
+    /** Update the extraction snapshot (data_ai_gave) for a specific file version */
+    updateFileVersionExtraction: (courseId: string | number, versionNumber: number, data: any) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .put(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/extraction`, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
 }
 
 export default syllabus;
