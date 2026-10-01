@@ -164,26 +164,52 @@ export default function CourseCard(props: any) {
   // Compute live stage state from workflowStatus if available, otherwise fallback to data
   const getStageInfo = (
     stageKey: string,
-    wfItem?: StageWorkflowData,
+    wfItem?: any,
     fallbackState?: string
   ) => {
-    const status = wfItem?.status || fallbackState || "not_started";
+    const versionsList: any[] = wfItem?.versions || wfItem?.versions_detailed || [];
+    const activeFromList = versionsList.find((v: any) => v.is_active);
+    const currentVer =
+      optimisticVersions[stageKey] ||
+      wfItem?.active_version ||
+      activeFromList?.version_number ||
+      activeFromList?.version ||
+      (versionsList.length > 0 ? versionsList[versionsList.length - 1]?.version_number || versionsList[versionsList.length - 1]?.version : null);
+
+    const currentVersionObj = versionsList.find(
+      (v: any) => (v.version_number ?? v.version) === currentVer
+    );
+
+    let status = currentVersionObj?.status || wfItem?.status || fallbackState || "not_started";
+    status = String(status).toLowerCase().trim();
+
     const hasVersions =
+      versionsList.length > 0 ||
       (wfItem?.total_versions !== undefined && wfItem.total_versions > 0) ||
       (wfItem?.available_versions && wfItem.available_versions.length > 0) ||
-      (wfItem?.active_version !== undefined && wfItem.active_version > 0 && status !== "not_started");
-    const ver = hasVersions ? (wfItem?.active_version || 1) : null;
-    const totalVers = hasVersions ? (wfItem?.total_versions || wfItem?.available_versions?.length || 1) : 0;
-    // Derive real available versions: strictly what backend reports or 1..totalVers, never synthesize beyond totalVers
-    const availableVersions: number[] =
-      hasVersions
-        ? (wfItem?.available_versions && wfItem.available_versions.length > 0
+      (currentVer !== null && status !== "not_started");
+
+    const totalVers = versionsList.length > 0
+      ? versionsList.length
+      : (wfItem?.total_versions || wfItem?.available_versions?.length || (currentVer ? 1 : 0));
+
+    const availableVersions: number[] = versionsList.length > 0
+      ? versionsList.map((v: any) => v.version_number ?? v.version)
+      : (wfItem?.available_versions && wfItem.available_versions.length > 0
           ? wfItem.available_versions
           : totalVers > 1
           ? Array.from({ length: totalVers }, (_, i) => i + 1)
-          : (ver ? [ver] : []))
-        : [];
-    return { status, ver, totalVers, availableVersions, canGenerate: wfItem?.can_generate ?? true, hasVersions };
+          : (currentVer ? [currentVer] : []));
+
+    return {
+      status,
+      ver: currentVer,
+      totalVers,
+      availableVersions,
+      versions: versionsList,
+      canGenerate: wfItem?.can_generate ?? true,
+      hasVersions,
+    };
   };
 
   const sSyllabus = getStageInfo("extraction", workflowStatus?.step_1_syllabus_extraction, data?.academic_preparation?.syllabus?.state);
@@ -196,7 +222,7 @@ export default function CourseCard(props: any) {
     1;
 
   // Filter CO-PO versions to children of active extraction version, or fall back to all CO-PO versions
-  const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed;
+  const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed || (workflowStatus?.step_2_copo_mapping as any)?.versions;
   let copoStatus = sCopo.status;
   let copoVer = optimisticVersions.copo || sCopo.ver;
   let copoTotalVers = sCopo.totalVers;
@@ -208,23 +234,21 @@ export default function CourseCard(props: any) {
     );
     const candidates = matchingChildCopo.length > 0 ? matchingChildCopo : copoDetailed;
     const activeMatch =
-      candidates.find((v: any) => v.is_active) || candidates[candidates.length - 1];
+      candidates.find((v: any) => (v.version_number ?? v.version) === copoVer) ||
+      candidates.find((v: any) => v.is_active) ||
+      candidates[candidates.length - 1];
 
-    copoVer = optimisticVersions.copo || activeMatch?.version || sCopo.ver;
+    copoVer = optimisticVersions.copo || activeMatch?.version_number || activeMatch?.version || sCopo.ver;
     copoTotalVers = candidates.length;
-    copoAvailableVersions = candidates.map((v: any) => v.version);
+    copoAvailableVersions = candidates.map((v: any) => v.version_number ?? v.version);
 
-    if (sCopo.status === "generating" || sCopo.status === "redis_queued") {
+    if (activeMatch?.status) {
+      copoStatus = String(activeMatch.status).toLowerCase();
+    } else if (sCopo.status === "generating" || sCopo.status === "redis_queued") {
       copoStatus = sCopo.status;
-    } else if (activeMatch?.status === "approved" || sCopo.status === "approved") {
-      copoStatus = "approved";
     } else {
-      copoStatus = activeMatch?.status || sCopo.status || "draft";
+      copoStatus = sCopo.status || "not_started";
     }
-  } else if (sCopo.status === "generating" || sCopo.status === "redis_queued") {
-    copoStatus = sCopo.status;
-  } else {
-    copoStatus = sCopo.status || "not_started";
   }
 
   const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_3_pedagogy_generation || workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
