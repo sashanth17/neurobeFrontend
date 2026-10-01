@@ -1556,6 +1556,7 @@ const Syllabus = () => {
                       onUpdateUnitTitle={handleUpdateUnitTitle}
                       onUpdateLTPC={handleUpdateLTPC}
                       syllabusId={state.courseData?.latest_syllabus?.id || state.lastLoadedSyllabusId || state.jobData?.syllabus_id || state.jobData?.id}
+                      courseId={course_id}
                     />
 
                     {/* Navigation buttons to downstream stages */}

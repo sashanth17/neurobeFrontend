@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import CourseOutcomes from "@/components/academic-setup/CourseOutcomes";
-import UnitTopics from "@/components/academic-setup/UnitTopics";
+import TopicHierarchyPanel from "@/components/academic-setup/TopicHierarchyPanel";
 import LabExperiments from "@/components/academic-setup/LabExperiments";
 import PrescribedTextbooks from "@/components/academic-setup/PrescribedTextbooks";
 
@@ -292,10 +292,12 @@ const ExtractedDataPanel = (props: any) => {
           />
         </div>
 
-        {/* Section 3 — Unit Titles, Hours & Topics */}
+        {/* Section 3 — Unit Titles, Hours & Topic Hierarchy */}
         <div ref={sectionRefs["Units & Topics"]}>
-          <UnitTopics
-            data={data?.units}
+          <TopicHierarchyPanel
+            courseId={courseData?.id || courseData?.course_id || props.courseId}
+            syllabusId={syllabusId || courseData?.latest_syllabus?.id}
+            initialUnits={data?.units}
             onAddTopic={onAddTopic}
             onDeleteTopic={onDeleteTopic}
             onUpdateHours={onUpdateUnitHours}
