@@ -680,7 +680,7 @@ const COPOMapping = () => {
 
       <PageHeader
         title="CO–PO Mapping Matrix"
-        records={state.versionNumber ? `Version ${state.versionNumber} (Parent Ext v${state.parentExtractionVersion || "—"})` : undefined}
+        records={state.versionNumber ? `Version ${state.versionNumber} (Syllabus v${state.parentExtractionVersion || "—"})` : undefined}
         subtitle="AI-assisted alignment matrix connecting Course Outcomes (CO) with Program Outcomes (PO1-PO12 & PSOs) with Bloom taxonomy compliance."
         icon={<Cable className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
       />
@@ -732,7 +732,7 @@ const COPOMapping = () => {
           <div className="flex flex-wrap items-center gap-2.5">
             {state.availableExtractions.length > 0 && (
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-slate-500">Base Ext:</span>
+                <span className="text-xs font-semibold text-slate-500">Parent Syllabus:</span>
                 <select
                   value={state.selectedExtractionForGen || ""}
                   onChange={(e) => setState({ selectedExtractionForGen: Number(e.target.value) })}
@@ -1194,7 +1194,7 @@ const COPOMapping = () => {
               </span>
               <span className="text-xs text-slate-400">|</span>
               <span className="text-xs text-slate-500">
-                Version {state.versionNumber} (Parent Ext v{state.parentExtractionVersion || "—"})
+                Version {state.versionNumber} (Syllabus v{state.parentExtractionVersion || "—"})
               </span>
             </div>
 
