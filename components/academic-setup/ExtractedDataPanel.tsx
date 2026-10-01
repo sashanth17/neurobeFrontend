@@ -263,10 +263,27 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setIsAddingUnit(true);
   };
 
-  const handleSaveNewUnit = () => {
+  const handleSaveNewUnit = async () => {
     if (!newUnitForm.unit_title.trim()) return;
     const currentUnits = [...units];
+    let createdId: number | undefined = undefined;
+
+    const extId = activeData?.extraction_id || activeData?.id;
+    if (courseId && extId) {
+      try {
+        const res: any = await (Models.syllabus as any).createUnit(courseId, extId, {
+          unit_number: Number(newUnitForm.unit_number),
+          unit_title: newUnitForm.unit_title.trim(),
+          theory_hours: Number(newUnitForm.theory_hours),
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create unit in table:", err);
+      }
+    }
+
     currentUnits.push({
+      id: createdId,
       unit_number: Number(newUnitForm.unit_number),
       unit_title: newUnitForm.unit_title.trim(),
       theory_hours: Number(newUnitForm.theory_hours),
@@ -287,20 +304,41 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditUnit = (uIdx: number) => {
+  const handleSaveEditUnit = async (uIdx: number) => {
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     u.unit_number = Number(editForm.unit_number);
     u.unit_title = editForm.unit_title;
     u.theory_hours = Number(editForm.theory_hours);
+
+    if (courseId && u.id) {
+      try {
+        await (Models.syllabus as any).updateUnit(courseId, u.id, {
+          unit_number: u.unit_number,
+          unit_title: u.unit_title,
+          theory_hours: u.theory_hours,
+        });
+      } catch (err) {
+        console.error("Failed to update unit in table:", err);
+      }
+    }
+
     currentUnits[uIdx] = u;
     const next = { ...activeData, units: currentUnits, syllabus_units: currentUnits };
     commitAndAutoSave(next);
     setEditingId(null);
   };
 
-  const handleDeleteUnit = (uIdx: number) => {
+  const handleDeleteUnit = async (uIdx: number) => {
     const currentUnits = [...units];
+    const u = currentUnits[uIdx];
+    if (courseId && u?.id) {
+      try {
+        await (Models.syllabus as any).deleteUnit(courseId, u.id);
+      } catch (err) {
+        console.error("Failed to delete unit from table:", err);
+      }
+    }
     currentUnits.splice(uIdx, 1);
     const next = { ...activeData, units: currentUnits, syllabus_units: currentUnits };
     commitAndAutoSave(next);
@@ -323,12 +361,30 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setAddingTopicUnitIdx(uIdx);
   };
 
-  const handleSaveNewTopic = (uIdx: number) => {
+  const handleSaveNewTopic = async (uIdx: number) => {
     if (!newTopicForm.topic_name.trim()) return;
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     const currentTopics = [...(u.topics || u.extracted_topics || [])];
+
+    let createdId: number | undefined = undefined;
+    if (courseId && u.id) {
+      try {
+        const res: any = await (Models.syllabus as any).createTopic(courseId, u.id, {
+          topic_code: newTopicForm.topic_code.trim(),
+          topic_name: newTopicForm.topic_name.trim(),
+          topic_description: newTopicForm.topic_description.trim(),
+          knowledge_level: newTopicForm.knowledge_level,
+          learning_sequence: currentTopics.length + 1,
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create topic in table:", err);
+      }
+    }
+
     currentTopics.push({
+      id: createdId,
       topic_code: newTopicForm.topic_code.trim(),
       topic_name: newTopicForm.topic_name.trim(),
       title: newTopicForm.topic_name.trim(),
@@ -356,7 +412,7 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditTopic = (uIdx: number, tIdx: number) => {
+  const handleSaveEditTopic = async (uIdx: number, tIdx: number) => {
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     const currentTopics = [...(u.topics || u.extracted_topics || [])];
@@ -368,6 +424,20 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     t.theory_hours = Number(editForm.theory_hours);
     t.knowledge_level = editForm.knowledge_level;
     t.bloomLevel = editForm.knowledge_level;
+
+    if (courseId && t.id) {
+      try {
+        await (Models.syllabus as any).updateTopic(courseId, t.id, {
+          topic_code: t.topic_code,
+          topic_name: t.topic_name,
+          topic_description: t.topic_description,
+          knowledge_level: t.knowledge_level,
+        });
+      } catch (err) {
+        console.error("Failed to update topic in table:", err);
+      }
+    }
+
     currentTopics[tIdx] = t;
     u.topics = currentTopics;
     currentUnits[uIdx] = u;
@@ -376,10 +446,18 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setEditingId(null);
   };
 
-  const handleDeleteTopic = (uIdx: number, tIdx: number) => {
+  const handleDeleteTopic = async (uIdx: number, tIdx: number) => {
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     const currentTopics = [...(u.topics || u.extracted_topics || [])];
+    const t = currentTopics[tIdx];
+    if (courseId && t?.id) {
+      try {
+        await (Models.syllabus as any).deleteTopic(courseId, t.id);
+      } catch (err) {
+        console.error("Failed to delete topic from table:", err);
+      }
+    }
     currentTopics.splice(tIdx, 1);
     u.topics = currentTopics;
     currentUnits[uIdx] = u;
@@ -402,18 +480,32 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
       knowledge_level: "Understand",
     });
     setAddingSubtopicKey(`${uIdx}_${tIdx}`);
-    // Auto expand subtopics for this topic
     setExpandedTopics((prev) => ({ ...prev, [`${uIdx}_${tIdx}`]: true }));
   };
 
-  const handleSaveNewSubtopic = (uIdx: number, tIdx: number) => {
+  const handleSaveNewSubtopic = async (uIdx: number, tIdx: number) => {
     if (!newSubtopicForm.subtopic_name.trim()) return;
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     const currentTopics = [...(u.topics || u.extracted_topics || [])];
     const t = { ...currentTopics[tIdx] };
     const currentSub = [...(t.subtopics || t.extracted_subtopics || t.sub_topics || [])];
+
+    let createdId: number | undefined = undefined;
+    if (courseId && t.id) {
+      try {
+        const res: any = await (Models.syllabus as any).createSubtopic(courseId, t.id, {
+          subtopic_code: newSubtopicForm.subtopic_code.trim(),
+          subtopic_name: newSubtopicForm.subtopic_name.trim(),
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create subtopic in table:", err);
+      }
+    }
+
     currentSub.push({
+      id: createdId,
       subtopic_code: newSubtopicForm.subtopic_code.trim(),
       subtopic_name: newSubtopicForm.subtopic_name.trim(),
       title: newSubtopicForm.subtopic_name.trim(),
@@ -439,7 +531,7 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditSubtopic = (uIdx: number, tIdx: number, sIdx: number) => {
+  const handleSaveEditSubtopic = async (uIdx: number, tIdx: number, sIdx: number) => {
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     const currentTopics = [...(u.topics || u.extracted_topics || [])];
@@ -451,6 +543,18 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     s.title = editForm.subtopic_name;
     s.theory_hours = Number(editForm.theory_hours || 0.5);
     s.knowledge_level = editForm.knowledge_level;
+
+    if (courseId && s.id) {
+      try {
+        await (Models.syllabus as any).updateSubtopic(courseId, s.id, {
+          subtopic_code: s.subtopic_code,
+          subtopic_name: s.subtopic_name,
+        });
+      } catch (err) {
+        console.error("Failed to update subtopic in table:", err);
+      }
+    }
+
     currentSub[sIdx] = s;
     t.subtopics = currentSub;
     currentTopics[tIdx] = t;
@@ -461,12 +565,20 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setEditingId(null);
   };
 
-  const handleDeleteSubtopic = (uIdx: number, tIdx: number, sIdx: number) => {
+  const handleDeleteSubtopic = async (uIdx: number, tIdx: number, sIdx: number) => {
     const currentUnits = [...units];
     const u = { ...currentUnits[uIdx] };
     const currentTopics = [...(u.topics || u.extracted_topics || [])];
     const t = { ...currentTopics[tIdx] };
     const currentSub = [...(t.subtopics || t.extracted_subtopics || t.sub_topics || [])];
+    const s = currentSub[sIdx];
+    if (courseId && s?.id) {
+      try {
+        await (Models.syllabus as any).deleteSubtopic(courseId, s.id);
+      } catch (err) {
+        console.error("Failed to delete subtopic from table:", err);
+      }
+    }
     currentSub.splice(sIdx, 1);
     t.subtopics = currentSub;
     currentTopics[tIdx] = t;
@@ -489,10 +601,27 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setIsAddingCO(true);
   };
 
-  const handleSaveNewCO = () => {
+  const handleSaveNewCO = async () => {
     if (!newCOForm.outcome_statement.trim()) return;
     const currentCOs = [...outcomes];
+    let createdId: number | undefined = undefined;
+
+    const extId = activeData?.extraction_id || activeData?.id;
+    if (courseId && extId) {
+      try {
+        const res: any = await (Models.syllabus as any).createOutcome(courseId, extId, {
+          co_code: newCOForm.outcome_code.trim(),
+          description: newCOForm.outcome_statement.trim(),
+          bloom_level: newCOForm.bloom_level,
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create outcome in table:", err);
+      }
+    }
+
     currentCOs.push({
+      id: createdId,
       outcome_code: newCOForm.outcome_code.trim(),
       outcome_statement: newCOForm.outcome_statement.trim(),
       statement: newCOForm.outcome_statement.trim(),
@@ -512,21 +641,42 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditCO = (idx: number) => {
+  const handleSaveEditCO = async (idx: number) => {
     const currentCOs = [...outcomes];
     const co = { ...currentCOs[idx] };
     co.outcome_code = editForm.outcome_code;
     co.outcome_statement = editForm.outcome_statement;
     co.statement = editForm.outcome_statement;
     co.bloom_level = editForm.bloom_level;
+
+    if (courseId && co.id) {
+      try {
+        await (Models.syllabus as any).updateOutcome(courseId, co.id, {
+          co_code: co.outcome_code,
+          description: co.outcome_statement,
+          bloom_level: co.bloom_level,
+        });
+      } catch (err) {
+        console.error("Failed to update outcome in table:", err);
+      }
+    }
+
     currentCOs[idx] = co;
     const next = { ...activeData, outcomes: currentCOs, course_outcomes: currentCOs };
     commitAndAutoSave(next);
     setEditingId(null);
   };
 
-  const handleDeleteCO = (idx: number) => {
+  const handleDeleteCO = async (idx: number) => {
     const currentCOs = [...outcomes];
+    const co = currentCOs[idx];
+    if (courseId && co?.id) {
+      try {
+        await (Models.syllabus as any).deleteOutcome(courseId, co.id);
+      } catch (err) {
+        console.error("Failed to delete outcome from table:", err);
+      }
+    }
     currentCOs.splice(idx, 1);
     const next = { ...activeData, outcomes: currentCOs, course_outcomes: currentCOs };
     commitAndAutoSave(next);
@@ -541,10 +691,28 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setIsAddingTextbook(true);
   };
 
-  const handleSaveNewTextbook = () => {
+  const handleSaveNewTextbook = async () => {
     if (!newTextbookForm.title.trim()) return;
     const current = [...textbooks];
-    current.push({ ...newTextbookForm });
+    let createdId: number | undefined = undefined;
+
+    const extId = activeData?.extraction_id || activeData?.id;
+    if (courseId && extId) {
+      try {
+        const res: any = await (Models.syllabus as any).createTextbook(courseId, extId, {
+          title: newTextbookForm.title.trim(),
+          authors: newTextbookForm.authors.trim(),
+          publisher: newTextbookForm.publisher.trim(),
+          edition: newTextbookForm.edition.trim(),
+          publication_year: newTextbookForm.publication_year ? Number(newTextbookForm.publication_year) : undefined,
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create textbook in table:", err);
+      }
+    }
+
+    current.push({ id: createdId, ...newTextbookForm });
     const next = { ...activeData, textbooks: current, prescribed_textbooks: current };
     commitAndAutoSave(next);
     setIsAddingTextbook(false);
@@ -561,16 +729,39 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditTextbook = (idx: number) => {
+  const handleSaveEditTextbook = async (idx: number) => {
     const current = [...textbooks];
     current[idx] = { ...current[idx], ...editForm };
+
+    if (courseId && current[idx]?.id) {
+      try {
+        await (Models.syllabus as any).updateTextbook(courseId, current[idx].id, {
+          title: current[idx].title,
+          authors: current[idx].authors,
+          publisher: current[idx].publisher,
+          edition: current[idx].edition,
+          publication_year: current[idx].publication_year ? Number(current[idx].publication_year) : undefined,
+        });
+      } catch (err) {
+        console.error("Failed to update textbook in table:", err);
+      }
+    }
+
     const next = { ...activeData, textbooks: current, prescribed_textbooks: current };
     commitAndAutoSave(next);
     setEditingId(null);
   };
 
-  const handleDeleteTextbook = (idx: number) => {
+  const handleDeleteTextbook = async (idx: number) => {
     const current = [...textbooks];
+    const tb = current[idx];
+    if (courseId && tb?.id) {
+      try {
+        await (Models.syllabus as any).deleteTextbook(courseId, tb.id);
+      } catch (err) {
+        console.error("Failed to delete textbook from table:", err);
+      }
+    }
     current.splice(idx, 1);
     const next = { ...activeData, textbooks: current, prescribed_textbooks: current };
     commitAndAutoSave(next);
@@ -583,10 +774,28 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setIsAddingReference(true);
   };
 
-  const handleSaveNewReference = () => {
+  const handleSaveNewReference = async () => {
     if (!newReferenceForm.title.trim()) return;
     const current = [...references];
-    current.push({ ...newReferenceForm });
+    let createdId: number | undefined = undefined;
+
+    const extId = activeData?.extraction_id || activeData?.id;
+    if (courseId && extId) {
+      try {
+        const res: any = await (Models.syllabus as any).createReferenceBook(courseId, extId, {
+          title: newReferenceForm.title.trim(),
+          authors: newReferenceForm.authors.trim(),
+          publisher: newReferenceForm.publisher.trim(),
+          edition: newReferenceForm.edition.trim(),
+          publication_year: newReferenceForm.publication_year ? Number(newReferenceForm.publication_year) : undefined,
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create reference book in table:", err);
+      }
+    }
+
+    current.push({ id: createdId, ...newReferenceForm });
     const next = { ...activeData, reference_books: current, references: current };
     commitAndAutoSave(next);
     setIsAddingReference(false);
@@ -603,16 +812,39 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditReference = (idx: number) => {
+  const handleSaveEditReference = async (idx: number) => {
     const current = [...references];
     current[idx] = { ...current[idx], ...editForm };
+
+    if (courseId && current[idx]?.id) {
+      try {
+        await (Models.syllabus as any).updateReferenceBook(courseId, current[idx].id, {
+          title: current[idx].title,
+          authors: current[idx].authors,
+          publisher: current[idx].publisher,
+          edition: current[idx].edition,
+          publication_year: current[idx].publication_year ? Number(current[idx].publication_year) : undefined,
+        });
+      } catch (err) {
+        console.error("Failed to update reference book in table:", err);
+      }
+    }
+
     const next = { ...activeData, reference_books: current, references: current };
     commitAndAutoSave(next);
     setEditingId(null);
   };
 
-  const handleDeleteReference = (idx: number) => {
+  const handleDeleteReference = async (idx: number) => {
     const current = [...references];
+    const rb = current[idx];
+    if (courseId && rb?.id) {
+      try {
+        await (Models.syllabus as any).deleteReferenceBook(courseId, rb.id);
+      } catch (err) {
+        console.error("Failed to delete reference book from table:", err);
+      }
+    }
     current.splice(idx, 1);
     const next = { ...activeData, reference_books: current, references: current };
     commitAndAutoSave(next);
@@ -632,10 +864,28 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     setIsAddingLab(true);
   };
 
-  const handleSaveNewLab = () => {
+  const handleSaveNewLab = async () => {
     if (!newLabForm.title.trim()) return;
     const current = [...labs];
+    let createdId: number | undefined = undefined;
+
+    const extId = activeData?.extraction_id || activeData?.id;
+    if (courseId && extId) {
+      try {
+        const res: any = await (Models.syllabus as any).createExperiment(courseId, extId, {
+          experiment_number: Number(newLabForm.experiment_number),
+          title: newLabForm.title.trim(),
+          description: newLabForm.description.trim(),
+          allocated_hours: Number(newLabForm.allocated_hours),
+        });
+        if (res?.id) createdId = res.id;
+      } catch (err) {
+        console.error("Failed to create experiment in table:", err);
+      }
+    }
+
     current.push({
+      id: createdId,
       experiment_number: Number(newLabForm.experiment_number),
       title: newLabForm.title.trim(),
       description: newLabForm.description.trim(),
@@ -656,7 +906,7 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
     });
   };
 
-  const handleSaveEditLab = (idx: number) => {
+  const handleSaveEditLab = async (idx: number) => {
     const current = [...labs];
     current[idx] = {
       ...current[idx],
@@ -665,13 +915,35 @@ const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
       description: editForm.description,
       allocated_hours: Number(editForm.allocated_hours),
     };
+
+    if (courseId && current[idx]?.id) {
+      try {
+        await (Models.syllabus as any).updateExperiment(courseId, current[idx].id, {
+          experiment_number: current[idx].experiment_number,
+          title: current[idx].title,
+          description: current[idx].description,
+          allocated_hours: current[idx].allocated_hours,
+        });
+      } catch (err) {
+        console.error("Failed to update experiment in table:", err);
+      }
+    }
+
     const next = { ...activeData, laboratory_experiments: current, experiments: current };
     commitAndAutoSave(next);
     setEditingId(null);
   };
 
-  const handleDeleteLab = (idx: number) => {
+  const handleDeleteLab = async (idx: number) => {
     const current = [...labs];
+    const lb = current[idx];
+    if (courseId && lb?.id) {
+      try {
+        await (Models.syllabus as any).deleteExperiment(courseId, lb.id);
+      } catch (err) {
+        console.error("Failed to delete experiment from table:", err);
+      }
+    }
     current.splice(idx, 1);
     const next = { ...activeData, laboratory_experiments: current, experiments: current };
     commitAndAutoSave(next);
