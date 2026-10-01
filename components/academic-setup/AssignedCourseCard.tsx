@@ -160,10 +160,10 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
         },
       ]
     : [
-        { key: "extraction", label: "Syllabus", data: { status: "not_started" as StageStatus, active_version: 1 } },
-        { key: "copo", label: "CO-PO", data: { status: "not_started" as StageStatus, active_version: 1 } },
-        { key: "pedagogy", label: "Pedagogy", data: { status: "not_started" as StageStatus, active_version: 1 } },
-        { key: "schedule", label: "Schedule", data: { status: "not_started" as StageStatus, active_version: 1 } },
+        { key: "extraction", label: "Syllabus", data: { status: "not_started" as StageStatus, active_version: null } },
+        { key: "copo", label: "CO-PO", data: { status: "not_started" as StageStatus, active_version: null } },
+        { key: "pedagogy", label: "Pedagogy", data: { status: "not_started" as StageStatus, active_version: null } },
+        { key: "schedule", label: "Schedule", data: { status: "not_started" as StageStatus, active_version: null } },
       ];
 
   return (
@@ -231,7 +231,8 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
               const cfg =
                 STAGE_STATUS_CONFIG[item.data?.status as StageStatus] ||
                 STAGE_STATUS_CONFIG.not_started;
-              const activeVer = item.data?.active_version || 1;
+              const activeVer = item.data?.active_version;
+              const hasActiveVer = typeof activeVer === "number" && activeVer > 0;
 
               return (
                 <button
@@ -239,9 +240,9 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onTriggerStage?.(item.key, activeVer);
+                    onTriggerStage?.(item.key, activeVer || 1);
                   }}
-                  title={`${item.label}: ${cfg.label} (v${activeVer})`}
+                  title={`${item.label}: ${cfg.label}${hasActiveVer ? ` (v${activeVer})` : ""}`}
                   className={`flex flex-col items-center justify-between rounded-lg p-1.5 text-center transition-all ${cfg.bg} hover:scale-105 active:scale-95`}
                 >
                   <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
@@ -251,7 +252,7 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
                   <div className="mt-1 flex items-center gap-1">
                     <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
                     <span className={`text-[9px] font-semibold ${cfg.text}`}>
-                      v{activeVer}
+                      {hasActiveVer ? `v${activeVer}` : "—"}
                     </span>
                   </div>
                 </button>

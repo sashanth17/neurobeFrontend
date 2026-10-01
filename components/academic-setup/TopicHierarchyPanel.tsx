@@ -366,7 +366,7 @@ const TopicHierarchyPanel: React.FC<TopicHierarchyPanelProps> = ({
         <GenericTabs
           tabs={unitTabs}
           activeKey={activeTab}
-          onChange={(key) => handleTabChange(key)}
+          onChange={(key) => handleTabChange(String(key))}
           rightContent={
             loadingUnits || loadingDetail ? (
               <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">

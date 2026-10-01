@@ -279,50 +279,61 @@ const Syllabus = () => {
     }
   };
 
-  /** Load a specific file version into review (without activating) */
+  /** Load a specific file version into review — fetches its specific extraction data and PDF */
   const handleLoadFileVersion = async (fv: any) => {
     try {
-      setState({ loadedVersionNumber: fv.version_number, isLoadingVersion: true });
-      // 1. Try to load specific extraction version snapshot if available
-      try {
-        const specRes: any = await Models.syllabus.get_specific_version(course_id!, "extraction", fv.version_number);
-        const dataToNormalize = specRes?.data_ai_gave || specRes?.data || specRes;
-        const targetSid = specRes?.syllabus_id || fv.syllabus_id;
-        if (targetSid) {
-          setState({ lastLoadedSyllabusId: targetSid });
-          try { sessionStorage.setItem(syllabusKey, String(targetSid)); } catch { }
-          uploded_file(targetSid);
+      setState({ loadedVersionNumber: fv.version_number, isLoadingVersion: true, showReview: true });
+
+      // 1. Fetch the extraction snapshot specifically linked to this file version
+      const extRes: any = await Models.syllabus.getFileVersionExtraction(course_id!, fv.version_number);
+
+      if (extRes?.extraction_status && extRes.extraction_status !== "not_started") {
+        // Has been extracted — populate the panel from data_ai_gave or fall back to syllabus_detail
+        const rawData = extRes?.data_ai_gave;
+        const extractionVersion = extRes?.extraction_version;
+        if (extractionVersion) {
+          setState({ lastLoadedSyllabusId: extRes?.extraction_id || state.lastLoadedSyllabusId });
         }
-        if (dataToNormalize && (dataToNormalize.outcomes || dataToNormalize.units || dataToNormalize.courseOutcomes)) {
-          const normData = normalizeSyllabusData(dataToNormalize);
-          setState({ jobData: normData, syllabusData: normData });
-        } else if (targetSid) {
-          await syllabus_detail(targetSid);
-        } else {
-          const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-          if (sid) {
-            setState({ lastLoadedSyllabusId: sid });
-            await syllabus_detail(sid);
-            uploded_file(sid);
-          }
+
+        if (rawData && (rawData.outcomes || rawData.units || rawData.courseOutcomes)) {
+          const normalized = normalizeSyllabusData(rawData);
+          setState({ jobData: normalized, syllabusData: normalized });
+        } else if (state.courseData?.latest_syllabus?.id) {
+          // Fallback to master syllabus detail if snapshot has no nested data
+          await syllabus_detail(state.courseData.latest_syllabus.id);
         }
-      } catch {
-        const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-        if (sid) {
-          setState({ lastLoadedSyllabusId: sid });
-          await syllabus_detail(sid);
-          uploded_file(sid);
+      } else {
+        // Not yet extracted — show empty/latest state
+        if (state.courseData?.latest_syllabus?.id) {
+          await syllabus_detail(state.courseData.latest_syllabus.id);
         }
       }
 
+      // 2. Load the PDF for this specific file version
+      try {
+        const blobRes: any = await Models.syllabus.getFileVersionFile(course_id!, fv.version_number);
+        if (blobRes instanceof Blob) {
+          // Revoke previous URL to avoid memory leak
+          if (state.pdfBlobUrl) {
+            try { URL.revokeObjectURL(state.pdfBlobUrl); } catch {}
+          }
+          const pdfBlobUrl = URL.createObjectURL(blobRes);
+          setState({ pdfBlobUrl });
+        }
+      } catch (fileErr) {
+        console.warn("Could not load PDF for file version:", fileErr);
+        // Don't fail — just leave pdfBlobUrl as-is
+      }
+
       setStep(3);
-      setState({ showReview: true, isLoadingVersion: false });
+      setState({ isLoadingVersion: false });
       Success(`Loaded Syllabus v${fv.version_number} into review.`);
     } catch (error: any) {
       Failure(typeof error === "string" ? error : error?.message || "Failed to load version");
-      setState({ isLoadingVersion: false });
+      setState({ isLoadingVersion: false, showReview: false });
     }
   };
+
 
   /** Trigger AI extraction from a specific file version */
   const extractFromVersion = async (fileVersionId: number, versionNumber: number) => {
@@ -1217,6 +1228,21 @@ const Syllabus = () => {
               {state.fileVersions.map((fv: any) => {
                 const isExtracting = state.extractingFileVersionId === fv.id;
                 const isActive = Boolean(fv.is_active);
+                const extStatus: string = fv.extraction_status || "not_started";
+                const hasExtraction = extStatus !== "not_started";
+                const isLoading = state.isLoadingVersion && state.loadedVersionNumber === fv.version_number;
+
+                const EXT_STATUS_MAP: Record<string, { label: string; cls: string }> = {
+                  approved: { label: "✓ Approved", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300" },
+                  draft: { label: "Draft", cls: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300" },
+                  redis_queued: { label: "⏳ Queued", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300" },
+                  generating: { label: "⚙ Extracting", cls: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300" },
+                  failed: { label: "✕ Failed", cls: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300" },
+                  cancelled_by_user: { label: "Cancelled", cls: "bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400" },
+                  not_started: { label: "Not Extracted", cls: "bg-slate-100 text-slate-400 dark:bg-slate-700/50 dark:text-slate-500" },
+                };
+                const extBadge = EXT_STATUS_MAP[extStatus] || EXT_STATUS_MAP["not_started"];
+
                 return (
                   <div
                     key={fv.id}
@@ -1233,7 +1259,7 @@ const Syllabus = () => {
                         <FileText className={`h-5 w-5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-indigo-500"}`} />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${
                             isActive
                               ? "bg-emerald-600 text-white"
@@ -1253,9 +1279,14 @@ const Syllabus = () => {
                               Inactive
                             </span>
                           )}
+                          {/* Extraction status badge */}
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${extBadge.cls}`}>
+                            {extBadge.label}
+                          </span>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-1">
                           {fv.uploaded_by} &bull; {fv.created_at ? new Date(fv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : ""}
+                          {fv.extraction_version ? ` • Extraction v${fv.extraction_version}` : ""}
                         </p>
                       </div>
                     </div>
@@ -1271,13 +1302,21 @@ const Syllabus = () => {
                         </button>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => handleLoadFileVersion(fv)}
-                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                      >
-                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Review
-                      </button>
+                      {/* Review button — only available when extraction exists */}
+                      {hasExtraction && (
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => handleLoadFileVersion(fv)}
+                          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-95 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          {isLoading ? (
+                            <><RotateCw className="h-3 w-3 animate-spin" /> Loading...</>
+                          ) : (
+                            <><Eye className="h-3.5 w-3.5 text-indigo-500" /> Review</>
+                          )}
+                        </button>
+                      )}
 
                       <button
                         type="button"

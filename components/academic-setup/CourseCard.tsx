@@ -145,11 +145,16 @@ export default function CourseCard(props: any) {
   // Calculate live readiness percentage based on workflowStatus or data
   const calculateReadiness = () => {
     if (!workflowStatus) return data?.readiness_percentage ?? 0;
-    const stages = Object.values(workflowStatus) as StageWorkflowData[];
+    const stages = [
+      workflowStatus.step_1_syllabus_extraction,
+      workflowStatus.step_2_copo_mapping,
+      workflowStatus.step_3_pedagogy_generation || workflowStatus.step_4_pedagogy_generation,
+      workflowStatus.step_4_lesson_plan_schedules || workflowStatus.step_5_lesson_plan_schedules,
+    ].filter(Boolean);
     let points = 0;
-    stages.forEach((st) => {
-      if (st?.status === "approved") points += 20;
-      else if (st?.status === "draft") points += 10;
+    stages.forEach((st: any) => {
+      if (st?.status === "approved") points += 25;
+      else if (st?.status === "draft") points += 12;
     });
     return Math.min(points, 100);
   };

@@ -539,6 +539,29 @@ const syllabus = {
         });
     },
 
+    /** Serve the PDF file for a specific versioned file upload */
+    getFileVersionFile: (courseId: string | number, versionNumber: number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/file`, {
+                    responseType: 'blob',
+                    transformResponse: [(data) => data],
+                })
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    /** Get the extraction snapshot (data_ai_gave + status) for a specific file version */
+    getFileVersionExtraction: (courseId: string | number, versionNumber: number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/extraction`)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
 }
 
 export default syllabus;
