@@ -155,7 +155,13 @@ function InstanceDashboardPage() {
                 onGoToExtractedView={() => setActiveTab("extracted-view")}
               />
             )}
-            {activeTab === "extracted-view" && <ExtractedViewTab ciaTestId={selectedCiaTest.cia_test_id} />}
+            {activeTab === "extracted-view" && (
+              <ExtractedViewTab 
+                ciaTestId={selectedCiaTest.cia_test_id} 
+                instanceId={instanceId as string}
+                onGoToExtraction={() => setActiveTab("extraction")}
+              />
+            )}
             {activeTab === "result"         && <ResultPageTab    ciaTestId={selectedCiaTest.cia_test_id} />}
             {activeTab === "students"       && <StudentListTab   instanceId={instanceId as string} />}
           </div>

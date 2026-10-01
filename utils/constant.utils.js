@@ -9,8 +9,19 @@ export const CLIENT_ID =
  * for each environment (dev / staging / production). Falls back to localhost
  * only when the var is absent (local docker-compose dev setup).
  */
-export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:80/";
+const rawBackend = (
+  (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) ||
+  "http://127.0.0.1:80/"
+).trim();
+
+// On Windows, localhost:80 connects to WSL relay [::1]:80 which hangs. Enforce 127.0.0.1 for local Docker Kong
+const normalizedBackend = (rawBackend || "http://127.0.0.1:80/")
+  .replace("://localhost:", "://127.0.0.1:")
+  .replace("://localhost/", "://127.0.0.1/");
+
+export const BACKEND_URL = normalizedBackend.endsWith("/")
+  ? normalizedBackend
+  : `${normalizedBackend}/`;
 
 export const FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";

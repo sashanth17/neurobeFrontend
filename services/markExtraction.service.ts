@@ -54,6 +54,7 @@ export interface QuestionMark {
 
 export interface StudentMarks {
   student_marks_id:             number;
+  student_id?:                  string | null;
   register_number?:             string;
   system_detected_reg_no?:      string;
   actual_reg_number?:           string;
@@ -201,11 +202,21 @@ export const MarkExtractionService = {
   // ── 7. Fetch latest extraction results ───────────────────────────────────
   getLatestExtractionResults: async (
     ciaTestId: number
-  ): Promise<LatestExtractionResults> => {
-    const res = await commonInstance().get(
-      `${COURSE_API_BASE}/cia-tests/${ciaTestId}/latest-extraction-results`
-    );
-    return res.data;
+  ): Promise<LatestExtractionResults | null> => {
+    if (!ciaTestId || isNaN(Number(ciaTestId))) {
+      return null;
+    }
+    try {
+      const res = await commonInstance().get(
+        `${COURSE_API_BASE}/cia-tests/${ciaTestId}/latest-extraction-results`
+      );
+      return res.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.message?.includes("404")) {
+        return null;
+      }
+      throw err;
+    }
   },
 
   // ── 8. Build image URL for answer-sheet page ─────────────────────────────
@@ -217,6 +228,9 @@ export const MarkExtractionService = {
   resolvePageImageUrl: (imageBaseUrl?: string, pageNumber?: number): string => {
     if (!imageBaseUrl || !pageNumber) return "";
     let base = imageBaseUrl.trim();
+    if (base.includes("://localhost:")) {
+      base = base.replace("://localhost:", "://127.0.0.1:");
+    }
     if (base.startsWith("http://") || base.startsWith("https://")) {
       const trimmed = base.endsWith("/") ? base : `${base}/`;
       return trimmed.endsWith("/image") ? `${trimmed}${pageNumber}` : `${trimmed}${pageNumber}/image`;

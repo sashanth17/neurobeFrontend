@@ -134,26 +134,33 @@ const attachInterceptors = (axiosInstance: AxiosInstance) => {
 
 // ─── Main instance → /org/api/v1/ ────────────────────────────────────────────
 export const instance = (): AxiosInstance => {
-  if (api) return api;
-
-  api = axios.create({
-    baseURL: `${BACKEND_URL}org/api/v1/`,
-  });
-
-  attachInterceptors(api);
+  const targetBaseUrl = `${BACKEND_URL}org/api/v1/`;
+  if (!api) {
+    api = axios.create({
+      baseURL: targetBaseUrl,
+      timeout: 30000,
+    });
+    attachInterceptors(api);
+  } else if (api.defaults.baseURL !== targetBaseUrl) {
+    api.defaults.baseURL = targetBaseUrl;
+  }
   return api;
 };
 
 // ─── Course instance → /course/ ──────────────────────────────────────────────
 export const commonInstance = (): AxiosInstance => {
-  if (courseApi) return courseApi;
-
-  courseApi = axios.create({
-    baseURL: `${BACKEND_URL}`,
-  });
-
-  attachInterceptors(courseApi);
+  const targetBaseUrl = `${BACKEND_URL}`;
+  if (!courseApi) {
+    courseApi = axios.create({
+      baseURL: targetBaseUrl,
+      timeout: 30000,
+    });
+    attachInterceptors(courseApi);
+  } else if (courseApi.defaults.baseURL !== targetBaseUrl) {
+    courseApi.defaults.baseURL = targetBaseUrl;
+  }
   return courseApi;
 };
 
 export default instance;
+
