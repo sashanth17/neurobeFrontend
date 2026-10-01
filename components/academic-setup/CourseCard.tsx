@@ -142,25 +142,6 @@ export default function CourseCard(props: any) {
     return normalized.includes("instructor");
   });
 
-  // Calculate live readiness percentage based on workflowStatus or data
-  const calculateReadiness = () => {
-    if (!workflowStatus) return data?.readiness_percentage ?? 0;
-    const stages = [
-      workflowStatus.step_1_syllabus_extraction,
-      workflowStatus.step_2_copo_mapping,
-      workflowStatus.step_3_pedagogy_generation || workflowStatus.step_4_pedagogy_generation,
-      workflowStatus.step_4_lesson_plan_schedules || workflowStatus.step_5_lesson_plan_schedules,
-    ].filter(Boolean);
-    let points = 0;
-    stages.forEach((st: any) => {
-      if (st?.status === "approved") points += 25;
-      else if (st?.status === "draft") points += 12;
-    });
-    return Math.min(points, 100);
-  };
-
-  const readinessPct = calculateReadiness();
-
   // Compute live stage state from workflowStatus if available, otherwise fallback to data
   const getStageInfo = (
     stageKey: string,
@@ -263,6 +244,19 @@ export default function CourseCard(props: any) {
   const isPedagogyApproved = sPedagogy.status === "approved";
   const isLessonApproved = sLesson.status === "approved";
 
+  // Calculate live readiness percentage dynamically from active/toggled stage states
+  const calculateReadiness = () => {
+    const stageStatuses = [sSyllabus.status, copoStatus, sPedagogy.status, sLesson.status];
+    let points = 0;
+    stageStatuses.forEach((st: string) => {
+      if (st === "approved") points += 25;
+      else if (st === "draft") points += 12;
+    });
+    return Math.min(points, 100);
+  };
+
+  const readinessPct = calculateReadiness();
+
   const preparations = [
     {
       label: "SYLLABUS",
@@ -271,6 +265,7 @@ export default function CourseCard(props: any) {
       version: optimisticVersions.extraction || sSyllabus.ver,
       totalVersions: sSyllabus.totalVers,
       availableVersions: sSyllabus.availableVersions,
+      versions: sSyllabus.versions,
       extra: syllabusFiles && syllabusFiles.length > 0 ? `${syllabusFiles.length} file${syllabusFiles.length > 1 ? "s" : ""}` : undefined,
       route: `/neurobe/syllabus?course_id=${targetCourseId}`,
       artifactsTab: "syllabus",
@@ -284,6 +279,7 @@ export default function CourseCard(props: any) {
       version: copoVer,
       totalVersions: copoTotalVers,
       availableVersions: copoAvailableVersions,
+      versions: sCopo.versions,
       route: `/neurobe/co-po-mapping?course_id=${targetCourseId}`,
       artifactsTab: "copo",
       isUnlocked: isSyllabusApproved,
@@ -296,6 +292,7 @@ export default function CourseCard(props: any) {
       version: optimisticVersions.pedagogy || sPedagogy.ver,
       totalVersions: sPedagogy.totalVers,
       availableVersions: sPedagogy.availableVersions,
+      versions: sPedagogy.versions,
       route: `/neurobe/pedagogy?course_id=${targetCourseId}`,
       artifactsTab: "pedagogy",
       isUnlocked: isSyllabusApproved,
@@ -308,6 +305,7 @@ export default function CourseCard(props: any) {
       version: optimisticVersions.schedule || sLesson.ver,
       totalVersions: sLesson.totalVers,
       availableVersions: sLesson.availableVersions,
+      versions: sLesson.versions,
       route: `/neurobe/lesson-plan?course_id=${targetCourseId}`,
       artifactsTab: "lesson-plan",
       isUnlocked: isPedagogyApproved,
@@ -412,8 +410,13 @@ export default function CourseCard(props: any) {
       setOptimisticVersions((prev) => ({ ...prev, extraction: newVer }));
       try {
         await (Models.syllabus as any).activateFileVersion(targetCourseId, newVer);
-      } catch {
+      } catch (err) {
+        console.warn("activateFileVersion warning:", err);
+      }
+      try {
         await Models.syllabus.activate_version(targetCourseId, "extraction", newVer);
+      } catch (err) {
+        console.warn("activate_version extraction warning:", err);
       }
       Success(`Activated Version ${newVer} for SYLLABUS`);
       await refetch();
@@ -695,9 +698,7 @@ export default function CourseCard(props: any) {
                               className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all dark:bg-slate-700 dark:text-slate-300"
                               title="Click to toggle version"
                             >
-                              <span>
-                                v{syllabusFiles.find((f: any) => f.is_active)?.version_number || sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1}
-                              </span>
+                              <span>v{item.version || 1}</span>
                               <ChevronDown className="h-3 w-3 opacity-60" />
                             </button>
 
@@ -714,22 +715,33 @@ export default function CourseCard(props: any) {
                               <Plus className="h-3.5 w-3.5" />
                             </button>
 
-                            {/* Syllabus File Version Dropdown Menu */}
+                            {/* Syllabus File/Extraction Version Dropdown Menu */}
                             {isMenuOpen && (
-                              <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                              <div className="absolute left-0 top-full z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-800">
                                 <div className="mb-1 px-2 py-1 text-[10px] font-bold text-slate-400">
                                   Select Active Version
                                 </div>
                                 <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
-                                  {syllabusFiles.map((fv: any) => {
-                                    const currentActiveVer = syllabusFiles.find((f: any) => f.is_active)?.version_number || sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1;
-                                    const isCurrent = fv.version_number === currentActiveVer;
+                                  {((item.versions && item.versions.length > 0)
+                                    ? item.versions
+                                    : (syllabusFiles && syllabusFiles.length > 0)
+                                    ? syllabusFiles
+                                    : [{ version: item.version || 1, status: item.status }]
+                                  ).map((fv: any) => {
+                                    const vNum = fv.version_number ?? fv.version;
+                                    const isCurrent = vNum === item.version;
+                                    const vStatus = (fv.status || "draft").toLowerCase();
+                                    const matchingFile = syllabusFiles?.find(
+                                      (sf: any) => (sf.version_number ?? sf.id) === (fv.syllabus_file_version_id ?? vNum)
+                                    );
+                                    const fileName = matchingFile?.original_filename || fv.original_filename || "";
+
                                     return (
                                       <button
-                                        key={fv.id || fv.version_number}
+                                        key={fv.id || vNum}
                                         type="button"
                                         disabled={actionLoading === "extraction"}
-                                        onClick={(e) => handleActivateSyllabusVersion(fv.version_number, e)}
+                                        onClick={(e) => handleActivateSyllabusVersion(vNum, e)}
                                         className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-all ${
                                           isCurrent
                                             ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
@@ -738,20 +750,33 @@ export default function CourseCard(props: any) {
                                       >
                                         <div className="min-w-0 pr-1">
                                           <div className="flex items-center gap-1.5">
-                                            <span className="font-bold">v{fv.version_number}</span>
+                                            <span className="font-bold">v{vNum}</span>
+                                            <span
+                                              className={`rounded px-1.5 py-0.2 text-[9px] font-bold capitalize ${
+                                                vStatus === "approved"
+                                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                                  : vStatus === "redis_queued"
+                                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
+                                                  : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                              }`}
+                                            >
+                                              {vStatus === "redis_queued" ? "Queued" : vStatus}
+                                            </span>
                                             {isCurrent && (
                                               <span className="rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
                                                 Active
                                               </span>
                                             )}
                                           </div>
-                                          {fv.original_filename && (
+                                          {fileName && (
                                             <span className="block truncate text-[10px] text-slate-400">
-                                              {fv.original_filename}
+                                              {fileName}
                                             </span>
                                           )}
                                         </div>
-                                        {isCurrent && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />}
+                                        {isCurrent && (
+                                          <CheckCircle className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                                        )}
                                       </button>
                                     );
                                   })}
@@ -800,25 +825,44 @@ export default function CourseCard(props: any) {
 
                             {/* Version Dropdown Menu */}
                             {isMenuOpen && (
-                              <div className="absolute left-0 top-full z-20 mt-1 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                              <div className="absolute left-0 top-full z-20 mt-1 w-36 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
                                 <div className="px-2 py-1 text-[9px] font-semibold text-slate-400">
                                   Switch Version
                                 </div>
-                                {item.availableVersions.map((v: number) => (
-                                  <button
-                                    key={v}
-                                    type="button"
-                                    onClick={(e) => handleToggleVersion(item.stageKey, v, e)}
-                                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs ${
-                                      v === item.version
-                                        ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
-                                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
-                                    }`}
-                                  >
-                                    <span>Version {v}</span>
-                                    {v === item.version && <CheckCircle className="h-3 w-3 text-indigo-600" />}
-                                  </button>
-                                ))}
+                                {item.availableVersions.map((v: number) => {
+                                  const matchVerObj = item.versions?.find(
+                                    (vo: any) => (vo.version_number ?? vo.version) === v
+                                  );
+                                  const vStat = matchVerObj?.status ? String(matchVerObj.status).toLowerCase() : null;
+                                  return (
+                                    <button
+                                      key={v}
+                                      type="button"
+                                      onClick={(e) => handleToggleVersion(item.stageKey, v, e)}
+                                      className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs ${
+                                        v === item.version
+                                          ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
+                                          : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span>v{v}</span>
+                                        {vStat && (
+                                          <span
+                                            className={`rounded px-1 text-[8px] font-bold capitalize ${
+                                              vStat === "approved"
+                                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                            }`}
+                                          >
+                                            {vStat === "redis_queued" ? "Queued" : vStat}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {v === item.version && <CheckCircle className="h-3 w-3 text-indigo-600" />}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             )}
                           </>

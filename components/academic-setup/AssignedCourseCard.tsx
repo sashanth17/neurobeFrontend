@@ -117,6 +117,21 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   );
   const activeWorkflow = incomingWorkflow || fetchedWorkflow;
 
+  const resolveStageData = (stItem: any) => {
+    if (!stItem) return { status: "not_started" as StageStatus, active_version: null };
+    const versions = stItem.versions || stItem.versions_detailed || [];
+    const activeVerObj = versions.find((v: any) => v.is_active);
+    const activeVer = stItem.active_version || activeVerObj?.version_number || activeVerObj?.version;
+    const currentVerObj = versions.find((v: any) => (v.version_number ?? v.version) === activeVer) || activeVerObj;
+    const rawStatus = currentVerObj?.status || stItem.status || "not_started";
+    const status = String(rawStatus).toLowerCase().trim() as StageStatus;
+    return {
+      ...stItem,
+      status,
+      active_version: activeVer,
+    };
+  };
+
   // Compute readiness points across the 4 core stages (Approved = 25% each, Draft = 12% each)
   const calculateProgress = () => {
     if (!activeWorkflow) return 0;
@@ -128,8 +143,9 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
     ].filter(Boolean);
     let points = 0;
     stages.forEach((st: any) => {
-      if (st?.status === "approved") points += 25;
-      else if (st?.status === "draft") points += 12;
+      const resolved = resolveStageData(st);
+      if (resolved.status === "approved") points += 25;
+      else if (resolved.status === "draft") points += 12;
     });
     return Math.min(points, 100);
   };
@@ -141,22 +157,22 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
         {
           key: "extraction",
           label: "Syllabus",
-          data: activeWorkflow.step_1_syllabus_extraction,
+          data: resolveStageData(activeWorkflow.step_1_syllabus_extraction),
         },
         {
           key: "copo",
           label: "CO-PO",
-          data: activeWorkflow.step_2_copo_mapping,
+          data: resolveStageData(activeWorkflow.step_2_copo_mapping),
         },
         {
           key: "pedagogy",
           label: "Pedagogy",
-          data: activeWorkflow.step_3_pedagogy_generation || activeWorkflow.step_4_pedagogy_generation,
+          data: resolveStageData(activeWorkflow.step_3_pedagogy_generation || activeWorkflow.step_4_pedagogy_generation),
         },
         {
           key: "schedule",
           label: "Schedule",
-          data: activeWorkflow.step_4_lesson_plan_schedules || activeWorkflow.step_5_lesson_plan_schedules,
+          data: resolveStageData(activeWorkflow.step_4_lesson_plan_schedules || activeWorkflow.step_5_lesson_plan_schedules),
         },
       ]
     : [
