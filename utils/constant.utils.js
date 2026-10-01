@@ -10,7 +10,7 @@ export const CLIENT_ID =
  * only when the var is absent (local docker-compose dev setup).
  */
 export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://neurobebk.irepute.co.in/";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:80/";
 
 export const FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
@@ -207,7 +207,7 @@ export const OwnmenuConfig = {
       type: "link",
       icon: "IconMenuNotes",
       label: "Marks Extraction & Verification",
-      href: "/neurobe/marks-extraction",
+      href: "/neurobe/mark-extraction",
     },
     // {
     //   type: "submenu",
@@ -288,7 +288,7 @@ export const OwnmenuConfig = {
       type: "link",
       icon: "IconMenuNotes",
       label: "Marks Extraction & Verification",
-      href: "/neurobe/ins-marks-extraction",
+      href: "/neurobe/mark-extraction",
     },
   ],
 };
@@ -352,7 +352,7 @@ OwnmenuConfig.FACULTY = [
     type: "link",
     icon: "IconMenuNotes",
     label: "Marks Extraction & Verification",
-    href: "/neurobe/ins-marks-extraction",
+    href: "/neurobe/mark-extraction",
   },
 ];
 
