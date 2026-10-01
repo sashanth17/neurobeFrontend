@@ -1,330 +1,561 @@
-import { useState, useRef, useEffect } from "react";
-import { CheckCircle2 } from "lucide-react";
-import CourseOutcomes from "@/components/academic-setup/CourseOutcomes";
-import TopicHierarchyPanel from "@/components/academic-setup/TopicHierarchyPanel";
-import LabExperiments from "@/components/academic-setup/LabExperiments";
-import PrescribedTextbooks from "@/components/academic-setup/PrescribedTextbooks";
+import React, { useState } from "react";
+import {
+  BookOpen,
+  Award,
+  Layers,
+  BookMarked,
+  FlaskConical,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Sparkles,
+} from "lucide-react";
 
-const TABS = [
-  "All Fields",
-  "Course Details",
-  "COs & Knowledge Levels",
-  "Units & Topics",
-  "Lab Experiments",
-  "Prescribed Textbooks",
-];
+interface ExtractedDataPanelProps {
+  data: any;
+  courseData?: any;
+  onUpdateLTPC?: (values: {
+    lecture_hours: number;
+    tutorial_hours: number;
+    practical_hours: number;
+    credits: number;
+  }) => void;
+}
 
-const ExtractedDataPanel = (props: any) => {
-  const {
-    data,
-    courseData,
-    onAddTopic,
-    onDeleteTopic,
-    handleAddTextbook,
-    onDeleteTextbook,
-    handleAddReference,
-    onDeleteReference,
-    handleSaveOutcome,
-    handleAcceptOutcome,
-    handleKnowledgeLevelChange,
-    onUpdateUnitHours,
-    onUpdateUnitTitle,
-    onUpdateLTPC,
-    syllabusId,
-  } = props;
+const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
+  data,
+  courseData,
+  onUpdateLTPC,
+}) => {
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "outcomes" | "units" | "books" | "labs"
+  >("units");
 
-  const [activeTab, setActiveTab] = useState("All Fields");
+  const [expandedUnits, setExpandedUnits] = useState<Record<number, boolean>>({
+    1: true,
+  });
 
-  // Initial values extracted from jobData or courseData
-  const getInitL = () => String(data?.lectureHours ?? data?.lecture_hours ?? data?.course_data?.lecture_hours ?? courseData?.latest_syllabus?.lecture_hours ?? courseData?.lecture_hours ?? 3);
-  const getInitT = () => String(data?.tutorialHours ?? data?.tutorial_hours ?? data?.course_data?.tutorial_hours ?? courseData?.latest_syllabus?.tutorial_hours ?? courseData?.tutorial_hours ?? 0);
-  const getInitP = () => String(data?.practicalHours ?? data?.practical_hours ?? data?.course_data?.practical_hours ?? courseData?.latest_syllabus?.practical_hours ?? courseData?.practical_hours ?? 0);
-  const getInitC = () => {
-    const extC = data?.credits ?? data?.course_data?.credits ?? data?.total_credits;
-    if (extC !== undefined && extC !== null && Number(extC) > 0) return String(extC);
-    const crsC = courseData?.credits ?? courseData?.latest_syllabus?.credits;
-    if (crsC !== undefined && crsC !== null && Number(crsC) > 0) return String(crsC);
-    return String(extC ?? crsC ?? 0);
-  };
+  // Extract units list
+  const rawUnits: any[] =
+    data?.units ||
+    data?.syllabus_units ||
+    data?.course_units ||
+    data?.curriculum_units ||
+    [];
 
-  const [L, setL] = useState(getInitL);
-  const [T, setT] = useState(getInitT);
-  const [P, setP] = useState(getInitP);
-  const [C, setC] = useState(getInitC);
+  // Extract outcomes (COs)
+  const rawOutcomes: any[] =
+    data?.outcomes ||
+    data?.course_outcomes ||
+    data?.courseOutcomes ||
+    [];
 
-  useEffect(() => {
-    setL(getInitL());
-    setT(getInitT());
-    setP(getInitP());
-    setC(getInitC());
-  }, [data, courseData]);
+  // Extract textbooks and references
+  const rawTextbooks: any[] =
+    data?.textbooks ||
+    data?.prescribed_textbooks ||
+    [];
 
-  const handleLChange = (val: string) => {
-    setL(val);
-    const numVal = parseFloat(val) || 0;
+  const rawReferences: any[] =
+    data?.reference_books ||
+    data?.references ||
+    [];
+
+  // Extract laboratory experiments
+  const rawLabs: any[] =
+    data?.laboratory_experiments ||
+    data?.experiments ||
+    data?.labs ||
+    [];
+
+  // LTPC Values
+  const initialL = Number(
+    data?.lecture_hours ??
+      data?.lectureHours ??
+      courseData?.lecture_hours ??
+      3
+  );
+  const initialT = Number(
+    data?.tutorial_hours ??
+      data?.tutorialHours ??
+      courseData?.tutorial_hours ??
+      0
+  );
+  const initialP = Number(
+    data?.practical_hours ??
+      data?.practicalHours ??
+      courseData?.practical_hours ??
+      0
+  );
+  const initialC = Number(
+    data?.credits ??
+      data?.total_credits ??
+      courseData?.credits ??
+      3
+  );
+
+  const [ltpc, setLtpc] = useState({
+    L: initialL,
+    T: initialT,
+    P: initialP,
+    C: initialC,
+  });
+
+  const handleLtpcChange = (field: "L" | "T" | "P" | "C", val: number) => {
+    const next = { ...ltpc, [field]: val };
+    setLtpc(next);
     onUpdateLTPC?.({
-      lecture_hours: numVal,
-      tutorial_hours: parseFloat(T) || 0,
-      practical_hours: parseFloat(P) || 0,
-      credits: parseFloat(C) || 0,
+      lecture_hours: next.L,
+      tutorial_hours: next.T,
+      practical_hours: next.P,
+      credits: next.C,
     });
   };
 
-  const handleTChange = (val: string) => {
-    setT(val);
-    const numVal = parseFloat(val) || 0;
-    onUpdateLTPC?.({
-      lecture_hours: parseFloat(L) || 0,
-      tutorial_hours: numVal,
-      practical_hours: parseFloat(P) || 0,
-      credits: parseFloat(C) || 0,
-    });
+  const toggleUnit = (uNum: number) => {
+    setExpandedUnits((prev) => ({ ...prev, [uNum]: !prev[uNum] }));
   };
 
-  const handlePChange = (val: string) => {
-    setP(val);
-    const numVal = parseFloat(val) || 0;
-    onUpdateLTPC?.({
-      lecture_hours: parseFloat(L) || 0,
-      tutorial_hours: parseFloat(T) || 0,
-      practical_hours: numVal,
-      credits: parseFloat(C) || 0,
-    });
-  };
-
-  const handleCChange = (val: string) => {
-    setC(val);
-    const numVal = parseFloat(val) || 0;
-    onUpdateLTPC?.({
-      lecture_hours: parseFloat(L) || 0,
-      tutorial_hours: parseFloat(T) || 0,
-      practical_hours: parseFloat(P) || 0,
-      credits: numVal,
-    });
-  };
-
-  const lNum = parseFloat(L) || 0;
-  const tNum = parseFloat(T) || 0;
-  const pNum = parseFloat(P) || 0;
-  const theoryHoursDisplay = (lNum + tNum) > 0 ? (lNum + tNum) * 15 : (courseData?.latest_syllabus?.total_theory_hours ?? data?.total_theory_hours ?? 0);
-  const labHoursDisplay = pNum > 0 ? pNum * 15 : (courseData?.latest_syllabus?.total_lab_hours ?? data?.total_lab_hours ?? 0);
-  const totalContactDisplay = theoryHoursDisplay + labHoursDisplay;
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const sectionRefs = {
-    "Course Details": useRef<HTMLDivElement>(null),
-    "COs & Knowledge Levels": useRef<HTMLDivElement>(null),
-    "Units & Topics": useRef<HTMLDivElement>(null),
-    "Lab Experiments": useRef<HTMLDivElement>(null),
-    "Prescribed Textbooks": useRef<HTMLDivElement>(null),
-  };
-
-  const handleTabClick = (tab: string) => {
-    setActiveTab(tab);
-    if (tab === "All Fields") {
-      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    const ref = sectionRefs[tab as keyof typeof sectionRefs];
-    if (ref?.current && scrollRef.current) {
-      const containerTop = scrollRef.current.getBoundingClientRect().top;
-      const sectionTop = ref.current.getBoundingClientRect().top;
-      const offset =
-        scrollRef.current.scrollTop + (sectionTop - containerTop) - 8;
-      scrollRef.current.scrollTo({ top: offset, behavior: "smooth" });
-    }
-  };
-
-  const courseCodeDisplay = courseData?.course_code || data?.courseCode || data?.course_code || "";
-  const courseTitleDisplay = courseData?.course_title || data?.courseName || data?.course_title || "";
+  const tabs = [
+    {
+      id: "units" as const,
+      label: "Units & Topics",
+      icon: <Layers className="h-4 w-4" />,
+      count: rawUnits.length,
+    },
+    {
+      id: "outcomes" as const,
+      label: "Course Outcomes (COs)",
+      icon: <Award className="h-4 w-4" />,
+      count: rawOutcomes.length,
+    },
+    {
+      id: "books" as const,
+      label: "Textbooks & References",
+      icon: <BookMarked className="h-4 w-4" />,
+      count: rawTextbooks.length + rawReferences.length,
+    },
+    {
+      id: "labs" as const,
+      label: "Lab Experiments",
+      icon: <FlaskConical className="h-4 w-4" />,
+      count: rawLabs.length,
+    },
+    {
+      id: "overview" as const,
+      label: "Course Overview",
+      icon: <BookOpen className="h-4 w-4" />,
+    },
+  ];
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Tabs */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => handleTabClick(tab)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
-              activeTab === tab
-                ? "bg-primary-custom text-white"
-                : "border border-gray-200 bg-white text-[#000] hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200/80 bg-slate-50/70 p-2 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900/50">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 transition-all ${
+                isActive
+                  ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-800 dark:text-indigo-400"
+                  : "text-slate-600 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+              {typeof tab.count === "number" && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                    isActive
+                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                      : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-
-      {/* Scrollable content */}
-      <div
-        ref={scrollRef}
-        className="flex-1 space-y-4 overflow-y-auto"
-        style={{ scrollbarWidth: "none" }}
-      >
-        {/* Section 1 — Course Identification & L-T-P-C Structure */}
-        <div
-          ref={sectionRefs["Course Details"]}
-          className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="bg-primary2 text-color2 flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold dark:bg-gray-100 dark:text-[#000]">
-                1
-              </span>
-              <h3 className="text-sm font-extrabold uppercase tracking-wide text-[#000] dark:text-white">
-                Course Identification & L-T-P-C Structure
-              </h3>
-            </div>
-            <span className="text-xs text-color2 font-medium">
-              L, T, P are editable (extracted from syllabus)
-            </span>
-          </div>
-
-          <div className="mb-4 grid grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-pri block text-xs font-semibold">
-                  Course Code:
-                </label>
-                <span className="text-[10px] text-gray-400 font-medium">From Course Table</span>
+      {/* Tab Content Body */}
+      <div className="flex-1 overflow-y-auto p-5">
+        {/* TAB 1: Units & Topics */}
+        {activeTab === "units" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Curriculum Units & Extracted Topics
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {rawUnits.length} Units extracted from syllabus document
+                </p>
               </div>
-              <input
-                value={courseCodeDisplay}
-                disabled
-                className="w-full rounded-lg border border-gray-200 bg-gray-100/80 px-3 py-2 text-sm font-medium text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-              />
+              <button
+                type="button"
+                onClick={() => {
+                  const allOpen: Record<number, boolean> = {};
+                  rawUnits.forEach((u, i) => {
+                    allOpen[u.unit_number || i + 1] = true;
+                  });
+                  setExpandedUnits(allOpen);
+                }}
+                className="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Expand All
+              </button>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-pri block text-xs font-semibold">
-                  Course Title:
-                </label>
-                <span className="text-[10px] text-gray-400 font-medium">From Course Table</span>
+
+            {rawUnits.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400 dark:border-slate-800">
+                No units extracted in this version yet.
               </div>
-              <input
-                disabled
-                value={courseTitleDisplay}
-                className="w-full rounded-lg border border-gray-200 bg-gray-100/80 px-3 py-2 text-sm font-medium text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-              />
-            </div>
+            ) : (
+              rawUnits.map((unit: any, uIdx: number) => {
+                const uNum = unit.unit_number || uIdx + 1;
+                const isExpanded = expandedUnits[uNum] ?? false;
+                const topics: any[] = unit.topics || unit.extracted_topics || [];
+                const hours = unit.theory_hours || unit.hours || 9;
+
+                return (
+                  <div
+                    key={unit.id || uNum}
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white transition-all dark:border-slate-800 dark:bg-slate-900/60"
+                  >
+                    {/* Unit Accordion Header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleUnit(uNum)}
+                      className="flex w-full items-center justify-between bg-slate-50/80 px-4 py-3 text-left transition-colors hover:bg-slate-100/60 dark:bg-slate-800/40 dark:hover:bg-slate-800/80"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
+                          {uNum}
+                        </span>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                            {unit.unit_title || `Unit ${uNum}`}
+                          </h5>
+                          <span className="text-[11px] text-slate-500">
+                            {topics.length} Topics • {hours} Hours
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-slate-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Unit Topics List */}
+                    {isExpanded && (
+                      <div className="divide-y divide-slate-100 p-3 dark:divide-slate-800">
+                        {topics.length === 0 ? (
+                          <p className="py-2 text-center text-xs text-slate-400">
+                            No topics under this unit
+                          </p>
+                        ) : (
+                          topics.map((t: any, tIdx: number) => (
+                            <div
+                              key={t.id || tIdx}
+                              className="flex items-start justify-between py-2 text-xs"
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
+                                  {t.topic_code || `${uNum}.${tIdx + 1}`}
+                                </span>
+                                <div>
+                                  <p className="font-medium text-slate-800 dark:text-slate-200">
+                                    {t.topic_name || t.title}
+                                  </p>
+                                  {t.topic_description && (
+                                    <p className="mt-0.5 text-[11px] text-slate-400 line-clamp-2">
+                                      {t.topic_description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex shrink-0 items-center gap-1.5 pl-2">
+                                {t.knowledge_level && (
+                                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                    {t.knowledge_level}
+                                  </span>
+                                )}
+                                <span className="text-[11px] text-slate-400">
+                                  {t.theory_hours || t.hours || 1}h
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
+        )}
 
-          <div className="mb-4 grid grid-cols-4 gap-3">
-            <div>
-              <label className="text-pri mb-1 block text-xs font-semibold">Lecture (L):</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={L}
-                onChange={(e) => handleLChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
+        {/* TAB 2: Course Outcomes (COs) */}
+        {activeTab === "outcomes" && (
+          <div className="space-y-3">
+            <div className="pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Course Outcomes (COs) & Bloom Taxonomy Levels
+              </h4>
+              <p className="text-xs text-slate-500">
+                Outcomes defined for this course mapping to Programme Outcomes (POs)
+              </p>
             </div>
 
-            <div>
-              <label className="text-pri mb-1 block text-xs font-semibold">Tutorial (T):</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={T}
-                onChange={(e) => handleTChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="text-pri mb-1 block text-xs font-semibold">Practical (P):</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={P}
-                onChange={(e) => handlePChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-pri block text-xs font-semibold">Credits (C):</label>
-                <span className="text-[10px] text-color2 font-medium">Editable</span>
+            {rawOutcomes.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400 dark:border-slate-800">
+                No course outcomes extracted yet.
               </div>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={C}
-                onChange={(e) => handleCChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
+            ) : (
+              rawOutcomes.map((co: any, idx: number) => {
+                const code = co.outcome_code || co.code || `CO${idx + 1}`;
+                const statement = co.outcome_statement || co.statement || co.description;
+                const level = co.bloom_level || co.knowledge_level || "K2";
+
+                return (
+                  <div
+                    key={co.id || idx}
+                    className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <span className="shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
+                      {code}
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-relaxed">
+                        {statement}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0">
+                      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400">
+                        {level}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: Textbooks & Reference Books */}
+        {activeTab === "books" && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Prescribed Textbooks ({rawTextbooks.length})
+              </h4>
+              <div className="mt-3 space-y-2">
+                {rawTextbooks.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">No textbooks listed.</p>
+                ) : (
+                  rawTextbooks.map((b: any, bIdx: number) => (
+                    <div
+                      key={b.id || bIdx}
+                      className="rounded-xl border border-slate-200/80 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <p className="font-bold text-slate-900 dark:text-white">
+                        {b.title}
+                      </p>
+                      <p className="mt-1 text-slate-500">
+                        Authors:{" "}
+                        {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors || "—"}
+                      </p>
+                      <p className="mt-0.5 text-slate-400 text-[11px]">
+                        {b.publisher ? `${b.publisher} • ` : ""}
+                        {b.edition ? `${b.edition} • ` : ""}
+                        {b.publication_year || ""}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Reference Books ({rawReferences.length})
+              </h4>
+              <div className="mt-3 space-y-2">
+                {rawReferences.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">No reference books listed.</p>
+                ) : (
+                  rawReferences.map((b: any, bIdx: number) => (
+                    <div
+                      key={b.id || bIdx}
+                      className="rounded-xl border border-slate-200/80 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <p className="font-bold text-slate-900 dark:text-white">
+                        {b.title}
+                      </p>
+                      <p className="mt-1 text-slate-500">
+                        Authors:{" "}
+                        {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors || "—"}
+                      </p>
+                      <p className="mt-0.5 text-slate-400 text-[11px]">
+                        {b.publisher ? `${b.publisher} • ` : ""}
+                        {b.edition ? `${b.edition} • ` : ""}
+                        {b.publication_year || ""}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="text-pri flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
-            <span>
-              Theory Hours:{" "}
-              <strong className="text-[#000] dark:text-gray-200">
-                {theoryHoursDisplay} hrs
-              </strong>
-              &nbsp; • &nbsp; Lab Hours:{" "}
-              <strong className="text-[#000] dark:text-gray-200">
-                {labHoursDisplay} hrs
-              </strong>
-            </span>
-            <span className="text-md text-color2 font-bold">
-              Total Contact: {totalContactDisplay} hrs
-            </span>
+        {/* TAB 4: Laboratory Experiments */}
+        {activeTab === "labs" && (
+          <div className="space-y-3">
+            <div className="pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Laboratory Experiments ({rawLabs.length})
+              </h4>
+              <p className="text-xs text-slate-500">
+                Practical laboratory components extracted from syllabus
+              </p>
+            </div>
+
+            {rawLabs.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400 dark:border-slate-800">
+                No practical/laboratory experiments for this course.
+              </div>
+            ) : (
+              rawLabs.map((lab: any, idx: number) => (
+                <div
+                  key={lab.id || idx}
+                  className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-50 font-bold text-xs text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
+                    {lab.experiment_number || idx + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                      {lab.title}
+                    </p>
+                    {lab.description && (
+                      <p className="mt-1 text-xs text-slate-500">{lab.description}</p>
+                    )}
+                  </div>
+                  {lab.allocated_hours > 0 && (
+                    <span className="shrink-0 text-xs text-slate-400">
+                      {lab.allocated_hours} hrs
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        )}
 
-        {/* Section 2 — Course Outcomes */}
-        <div ref={sectionRefs["COs & Knowledge Levels"]}>
-          <CourseOutcomes 
-            outcomes={data?.outcomes}
-            onSaveOutcome={handleSaveOutcome}
-            onAcceptOutcome={handleAcceptOutcome}
-            onKnowledgeLevelChange={handleKnowledgeLevelChange}
-          />
-        </div>
+        {/* TAB 5: Course Overview & L-T-P-C */}
+        {activeTab === "overview" && (
+          <div className="space-y-5">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Course Credits & Allocation (L-T-P-C)
+              </h4>
+              <p className="text-xs text-slate-500">
+                Adjust Lecture, Tutorial, Practical, and Credit distribution
+              </p>
+            </div>
 
-        {/* Section 3 — Unit Titles, Hours & Topic Hierarchy */}
-        <div ref={sectionRefs["Units & Topics"]}>
-          <TopicHierarchyPanel
-            courseId={courseData?.id || courseData?.course_id || props.courseId}
-            syllabusId={syllabusId || courseData?.latest_syllabus?.id}
-            initialUnits={data?.units}
-            onAddTopic={onAddTopic}
-            onDeleteTopic={onDeleteTopic}
-            onUpdateHours={onUpdateUnitHours}
-            onUpdateUnitTitle={onUpdateUnitTitle}
-          />
-        </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-center dark:border-slate-700 dark:bg-slate-800/50">
+                <span className="text-xs font-bold text-slate-500">L (Lecture)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={ltpc.L}
+                  onChange={(e) => handleLtpcChange("L", Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white py-1 text-center font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                />
+              </div>
 
-        {/* Section 4 — Laboratory Experiments */}
-        <div ref={sectionRefs["Lab Experiments"]}>
-          <LabExperiments
-            experiments={data?.laboratory_experiments || data?.laboratoryExperiments || data?.experiments || []}
-            syllabusId={syllabusId}
-          />
-        </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-center dark:border-slate-700 dark:bg-slate-800/50">
+                <span className="text-xs font-bold text-slate-500">T (Tutorial)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={ltpc.T}
+                  onChange={(e) => handleLtpcChange("T", Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white py-1 text-center font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                />
+              </div>
 
-        {/* Section 5 — Prescribed Textbooks */}
-        <div ref={sectionRefs["Prescribed Textbooks"]}>
-          <PrescribedTextbooks
-            textBooks={data?.textbooks}
-            reference={data?.reference_books}
-            onDeleteBook={onDeleteTextbook}
-            onAddBook={handleAddTextbook}
-            syllabusId={syllabusId}
-            onAddReference={handleAddReference}
-            onDeleteReference={onDeleteReference}
-          />
-        </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-center dark:border-slate-700 dark:bg-slate-800/50">
+                <span className="text-xs font-bold text-slate-500">P (Practical)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={ltpc.P}
+                  onChange={(e) => handleLtpcChange("P", Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white py-1 text-center font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                />
+              </div>
+
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/30 p-3 text-center dark:border-indigo-800 dark:bg-indigo-950/20">
+                <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400">
+                  C (Credits)
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  value={ltpc.C}
+                  onChange={(e) => handleLtpcChange("C", Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-indigo-300 bg-white py-1 text-center font-bold text-indigo-700 dark:border-indigo-600 dark:bg-slate-700 dark:text-indigo-300"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 p-4 text-xs space-y-2 dark:bg-slate-800/40">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Course Code:</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">
+                  {courseData?.course_code || "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Course Title:</span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {courseData?.course_title || "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Programme:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {courseData?.programme || "B.Tech CSE"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Regulation:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {courseData?.regulation || "R2021"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

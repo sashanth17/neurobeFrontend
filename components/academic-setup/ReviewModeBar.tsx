@@ -1,78 +1,112 @@
-import { TriangleAlert, CheckCircle } from "lucide-react";
+import React from "react";
+import { ArrowLeft, CheckCircle2, RotateCw, Sparkles, FileText, ArrowRight } from "lucide-react";
 
 interface ReviewModeBarProps {
-  onSaveDraft?: () => void;
-  onContinue?: () => void;
-  isApproved?: boolean;
-  status?: string;
+  fileVersionNumber: number;
+  extractionVersion?: number | null;
+  extractionStatus?: string;
+  isSaving: boolean;
+  isApproving: boolean;
+  onBackToVersions: () => void;
+  onSaveDraft: () => void;
+  onApprove: () => void;
+  onProceedToCopo?: () => void;
 }
 
-const ReviewModeBar = ({ onSaveDraft, onContinue, isApproved, status }: ReviewModeBarProps) => {
-  const approved = isApproved || status === "approved";
+const ReviewModeBar: React.FC<ReviewModeBarProps> = ({
+  fileVersionNumber,
+  extractionVersion,
+  extractionStatus = "draft",
+  isSaving,
+  isApproving,
+  onBackToVersions,
+  onSaveDraft,
+  onApprove,
+  onProceedToCopo,
+}) => {
+  const isApproved = extractionStatus.toLowerCase() === "approved";
 
-  if (approved) {
-    return (
-      <div className="mb-5 mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-5 py-4 dark:border-green-800 dark:bg-green-950/20">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white dark:bg-green-900">
-            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      {/* Left: Back button & Version info */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBackToVersions}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>All Syllabus Files</span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <FileText className="h-3.5 w-3.5" />
+            <span>File v{fileVersionNumber}</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-green-900 dark:text-green-200">
-                SYLLABUS EXTRACTION APPROVED
-              </p>
-              <span className="rounded-full border border-green-400 bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900 dark:text-green-300">
-                Approved by BoS
-              </span>
+
+          {extractionVersion && (
+            <div className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Extraction v{extractionVersion}</span>
             </div>
-            <p className="mt-0.5 text-xs text-green-700 dark:text-green-400">
-              Extraction is verified and approved. You can now generate CO-PO Mapping and Topic Hierarchy.
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white">
-            <CheckCircle className="h-4 w-4" /> Approved
+          )}
+
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              isApproved
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
+                : "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300"
+            }`}
+          >
+            {isApproved ? "✓ Approved" : "Draft (Reviewing)"}
           </span>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="mb-5 mt-2 flex items-center justify-between rounded-xl border border-yellow-200 bg-[#FEF3C7] px-5 py-4 dark:border-yellow-800 dark:bg-yellow-900/20">
-      <div className="flex items-center gap-3"> 
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white">
-          <TriangleAlert className="h-5 w-5 text-yellow-500" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-bold text-[#000] dark:text-white">
-              NOTHING IS FINAL UNTIL COORDINATOR APPROVAL
-            </p>
-            <span className="rounded-full border border-yellow-400 px-2 py-0.5 text-xs font-semibold text-yellow-600">
-              Review Mode
-            </span>
-          </div>
-          <p className="mt-0.5 text-sm text-[#000] dark:text-gray-400">
-            Verify all AI-extracted fields against the source PDF on the left. You can edit every title, topic, L-T-P-C value, and Knowledge Level.
-          </p>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-3">
-        <button
-          onClick={onSaveDraft}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-[#000] hover:bg-gray-50 transition-all dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-        >
-          <span>🗒</span> Save Draft
-        </button>
-        <button
-          onClick={onContinue}
-          className="flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-all"
-        >
-          Continue to Approve & Save →
-        </button>
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2">
+        {!isApproved && (
+          <button
+            type="button"
+            disabled={isSaving || isApproving}
+            onClick={onSaveDraft}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          >
+            {isSaving ? <RotateCw className="h-3.5 w-3.5 animate-spin" /> : null}
+            <span>Save Draft</span>
+          </button>
+        )}
+
+        {isApproved ? (
+          <button
+            type="button"
+            onClick={onProceedToCopo}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+          >
+            <span>Proceed to CO-PO Mapping</span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isApproving || isSaving}
+            onClick={onApprove}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+          >
+            {isApproving ? (
+              <>
+                <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                <span>Approving...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Approve Extraction</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
