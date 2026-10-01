@@ -342,13 +342,14 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     }
   };
 
-  // ── Action 3: Assign student to unmapped sheet ────────────────────────────────
+  // ── Action 3: Assign / Reassign student to sheet ──────────────────────────────
   const handleAssignStudent = async (student: any) => {
     if (!selectedStudent || isAssigning) return;
     setIsAssigning(true);
     try {
       const regNo = student.register_number || student.reg_no || '';
       const sId = student.student_id || student.id;
+      const sName = student.student_name || student.name || `${student.first_name || ''} ${student.last_name || ''}`.trim() || regNo;
       
       await MarkExtractionService.updateStudentMarks(selectedStudent.student_marks_id, {
         student_id: sId,
@@ -356,13 +357,50 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         student_reg_number: regNo,
       });
 
-      Success(`Assigned answer sheet to ${student.student_name || regNo} successfully!`);
+      setSelectedStudent(prev => prev ? {
+        ...prev,
+        student_id: sId,
+        student_name: sName,
+        actual_reg_number: regNo,
+        mapping_status: 'MANUALLY_MAPPED',
+      } : null);
+
+      Success(`Assigned answer sheet to ${sName} successfully!`);
       setIsAssignModalOpen(false);
       setAssignSearch('');
-      await fetchResults();
+      await fetchResults(selectedJobId ?? undefined);
     } catch (err: any) {
       console.error("Failed to assign student", err);
       Failure(err?.response?.data?.detail || "Failed to assign student.");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleAssignByRegNumber = async (regNoToAssign: string) => {
+    if (!selectedStudent || isAssigning || !regNoToAssign.trim()) return;
+    setIsAssigning(true);
+    try {
+      const cleanReg = regNoToAssign.trim().toUpperCase();
+      await MarkExtractionService.updateStudentMarks(selectedStudent.student_marks_id, {
+        actual_reg_number: cleanReg,
+        student_reg_number: cleanReg,
+      });
+
+      setSelectedStudent(prev => prev ? {
+        ...prev,
+        actual_reg_number: cleanReg,
+        student_name: cleanReg,
+        mapping_status: 'MANUALLY_MAPPED',
+      } : null);
+
+      Success(`Assigned answer sheet to Reg No ${cleanReg}!`);
+      setIsAssignModalOpen(false);
+      setAssignSearch('');
+      await fetchResults(selectedJobId ?? undefined);
+    } catch (err: any) {
+      console.error("Failed to assign register number", err);
+      Failure(err?.response?.data?.detail || "Failed to update register number.");
     } finally {
       setIsAssigning(false);
     }
@@ -462,7 +500,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     const students = results?.students || [];
     const verified = students.filter(s => s.is_locked || s.verification_status === 'VERIFIED').length;
     const needsReview = students.filter(s => (!s.is_locked && s.verification_status !== 'VERIFIED') && (s.mapping_status === 'NEEDS_REVIEW' || s.verification_status === 'NEEDS_REVIEW' || s.total_mismatch_flag)).length;
-    const readyToVerify = students.filter(s => (!s.is_locked && s.verification_status !== 'VERIFIED') && s.mapping_status === 'AUTO_MAPPED' && !s.total_mismatch_flag).length;
+    const readyToVerify = students.filter(s => (!s.is_locked && s.verification_status !== 'VERIFIED') && (s.mapping_status === 'AUTO_MAPPED' || s.mapping_status === 'MANUALLY_MAPPED') && !s.total_mismatch_flag).length;
     const unmapped = students.filter(s => s.mapping_status === 'UNMAPPED' || s.mapping_status === 'NO_STUDENT_FOUND' || s.mapping_status === 'UNDETECTED_STUDENT_MARK' || !s.student_id).length;
 
     return {
@@ -481,7 +519,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     return results.students.filter(s => {
       const isVerified = s.is_locked || s.verification_status === 'VERIFIED';
       const isNeedsReview = !isVerified && (s.mapping_status === 'NEEDS_REVIEW' || s.verification_status === 'NEEDS_REVIEW' || s.total_mismatch_flag);
-      const isReadyToVerify = !isVerified && s.mapping_status === 'AUTO_MAPPED' && !s.total_mismatch_flag;
+      const isReadyToVerify = !isVerified && (s.mapping_status === 'AUTO_MAPPED' || s.mapping_status === 'MANUALLY_MAPPED') && !s.total_mismatch_flag;
       const isUnmapped = s.mapping_status === 'UNMAPPED' || s.mapping_status === 'NO_STUDENT_FOUND' || s.mapping_status === 'UNDETECTED_STUDENT_MARK' || !s.student_id;
 
       if (activeFilter === 'NEEDS_REVIEW' && !isNeedsReview) return false;
@@ -504,8 +542,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     if (!assignSearch.trim()) return enrolledStudents;
     const q = assignSearch.toLowerCase().trim();
     return enrolledStudents.filter(s => 
-      (s.student_name || s.name || '').toLowerCase().includes(q) ||
-      (s.register_number || s.reg_no || '').toLowerCase().includes(q)
+      `${s.student_name || s.name || s.first_name || ''} ${s.last_name || ''} ${s.register_number || s.reg_no || ''}`.toLowerCase().includes(q)
     );
   }, [enrolledStudents, assignSearch]);
 
@@ -936,8 +973,8 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               onClick={() => setActiveFilter('UNMAPPED')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
                 activeFilter === 'UNMAPPED'
-                  ? 'bg-rose-600 text-white'
-                  : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                  ? 'bg-violet-600 text-white'
+                  : 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800'
               }`}
             >
               Unmapped ({filterCounts.UNMAPPED})
@@ -1004,12 +1041,11 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               No students match the selected filter.
             </div>
           ) : (
-            paginatedStudents.map(student => {
               const isSelected = selectedStudent?.student_marks_id === student.student_marks_id;
               const isVerified = student.is_locked || student.verification_status === 'VERIFIED';
               const isNeedsReview = !isVerified && (student.mapping_status === 'NEEDS_REVIEW' || student.verification_status === 'NEEDS_REVIEW' || student.total_mismatch_flag);
-              const isReadyToVerify = !isVerified && student.mapping_status === 'AUTO_MAPPED' && !student.total_mismatch_flag;
               const isUnmapped = !student.student_id || student.mapping_status === 'UNMAPPED' || student.mapping_status === 'NO_STUDENT_FOUND' || student.mapping_status === 'UNDETECTED_STUDENT_MARK';
+              const isAutoMapped = !isVerified && !isUnmapped;
 
               return (
                 <button
@@ -1025,11 +1061,15 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                   className={`w-56 shrink-0 p-3 rounded-2xl cursor-pointer text-left transition-all duration-150 border relative ${
                     isSelected
                       ? 'bg-violet-50/50 dark:bg-violet-950/30 border-violet-500 shadow-sm ring-2 ring-violet-500/20'
+                      : isUnmapped
+                      ? 'bg-violet-50/20 dark:bg-violet-950/15 border-violet-200/90 dark:border-violet-900/60 hover:border-violet-300 hover:shadow-xs'
                       : 'bg-white dark:bg-gray-800 border-gray-200/90 dark:border-gray-700/80 hover:border-gray-300 hover:shadow-xs'
                   }`}
                 >
                   {/* Student Name */}
-                  <div className="font-bold text-xs text-gray-900 dark:text-white truncate">
+                  <div className={`font-bold text-xs truncate ${
+                    isUnmapped ? 'text-violet-900 dark:text-violet-200' : 'text-gray-900 dark:text-white'
+                  }`}>
                     {student.student_name || (isUnmapped ? 'Unmapped Answer Sheet' : 'Unknown Student')}
                   </div>
 
@@ -1044,25 +1084,22 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       {student.final_total_mark !== undefined ? student.final_total_mark : '-'}/{student.actual_max_mark || 50}
                     </span>
 
-                    {/* Status Pill Badge */}
-                    {isVerified && (
+                    {/* Status Pill Badge: Verified (Emerald), Unmapped (Purple), Auto Mapped (Grey) */}
+                    {isVerified ? (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300">
                         Verified
                       </span>
-                    )}
-                    {isReadyToVerify && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300">
-                        Ready to Verify
+                    ) : isUnmapped ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100/90 text-violet-700 border border-violet-300 dark:bg-violet-950/60 dark:text-violet-300 dark:border-violet-800">
+                        Unmapped
                       </span>
-                    )}
-                    {isNeedsReview && (
+                    ) : isNeedsReview ? (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300">
                         Needs Review
                       </span>
-                    )}
-                    {isUnmapped && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300">
-                        Unmapped
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-750 dark:text-gray-300 dark:border-gray-600">
+                        {student.mapping_status === 'MANUALLY_MAPPED' ? 'Assigned' : 'Auto Mapped'}
                       </span>
                     )}
                   </div>
