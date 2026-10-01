@@ -165,18 +165,19 @@ const MyAssignedCourses = () => {
       router.push(`/neurobe/mcq-generation/bank${buildQueryString()}`);
     } else if (nextAction.includes("pedagogy")) {
       router.push(`/neurobe/pedagogy${buildQueryString()}`);
-    } else if (nextAction.includes("lesson")) {
+    } else if (nextAction.includes("lesson") || nextAction.includes("schedule")) {
       router.push(`/neurobe/lesson-plan${buildQueryString()}`);
-    } else if (nextAction.includes("topics") || nextAction.includes("hierarchy")) {
-      router.push(`/neurobe/topics${buildQueryString()}`);
-    } else if (nextAction.includes("learning")) {
-      router.push(`/neurobe/learning-materials${buildQueryString()}`);
     } else if (
+      nextAction.includes("topics") ||
+      nextAction.includes("hierarchy") ||
       nextAction.includes("syllabus") ||
       nextAction.includes("extract") ||
       nextAction.includes("upload")
     ) {
+      // Curriculum hierarchy (units/topics) is unified into Syllabus review
       router.push(`/neurobe/syllabus${buildQueryString(true)}`);
+    } else if (nextAction.includes("learning")) {
+      router.push(`/neurobe/learning-materials${buildQueryString()}`);
     } else {
       router.push(`/neurobe/syllabus${buildQueryString(true)}`);
     }
@@ -535,7 +536,7 @@ const MyAssignedCourses = () => {
                 onTriggerStage={(stageKey) => {
                   const courseId = card.id || card.course_id;
                   const courseCode = card.course_code || card.code || "";
-                  if (stageKey === "extraction") {
+                  if (stageKey === "extraction" || stageKey === "hierarchy") {
                     router.push(
                       `/neurobe/syllabus?course_id=${courseId}&code=${courseCode}&from=my-courses`
                     );

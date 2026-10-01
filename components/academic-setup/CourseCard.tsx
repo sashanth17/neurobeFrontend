@@ -222,9 +222,8 @@ export default function CourseCard(props: any) {
     copoStatus = sCopo.status || "not_started";
   }
 
-  const sTopics = getStageInfo("hierarchy", workflowStatus?.step_3_topic_hierarchy, data?.academic_preparation?.topics?.state);
-  const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
-  const sLesson = getStageInfo("schedule", workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
+  const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_3_pedagogy_generation || workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
+  const sLesson = getStageInfo("schedule", workflowStatus?.step_4_lesson_plan_schedules || workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
   const sQuestionBank = getStageInfo("question-bank", (workflowStatus as any)?.step_6_question_bank, data?.academic_preparation?.question_bank?.state);
 
   const qbData = data?.academic_preparation?.question_bank;
@@ -232,7 +231,6 @@ export default function CourseCard(props: any) {
 
   // Approval status indicators for topological gating
   const isSyllabusApproved = sSyllabus.status === "approved";
-  const isTopicsApproved = sTopics.status === "approved";
   const isPedagogyApproved = sPedagogy.status === "approved";
   const isLessonApproved = sLesson.status === "approved";
 
@@ -263,18 +261,6 @@ export default function CourseCard(props: any) {
       unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
-      label: "TOPICS",
-      stageKey: "hierarchy",
-      status: sTopics.status,
-      version: optimisticVersions.hierarchy || sTopics.ver,
-      totalVersions: sTopics.totalVers,
-      availableVersions: sTopics.availableVersions,
-      route: `/neurobe/topics?course_id=${targetCourseId}`,
-      artifactsTab: "topics",
-      isUnlocked: isSyllabusApproved,
-      unlockMessage: "Requires Syllabus Extraction to be approved first.",
-    },
-    {
       label: "PEDAGOGY",
       stageKey: "pedagogy",
       status: sPedagogy.status,
@@ -283,8 +269,8 @@ export default function CourseCard(props: any) {
       availableVersions: sPedagogy.availableVersions,
       route: `/neurobe/pedagogy?course_id=${targetCourseId}`,
       artifactsTab: "pedagogy",
-      isUnlocked: isTopicsApproved,
-      unlockMessage: "Requires Topic Hierarchy to be approved first.",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
       label: "LESSON PLAN",
@@ -317,8 +303,8 @@ export default function CourseCard(props: any) {
       extra: qbCount !== undefined ? `${qbCount} Questions` : undefined,
       route: `/neurobe/mcq-generation/bank?course_id=${targetCourseId}`,
       artifactsTab: "question-bank",
-      isUnlocked: isTopicsApproved,
-      unlockMessage: "Requires Topic Hierarchy to be approved first.",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
       label: "CIA QUESTION PAPER",
@@ -334,7 +320,6 @@ export default function CourseCard(props: any) {
   // Dynamic Next Action computation
   const getComputedNextAction = () => {
     if (sSyllabus.status === "not_started") return "Upload Syllabus & Extract";
-    if (sTopics.status === "not_started") return "Generate Topics Hierarchy";
     if (sCopo.status === "not_started") return "Generate CO-PO Mapping";
     if (sPedagogy.status === "not_started") return "Generate Pedagogy Suggestions";
     if (sLesson.status === "not_started") return "Generate Lesson Plan / Schedule";
@@ -366,9 +351,9 @@ export default function CourseCard(props: any) {
     const stepKeyMap: Record<string, string> = {
       extraction: "step_1_syllabus_extraction",
       copo: "step_2_copo_mapping",
-      hierarchy: "step_3_topic_hierarchy",
-      pedagogy: "step_4_pedagogy_generation",
-      schedule: "step_5_lesson_plan_schedules",
+      hierarchy: "step_1_syllabus_extraction",
+      pedagogy: "step_3_pedagogy_generation",
+      schedule: "step_4_lesson_plan_schedules",
     };
     try {
       setActionLoading(stageKey);

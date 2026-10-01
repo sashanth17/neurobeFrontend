@@ -117,14 +117,19 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   );
   const activeWorkflow = incomingWorkflow || fetchedWorkflow;
 
-  // Compute readiness points (Approved = 20% each, Draft = 10% each)
+  // Compute readiness points across the 4 core stages (Approved = 25% each, Draft = 12% each)
   const calculateProgress = () => {
     if (!activeWorkflow) return 0;
-    const stages = Object.values(activeWorkflow);
+    const stages = [
+      activeWorkflow.step_1_syllabus_extraction,
+      activeWorkflow.step_2_copo_mapping,
+      activeWorkflow.step_3_pedagogy_generation || activeWorkflow.step_4_pedagogy_generation,
+      activeWorkflow.step_4_lesson_plan_schedules || activeWorkflow.step_5_lesson_plan_schedules,
+    ].filter(Boolean);
     let points = 0;
     stages.forEach((st: any) => {
-      if (st?.status === "approved") points += 20;
-      else if (st?.status === "draft") points += 10;
+      if (st?.status === "approved") points += 25;
+      else if (st?.status === "draft") points += 12;
     });
     return Math.min(points, 100);
   };
@@ -135,7 +140,7 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
     ? [
         {
           key: "extraction",
-          label: "Extraction",
+          label: "Syllabus",
           data: activeWorkflow.step_1_syllabus_extraction,
         },
         {
@@ -144,25 +149,19 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
           data: activeWorkflow.step_2_copo_mapping,
         },
         {
-          key: "hierarchy",
-          label: "Hierarchy",
-          data: activeWorkflow.step_3_topic_hierarchy,
-        },
-        {
           key: "pedagogy",
           label: "Pedagogy",
-          data: activeWorkflow.step_4_pedagogy_generation,
+          data: activeWorkflow.step_3_pedagogy_generation || activeWorkflow.step_4_pedagogy_generation,
         },
         {
           key: "schedule",
           label: "Schedule",
-          data: activeWorkflow.step_5_lesson_plan_schedules,
+          data: activeWorkflow.step_4_lesson_plan_schedules || activeWorkflow.step_5_lesson_plan_schedules,
         },
       ]
     : [
-        { key: "extraction", label: "Extraction", data: { status: "not_started" as StageStatus, active_version: 1 } },
+        { key: "extraction", label: "Syllabus", data: { status: "not_started" as StageStatus, active_version: 1 } },
         { key: "copo", label: "CO-PO", data: { status: "not_started" as StageStatus, active_version: 1 } },
-        { key: "hierarchy", label: "Hierarchy", data: { status: "not_started" as StageStatus, active_version: 1 } },
         { key: "pedagogy", label: "Pedagogy", data: { status: "not_started" as StageStatus, active_version: 1 } },
         { key: "schedule", label: "Schedule", data: { status: "not_started" as StageStatus, active_version: 1 } },
       ];
@@ -220,14 +219,14 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
           </div>
         </div>
 
-        {/* 4. 5-Stage AI Intelligence Pipeline Stepper */}
+        {/* 4. 4-Stage AI Intelligence Pipeline Stepper */}
         <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
           <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">
             <span>AI Curriculum Pipeline</span>
-            <span className="text-[10px] text-slate-400">5 Stages</span>
+            <span className="text-[10px] text-slate-400">4 Stages</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-4 gap-1.5">
             {stagesList.map((item) => {
               const cfg =
                 STAGE_STATUS_CONFIG[item.data?.status as StageStatus] ||

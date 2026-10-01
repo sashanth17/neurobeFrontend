@@ -1189,11 +1189,11 @@ const COPOMapping = () => {
             actionBtn1={
               displayStatus === "Approved"
                 ? {
-                    label: "Next: Topic",
+                    label: "Next: Pedagogy",
                     icon: <ArrowRight className="h-4 w-4" />,
                     onClick: () => {
                       const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                      router.push(cid ? `/neurobe/topics?course_id=${cid}` : "/neurobe/topics");
+                      router.push(cid ? `/neurobe/pedagogy?course_id=${cid}` : "/neurobe/pedagogy");
                     },
                     className: "create-btn",
                   }

@@ -130,11 +130,12 @@ const Pedagogy = () => {
   const restoreWorkflowState = async (cid: string | number) => {
     try {
       const wfRes: any = await Models.syllabus.get_workflow_status(cid);
+      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
       const topicStep = wfRes?.workflow?.step_3_topic_hierarchy;
-      const isTopicApproved = topicStep?.status === "approved";
-      setState({ upstreamNotApproved: !isTopicApproved });
+      const isUpstreamApproved = extractionStep?.status === "approved" || topicStep?.status === "approved";
+      setState({ upstreamNotApproved: !isUpstreamApproved });
 
-      const pedStep = wfRes?.workflow?.step_4_pedagogy_generation;
+      const pedStep = wfRes?.workflow?.step_3_pedagogy_generation || wfRes?.workflow?.step_4_pedagogy_generation;
       if (!pedStep) return;
 
       const { status, job_id } = pedStep;

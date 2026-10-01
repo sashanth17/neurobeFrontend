@@ -211,22 +211,36 @@ const MCQGenerationIndexPage = () => {
       // Step A: Check workflow status for active hierarchy version
       const wfRes: any = await Models.syllabus.get_workflow_status(courseId).catch(() => null);
       const wfObj = wfRes?.workflow || wfRes;
+      const stepExtraction = wfObj?.step_1_syllabus_extraction;
       const step3 = wfObj?.step_3_topic_hierarchy;
       const activeVersion =
-        step3?.active_version || (Number(step3?.total_versions) > 0 ? step3.total_versions : 1);
+        stepExtraction?.active_version || step3?.active_version || (Number(stepExtraction?.total_versions) > 0 ? stepExtraction.total_versions : (Number(step3?.total_versions) > 0 ? step3.total_versions : 1));
 
       let rawUnits: any[] = [];
 
       if (activeVersion) {
-        const hierSnap: any = await Models.syllabus
-          .get_specific_version(courseId, "hierarchy", activeVersion)
+        // Try extraction version first (curriculum hierarchy is extracted in step 1)
+        const extSnap: any = await Models.syllabus
+          .get_specific_version(courseId, "extraction", activeVersion)
           .catch(() => null);
 
         rawUnits =
-          hierSnap?.data_ai_gave?.units ||
-          hierSnap?.data_ai_gave ||
-          hierSnap?.units ||
+          extSnap?.data_ai_gave?.units ||
+          extSnap?.data_ai_gave?.syllabus?.units ||
+          extSnap?.units ||
           [];
+
+        if (!rawUnits.length) {
+          const hierSnap: any = await Models.syllabus
+            .get_specific_version(courseId, "hierarchy", activeVersion)
+            .catch(() => null);
+
+          rawUnits =
+            hierSnap?.data_ai_gave?.units ||
+            hierSnap?.data_ai_gave ||
+            hierSnap?.units ||
+            [];
+        }
       }
 
       // If version data exists, map topics and subtopics

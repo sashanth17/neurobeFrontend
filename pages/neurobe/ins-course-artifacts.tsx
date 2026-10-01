@@ -2004,8 +2004,8 @@ const QuestionBank = () => {
         const step1 = wfObj?.step_1_syllabus_extraction;
         const step2 = wfObj?.step_2_copo_mapping;
         const step3 = wfObj?.step_3_topic_hierarchy;
-        const step4 = wfObj?.step_4_pedagogy_generation;
-        const step5 = wfObj?.step_5_lesson_plan_schedules;
+        const step4 = wfObj?.step_3_pedagogy_generation || wfObj?.step_4_pedagogy_generation;
+        const step5 = wfObj?.step_4_lesson_plan_schedules || wfObj?.step_5_lesson_plan_schedules;
 
         const isSyllabusApprovedAndActive =
           ((step1?.status?.toLowerCase() === "approved") || (cData?.latest_syllabus?.approval_status?.toLowerCase().includes("approved"))) &&
@@ -2016,8 +2016,8 @@ const QuestionBank = () => {
           (step2?.versions_detailed?.find((v: any) => v.version_number === step2.active_version)?.is_active ?? step2?.is_active ?? true);
 
         const isHierarchyApprovedAndActive =
-          (step3?.status?.toLowerCase() === "approved") &&
-          (Number(step3?.total_versions) > 0);
+          ((step1?.status?.toLowerCase() === "approved") || (step3?.status?.toLowerCase() === "approved")) &&
+          (Number(step1?.total_versions || step3?.total_versions || 1) > 0);
 
         const isPedagogyApprovedAndActive =
           (step4?.status?.toLowerCase() === "approved") &&
@@ -2103,9 +2103,9 @@ const QuestionBank = () => {
   const stageWorkflowMap: Record<string, any> = {
     syllabus: wfObj?.step_1_syllabus_extraction,
     copo: wfObj?.step_2_copo_mapping,
-    topics: wfObj?.step_3_topic_hierarchy,
-    pedagogy: wfObj?.step_4_pedagogy_generation,
-    "lesson-plan": wfObj?.step_5_lesson_plan_schedules,
+    topics: wfObj?.step_3_topic_hierarchy || wfObj?.step_1_syllabus_extraction,
+    pedagogy: wfObj?.step_3_pedagogy_generation || wfObj?.step_4_pedagogy_generation,
+    "lesson-plan": wfObj?.step_4_lesson_plan_schedules || wfObj?.step_5_lesson_plan_schedules,
   };
   const activeStageWf = stageWorkflowMap[state.selectedReferenceId] || wfObj?.step_1_syllabus_extraction;
 
@@ -2318,16 +2318,19 @@ const QuestionBank = () => {
     (wfObj?.step_2_copo_mapping?.versions_detailed?.find((v: any) => v.version_number === wfObj?.step_2_copo_mapping.active_version)?.is_active ?? wfObj?.step_2_copo_mapping?.is_active ?? true);
 
   const isHierarchyApprovedAndActive =
-    (wfObj?.step_3_topic_hierarchy?.status?.toLowerCase() === "approved") &&
-    (Number(wfObj?.step_3_topic_hierarchy?.total_versions) > 0);
+    ((wfObj?.step_1_syllabus_extraction?.status?.toLowerCase() === "approved") ||
+     (wfObj?.step_3_topic_hierarchy?.status?.toLowerCase() === "approved")) &&
+    (Number(wfObj?.step_1_syllabus_extraction?.total_versions || wfObj?.step_3_topic_hierarchy?.total_versions || 1) > 0);
 
   const isPedagogyApprovedAndActive =
-    (wfObj?.step_4_pedagogy_generation?.status?.toLowerCase() === "approved") &&
-    (Number(wfObj?.step_4_pedagogy_generation?.total_versions) > 0);
+    ((wfObj?.step_3_pedagogy_generation?.status?.toLowerCase() === "approved") ||
+     (wfObj?.step_4_pedagogy_generation?.status?.toLowerCase() === "approved")) &&
+    (Number(wfObj?.step_3_pedagogy_generation?.total_versions || wfObj?.step_4_pedagogy_generation?.total_versions || 0) > 0);
 
   const isLessonPlanApprovedAndActive =
-    (wfObj?.step_5_lesson_plan_schedules?.status?.toLowerCase() === "approved") &&
-    (Number(wfObj?.step_5_lesson_plan_schedules?.total_versions) > 0);
+    ((wfObj?.step_4_lesson_plan_schedules?.status?.toLowerCase() === "approved") ||
+     (wfObj?.step_5_lesson_plan_schedules?.status?.toLowerCase() === "approved")) &&
+    (Number(wfObj?.step_4_lesson_plan_schedules?.total_versions || wfObj?.step_5_lesson_plan_schedules?.total_versions || 0) > 0);
 
   // Topics: MUST come from topic hierarchy generation, NOT from extraction, NO timing
   const dynamicTopicUnits = isHierarchyApprovedAndActive && state.activeHierarchySnapshot ? (

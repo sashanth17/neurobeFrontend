@@ -350,7 +350,7 @@ const Topics = () => {
       const isExtractionApproved = extractionStep?.status === "approved";
       setState({ upstreamNotApproved: !isExtractionApproved });
 
-      const topicStep = wfRes?.workflow?.step_3_topic_hierarchy;
+      const topicStep = wfRes?.workflow?.step_3_topic_hierarchy || wfRes?.workflow?.step_1_syllabus_extraction;
       if (!topicStep) return;
 
       const { status, job_id } = topicStep;

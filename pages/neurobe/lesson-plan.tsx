@@ -323,11 +323,11 @@ const LessonPlan = () => {
   const restoreWorkflowState = async (cid: string | number) => {
     try {
       const wfRes: any = await Models.syllabus.get_workflow_status(cid);
-      const pedStep = wfRes?.workflow?.step_4_pedagogy_generation;
+      const pedStep = wfRes?.workflow?.step_3_pedagogy_generation || wfRes?.workflow?.step_4_pedagogy_generation;
       const isPedagogyApproved = pedStep?.status === "approved";
       setState({ upstreamNotApproved: !isPedagogyApproved });
 
-      const lpStep = wfRes?.workflow?.step_5_lesson_plan_schedules;
+      const lpStep = wfRes?.workflow?.step_4_lesson_plan_schedules || wfRes?.workflow?.step_5_lesson_plan_schedules;
       if (!lpStep) return;
 
       const { status, job_id, active_version, total_versions } = lpStep;
@@ -748,7 +748,7 @@ const LessonPlan = () => {
       attempts++;
       try {
         const wfRes: any = await Models.syllabus.get_workflow_status(cid);
-        const lpStep = wfRes?.workflow?.step_5_lesson_plan_schedules;
+        const lpStep = wfRes?.workflow?.step_4_lesson_plan_schedules || wfRes?.workflow?.step_5_lesson_plan_schedules;
         const currentStatus = lpStep?.status;
         const currentJobId = lpStep?.job_id;
 

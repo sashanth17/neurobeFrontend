@@ -91,7 +91,7 @@ const MyAssignedCourses = () => {
       <CourseBanner
         courseCode={firstCourse?.course_code || firstCourse?.code || "Courses"}
         courseTitle={firstCourse?.course_title || firstCourse?.title || "My Assigned Courses"}
-        description="Instructor View — Access academic course artifacts, approved syllabus, outcomes mapping, topic hierarchy, pedagogy, and lesson plans."
+        description="Instructor View — Access academic course artifacts, approved syllabus & curriculum hierarchy, outcomes mapping, pedagogy, and lesson plans."
         programme={firstCourse?.programme || "B.Tech"}
         batch={firstCourse?.batch_name || firstCourse?.batch || "Active Academic Year"}
         academicYear={firstCourse?.academic_year || firstCourse?.term || "Active Term"}

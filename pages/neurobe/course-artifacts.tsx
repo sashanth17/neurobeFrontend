@@ -2083,9 +2083,9 @@ const QuestionBank = () => {
   const stageWorkflowMap: Record<string, any> = {
     syllabus: wfObj?.step_1_syllabus_extraction,
     copo: wfObj?.step_2_copo_mapping,
-    topics: wfObj?.step_3_topic_hierarchy,
-    pedagogy: wfObj?.step_4_pedagogy_generation,
-    "lesson-plan": wfObj?.step_5_lesson_plan_schedules,
+    topics: wfObj?.step_3_topic_hierarchy || wfObj?.step_1_syllabus_extraction,
+    pedagogy: wfObj?.step_3_pedagogy_generation || wfObj?.step_4_pedagogy_generation,
+    "lesson-plan": wfObj?.step_4_lesson_plan_schedules || wfObj?.step_5_lesson_plan_schedules,
   };
   const activeStageWf = stageWorkflowMap[state.selectedReferenceId] || wfObj?.step_1_syllabus_extraction;
 
@@ -2119,16 +2119,20 @@ const QuestionBank = () => {
   );
 
   const isTopicsApproved = Boolean(
+    wfObj?.step_1_syllabus_extraction?.status?.toLowerCase() === "approved" ||
     wfObj?.step_3_topic_hierarchy?.status?.toLowerCase() === "approved" ||
-    state.workflowStatus?.hierarchy_status?.toLowerCase() === "approved"
+    state.workflowStatus?.hierarchy_status?.toLowerCase() === "approved" ||
+    state.workflowStatus?.extraction_status?.toLowerCase() === "approved"
   );
 
   const isPedagogyApproved = Boolean(
+    wfObj?.step_3_pedagogy_generation?.status?.toLowerCase() === "approved" ||
     wfObj?.step_4_pedagogy_generation?.status?.toLowerCase() === "approved" ||
     state.workflowStatus?.pedagogy_status?.toLowerCase() === "approved"
   );
 
   const isLessonPlanApproved = Boolean(
+    wfObj?.step_4_lesson_plan_schedules?.status?.toLowerCase() === "approved" ||
     wfObj?.step_5_lesson_plan_schedules?.status?.toLowerCase() === "approved" ||
     state.workflowStatus?.schedule_status?.toLowerCase() === "approved" ||
     state.lessonUnits?.some((lu: any) => lu?.workspace_status === "Approved" || lu?.overall_approval_status === "Approved")

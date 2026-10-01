@@ -1490,7 +1490,7 @@ const Syllabus = () => {
                           </span>
                         </div>
                         <p className="mt-0.5 text-xs text-green-700 dark:text-green-400">
-                          Extraction is verified and approved. You can now generate CO-PO Mapping and Topic Hierarchy.
+                          Extraction and curriculum hierarchy are verified and approved. You can now proceed to CO-PO Mapping.
                         </p>
                       </div>
                     </div>
@@ -1498,16 +1498,9 @@ const Syllabus = () => {
                       <button
                         type="button"
                         onClick={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 transition-all"
+                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 transition-all cursor-pointer"
                       >
-                        CO-PO Mapping <ArrowRight className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/neurobe/topics?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-purple-700 transition-all"
-                      >
-                        Topic Hierarchy <ArrowRight className="h-3 w-3" />
+                        Next: CO-PO Mapping <ArrowRight className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
@@ -1574,13 +1567,6 @@ const Syllabus = () => {
                         className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300"
                       >
                         CO-PO Mapping <ArrowRight className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/neurobe/topics?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:bg-purple-950/30 dark:text-purple-300"
-                      >
-                        Topic Hierarchy <ArrowRight className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
