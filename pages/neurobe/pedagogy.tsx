@@ -224,60 +224,6 @@ const PedagogyPage = () => {
     }
   };
 
-  /** 5. Toggle Selection of Teaching Method (Immediate Relational DB Update) */
-  const handleToggleSelect = async (pedagogyId: number | string, currentSelected: boolean) => {
-    const sid = getSyllabusId();
-    if (!sid) return;
-
-    const nextSelected = !currentSelected;
-
-    // Optimistically update workspace in memory
-    setWorkspaceData((prev: any) => {
-      if (!prev?.selected_unit?.topics) return prev;
-      const updatedTopics = prev.selected_unit.topics.map((t: any) => {
-        const updatedPeds = (t.suggested_pedagogies || []).map((p: any) => {
-          if (String(p.id) === String(pedagogyId)) {
-            return { ...p, is_selected: nextSelected };
-          }
-          return p;
-        });
-        return { ...t, suggested_pedagogies: updatedPeds };
-      });
-      return {
-        ...prev,
-        selected_unit: { ...prev.selected_unit, topics: updatedTopics },
-      };
-    });
-
-    try {
-      await Models.pedagogy.update_selection(
-        sid,
-        pedagogyId,
-        { is_selected: nextSelected },
-        loadedVersion
-      );
-      Success(nextSelected ? "Method selected" : "Method unselected");
-    } catch (err: any) {
-      // Revert optimistic update
-      setWorkspaceData((prev: any) => {
-        if (!prev?.selected_unit?.topics) return prev;
-        const updatedTopics = prev.selected_unit.topics.map((t: any) => {
-          const updatedPeds = (t.suggested_pedagogies || []).map((p: any) => {
-            if (String(p.id) === String(pedagogyId)) {
-              return { ...p, is_selected: currentSelected };
-            }
-            return p;
-          });
-          return { ...t, suggested_pedagogies: updatedPeds };
-        });
-        return {
-          ...prev,
-          selected_unit: { ...prev.selected_unit, topics: updatedTopics },
-        };
-      });
-      Failure(getErrorMessage(err, "Failed to update selection"));
-    }
-  };
 
   /** 6. Delete Pedagogy Item (Relational Table Deletion) */
   const handleDeletePedagogy = async (pedagogyId: number | string) => {
@@ -496,11 +442,6 @@ const PedagogyPage = () => {
     0
   );
 
-  const selectedMethods = topics.reduce(
-    (acc: number, t: any) =>
-      acc + (t.suggested_pedagogies?.filter((p: any) => p.is_selected)?.length || 0),
-    0
-  );
 
   return (
     <div className="min-h-screen pb-16">
@@ -565,12 +506,12 @@ const PedagogyPage = () => {
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
+              <Clock className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500">Selected Methods</p>
+              <p className="text-xs font-medium text-slate-500">Allocated Hours</p>
               <h4 className="text-xl font-bold text-slate-900 dark:text-white">
-                {selectedMethods}
+                {workspaceData?.selected_unit?.theory_hours || 9} hrs
               </h4>
             </div>
           </div>
@@ -719,39 +660,25 @@ const PedagogyPage = () => {
                         No teaching methods suggested yet. Click &quot;Add Teaching Method&quot; above to create one.
                       </div>
                     ) : (
-                      suggestedPeds.map((ped: any) => {
-                        const isSelected = Boolean(ped.is_selected);
+                      suggestedPeds.map((ped: any, pedIdx: number) => {
                         const title = ped.pedagogy_name || ped.strategy_name || ped.title || "Method";
                         const desc = ped.methodology || ped.description || "";
 
                         return (
                           <div
-                            key={ped.id}
-                            className={`flex flex-col justify-between rounded-xl border p-3.5 transition-all ${
-                              isSelected
-                                ? "border-indigo-300 bg-indigo-50/40 ring-1 ring-indigo-200 dark:border-indigo-800 dark:bg-indigo-950/20 dark:ring-indigo-900"
-                                : "border-slate-200 bg-slate-50/50 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40"
-                            }`}
+                            key={ped.id || pedIdx}
+                            className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs transition hover:border-indigo-200 hover:shadow-sm dark:border-slate-800 dark:bg-slate-800/60 dark:hover:border-slate-700"
                           >
                             <div>
                               <div className="flex items-start justify-between gap-2">
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleToggleSelect(ped.id, isSelected)}
-                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                  />
-                                  <span
-                                    className={`text-xs font-bold ${
-                                      isSelected
-                                        ? "text-indigo-900 dark:text-indigo-200"
-                                        : "text-slate-800 dark:text-slate-200"
-                                    }`}
-                                  >
-                                    {title}
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                                    {pedIdx + 1}
                                   </span>
-                                </label>
+                                  <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                                    {title}
+                                  </h5>
+                                </div>
 
                                 <div className="flex items-center gap-1">
                                   <button
@@ -766,7 +693,7 @@ const PedagogyPage = () => {
                                       })
                                     }
                                     title="Edit teaching method"
-                                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                                   >
                                     <Edit3 className="h-3.5 w-3.5" />
                                   </button>
@@ -782,22 +709,10 @@ const PedagogyPage = () => {
                               </div>
 
                               {desc && (
-                                <p className="mt-2 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+                                <p className="mt-2.5 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
                                   {desc}
                                 </p>
                               )}
-                            </div>
-
-                            <div className="mt-3 flex items-center justify-between border-t border-slate-200/60 pt-2 text-[10px] text-slate-400 dark:border-slate-800">
-                              <span>
-                                {isSelected ? (
-                                  <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                    Selected for syllabus
-                                  </span>
-                                ) : (
-                                  "Not selected"
-                                )}
-                              </span>
                             </div>
                           </div>
                         );
@@ -820,7 +735,11 @@ const PedagogyPage = () => {
             </span>
             <span className="text-slate-300">&bull;</span>
             <span className="text-xs font-medium text-slate-500">
-              Selected: <strong className="text-indigo-600 dark:text-indigo-400">{selectedMethods}</strong> methods
+              Topics: <strong className="text-slate-800 dark:text-white">{topics.length}</strong>
+            </span>
+            <span className="text-slate-300">&bull;</span>
+            <span className="text-xs font-medium text-slate-500">
+              Teaching Methods: <strong className="text-indigo-600 dark:text-indigo-400">{totalMethods}</strong>
             </span>
           </div>
 
