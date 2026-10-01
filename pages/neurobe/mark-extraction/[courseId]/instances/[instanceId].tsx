@@ -30,22 +30,28 @@ function InstanceDashboardPage() {
     dispatch(setPageTitle("Instance Dashboard"));
   }, [dispatch]);
 
-  const fetchCiaTests = useCallback(async () => {
+  const fetchCiaTests = useCallback(async (silent = false) => {
     if (!instanceId) return;
-    setLoadingTests(true);
+    if (!silent) setLoadingTests(true);
     try {
       const tests = await MarkExtractionService.getCiaTestsStatus(instanceId as string);
       setCiaTests(tests ?? []);
-      if (tests && tests.length > 0) setSelectedCiaTest(tests[0]);
+      if (tests && tests.length > 0) {
+        setSelectedCiaTest((prev) => {
+          if (!prev) return tests[0];
+          const matched = tests.find((t) => t.cia_test_id === prev.cia_test_id);
+          return matched || tests[0];
+        });
+      }
     } catch (err) {
       console.error("Failed to fetch CIA tests", err);
     } finally {
-      setLoadingTests(false);
+      if (!silent) setLoadingTests(false);
     }
   }, [instanceId]);
 
   useEffect(() => {
-    fetchCiaTests();
+    fetchCiaTests(false);
   }, [fetchCiaTests]);
 
   const handleCiaTestChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -149,20 +155,32 @@ function InstanceDashboardPage() {
           <div className="h-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
             {activeTab === "extraction"     && (
               <ExtractionTab
+                key={`extraction-${selectedCiaTest.cia_test_id}`}
                 ciaTestId={selectedCiaTest.cia_test_id}
                 initialStatus={selectedCiaTest.job_status}
                 initialJobId={selectedCiaTest.latest_job_id}
                 onGoToExtractedView={() => setActiveTab("extracted-view")}
+                onRefreshCiaTests={fetchCiaTests}
               />
             )}
             {activeTab === "extracted-view" && (
               <ExtractedViewTab 
+                key={`extracted-view-${selectedCiaTest.cia_test_id}`}
                 ciaTestId={selectedCiaTest.cia_test_id} 
                 instanceId={instanceId as string}
                 onGoToExtraction={() => setActiveTab("extraction")}
+                onRefreshCiaTests={fetchCiaTests}
               />
             )}
-            {activeTab === "result"         && <ResultPageTab    ciaTestId={selectedCiaTest.cia_test_id} />}
+            {activeTab === "result"         && (
+              <ResultPageTab
+                key={`result-${selectedCiaTest.cia_test_id}`}
+                ciaTestId={selectedCiaTest.cia_test_id}
+                instanceId={instanceId as string}
+                onGoToExtractedView={() => setActiveTab("extracted-view")}
+                onRefreshCiaTests={fetchCiaTests}
+              />
+            )}
             {activeTab === "students"       && <StudentListTab   instanceId={instanceId as string} />}
           </div>
         )}

@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   FileText, ZoomIn, ZoomOut, Check, AlertTriangle, Save, Loader2, Info, 
-  AlertCircle, Lock, Search, RotateCw, Sparkles, User, ShieldCheck, RefreshCw,
-  ChevronLeft, ChevronRight, Share2, Maximize2, ExternalLink, X, UserPlus, CheckCircle2
+  AlertCircle, Lock, Unlock, Search, RotateCw, Sparkles, User, ShieldCheck, RefreshCw,
+  ChevronLeft, ChevronRight, Share2, Maximize2, ExternalLink, X, UserPlus, CheckCircle2, Trash2,
+  Layers, ChevronDown
 } from 'lucide-react';
 import { 
   MarkExtractionService, 
   LatestExtractionResults, 
   StudentMarks, 
-  QuestionMark 
+  QuestionMark,
+  CIATestJobItem
 } from '@/services/markExtraction.service';
 import { Success, Failure } from '@/utils/function.utils';
 import instance from '@/utils/axios.utils';
@@ -17,9 +19,10 @@ interface ExtractedViewTabProps {
   ciaTestId: number;
   instanceId?: string;
   onGoToExtraction?: () => void;
+  onRefreshCiaTests?: () => void;
 }
 
-export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtraction }: ExtractedViewTabProps) {
+export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtraction, onRefreshCiaTests }: ExtractedViewTabProps) {
   const [results, setResults] = useState<LatestExtractionResults | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -53,6 +56,36 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
   const [assignSearch, setAssignSearch] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
 
+  // Job History & Multi-Job Selection
+  const [availableJobs, setAvailableJobs] = useState<CIATestJobItem[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+
+  // In-Progress Job Cancelling State
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Unlocking State
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  // Pagination for Student Cards
+  const [studentPageIndex, setStudentPageIndex] = useState(0);
+  const STUDENTS_PER_PAGE = 10;
+
+  // Delete Job Modal & 5-Second Undo State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingJob, setIsDeletingJob] = useState(false);
+  const [pendingDeleteJobId, setPendingDeleteJobId] = useState<number | null>(null);
+  const [undoSecondsRemaining, setUndoSecondsRemaining] = useState<number>(5);
+  const deleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const deleteCountdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+      if (deleteCountdownRef.current) clearInterval(deleteCountdownRef.current);
+    };
+  }, []);
+
   // Fetch enrolled students for mapping
   useEffect(() => {
     if (!instanceId) return;
@@ -74,6 +107,60 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     setIsCustomTotalEditing(false);
   }, [selectedStudent?.student_marks_id]);
 
+  // Fetch available extraction jobs for this CIA test
+  const fetchJobs = useCallback(async () => {
+    if (!ciaTestId || isNaN(Number(ciaTestId))) return;
+    try {
+      const jobs = await MarkExtractionService.getCiaJobs(ciaTestId);
+      setAvailableJobs(jobs);
+    } catch (err) {
+      console.error("Failed to fetch CIA extraction jobs", err);
+    }
+  }, [ciaTestId]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  // Cancel running extraction job
+  const handleCancelJob = async (jobId: number) => {
+    setIsCancelling(true);
+    try {
+      await MarkExtractionService.cancelExtractionJob(jobId);
+      Success("Extraction job cancelled successfully.");
+      await fetchJobs();
+      await fetchResults(jobId);
+      if (onRefreshCiaTests) onRefreshCiaTests();
+    } catch (err: any) {
+      console.error("Failed to cancel job", err);
+      Failure(err?.response?.data?.detail || "Failed to cancel extraction job.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  // Poll progress when current job is in PROCESSING or PENDING
+  useEffect(() => {
+    if (!results || (results.job_status !== 'PROCESSING' && results.job_status !== 'PENDING')) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const data = await MarkExtractionService.getLatestExtractionResults(ciaTestId, selectedJobId ?? undefined);
+        if (data) {
+          setResults(data);
+          if (data.job_status !== 'PROCESSING' && data.job_status !== 'PENDING') {
+            await fetchJobs();
+            if (onRefreshCiaTests) onRefreshCiaTests();
+          }
+        }
+      } catch (err) {
+        console.error("Polling error for in-progress job", err);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [results?.job_status, ciaTestId, selectedJobId, fetchJobs, onRefreshCiaTests]);
+
   useEffect(() => {
     if (!ciaTestId || isNaN(Number(ciaTestId))) {
       setLoadError("NOT_EXTRACTED_YET");
@@ -82,7 +169,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     fetchResults();
   }, [ciaTestId]);
 
-  const fetchResults = async () => {
+  const fetchResults = async (jobIdToFetch?: number) => {
     if (!ciaTestId || isNaN(Number(ciaTestId))) {
       setLoadError("NOT_EXTRACTED_YET");
       return;
@@ -90,7 +177,8 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await MarkExtractionService.getLatestExtractionResults(ciaTestId);
+      const targetJob = jobIdToFetch !== undefined ? jobIdToFetch : (selectedJobId ?? undefined);
+      const data = await MarkExtractionService.getLatestExtractionResults(ciaTestId, targetJob);
       if (!data) {
         setResults(null);
         setSelectedStudent(null);
@@ -98,6 +186,9 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         return;
       }
       setResults(data);
+      if (data.job_id && selectedJobId !== data.job_id) {
+        setSelectedJobId(data.job_id);
+      }
       if (data.students && data.students.length > 0) {
         if (selectedStudent) {
           const current = data.students.find((s: StudentMarks) => s.student_marks_id === selectedStudent.student_marks_id);
@@ -217,13 +308,30 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
   const handleVerifyAndLock = async () => {
     if (!selectedStudent || isVerifying || isUpdating) return;
     if (hasUnsavedChanges) {
-      Failure("Please save your updated marks first before verifying.");
+      Failure("Please save your updated marks first by clicking 'Update Marks' before verifying.");
       return;
     }
     setIsVerifying(true);
     try {
+      // 1. Automatically change all individual marks status to VERIFIED
+      const verifiedMarks = (selectedStudent.marks || []).map(m => ({
+        ...m,
+        status: 'VERIFIED',
+      }));
+
+      // Update student marks with all marks set to VERIFIED status
+      await MarkExtractionService.updateStudentMarks(selectedStudent.student_marks_id, {
+        actual_reg_number: selectedStudent.actual_reg_number,
+        student_reg_number: selectedStudent.actual_reg_number,
+        final_total_mark: selectedStudent.final_total_mark,
+        total_selection_option: selectedStudent.total_selection_option,
+        marks: verifiedMarks,
+      });
+
+      // 2. Confirm and lock the student marks
       await MarkExtractionService.verifyAndLockStudentMarks(selectedStudent.student_marks_id);
       
+      setHasUnsavedChanges(false);
       Success("Student marks verified and locked successfully!");
       await fetchResults();
     } catch (error: any) {
@@ -257,6 +365,79 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
       Failure(err?.response?.data?.detail || "Failed to assign student.");
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  // ── Action 4: Unlock Student Marks (Allows editing & removes from published result) ──
+  const handleUnlockStudent = async () => {
+    if (!selectedStudent || isUnlocking) return;
+    setIsUnlocking(true);
+    try {
+      await MarkExtractionService.unlockStudentMarks(selectedStudent.student_marks_id);
+      Success(`Student ${selectedStudent.student_name || selectedStudent.actual_reg_number} unlocked. You can now edit question marks.`);
+      await fetchResults(selectedJobId ?? undefined);
+      if (onRefreshCiaTests) onRefreshCiaTests();
+    } catch (err: any) {
+      console.error("Unlock student error", err);
+      Failure(err?.response?.data?.detail || "Failed to unlock student marks.");
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  // ── Action 5: Delete extraction job with 5-Second Undo Grace Period ──────────
+  const handleScheduleDeleteJob = () => {
+    const targetJobId = results?.job_id || selectedJobId;
+    if (!targetJobId) return;
+
+    setShowDeleteModal(false);
+    setPendingDeleteJobId(targetJobId);
+    setUndoSecondsRemaining(5);
+
+    deleteCountdownRef.current = setInterval(() => {
+      setUndoSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          if (deleteCountdownRef.current) clearInterval(deleteCountdownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    deleteTimeoutRef.current = setTimeout(async () => {
+      await executeDeleteJob(targetJobId);
+    }, 5000);
+  };
+
+  const handleCancelUndoDelete = () => {
+    if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    if (deleteCountdownRef.current) clearInterval(deleteCountdownRef.current);
+    setPendingDeleteJobId(null);
+    Success("Extraction job deletion cancelled.");
+  };
+
+  const executeDeleteJob = async (id: number) => {
+    setIsDeletingJob(true);
+    try {
+      await MarkExtractionService.deleteExtractionJob(id);
+      Success("Extraction job and all associated files deleted successfully!");
+      setResults(null);
+      setSelectedStudent(null);
+      await fetchJobs();
+      if (onRefreshCiaTests) {
+        await onRefreshCiaTests();
+      }
+      if (onGoToExtraction) {
+        onGoToExtraction();
+      } else {
+        await fetchResults();
+      }
+    } catch (err: any) {
+      console.error("Failed to delete job", err);
+      Failure(err?.response?.data?.detail || "Failed to delete extraction job.");
+    } finally {
+      setIsDeletingJob(false);
+      setPendingDeleteJobId(null);
     }
   };
 
@@ -328,6 +509,55 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     );
   }, [enrolledStudents, assignSearch]);
 
+  // Paginated students for horizontal rail
+  const totalStudentPages = Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE) || 1;
+  const paginatedStudents = useMemo(() => {
+    const start = studentPageIndex * STUDENTS_PER_PAGE;
+    return filteredStudents.slice(start, start + STUDENTS_PER_PAGE);
+  }, [filteredStudents, studentPageIndex]);
+
+  // Current student index in filtered students
+  const currentStudentIndex = useMemo(() => {
+    if (!selectedStudent) return -1;
+    return filteredStudents.findIndex(s => s.student_marks_id === selectedStudent.student_marks_id);
+  }, [filteredStudents, selectedStudent]);
+
+  const handleGoToNextStudent = () => {
+    if (currentStudentIndex >= 0 && currentStudentIndex < filteredStudents.length - 1) {
+      const next = filteredStudents[currentStudentIndex + 1];
+      setSelectedStudent(next);
+      if (next.source_pages && next.source_pages.length > 0) {
+        setActivePage(next.source_pages[0]);
+      }
+    }
+  };
+
+  const handleGoToPrevStudent = () => {
+    if (currentStudentIndex > 0) {
+      const prev = filteredStudents[currentStudentIndex - 1];
+      setSelectedStudent(prev);
+      if (prev.source_pages && prev.source_pages.length > 0) {
+        setActivePage(prev.source_pages[0]);
+      }
+    }
+  };
+
+  // Subsection totals computation
+  const subsectionTotals = useMemo(() => {
+    if (!selectedStudent?.marks || selectedStudent.marks.length === 0) return [];
+    const map: Record<string, { section: string; obtained: number; max: number; count: number }> = {};
+    selectedStudent.marks.forEach(m => {
+      const sec = m.section_name || 'General';
+      if (!map[sec]) {
+        map[sec] = { section: sec, obtained: 0, max: 0, count: 0 };
+      }
+      map[sec].obtained += Number(m.final_mark) || 0;
+      map[sec].max += Number(m.max_marks_assigned) || 0;
+      map[sec].count += 1;
+    });
+    return Object.values(map);
+  }, [selectedStudent?.marks]);
+
   // Loading state
   if (isLoading && !results) {
     return (
@@ -339,8 +569,142 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     );
   }
 
-  // Graceful Empty State (when no extraction exists yet or 404)
-  if (loadError === "NOT_EXTRACTED_YET" || (!isLoading && !loadError && (!results || results.students?.length === 0))) {
+  // 1. In-Progress Job Card (when job is PROCESSING or PENDING)
+  if (results && (results.job_status === 'PROCESSING' || results.job_status === 'PENDING')) {
+    const totalP = results.total_pages || 1;
+    const procP = results.processed_pages || 0;
+    const pct = Math.min(100, Math.max(5, Math.round((procP / totalP) * 100)));
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/70 dark:bg-gray-900 h-full overflow-y-auto">
+        <div className="w-full max-w-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl p-8 shadow-xl text-center space-y-6 animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-violet-100 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-inner">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+
+          <div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800 mb-3">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              Extraction in Progress
+            </span>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              AI Mark Extraction is Running
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+              Job #{results.job_id} • Processing answer sheets with high-precision OCR &amp; Vision models
+            </p>
+          </div>
+
+          {/* Progress Bar & Counter: extraction of 30 out 2 done */}
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-750 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-gray-700 dark:text-gray-300">
+                Extraction of {totalP} out {procP} done
+              </span>
+              <span className="text-violet-600 dark:text-violet-400 font-mono">
+                {pct}%
+              </span>
+            </div>
+            <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 text-left pt-1">
+              Currently processing pages. Results update automatically.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            {results.job_id && (
+              <button
+                type="button"
+                onClick={() => handleCancelJob(results.job_id!)}
+                disabled={isCancelling}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold border border-red-200 dark:border-red-800/80 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 transition cursor-pointer disabled:opacity-50"
+              >
+                {isCancelling ? "Cancelling..." : "Cancel Running Job"}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => fetchResults(selectedJobId ?? undefined)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Check Now</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Failed Job Card (when job is FAILED and 0 students were extracted)
+  if (results && results.job_status === 'FAILED' && (!results.students || results.students.length === 0)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/70 dark:bg-gray-900 h-full overflow-y-auto">
+        <div className="w-full max-w-lg bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/60 rounded-3xl p-8 shadow-xl text-center space-y-6 animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-950/80 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto border border-red-200 dark:border-red-800">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+
+          <div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-800 mb-3">
+              Extraction Failed
+            </span>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Extraction Job #{results.job_id} Failed
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+              Pages attempted: {results.processed_pages || 0} of {results.total_pages || 0}
+            </p>
+          </div>
+
+          <div className="p-4 bg-red-50/60 dark:bg-red-950/30 rounded-2xl border border-red-200 dark:border-red-900/60 text-left">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-red-700 dark:text-red-300 block mb-1">
+              Error Diagnostic
+            </span>
+            <p className="text-xs font-mono text-red-800 dark:text-red-300 break-words leading-relaxed">
+              {results.error_message || "The AI worker encountered an unrecoverable failure during answer sheet extraction."}
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            {results.job_id && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingDeleteJobId(results.job_id!);
+                  setShowDeleteModal(true);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition shadow-xs cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Failed Job</span>
+              </button>
+            )}
+
+            {onGoToExtraction && (
+              <button
+                type="button"
+                onClick={onGoToExtraction}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Upload New Batch</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Graceful Empty State (when no extraction exists yet or 404)
+  if (loadError === "NOT_EXTRACTED_YET" || (!isLoading && !loadError && (!results || (!results.students || results.students.length === 0)))) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-gray-800 h-full">
         <div className="w-16 h-16 rounded-2xl bg-violet-50 dark:bg-violet-950/60 flex items-center justify-center mb-4 text-violet-600 dark:text-violet-400">
@@ -363,7 +727,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
             </button>
           )}
           <button
-            onClick={fetchResults}
+            onClick={() => fetchResults()}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
           >
             <RefreshCw className="w-4 h-4" />
@@ -374,7 +738,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     );
   }
 
-  // Error State
+  // 4. Error State
   if (loadError && !results) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-gray-800 h-full">
@@ -389,7 +753,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         </p>
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchResults}
+            onClick={() => fetchResults()}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-violet-600 text-white hover:bg-violet-700 transition shadow-sm"
           >
             <RefreshCw className="w-4 h-4" />
@@ -426,6 +790,88 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-gray-50/70 dark:bg-gray-900 p-4 xl:p-6 space-y-4">
+
+      {/* Partial Extraction Warning Banner */}
+      {(results?.job_status === 'PARTIAL' || (results?.job_status === 'FAILED' && (results?.students?.length || 0) > 0)) && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs shadow-2xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold">Partial Extraction (Job #{results?.job_id}):</span>{' '}
+              {results?.processed_pages || results?.students?.length || 0} of {results?.total_pages || '?'} pages were successfully extracted before processing stopped.
+              The successfully extracted student answer sheets and marks are shown below for verification.
+            </div>
+          </div>
+          {results?.job_id && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingDeleteJobId(results.job_id!);
+                setShowDeleteModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 shrink-0 self-start sm:self-auto px-3.5 py-1.5 rounded-xl font-bold bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 text-amber-950 dark:text-white transition shadow-2xs cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Job</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── 0. Job Selector Bar (Switch between multiple extraction jobs) ── */}
+      {availableJobs.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200/90 dark:border-gray-700/80 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <Layers className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
+            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Extraction Job:</span>
+            <div className="relative">
+              <select
+                value={selectedJobId ?? results?.job_id ?? ''}
+                onChange={(e) => {
+                  const newJobId = Number(e.target.value);
+                  setSelectedJobId(newJobId);
+                  fetchResults(newJobId);
+                }}
+                className="pl-3 pr-8 py-1.5 rounded-xl text-xs font-semibold bg-gray-50 dark:bg-gray-750 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer appearance-none shadow-2xs"
+              >
+                {availableJobs.map((j, idx) => {
+                  const dateStr = j.created_at ? new Date(j.created_at).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  }) : 'Unknown date';
+                  const effectiveStatus = (j.status === 'FAILED' && j.student_count > 0) ? 'PARTIAL' : j.status;
+                  return (
+                    <option key={j.id} value={j.id}>
+                      Job #{j.id} — {dateStr} ({j.student_count} students, {effectiveStatus}) {idx === 0 ? '★ Latest' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-gray-400">
+              {availableJobs.length} {availableJobs.length === 1 ? 'batch job' : 'batch jobs'} recorded
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                fetchJobs();
+                fetchResults(selectedJobId ?? undefined);
+              }}
+              className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-750 transition"
+              title="Refresh job list & results"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 1. Filter Bar & Share Task Action ───────────────────────────────── */}
 
@@ -499,7 +945,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
           )}
         </div>
 
-        {/* Share Button & Search */}
+        {/* Share Button, Delete Job & Search */}
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -518,8 +964,20 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 transition shadow-2xs"
           >
             <Share2 className="h-3.5 w-3.5 text-gray-500" />
-            <span>Share Verification Task</span>
+            <span>Share</span>
           </button>
+
+          {results?.job_id && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 transition shadow-2xs"
+              title="Delete this extraction job and all associated files"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+              <span>Delete Job</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -546,7 +1004,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               No students match the selected filter.
             </div>
           ) : (
-            filteredStudents.map(student => {
+            paginatedStudents.map(student => {
               const isSelected = selectedStudent?.student_marks_id === student.student_marks_id;
               const isVerified = student.is_locked || student.verification_status === 'VERIFIED';
               const isNeedsReview = !isVerified && (student.mapping_status === 'NEEDS_REVIEW' || student.verification_status === 'NEEDS_REVIEW' || student.total_mismatch_flag);
@@ -625,6 +1083,37 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         </button>
       </div>
 
+      {/* Student Cards Rail Pagination Controls */}
+      {filteredStudents.length > STUDENTS_PER_PAGE && (
+        <div className="flex items-center justify-between px-2 text-xs text-gray-500 flex-shrink-0">
+          <span className="text-[11px]">
+            Showing {studentPageIndex * STUDENTS_PER_PAGE + 1}–
+            {Math.min((studentPageIndex + 1) * STUDENTS_PER_PAGE, filteredStudents.length)} of {filteredStudents.length} students
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={studentPageIndex === 0}
+              onClick={() => setStudentPageIndex(p => Math.max(0, p - 1))}
+              className="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer"
+            >
+              ← Prev
+            </button>
+            <span className="font-mono text-[11px] px-1 text-gray-400">
+              Page {studentPageIndex + 1} of {totalStudentPages}
+            </span>
+            <button
+              type="button"
+              disabled={studentPageIndex >= totalStudentPages - 1}
+              onClick={() => setStudentPageIndex(p => Math.min(totalStudentPages - 1, p + 1))}
+              className="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 3. Main Workspace Layout (2 Columns: Left = Document, Right = Verification) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-[620px]">
 
@@ -646,18 +1135,26 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               <div className="flex items-center space-x-2 bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-700 text-[11px]">
                 <button
                   type="button"
-                  disabled={activePage <= 1}
-                  onClick={() => setActivePage(p => Math.max(1, p - 1))}
-                  className="hover:text-white disabled:opacity-30 disabled:hover:text-gray-300"
+                  disabled={selectedStudent.source_pages.indexOf(activePage) <= 0}
+                  onClick={() => {
+                    const idx = selectedStudent.source_pages.indexOf(activePage);
+                    if (idx > 0) setActivePage(selectedStudent.source_pages[idx - 1]);
+                  }}
+                  className="hover:text-white disabled:opacity-30 disabled:hover:text-gray-300 cursor-pointer"
                 >
                   <ChevronLeft className="h-3 w-3" />
                 </button>
-                <span>Page {activePage} of {selectedStudent.source_pages.length}</span>
+                <span>
+                  Page {selectedStudent.source_pages.indexOf(activePage) >= 0 ? selectedStudent.source_pages.indexOf(activePage) + 1 : 1} of {selectedStudent.source_pages.length} (Sheet p.{activePage})
+                </span>
                 <button
                   type="button"
-                  disabled={activePage >= selectedStudent.source_pages.length}
-                  onClick={() => setActivePage(p => Math.min(selectedStudent.source_pages.length, p + 1))}
-                  className="hover:text-white disabled:opacity-30 disabled:hover:text-gray-300"
+                  disabled={selectedStudent.source_pages.indexOf(activePage) >= selectedStudent.source_pages.length - 1}
+                  onClick={() => {
+                    const idx = selectedStudent.source_pages.indexOf(activePage);
+                    if (idx >= 0 && idx < selectedStudent.source_pages.length - 1) setActivePage(selectedStudent.source_pages[idx + 1]);
+                  }}
+                  className="hover:text-white disabled:opacity-30 disabled:hover:text-gray-300 cursor-pointer"
                 >
                   <ChevronRight className="h-3 w-3" />
                 </button>
@@ -778,12 +1275,24 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       {selectedStudent.actual_reg_number || 'No Register Number Mapped'}
                     </span>
                     {selectedStudent.is_locked ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                        <Lock className="h-2.5 w-2.5" /> Locked
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5" /> Verified &amp; Locked
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleUnlockStudent}
+                          disabled={isUnlocking}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition cursor-pointer shadow-2xs"
+                          title="Unlock marks to edit questions. Removes from final result until re-verified."
+                        >
+                          <Unlock className="w-2.5 h-2.5 text-amber-600" />
+                          <span>{isUnlocking ? "Unlocking..." : "Unlock to Edit"}</span>
+                        </button>
+                      </div>
                     ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                        Draft
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        Editable Draft
                       </span>
                     )}
                   </div>
@@ -918,6 +1427,33 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                   </div>
                 )}
 
+                {/* ── Subsection Totals Banner (Part A, Part B, Grand Total) ── */}
+                {subsectionTotals.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40">
+                    <div className="text-[11px] font-bold text-violet-950 dark:text-violet-200 mr-1 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                      <span>Subsections:</span>
+                    </div>
+                    {subsectionTotals.map((sec) => (
+                      <div
+                        key={sec.section}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-gray-800 border border-violet-200/80 dark:border-violet-800 text-xs shadow-2xs"
+                      >
+                        <span className="font-semibold text-gray-600 dark:text-gray-300">{sec.section}:</span>
+                        <span className="font-mono font-bold text-violet-700 dark:text-violet-400">
+                          {Math.round(sec.obtained * 100) / 100}
+                        </span>
+                        <span className="text-gray-400 text-[10px] font-mono">/ {sec.max}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-violet-600 text-white text-xs font-bold shadow-2xs ml-auto">
+                      <span>Grand Total:</span>
+                      <span className="font-mono">{selectedStudent.final_total_mark}</span>
+                      <span className="text-violet-200 text-[10px] font-mono">/ {selectedStudent.actual_max_mark || 50}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Marks Verification Table ─────────────────────────────── */}
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between">
@@ -1029,34 +1565,99 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               </div>
 
               {/* ── Footer: Action Buttons ─────────────────────────────────── */}
-              <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-end space-x-3 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={handleUpdateMarks}
-                  disabled={selectedStudent.is_locked || isUpdating || isVerifying}
-                  className="flex items-center space-x-2 py-2.5 px-5 rounded-xl font-bold text-xs border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 hover:bg-violet-100 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
-                >
-                  {isUpdating ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-600" />
-                  ) : (
-                    <Save className="h-3.5 w-3.5 text-violet-600" />
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between space-x-3 flex-shrink-0">
+                <div className="flex items-center">
+                  {hasUnsavedChanges && (
+                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-1.5 rounded-lg animate-pulse">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      Unsaved edits! Click &ldquo;Update Marks&rdquo; first to enable Verify &amp; Lock.
+                    </span>
                   )}
-                  <span>{isUpdating ? "Saving..." : "Update Marks"}</span>
-                </button>
+                  {selectedStudent.is_locked && (
+                    <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1.5 rounded-lg">
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                      Marks are verified and locked.
+                    </span>
+                  )}
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleVerifyAndLock}
-                  disabled={selectedStudent.is_locked || isUpdating || isVerifying}
-                  className="flex items-center space-x-2 py-2.5 px-5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
-                >
-                  {isVerifying ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                <div className="flex items-center space-x-3">
+                  {selectedStudent.is_locked ? (
+                    <button
+                      type="button"
+                      onClick={handleUnlockStudent}
+                      disabled={isUnlocking}
+                      className="flex items-center space-x-2 py-2.5 px-5 rounded-xl font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-50 shadow-2xs cursor-pointer"
+                    >
+                      {isUnlocking ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Unlock className="h-3.5 w-3.5" />
+                      )}
+                      <span>Unlock to Edit Marks</span>
+                    </button>
                   ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleUpdateMarks}
+                        disabled={isUpdating || isVerifying}
+                        className="flex items-center space-x-2 py-2.5 px-5 rounded-xl font-bold text-xs border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 hover:bg-violet-100 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                      >
+                        {isUpdating ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-600" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5 text-violet-600" />
+                        )}
+                        <span>{isUpdating ? "Saving..." : "Update Marks"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleVerifyAndLock}
+                        disabled={isUpdating || isVerifying || hasUnsavedChanges}
+                        title={
+                          hasUnsavedChanges
+                            ? "Save changes using 'Update Marks' before verifying"
+                            : "Verify and lock student marks"
+                        }
+                        className="flex items-center space-x-2 py-2.5 px-5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                      >
+                        {isVerifying ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                        )}
+                        <span>{isVerifying ? "Verifying..." : "Verify & Lock"}</span>
+                      </button>
+                    </>
                   )}
-                  <span>{isVerifying ? "Verifying..." : "Verify & Lock"}</span>
-                </button>
+
+                  {/* Next / Previous student quick navigation */}
+                  <div className="flex items-center gap-1.5 ml-2 border-l border-gray-200 dark:border-gray-700 pl-2">
+                    <button
+                      type="button"
+                      onClick={handleGoToPrevStudent}
+                      disabled={currentStudentIndex <= 0}
+                      className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-750 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
+                      title="Previous Student"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-[11px] font-mono text-gray-400">
+                      {currentStudentIndex + 1}/{filteredStudents.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleGoToNextStudent}
+                      disabled={currentStudentIndex < 0 || currentStudentIndex >= filteredStudents.length - 1}
+                      className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-750 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
+                      title="Next Student"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -1154,6 +1755,85 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Delete Job Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-4">
+              <div className="p-3 bg-red-100 dark:bg-red-950/60 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Delete Extraction Job</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Permanently delete job data & files</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+              Are you sure you want to delete this extraction job? This action will permanently remove:
+            </p>
+            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1.5 mb-6 list-disc list-inside bg-gray-50 dark:bg-gray-900/50 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800">
+              <li>All extracted student marks and confirmed marks for this job</li>
+              <li>Uploaded answer sheet PDF files</li>
+              <li>Rendered page images in cloud storage</li>
+              <li>Extraction batch logs and audit records</li>
+            </ul>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeletingJob}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleScheduleDeleteJob}
+                disabled={isDeletingJob}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition shadow-sm cursor-pointer"
+              >
+                {isDeletingJob ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting Job...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete All Data & Files</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5-SECOND UNDO DELETION FLOATING TOAST ─────────────────────────── */}
+      {pendingDeleteJobId && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-5 py-3.5 rounded-2xl bg-gray-900/95 dark:bg-black/95 text-white shadow-2xl border border-gray-700 backdrop-blur-md animate-in slide-in-from-bottom-5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-bold flex items-center gap-1.5">
+              <span>Job #{pendingDeleteJobId} scheduled for deletion</span>
+              <span className="text-amber-400 font-mono">({undoSecondsRemaining}s)</span>
+            </div>
+            <p className="text-[11px] text-gray-400">All student marks & answer sheets will be deleted.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancelUndoDelete}
+            className="ml-2 px-3.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer"
+          >
+            UNDO
+          </button>
         </div>
       )}
     </div>

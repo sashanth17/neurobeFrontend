@@ -80,12 +80,60 @@ export interface ExtractionVerificationSummary {
   remaining_count:       number;
 }
 
+export interface VerifiedMarkQuestion {
+  q_no: string;
+  mark: number;
+  section?: string;
+  max_mark?: number;
+}
+
+export interface VerifiedMarkStudent {
+  register_number: string;
+  student_name: string;
+  question_marks: VerifiedMarkQuestion[];
+  total_mark: number;
+  max_mark?: number;
+  student_marks_id?: number;
+  student_id?: string;
+  job_id?: number;
+  batch_id?: number;
+  source_pages?: number[];
+  image_base_url?: string;
+  section_totals?: Record<string, number>;
+}
+
+export interface VerifiedMarksResponse {
+  cia_test_id: number;
+  total_enrolled: number;
+  total_verified: number;
+  image_base_url?: string;
+  verified_students: VerifiedMarkStudent[];
+}
+
+export interface CIATestJobItem {
+  id: number;
+  cia_test_id: number;
+  batch_id?: number;
+  status: string;
+  total_pages: number;
+  processed_pages?: number;
+  total_batches: number;
+  student_count: number;
+  created_at?: string;
+  completed_at?: string;
+  error_message?: string | null;
+}
+
 export interface LatestExtractionResults {
   job_id?:              number;
   cia_test_id?:         number;
   course_code?:         string;
   course_name?:         string;
   image_base_url:       string;
+  job_status?:          string;
+  total_pages?:         number;
+  processed_pages?:     number;
+  error_message?:       string | null;
   summary:              ExtractionVerificationSummary;
   students:             StudentMarks[];
   template_questions?:  any[];
@@ -199,17 +247,63 @@ export const MarkExtractionService = {
     return res.data;
   },
 
-  // ── 7. Fetch latest extraction results ───────────────────────────────────
+  // ── 6b. Get current or latest job for CIA test ───────────────────────────
+  getCurrentCiaJob: async (ciaTestId: number) => {
+    try {
+      const res = await commonInstance().get(
+        `${COURSE_API_BASE}/cia-tests/${ciaTestId}/current-job`
+      );
+      return res.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  // ── 6c. Cancel running extraction job ─────────────────────────────────────
+  cancelExtractionJob: async (jobId: number) => {
+    const res = await commonInstance().post(
+      `${COURSE_API_BASE}/extraction-jobs/${jobId}/cancel`
+    );
+    return res.data;
+  },
+
+  // ── 6d. Delete extraction job & all related files ─────────────────────────
+  deleteExtractionJob: async (jobId: number) => {
+    const res = await commonInstance().delete(
+      `${COURSE_API_BASE}/extraction-jobs/${jobId}`
+    );
+    return res.data;
+  },
+
+  // ── 6e. Get all extraction jobs for CIA test ─────────────────────────────
+  getCiaJobs: async (ciaTestId: number): Promise<CIATestJobItem[]> => {
+    if (!ciaTestId || isNaN(Number(ciaTestId))) {
+      return [];
+    }
+    try {
+      const res = await commonInstance().get(
+        `${COURSE_API_BASE}/cia-tests/${ciaTestId}/jobs`
+      );
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (err) {
+      console.error("Failed to load CIA jobs", err);
+      return [];
+    }
+  },
+
+  // ── 7. Fetch extraction results (latest or specific job) ─────────────────
   getLatestExtractionResults: async (
-    ciaTestId: number
+    ciaTestId: number,
+    jobId?: number
   ): Promise<LatestExtractionResults | null> => {
     if (!ciaTestId || isNaN(Number(ciaTestId))) {
       return null;
     }
     try {
-      const res = await commonInstance().get(
-        `${COURSE_API_BASE}/cia-tests/${ciaTestId}/latest-extraction-results`
-      );
+      const url = jobId
+        ? `${COURSE_API_BASE}/cia-tests/${ciaTestId}/latest-extraction-results?job_id=${jobId}`
+        : `${COURSE_API_BASE}/cia-tests/${ciaTestId}/latest-extraction-results`;
+      const res = await commonInstance().get(url);
       return res.data;
     } catch (err: any) {
       if (err?.response?.status === 404 || err?.message?.includes("404")) {
@@ -228,8 +322,8 @@ export const MarkExtractionService = {
   resolvePageImageUrl: (imageBaseUrl?: string, pageNumber?: number): string => {
     if (!imageBaseUrl || !pageNumber) return "";
     let base = imageBaseUrl.trim();
-    if (base.includes("://localhost:")) {
-      base = base.replace("://localhost:", "://127.0.0.1:");
+    if (base.includes(":8002")) {
+      base = base.replace(/^https?:\/\/[^/]+/, "");
     }
     if (base.startsWith("http://") || base.startsWith("https://")) {
       const trimmed = base.endsWith("/") ? base : `${base}/`;
@@ -265,10 +359,39 @@ export const MarkExtractionService = {
     return MarkExtractionService.verifyStudentMarks(studentMarksId);
   },
 
+  // ── 10b. Unlock student marks to allow editing & remove from verified list ─
+  unlockStudentMarks: async (studentMarksId: number) => {
+    const res = await commonInstance().post(
+      `${COURSE_API_BASE}/student-marks/${studentMarksId}/unlock`
+    );
+    return res.data;
+  },
+
   // ── 11. Verified marks for result export ─────────────────────────────────
-  getVerifiedMarks: async (ciaTestId: number) => {
+  getVerifiedMarks: async (ciaTestId: number): Promise<VerifiedMarksResponse> => {
     const res = await commonInstance().get(
       `${COURSE_API_BASE}/cia-tests/${ciaTestId}/verified-marks`
+    );
+    return res.data;
+  },
+
+  // ── 12. Unlock confirmed marks from result page (without full reload) ────
+  unlockConfirmedMarks: async (ciaTestId: number, regNo: string) => {
+    const res = await commonInstance().post(
+      `${COURSE_API_BASE}/cia-tests/${ciaTestId}/students/${encodeURIComponent(regNo)}/unlock-result`
+    );
+    return res.data;
+  },
+
+  // ── 13. Update & re-lock confirmed marks from result page ───────────────
+  updateConfirmedMarks: async (
+    ciaTestId: number,
+    regNo: string,
+    payload: { marks: any[]; final_total_mark?: number }
+  ) => {
+    const res = await commonInstance().post(
+      `${COURSE_API_BASE}/cia-tests/${ciaTestId}/students/${encodeURIComponent(regNo)}/update-confirmed-marks`,
+      payload
     );
     return res.data;
   },
