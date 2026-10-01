@@ -128,21 +128,23 @@ export default function ExtractionTab({
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    if (isRunning) return;
+    if (isRunning || isUploading) return;
 
     const dropped = e.dataTransfer.files[0];
     if (dropped?.type === "application/pdf") {
       setFile(dropped);
+      setBatchId(null);
       setErrorMessage(null);
     } else {
       setErrorMessage("Only PDF files are accepted.");
     }
-  }, [isRunning]);
+  }, [isRunning, isUploading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
       setFile(selected);
+      setBatchId(null);
       setErrorMessage(null);
     }
   }, []);
@@ -163,13 +165,19 @@ export default function ExtractionTab({
     try {
       // 1. Upload PDF batch (max 60 pages enforced by backend)
       const batch = await MarkExtractionService.uploadAnswerSheetBatch(ciaTestId, file);
-      setBatchId(batch.batch_id);
+      const targetBatchId = Number(batch.batch_id ?? (batch as any).id);
+      if (!targetBatchId || isNaN(targetBatchId)) {
+        throw new Error("Answer sheet batch uploaded, but valid batch ID was not received from server.");
+      }
+      setBatchId(targetBatchId);
 
       // 2. Trigger Extraction
-      const job = await MarkExtractionService.triggerExtraction(batch.batch_id);
+      const job = await MarkExtractionService.triggerExtraction(targetBatchId);
       setJobId(job.job_id);
       setJobStatus("PENDING");
       setProgressPct(0);
+      setProcessedPages(0);
+      setTotalPages(0);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
@@ -463,25 +471,30 @@ export default function ExtractionTab({
         {/* Drop Zone */}
         <div
           className={`relative border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-8 text-center transition-all duration-200 ${
-            isRunning
+            isRunning || isUploading
               ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700'
               : dragOver
               ? 'border-violet-500 bg-violet-50/60 dark:bg-violet-950/20 cursor-pointer'
               : file
-              ? 'border-violet-400 bg-violet-50/40 dark:bg-violet-950/10 cursor-pointer'
+              ? 'border-violet-400 bg-violet-50/40 dark:bg-violet-950/10'
               : 'border-gray-300 dark:border-gray-600 hover:border-violet-400 hover:bg-gray-50/50 cursor-pointer'
           }`}
-          onDragOver={(e) => { e.preventDefault(); if (!isRunning) setDragOver(true); }}
+          onDragOver={(e) => { e.preventDefault(); if (!isRunning && !isUploading) setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleFileDrop}
-          onClick={() => !isRunning && !batchId && fileInputRef.current?.click()}
+          onClick={() => {
+            if (!isRunning && !isUploading && !file) {
+              fileInputRef.current?.click();
+            }
+          }}
         >
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileSelect}
+            onClick={(e) => e.stopPropagation()}
             accept="application/pdf"
-            disabled={isRunning}
+            disabled={isRunning || isUploading}
             className="hidden"
           />
 
@@ -500,7 +513,7 @@ export default function ExtractionTab({
                 <button
                   type="button"
                   onClick={clearFile}
-                  className="mt-2 inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-medium"
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                   <span>Choose a different file</span>
@@ -520,6 +533,18 @@ export default function ExtractionTab({
               <p className="text-[11px] text-gray-400">
                 Single PDF file containing evaluated student answer sheets (up to 60 pages).
               </p>
+              {!isRunning && !isUploading && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="mt-1 px-4 py-1.5 rounded-xl text-xs font-semibold bg-violet-50 hover:bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-900/60 border border-violet-200 dark:border-violet-800 transition cursor-pointer"
+                >
+                  Browse PDF File
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -271,9 +271,18 @@ export default function ResultPageTab({
       };
 
       // Add each question mark
+      const markMap = new Map<string, number>();
+      (student.question_marks || []).forEach(m => {
+        if (!m.q_no) return;
+        const match = m.q_no.match(/^(Q\d+)/i);
+        const parentKey = match ? match[1].toUpperCase() : m.q_no.toUpperCase();
+        const existing = markMap.get(parentKey);
+        if (existing === undefined || m.mark > existing) {
+          markMap.set(parentKey, m.mark);
+        }
+      });
       questionKeys.forEach((key) => {
-        const found = (student.question_marks || []).find((m) => m.q_no === key);
-        rowData[key] = found ? found.mark : 0;
+        rowData[key] = markMap.has(key) ? markMap.get(key) : 0;
       });
 
       // Section Totals if present

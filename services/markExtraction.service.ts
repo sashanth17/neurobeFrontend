@@ -218,7 +218,7 @@ export const MarkExtractionService = {
   uploadAnswerSheetBatch: async (
     ciaTestId: number,
     file:      File
-  ): Promise<{ batch_id: number }> => {
+  ): Promise<{ id: number; batch_id: number; [key: string]: any }> => {
     const formData = new FormData();
     formData.append("file", file);
     const res = await commonInstance().post(
@@ -226,13 +226,21 @@ export const MarkExtractionService = {
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
-    return res.data;
+    const resolvedBatchId = res.data?.batch_id ?? res.data?.id;
+    return {
+      ...res.data,
+      batch_id: resolvedBatchId,
+      id: resolvedBatchId,
+    };
   },
 
   // ── 5. Trigger extraction job ─────────────────────────────────────────────
   triggerExtraction: async (
     batchId: number
   ): Promise<{ job_id: number }> => {
+    if (!batchId || isNaN(Number(batchId))) {
+      throw new Error(`Invalid batchId (${batchId}) provided for extraction.`);
+    }
     const res = await commonInstance().post(
       `${COURSE_API_BASE}/answer-sheet-batches/${batchId}/extract`
     );
