@@ -43,9 +43,12 @@ const lession_plan = {
         return promise;
     },
 
-    draft: (syllabus_id: string | number) => {
+    draft: (syllabus_id: string | number, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/lesson-plan/draft`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             
             commonInstance()
                 .post(url)
@@ -63,9 +66,12 @@ const lession_plan = {
         return promise;
     },
 
-     approve: (syllabus_id: string | number) => {
+     approve: (syllabus_id: string | number, version_number?: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/syllabi/${syllabus_id}/lesson-plan/approve`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .post(url)
                 .then((res) => {
@@ -124,9 +130,12 @@ const lession_plan = {
         });
     },
 
-    approve_schedule: (id: string | number) => {
+    approve_schedule: (id: string | number, version_number?: any) => {
         return new Promise((resolve, reject) => {
             let url = `course/syllabi/${id}/approve-schedule`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
             commonInstance()
                 .post(url)
                 .then((res) => resolve(res.data))

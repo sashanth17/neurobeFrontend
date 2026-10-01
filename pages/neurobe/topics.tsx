@@ -407,7 +407,7 @@ const Topics = () => {
         courseDetail: res,
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
-      const sid = res?.syllabus_id || res?.latest_syllabus?.id;
+      const sid = res?.syllabus_id || res?.latest_syllabus?.id || cid;
       if (sid) {
         getUnits(sid);
       } else {
@@ -421,7 +421,7 @@ const Topics = () => {
   };
 
   const getUnits = async (syllabusId?: any, verNum?: number) => {
-    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id;
+    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
     if (!sid) {
       setState({ loadingUnits: false });
       return;
@@ -430,7 +430,7 @@ const Topics = () => {
     try {
       setState({ loadingUnits: true });
       const res: any = await Models.topics.units(sid);
-      const rawUnitsData = Array.isArray(res) ? res : res?.data || [];
+      const rawUnitsData = Array.isArray(res) ? res : res?.data || res?.Data || [];
       const unitsData = rawUnitsData.map((u: any, idx: number) => {
         const num = u.unit_number ?? (idx + 1);
         const realId = u.id ?? u.unit_id;

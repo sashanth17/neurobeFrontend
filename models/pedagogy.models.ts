@@ -26,9 +26,12 @@ const pedagogy = {
         return promise;
     },
 
-    add_pedagogy: (topic_id?: any, body?: any) => { 
+    add_pedagogy: (topic_id?: any, body?: any, version_number?: any) => { 
         let promise = new Promise((resolve, reject) => {
             let url = `course/topics/${topic_id}/pedagogies`;
+            if (version_number !== undefined && version_number !== null) {
+                url += `?version_number=${version_number}`;
+            }
 
             const config: any = {};
             if (body instanceof FormData) {
@@ -50,6 +53,7 @@ const pedagogy = {
         });
         return promise;
     },
+
 
     create: (topic_id?: any, body?: any) => { 
         let promise = new Promise((resolve, reject) => {
