@@ -52,6 +52,8 @@ export const Models: any = {
   lession_plan,
   learning_material,
   COPOMap,
+  copo: COPOMap,
+  copo_map: COPOMap,
   topics,
   pedagogy,
   pso,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useDispatch } from "react-redux";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/router";
 import {
   Sparkles,
   RotateCw,
@@ -32,8 +32,41 @@ import Models from "@/imports/models.import";
 const LessonPlanPage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const courseIdParam = searchParams.get("course_id");
+
+  // Master Course & Version State with immediate client fallback
+  const [courseIdParam, setCourseIdParam] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      return (
+        urlParams.get("course_id") ||
+        urlParams.get("id") ||
+        localStorage.getItem("active_course_id") ||
+        null
+      );
+    }
+    return null;
+  });
+
+  // Keep courseIdParam synchronized with router query
+  useEffect(() => {
+    const qCid =
+      (router.query.course_id as string) ||
+      (router.query.id as string) ||
+      (typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("course_id") ||
+          new URLSearchParams(window.location.search).get("id") ||
+          localStorage.getItem("active_course_id")
+        : null);
+
+    if (qCid) {
+      if (qCid !== courseIdParam) {
+        setCourseIdParam(qCid);
+      }
+      try {
+        localStorage.setItem("active_course_id", qCid);
+      } catch {}
+    }
+  }, [router.isReady, router.query, courseIdParam]);
 
   // Master Course & Version State
   const [courseData, setCourseData] = useState<any>(null);
@@ -129,12 +162,19 @@ const LessonPlanPage = () => {
     init();
   }, [courseIdParam]);
 
-  /** Load workspace whenever syllabus or initial load completes */
+  /** Load workspace when courseIdParam is available */
   useEffect(() => {
-    if (courseData && !loadingInitial) {
-      fetchWorkspace(1, loadedVersion);
+    if (courseIdParam) {
+      fetchWorkspace(activeUnitNum, loadedVersion);
     }
-  }, [courseData, loadingInitial]);
+  }, [courseIdParam]);
+
+  /** Fallback: re-fetch if courseData loads and workspace is still empty */
+  useEffect(() => {
+    if (courseData && !workspaceData) {
+      fetchWorkspace(activeUnitNum, loadedVersion);
+    }
+  }, [courseData, workspaceData]);
 
   /** Handle tab change */
   const handleTabChange = (unitNum: number) => {

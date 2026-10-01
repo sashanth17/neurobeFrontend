@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useDispatch } from "react-redux";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/router";
 import {
   BookOpen,
   Layers,
@@ -30,10 +30,65 @@ import Models from "@/imports/models.import";
 const InsCourseArtifacts = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const courseIdParam = searchParams.get("course_id");
-  const codeParam = searchParams.get("code");
-  const fromParam = searchParams.get("from");
+
+  const [courseIdParam, setCourseIdParam] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      return (
+        urlParams.get("course_id") ||
+        urlParams.get("id") ||
+        localStorage.getItem("active_course_id") ||
+        null
+      );
+    }
+    return null;
+  });
+
+  const [codeParam, setCodeParam] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("code") || null;
+    }
+    return null;
+  });
+
+  const [fromParam, setFromParam] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("from") || null;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const qCid =
+      (router.query.course_id as string) ||
+      (router.query.id as string) ||
+      (typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("course_id") ||
+          new URLSearchParams(window.location.search).get("id") ||
+          localStorage.getItem("active_course_id")
+        : null);
+
+    if (qCid) {
+      if (qCid !== courseIdParam) setCourseIdParam(qCid);
+      try {
+        localStorage.setItem("active_course_id", qCid);
+      } catch {}
+    }
+
+    const qCode =
+      (router.query.code as string) ||
+      (typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("code")
+        : null);
+    if (qCode && qCode !== codeParam) setCodeParam(qCode);
+
+    const qFrom =
+      (router.query.from as string) ||
+      (typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("from")
+        : null);
+    if (qFrom && qFrom !== fromParam) setFromParam(qFrom);
+  }, [router.isReady, router.query, courseIdParam, codeParam, fromParam]);
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<
@@ -69,11 +124,20 @@ const InsCourseArtifacts = () => {
         courseIdParam;
 
       // 2. Fetch Master Syllabus (Units, Outcomes, Textbooks, References)
-      const sRes: any = await Models.syllabus.detail(sid).catch(() => null);
+      let sRes: any = await Models.syllabus.detail(sid).catch(() => null);
+      if (!sRes && courseIdParam && String(courseIdParam) !== String(sid)) {
+        sRes = await Models.syllabus.detail(courseIdParam).catch(() => null);
+      }
       if (sRes) setSyllabusData(sRes);
 
       // 3. Fetch CO-PO Mapping Matrix
-      const copoRes: any = await Models.copo.copo_map(sid).catch(() => null);
+      let copoRes: any = await Models.copo.copo_map(courseIdParam).catch(() => null);
+      if (!copoRes && sid && String(sid) !== String(courseIdParam)) {
+        copoRes = await Models.copo.copo_map(sid).catch(() => null);
+      }
+      if (!copoRes && sRes?.id && String(sRes.id) !== String(courseIdParam)) {
+        copoRes = await Models.copo.copo_map(sRes.id).catch(() => null);
+      }
       if (copoRes) setCopoData(copoRes);
 
       // 4. Fetch Active Pedagogy Data for Unit 1
@@ -125,19 +189,42 @@ const InsCourseArtifacts = () => {
 
   // Normalized values
   const units: any[] = syllabusData?.units || [];
-  const outcomes: any[] = syllabusData?.outcomes || syllabusData?.course_outcomes || [];
+  const outcomes: any[] =
+    syllabusData?.outcomes?.length > 0
+      ? syllabusData.outcomes
+      : syllabusData?.course_outcomes?.length > 0
+      ? syllabusData.course_outcomes
+      : copoData?.course_outcomes || [];
   const textbooks: any[] = syllabusData?.textbooks || [];
   const references: any[] = syllabusData?.reference_books || [];
 
-  const programOutcomes: any[] =
-    copoData?.program_outcomes ||
-    Array.from({ length: 12 }, (_, i) => ({
-      code: `PO${i + 1}`,
-      title: `Program Outcome ${i + 1}`,
-    }));
+  const programOutcomes: any[] = [
+    ...(copoData?.program_outcomes ||
+      Array.from({ length: 12 }, (_, i) => ({
+        code: `PO${i + 1}`,
+        title: `Program Outcome ${i + 1}`,
+      }))),
+    ...(copoData?.program_specific_outcomes || []),
+  ];
 
   const matrix: Record<string, any> = copoData?.matrix || {};
   const poAverages: Record<string, any> = copoData?.po_averages || {};
+
+  const getCoDescription = (coCode: string) => {
+    const fromCopo = copoData?.course_outcomes?.find(
+      (c: any) => c.co_code === coCode || c.code === coCode || c.co === coCode
+    );
+    if (fromCopo?.statement || fromCopo?.description) {
+      return fromCopo.statement || fromCopo.description;
+    }
+    const fromSyl = outcomes.find(
+      (c: any) =>
+        c.co_code === coCode ||
+        c.code === coCode ||
+        c.outcome_code === coCode
+    );
+    return fromSyl?.outcome_statement || fromSyl?.statement || fromSyl?.description || "";
+  };
 
   return (
     <div className="min-h-screen pb-16">
@@ -278,6 +365,12 @@ const InsCourseArtifacts = () => {
                 setActiveTab(tab.key as any);
                 if (tab.key === "pedagogy" || tab.key === "lesson-plan") {
                   handleUnitChange(selectedUnitNum);
+                } else if (tab.key === "copo" && !copoData && courseIdParam) {
+                  Models.copo.copo_map(courseIdParam)
+                    .then((res: any) => {
+                      if (res) setCopoData(res);
+                    })
+                    .catch(() => null);
                 }
               }}
               className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
@@ -459,13 +552,13 @@ const InsCourseArtifacts = () => {
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800">
-                        <th className="p-3 font-bold text-slate-700 dark:text-slate-300">
+                        <th className="min-w-[180px] p-3 font-bold text-slate-700 dark:text-slate-300">
                           Course Outcome
                         </th>
                         {programOutcomes.map((po: any) => (
                           <th
                             key={po.code}
-                            className="p-3 text-center font-bold text-slate-700 dark:text-slate-300"
+                            className="p-3 text-center font-bold text-slate-700 dark:text-slate-300 min-w-[48px]"
                             title={po.title}
                           >
                             {po.code}
@@ -474,25 +567,50 @@ const InsCourseArtifacts = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {Object.keys(matrix).length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={programOutcomes.length + 1}
-                            className="py-12 text-center text-xs text-slate-400"
-                          >
-                            No CO–PO correlation matrix data found.
-                          </td>
-                        </tr>
-                      ) : (
-                        Object.keys(matrix).map((coCode) => {
+                      {(() => {
+                        const coRows =
+                          Object.keys(matrix).length > 0
+                            ? Object.keys(matrix)
+                            : outcomes
+                                .map((o: any) => o.co_code || o.code || o.outcome_code)
+                                .filter(Boolean);
+
+                        if (coRows.length === 0) {
+                          return (
+                            <tr>
+                              <td
+                                colSpan={programOutcomes.length + 1}
+                                className="py-12 text-center text-xs text-slate-400"
+                              >
+                                No CO–PO correlation matrix data found.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return coRows.map((coCode: string) => {
                           const poRow = matrix[coCode] || {};
+                          const desc = getCoDescription(coCode);
+
                           return (
                             <tr
                               key={coCode}
                               className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40"
                             >
-                              <td className="p-3 font-bold text-indigo-700 dark:text-indigo-400">
-                                {coCode}
+                              <td className="p-3">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                                    {coCode}
+                                  </span>
+                                  {desc && (
+                                    <span
+                                      className="mt-0.5 line-clamp-1 max-w-xs text-[11px] font-normal text-slate-500 dark:text-slate-400"
+                                      title={desc}
+                                    >
+                                      {desc}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               {programOutcomes.map((po: any) => {
                                 const rawVal = poRow[po.code];
@@ -500,12 +618,17 @@ const InsCourseArtifacts = () => {
                                   typeof rawVal === "object"
                                     ? rawVal?.correlation_level
                                     : rawVal;
+                                const justification =
+                                  typeof rawVal === "object"
+                                    ? rawVal?.justification
+                                    : copoData?.justifications?.[coCode]?.[po.code] || "";
 
                                 return (
                                   <td key={po.code} className="p-3 text-center">
                                     {score && Number(score) > 0 ? (
                                       <span
-                                        className={`inline-flex h-6 w-6 items-center justify-center rounded-md font-bold ${
+                                        title={justification || `${coCode} — ${po.code}: Level ${score}`}
+                                        className={`inline-flex h-6 w-6 items-center justify-center rounded-md font-bold cursor-default shadow-2xs ${
                                           Number(score) === 3
                                             ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
                                             : Number(score) === 2
@@ -516,35 +639,81 @@ const InsCourseArtifacts = () => {
                                         {score}
                                       </span>
                                     ) : (
-                                      <span className="text-slate-300">&mdash;</span>
+                                      <span className="text-slate-300">—</span>
                                     )}
                                   </td>
                                 );
                               })}
                             </tr>
                           );
-                        })
-                      )}
+                        });
+                      })()}
                     </tbody>
 
                     {/* PO Averages Footer */}
                     {Object.keys(poAverages).length > 0 && (
                       <tfoot>
                         <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold dark:border-slate-700 dark:bg-slate-800/80">
-                          <td className="p-3 text-slate-900 dark:text-white">PO Average</td>
-                          {programOutcomes.map((po: any) => (
-                            <td
-                              key={po.code}
-                              className="p-3 text-center font-bold text-indigo-600 dark:text-indigo-400"
-                            >
-                              {poAverages[po.code] ? Number(poAverages[po.code]).toFixed(1) : "&mdash;"}
-                            </td>
-                          ))}
+                          <td className="p-3 text-slate-900 dark:text-white">PO / PSO Average</td>
+                          {programOutcomes.map((po: any) => {
+                            const avg = poAverages[po.code];
+                            return (
+                              <td
+                                key={po.code}
+                                className="p-3 text-center font-bold text-indigo-600 dark:text-indigo-400"
+                              >
+                                {avg !== undefined && avg !== null && Number(avg) > 0
+                                  ? Number(avg).toFixed(1)
+                                  : "—"}
+                              </td>
+                            );
+                          })}
                         </tr>
                       </tfoot>
                     )}
                   </table>
                 </div>
+
+                {/* Justifications Breakdown */}
+                {copoData?.justifications && Object.keys(copoData.justifications).length > 0 && (
+                  <div className="border-t border-slate-100 bg-slate-50/40 p-5 dark:border-slate-800 dark:bg-slate-900/50">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Articulation Mapping Rationales & Justifications
+                    </h4>
+                    <div className="mt-3 space-y-2.5">
+                      {Object.entries(copoData.justifications).map(([coCode, poJustMap]: [string, any]) => {
+                        const entries = Object.entries(poJustMap || {}).filter(([_, just]) => Boolean(just));
+                        if (entries.length === 0) return null;
+
+                        return (
+                          <div
+                            key={coCode}
+                            className="rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-800/40"
+                          >
+                            <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                              {coCode}
+                            </span>
+                            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              {entries.map(([poCode, just]: [string, any]) => (
+                                <div
+                                  key={poCode}
+                                  className="flex items-start gap-2 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
+                                >
+                                  <span className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                    {poCode}
+                                  </span>
+                                  <span className="leading-relaxed line-clamp-2" title={String(just)}>
+                                    {String(just)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -751,7 +920,7 @@ const InsCourseArtifacts = () => {
                             {tb.title}
                           </h4>
                           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                            {tb.authors}
+                            {Array.isArray(tb.authors) ? tb.authors.join(", ") : (tb.authors || "Author not specified")}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
                             {tb.publisher && <span>Publisher: {tb.publisher}</span>}
@@ -787,7 +956,7 @@ const InsCourseArtifacts = () => {
                             {rb.title}
                           </h4>
                           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                            {rb.authors}
+                            {Array.isArray(rb.authors) ? rb.authors.join(", ") : (rb.authors || "Author not specified")}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
                             {rb.publisher && <span>Publisher: {rb.publisher}</span>}
