@@ -150,11 +150,12 @@ export default function CourseCard(props: any) {
   ) => {
     const versionsList: any[] = wfItem?.versions || wfItem?.versions_detailed || [];
     const activeFromList = versionsList.find((v: any) => v.is_active);
+    // Prioritize is_active=true from the versions list (source of truth), fall back to wfItem.active_version
     const currentVer =
       optimisticVersions[stageKey] ||
-      wfItem?.active_version ||
       activeFromList?.version_number ||
       activeFromList?.version ||
+      wfItem?.active_version ||
       (versionsList.length > 0 ? versionsList[versionsList.length - 1]?.version_number || versionsList[versionsList.length - 1]?.version : null);
 
     const currentVersionObj = versionsList.find(

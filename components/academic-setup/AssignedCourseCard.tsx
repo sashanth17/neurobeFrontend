@@ -120,8 +120,9 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   const resolveStageData = (stItem: any) => {
     if (!stItem) return { status: "not_started" as StageStatus, active_version: null };
     const versions = stItem.versions || stItem.versions_detailed || [];
+    // Prioritize is_active=true from versions list (source of truth) over the potentially stale active_version
     const activeVerObj = versions.find((v: any) => v.is_active);
-    const activeVer = stItem.active_version || activeVerObj?.version_number || activeVerObj?.version;
+    const activeVer = activeVerObj?.version_number ?? activeVerObj?.version ?? stItem.active_version;
     const currentVerObj = versions.find((v: any) => (v.version_number ?? v.version) === activeVer) || activeVerObj;
     const rawStatus = currentVerObj?.status || stItem.status || "not_started";
     const status = String(rawStatus).toLowerCase().trim() as StageStatus;
