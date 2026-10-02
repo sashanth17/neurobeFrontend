@@ -22,11 +22,19 @@ import {
   UserCheck,
   Check,
   History,
+  Columns,
+  Edit2,
+  Plus,
+  Trash2,
+  Save,
+  X,
+  Lock,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import Models from "@/imports/models.import";
+import PDFViewer from "@/components/academic-setup/PDFViewer";
 
 const InsCourseArtifacts = () => {
   const dispatch = useDispatch();
@@ -119,6 +127,54 @@ const InsCourseArtifacts = () => {
   const activeCopo = portfolio?.active_copo;
   const activePedagogy = portfolio?.active_pedagogy;
   const activeLessonPlan = portfolio?.active_lesson_plan;
+
+  // ── Split-Screen Document Viewer State ─────────────────────────────────────
+  const [splitScreenView, setSplitScreenView] = useState<boolean>(false);
+  const [documentBlobUrl, setDocumentBlobUrl] = useState<string | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!splitScreenView) return;
+    const sylId = activeSyllabus?.course_syllabus_id;
+    if (!sylId) {
+      setDocumentBlobUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingDoc(true);
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+    const directFileUrl = `http://localhost:8080/course/syllabi/${sylId}/file${tokenParam}`;
+
+    Models.syllabus
+      .getFileBlob(sylId)
+      .then((blob: any) => {
+        if (!isMounted) return;
+        if (blob instanceof Blob && blob.size > 0) {
+          const pdfBlob =
+            blob.type === "application/pdf"
+              ? blob
+              : new Blob([blob], { type: "application/pdf" });
+          const url = URL.createObjectURL(pdfBlob);
+          setDocumentBlobUrl(url);
+        } else {
+          setDocumentBlobUrl(directFileUrl);
+        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setDocumentBlobUrl(directFileUrl);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDoc(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [splitScreenView, activeSyllabus?.course_syllabus_id]);
 
   // ── Actions (Course Coordinator Only) ──────────────────────────────────────
 
@@ -312,6 +368,486 @@ const InsCourseArtifacts = () => {
   const units = activeExt?.units || [];
   const selectedUnit = units[selectedUnitIndex] || units[0];
 
+  // ── Coordinator CRUD & Section Edit State ─────────────────────────────────
+  const canEdit = Boolean(isCoord && activeExt && !activeExt.is_approved);
+
+  const KNOWLEDGE_LEVELS = [
+    "K1 - Remember",
+    "K2 - Understand",
+    "K3 - Apply",
+    "K4 - Analyze",
+    "K5 - Evaluate",
+    "K6 - Create",
+  ];
+
+  // Section edit modes: null | "hours" | "objectives" | "outcomes" | "textbooks"
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [savingSection, setSavingSection] = useState<boolean>(false);
+
+  // Draft states
+  const [hoursDraft, setHoursDraft] = useState({
+    credits: 0,
+    lecture_hours: 0,
+    tutorial_hours: 0,
+    practical_hours: 0,
+    total_theory_hours: 0,
+    total_lab_hours: 0,
+  });
+  const [objectivesDraft, setObjectivesDraft] = useState<any[]>([]);
+  const [outcomesDraft, setOutcomesDraft] = useState<any[]>([]);
+  const [textbooksDraft, setTextbooksDraft] = useState<any[]>([]);
+
+  // Hierarchy CRUD modal state (Unit / Topic / Subtopic)
+  const [hierarchyModal, setHierarchyModal] = useState<{
+    type: "unit" | "topic" | "subtopic";
+    mode: "add" | "edit";
+    data?: any;
+    unitId?: number;
+    topicId?: number;
+    subtopicId?: number;
+  } | null>(null);
+  const [modalForm, setModalForm] = useState<any>({});
+  const [submittingModal, setSubmittingModal] = useState<boolean>(false);
+
+  // ── Section 1: Hours & Credits Handlers ────────────────────────────────────
+  const startEditHours = () => {
+    setHoursDraft({
+      credits: activeExt?.credits ?? course.credits ?? 0,
+      lecture_hours: activeExt?.lecture_hours ?? 0,
+      tutorial_hours: activeExt?.tutorial_hours ?? 0,
+      practical_hours: activeExt?.practical_hours ?? 0,
+      total_theory_hours: activeExt?.total_theory_hours ?? course.total_theory_hours ?? 0,
+      total_lab_hours: activeExt?.total_lab_hours ?? course.total_lab_hours ?? 0,
+    });
+    setEditingSection("hours");
+  };
+
+  const saveHours = async () => {
+    if (!activeExt?.extractions_id) return;
+    try {
+      setSavingSection(true);
+      await Models.syllabus.update_hours(activeExt.extractions_id, {
+        credits: Number(hoursDraft.credits),
+        lecture_hours: Number(hoursDraft.lecture_hours),
+        tutorial_hours: Number(hoursDraft.tutorial_hours),
+        practical_hours: Number(hoursDraft.practical_hours),
+        total_theory_hours: Number(hoursDraft.total_theory_hours),
+        total_lab_hours: Number(hoursDraft.total_lab_hours),
+      });
+      Success("Curriculum hours and credits updated successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update hours"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 2: Objectives Handlers ─────────────────────────────────────────
+  const startEditObjectives = () => {
+    setObjectivesDraft((activeExt?.objectives || []).map((o: any) => ({ ...o })));
+    setEditingSection("objectives");
+  };
+
+  const handleAddObjectiveRow = () => {
+    setObjectivesDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        objective_number: prev.length + 1,
+        description: "",
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteObjectiveRow = (id: any) => {
+    setObjectivesDraft((prev) => prev.filter((o) => o.id !== id));
+  };
+
+  const saveObjectives = async () => {
+    if (!activeExt?.extractions_id) return;
+    try {
+      setSavingSection(true);
+      const original = activeExt.objectives || [];
+      const currentIds = new Set(objectivesDraft.filter((o) => !o.isNew).map((o) => o.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteObjective(activeExt.extractions_id, orig.id);
+        }
+      }
+
+      for (const obj of objectivesDraft) {
+        if (obj.isNew) {
+          if (obj.description?.trim()) {
+            await Models.syllabus.addObjective(activeExt.extractions_id, {
+              objective_number: Number(obj.objective_number) || 1,
+              description: obj.description.trim(),
+            });
+          }
+        } else {
+          await Models.syllabus.updateObjective(activeExt.extractions_id, obj.id, {
+            objective_number: Number(obj.objective_number) || 1,
+            description: obj.description?.trim() || "",
+          });
+        }
+      }
+
+      Success("Course objectives saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save objectives"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 3: Course Outcomes Handlers ────────────────────────────────────
+  const startEditOutcomes = () => {
+    setOutcomesDraft(
+      (activeExt?.outcomes || []).map((co: any) => ({
+        ...co,
+        knowledge_level: co.knowledge_level || (co.bloom_level ? `K2 - ${co.bloom_level}` : "K2 - Understand"),
+      }))
+    );
+    setEditingSection("outcomes");
+  };
+
+  const handleAddOutcomeRow = () => {
+    setOutcomesDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        co_code: `CO${prev.length + 1}`,
+        description: "",
+        knowledge_level: "K2 - Understand",
+        bloom_level: "Understand",
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteOutcomeRow = (id: any) => {
+    setOutcomesDraft((prev) => prev.filter((co) => co.id !== id));
+  };
+
+  const saveOutcomes = async () => {
+    if (!activeExt?.extractions_id) return;
+    try {
+      setSavingSection(true);
+      const original = activeExt.outcomes || [];
+      const currentIds = new Set(outcomesDraft.filter((co) => !co.isNew).map((co) => co.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteOutcome(activeExt.extractions_id, orig.id);
+        }
+      }
+
+      for (const co of outcomesDraft) {
+        const kLevel = co.knowledge_level || "K2 - Understand";
+        const bloomPart = kLevel.includes("-") ? kLevel.split("-")[1].trim() : kLevel;
+
+        if (co.isNew) {
+          if (co.description?.trim()) {
+            await Models.syllabus.addOutcome(activeExt.extractions_id, {
+              co_code: co.co_code?.trim() || "CO1",
+              description: co.description.trim(),
+              knowledge_level: kLevel,
+              bloom_level: bloomPart,
+            });
+          }
+        } else {
+          await Models.syllabus.updateOutcome(activeExt.extractions_id, co.id, {
+            co_code: co.co_code?.trim() || "CO1",
+            description: co.description?.trim() || "",
+            knowledge_level: kLevel,
+            bloom_level: bloomPart,
+          });
+        }
+      }
+
+      Success("Course outcomes saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save outcomes"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 4: Textbooks Handlers ──────────────────────────────────────────
+  const startEditTextbooks = () => {
+    setTextbooksDraft(
+      (activeExt?.textbooks || []).map((t: any) => ({
+        ...t,
+        authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors || ""),
+      }))
+    );
+    setEditingSection("textbooks");
+  };
+
+  const handleAddTextbookRow = () => {
+    setTextbooksDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        title: "",
+        authorsStr: "",
+        publisher: "",
+        edition: "",
+        publication_year: new Date().getFullYear(),
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteTextbookRow = (id: any) => {
+    setTextbooksDraft((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const saveTextbooks = async () => {
+    if (!activeExt?.extractions_id) return;
+    try {
+      setSavingSection(true);
+      const original = activeExt.textbooks || [];
+      const currentIds = new Set(textbooksDraft.filter((t) => !t.isNew).map((t) => t.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteTextbook(activeExt.extractions_id, orig.id);
+        }
+      }
+
+      for (const t of textbooksDraft) {
+        const authorsArr = (t.authorsStr || "")
+          .split(",")
+          .map((a: string) => a.trim())
+          .filter(Boolean);
+
+        if (t.isNew) {
+          if (t.title?.trim()) {
+            await Models.syllabus.addTextbook(activeExt.extractions_id, {
+              title: t.title.trim(),
+              authors: authorsArr,
+              publisher: t.publisher?.trim() || undefined,
+              edition: t.edition?.trim() || undefined,
+              publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+            });
+          }
+        } else {
+          await Models.syllabus.updateTextbook(activeExt.extractions_id, t.id, {
+            title: t.title?.trim() || "",
+            authors: authorsArr,
+            publisher: t.publisher?.trim() || undefined,
+            edition: t.edition?.trim() || undefined,
+            publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+          });
+        }
+      }
+
+      Success("Textbooks saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save textbooks"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 5: Curriculum Hierarchy Modal & CRUD (Unit / Topic / Subtopic) ──
+  const openUnitModal = (mode: "add" | "edit", unit?: any) => {
+    setHierarchyModal({
+      type: "unit",
+      mode,
+      unitId: unit?.id,
+      data: unit,
+    });
+    setModalForm(
+      mode === "edit"
+        ? {
+            unit_number: unit.unit_number || 1,
+            unit_title: unit.unit_title || "",
+            unit_overview: unit.unit_overview || "",
+            theory_hours: unit.theory_hours || 0,
+            lab_hours: unit.lab_hours || 0,
+            tutorial_hours: unit.tutorial_hours || 0,
+          }
+        : {
+            unit_number: (units.length || 0) + 1,
+            unit_title: "",
+            unit_overview: "",
+            theory_hours: 8,
+            lab_hours: 0,
+            tutorial_hours: 0,
+          }
+    );
+  };
+
+  const openTopicModal = (mode: "add" | "edit", unitId: number, topic?: any) => {
+    setHierarchyModal({
+      type: "topic",
+      mode,
+      unitId,
+      topicId: topic?.id,
+      data: topic,
+    });
+    setModalForm(
+      mode === "edit"
+        ? {
+            topic_code: topic.topic_code || "",
+            topic_name: topic.topic_name || "",
+            topic_description: topic.topic_description || "",
+            knowledge_level: topic.knowledge_level || "K2 - Understand",
+            learning_sequence: topic.learning_sequence || 1,
+          }
+        : {
+            topic_code: "",
+            topic_name: "",
+            topic_description: "",
+            knowledge_level: "K2 - Understand",
+            learning_sequence: 1,
+          }
+    );
+  };
+
+  const openSubtopicModal = (mode: "add" | "edit", topicId: number, subtopic?: any) => {
+    setHierarchyModal({
+      type: "subtopic",
+      mode,
+      topicId,
+      subtopicId: subtopic?.id,
+      data: subtopic,
+    });
+    setModalForm(
+      mode === "edit"
+        ? {
+            subtopic_code: subtopic.subtopic_code || "",
+            subtopic_name: subtopic.subtopic_name || "",
+            subtopic_description: subtopic.subtopic_description || "",
+          }
+        : {
+            subtopic_code: "",
+            subtopic_name: "",
+            subtopic_description: "",
+          }
+    );
+  };
+
+  const handleHierarchySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hierarchyModal || !activeExt?.extractions_id) return;
+    try {
+      setSubmittingModal(true);
+      const { type, mode, unitId, topicId, subtopicId } = hierarchyModal;
+
+      if (type === "unit") {
+        if (mode === "add") {
+          await Models.syllabus.addUnit(activeExt.extractions_id, {
+            unit_number: Number(modalForm.unit_number) || 1,
+            unit_title: modalForm.unit_title.trim(),
+            unit_overview: modalForm.unit_overview?.trim() || undefined,
+            theory_hours: Number(modalForm.theory_hours) || 0,
+            lab_hours: Number(modalForm.lab_hours) || 0,
+            tutorial_hours: Number(modalForm.tutorial_hours) || 0,
+          });
+          Success("Unit created successfully!");
+        } else {
+          await Models.syllabus.updateUnit(activeExt.extractions_id, unitId!, {
+            unit_number: Number(modalForm.unit_number) || undefined,
+            unit_title: modalForm.unit_title?.trim() || undefined,
+            unit_overview: modalForm.unit_overview?.trim() || undefined,
+            theory_hours: Number(modalForm.theory_hours) ?? undefined,
+            lab_hours: Number(modalForm.lab_hours) ?? undefined,
+            tutorial_hours: Number(modalForm.tutorial_hours) ?? undefined,
+          });
+          Success("Unit updated successfully!");
+        }
+      } else if (type === "topic") {
+        if (mode === "add") {
+          await Models.syllabus.addTopic(activeExt.extractions_id, unitId!, {
+            topic_code: modalForm.topic_code?.trim() || "",
+            topic_name: modalForm.topic_name.trim(),
+            topic_description: modalForm.topic_description?.trim() || undefined,
+            knowledge_level: modalForm.knowledge_level || undefined,
+            learning_sequence: Number(modalForm.learning_sequence) || 1,
+          });
+          Success("Topic created successfully!");
+        } else {
+          await Models.syllabus.updateTopic(activeExt.extractions_id, topicId!, {
+            topic_code: modalForm.topic_code?.trim() || undefined,
+            topic_name: modalForm.topic_name?.trim() || undefined,
+            topic_description: modalForm.topic_description?.trim() || undefined,
+            knowledge_level: modalForm.knowledge_level || undefined,
+            learning_sequence: Number(modalForm.learning_sequence) || undefined,
+          });
+          Success("Topic updated successfully!");
+        }
+      } else if (type === "subtopic") {
+        if (mode === "add") {
+          await Models.syllabus.addSubtopic(activeExt.extractions_id, topicId!, {
+            subtopic_code: modalForm.subtopic_code?.trim() || "",
+            subtopic_name: modalForm.subtopic_name.trim(),
+            subtopic_description: modalForm.subtopic_description?.trim() || undefined,
+          });
+          Success("Subtopic created successfully!");
+        } else {
+          await Models.syllabus.updateSubtopic(activeExt.extractions_id, subtopicId!, {
+            subtopic_code: modalForm.subtopic_code?.trim() || undefined,
+            subtopic_name: modalForm.subtopic_name?.trim() || undefined,
+            subtopic_description: modalForm.subtopic_description?.trim() || undefined,
+          });
+          Success("Subtopic updated successfully!");
+        }
+      }
+
+      setHierarchyModal(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save changes"));
+    } finally {
+      setSubmittingModal(false);
+    }
+  };
+
+  const handleDeleteUnit = async (unitId: number) => {
+    if (!confirm("Are you sure you want to delete this Unit and all its topics and subtopics?")) return;
+    try {
+      await Models.syllabus.deleteUnit(activeExt.extractions_id, unitId);
+      Success("Unit deleted successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to delete unit"));
+    }
+  };
+
+  const handleDeleteTopic = async (topicId: number) => {
+    if (!confirm("Are you sure you want to delete this Topic and its subtopics?")) return;
+    try {
+      await Models.syllabus.deleteTopic(activeExt.extractions_id, topicId);
+      Success("Topic deleted successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to delete topic"));
+    }
+  };
+
+  const handleDeleteSubtopic = async (subtopicId: number) => {
+    if (!confirm("Are you sure you want to delete this Subtopic?")) return;
+    try {
+      await Models.syllabus.deleteSubtopic(activeExt.extractions_id, subtopicId);
+      Success("Subtopic deleted successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to delete subtopic"));
+    }
+  };
+
   return (
     <div className="min-h-screen space-y-6 pb-16">
       {/* ── Top Header & Course Identity ── */}
@@ -360,6 +896,22 @@ const InsCourseArtifacts = () => {
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-indigo-500" : ""}`} />
               <span>Refresh</span>
             </button>
+
+            {activeSyllabus && (
+              <button
+                type="button"
+                onClick={() => setSplitScreenView(!splitScreenView)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-xs transition ${
+                  splitScreenView
+                    ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/70 dark:text-indigo-300"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                }`}
+                title={splitScreenView ? "Close split screen view" : "View original document in split screen"}
+              >
+                <Columns className="h-3.5 w-3.5 text-indigo-500" />
+                <span>{splitScreenView ? "Exit Split View" : "Split View (Document)"}</span>
+              </button>
+            )}
 
             {/* Coordinator-only Upload & Version History */}
             {isCoord && (
@@ -503,8 +1055,12 @@ const InsCourseArtifacts = () => {
         </nav>
       </div>
 
-      {/* ── TAB 1: SYLLABUS & CURRICULUM ── */}
-      {activeTab === "syllabus" && (
+      {/* ── Tabs Content (Full Width or Split Screen) ── */}
+      {(() => {
+        const tabContent = (
+          <>
+            {/* ── TAB 1: SYLLABUS & CURRICULUM ── */}
+            {activeTab === "syllabus" && (
         <div className="space-y-6">
           {/* Active Version Snapshot Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -556,6 +1112,21 @@ const InsCourseArtifacts = () => {
                   {actionLoading === "activate_extraction" ? "Activating..." : "Set as Active"}
                 </button>
               )}
+
+              {activeSyllabus && (
+                <button
+                  type="button"
+                  onClick={() => setSplitScreenView(!splitScreenView)}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-xs transition ${
+                    splitScreenView
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  <Columns className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>{splitScreenView ? "Close Split View" : "Split View (Source Document)"}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -585,151 +1156,766 @@ const InsCourseArtifacts = () => {
           )}
 
           {activeExt && (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {/* Left Column: Objectives & Outcomes */}
-              <div className="space-y-6 lg:col-span-1">
-                {/* Course Objectives */}
-                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Award className="h-4 w-4 text-indigo-500" />
-                    <span>Course Objectives</span>
-                  </h3>
-                  <ul className="mt-3 space-y-2.5">
-                    {(activeExt.objectives || []).map((obj: any, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                          {obj.objective_number || idx + 1}
-                        </span>
-                        <span className="leading-relaxed">{obj.description}</span>
-                      </li>
-                    ))}
-                    {(!activeExt.objectives || activeExt.objectives.length === 0) && (
-                      <li className="text-xs text-slate-400 italic">No specific objectives defined.</li>
-                    )}
-                  </ul>
+            <div className="space-y-6">
+              {/* ── Section 1: Curriculum Hours & Credits ── */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-indigo-500" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Curriculum Hours & Credits
+                    </h3>
+                  </div>
+
+                  {canEdit && editingSection !== "hours" && (
+                    <button
+                      type="button"
+                      onClick={startEditHours}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      <Edit2 className="h-3 w-3 text-indigo-500" />
+                      <span>Edit Hours</span>
+                    </button>
+                  )}
                 </div>
 
-                {/* Course Outcomes */}
-                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span>Course Outcomes (COs)</span>
-                  </h3>
-                  <div className="mt-3 space-y-3">
-                    {(activeExt.outcomes || []).map((co: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
+                {editingSection === "hours" ? (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Credits</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.credits}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, credits: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Theory Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.total_theory_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, total_theory_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Lab Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.total_lab_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, total_lab_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Lecture Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.lecture_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, lecture_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tutorial Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.tutorial_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, tutorial_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Practical Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.practical_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, practical_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSection(null)}
+                        disabled={savingSection}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                            {co.co_code}
-                          </span>
-                          {co.bloom_level && (
-                            <span className="rounded bg-slate-200/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                              {co.bloom_level}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed">
-                          {co.description}
-                        </p>
-                      </div>
-                    ))}
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveHours}
+                        disabled={savingSection}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Save className="h-3 w-3" />
+                        <span>{savingSection ? "Saving..." : "Save Hours"}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                {/* Textbooks & References */}
-                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-purple-500" />
-                    <span>Prescribed Textbooks</span>
-                  </h3>
-                  <div className="mt-3 space-y-2.5">
-                    {(activeExt.textbooks || []).map((b: any, idx: number) => (
-                      <div key={idx} className="text-xs text-slate-700 dark:text-slate-300">
-                        <p className="font-semibold">{b.title}</p>
-                        <p className="text-[11px] text-slate-400">
-                          {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors} {b.publisher ? `— ${b.publisher}` : ""}
-                        </p>
-                      </div>
-                    ))}
-                    {(!activeExt.textbooks || activeExt.textbooks.length === 0) && (
-                      <p className="text-xs text-slate-400 italic">No textbooks recorded.</p>
-                    )}
+                ) : (
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">{activeExt.credits ?? course.credits ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Credits</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{activeExt.total_theory_hours ?? course.total_theory_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Theory Hours</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{activeExt.total_lab_hours ?? course.total_lab_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Lab Hours</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{activeExt.lecture_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Lecture (L)</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{activeExt.tutorial_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Tutorial (T)</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{activeExt.practical_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Practical (P)</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Right Column: Units & Curriculum Hierarchy */}
-              <div className="space-y-4 lg:col-span-2">
-                <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Curriculum Hierarchy (Units, Topics & Subtopics)
-                    </h3>
-                    <span className="text-xs font-semibold text-slate-400">
-                      {units.length} Units Extracted
-                    </span>
-                  </div>
+              {/* ── Two Columns: Objectives/Outcomes/Textbooks (Left) & Units Hierarchy (Right) ── */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Left Column: Objectives & Outcomes & Textbooks */}
+                <div className="space-y-6 lg:col-span-1">
+                  {/* ── Course Objectives Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Award className="h-4 w-4 text-indigo-500" />
+                        <span>Course Objectives</span>
+                      </h3>
 
-                  <div className="mt-5 space-y-5">
-                    {units.map((u: any, uIdx: number) => (
-                      <div
-                        key={uIdx}
-                        className="rounded-xl border border-slate-200/70 bg-slate-50/40 p-4 dark:border-slate-800 dark:bg-slate-800/30"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                            Unit {u.unit_number}: {u.unit_title}
-                          </h4>
-                          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                            <span>{u.theory_hours || 0} Theory Hrs</span>
-                            <span>•</span>
-                            <span>{u.lab_hours || 0} Lab Hrs</span>
-                          </div>
+                      {canEdit && (
+                        <div>
+                          {editingSection === "objectives" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddObjectiveRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Objective"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveObjectives}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditObjectives}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
                         </div>
+                      )}
+                    </div>
 
-                        {u.unit_overview && (
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            {u.unit_overview}
+                    {editingSection === "objectives" ? (
+                      <div className="mt-3 space-y-3">
+                        {objectivesDraft.map((obj, idx) => (
+                          <div key={obj.id} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 dark:border-slate-700 dark:bg-slate-800/40">
+                            <input
+                              type="number"
+                              min={1}
+                              value={obj.objective_number}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setObjectivesDraft(objectivesDraft.map((o) => o.id === obj.id ? { ...o, objective_number: val } : o));
+                              }}
+                              className="w-12 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                              placeholder="#"
+                            />
+                            <textarea
+                              rows={2}
+                              value={obj.description}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setObjectivesDraft(objectivesDraft.map((o) => o.id === obj.id ? { ...o, description: val } : o));
+                              }}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              placeholder="Objective description..."
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteObjectiveRow(obj.id)}
+                              className="mt-1 rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                              title="Delete Objective"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {objectivesDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No objectives. Click &apos;Add&apos; to create one.
                           </p>
                         )}
+                      </div>
+                    ) : (
+                      <ul className="mt-3 space-y-2.5">
+                        {(activeExt.objectives || []).map((obj: any, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                              {obj.objective_number || idx + 1}
+                            </span>
+                            <span className="leading-relaxed">{obj.description}</span>
+                          </li>
+                        ))}
+                        {(!activeExt.objectives || activeExt.objectives.length === 0) && (
+                          <li className="text-xs text-slate-400 italic">No specific objectives defined.</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
 
-                        {/* Topics List */}
-                        <div className="mt-3 space-y-2">
-                          {(u.topics || []).map((t: any, tIdx: number) => (
-                            <div
-                              key={tIdx}
-                              className="rounded-lg border border-slate-100 bg-white p-3 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800"
+                  {/* ── Course Outcomes Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span>Course Outcomes (COs)</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "outcomes" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddOutcomeRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Course Outcome"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveOutcomes}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditOutcomes}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
-                                  {t.topic_code ? `${t.topic_code} — ` : ""}{t.topic_name}
-                                </span>
-                                {t.knowledge_level && (
-                                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                                    {t.knowledge_level}
-                                  </span>
-                                )}
-                              </div>
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
-                              {/* Subtopics */}
-                              {(t.subtopics || []).length > 0 && (
-                                <ul className="mt-2 pl-4 border-l-2 border-indigo-100 dark:border-indigo-950 space-y-1">
-                                  {t.subtopics.map((st: any, stIdx: number) => (
-                                    <li key={stIdx} className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                                      <span className="h-1 w-1 rounded-full bg-indigo-400" />
-                                      <span>{st.subtopic_name}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                    {editingSection === "outcomes" ? (
+                      <div className="mt-3 space-y-3">
+                        {outcomesDraft.map((co, idx) => (
+                          <div key={co.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                value={co.co_code}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setOutcomesDraft(outcomesDraft.map((item) => item.id === co.id ? { ...item, co_code: val } : item));
+                                }}
+                                className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                                placeholder="CO#"
+                              />
+                              <select
+                                value={co.knowledge_level || "K2 - Understand"}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setOutcomesDraft(outcomesDraft.map((item) => item.id === co.id ? { ...item, knowledge_level: val } : item));
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              >
+                                {KNOWLEDGE_LEVELS.map((lvl) => (
+                                  <option key={lvl} value={lvl}>{lvl}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteOutcomeRow(co.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                title="Delete Outcome"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={co.description}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOutcomesDraft(outcomesDraft.map((item) => item.id === co.id ? { ...item, description: val } : item));
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              placeholder="Course outcome description..."
+                            />
+                          </div>
+                        ))}
+                        {outcomesDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No course outcomes. Click &apos;Add&apos; to create one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {(activeExt.outcomes || []).map((co: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                {co.co_code}
+                              </span>
+                              {(co.knowledge_level || co.bloom_level) && (
+                                <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                  {co.knowledge_level || co.bloom_level}
+                                </span>
                               )}
                             </div>
-                          ))}
-                        </div>
+                            <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed">
+                              {co.description}
+                            </p>
+                          </div>
+                        ))}
+                        {(!activeExt.outcomes || activeExt.outcomes.length === 0) && (
+                          <p className="text-xs text-slate-400 italic">No course outcomes extracted.</p>
+                        )}
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* ── Prescribed Textbooks Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-purple-500" />
+                        <span>Prescribed Textbooks</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "textbooks" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddTextbookRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Textbook"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveTextbooks}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditTextbooks}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {editingSection === "textbooks" ? (
+                      <div className="mt-3 space-y-3">
+                        {textbooksDraft.map((t, idx) => (
+                          <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                value={t.title}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, title: val } : item));
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                placeholder="Book Title"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTextbookRow(t.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                title="Delete Textbook"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={t.authorsStr}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, authorsStr: val } : item));
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                              placeholder="Authors (comma-separated)"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={t.publisher || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, publisher: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Publisher"
+                              />
+                              <input
+                                type="number"
+                                value={t.publication_year || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, publication_year: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Year"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {textbooksDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No textbooks. Click &apos;Add&apos; to record one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2.5">
+                        {(activeExt.textbooks || []).map((b: any, idx: number) => (
+                          <div key={idx} className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+                            <p className="font-semibold text-slate-900 dark:text-white">{b.title}</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors} {b.publisher ? `— ${b.publisher}` : ""} {b.publication_year ? `(${b.publication_year})` : ""}
+                            </p>
+                          </div>
+                        ))}
+                        {(!activeExt.textbooks || activeExt.textbooks.length === 0) && (
+                          <p className="text-xs text-slate-400 italic">No textbooks recorded.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Right Column: Curriculum Hierarchy (Units, Topics & Subtopics) ── */}
+                <div className="space-y-4 lg:col-span-2">
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          Curriculum Hierarchy (Units, Topics & Subtopics)
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {units.length} Units • Structured hierarchical teaching units
+                        </p>
+                      </div>
+
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => openUnitModal("add")}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Add Unit</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-5 space-y-6">
+                      {units.map((u: any, uIdx: number) => (
+                        <div
+                          key={u.id || uIdx}
+                          className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
+                        >
+                          {/* Unit Header Bar */}
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-md bg-indigo-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white shadow-2xs dark:bg-indigo-500">
+                                  Unit {u.unit_number}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                  {u.unit_title}
+                                </h4>
+                              </div>
+                              {u.unit_overview && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                                  {u.unit_overview}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-lg bg-slate-200/70 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                {u.theory_hours || 0} Theory Hrs • {u.lab_hours || 0} Lab Hrs
+                              </span>
+
+                              {canEdit && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openTopicModal("add", u.id)}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                    title="Add Topic to this Unit"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    <span>Add Topic</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUnitModal("edit", u)}
+                                    className="rounded-lg border border-slate-200 bg-white p-1 text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    title="Edit Unit"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteUnit(u.id)}
+                                    className="rounded-lg border border-rose-200 bg-rose-50 p-1 text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                    title="Delete Unit"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Topics List (Hierarchical children of Unit) */}
+                          <div className="mt-4 space-y-3">
+                            {(u.topics || []).map((t: any, tIdx: number) => (
+                              <div
+                                key={t.id || tIdx}
+                                className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800"
+                              >
+                                {/* Topic Title & Controls */}
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-xs text-slate-900 dark:text-white">
+                                      {t.topic_code ? `${t.topic_code} : ` : ""}{t.topic_name}
+                                    </span>
+                                    {t.knowledge_level && (
+                                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                        {t.knowledge_level}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {canEdit && (
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => openSubtopicModal("add", t.id)}
+                                        className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-400"
+                                        title="Add Subtopic under this Topic"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                        <span>Add Subtopic</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openTopicModal("edit", u.id, t)}
+                                        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                                        title="Edit Topic"
+                                      >
+                                        <Edit2 className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteTopic(t.id)}
+                                        className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                        title="Delete Topic"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {t.topic_description && (
+                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {t.topic_description}
+                                  </p>
+                                )}
+
+                                {/* Subtopics: Rendered Hierarchically Under Parent Topic */}
+                                <div className="mt-3 ml-3 border-l-2 border-indigo-200 pl-3.5 space-y-2 dark:border-indigo-900/60">
+                                  {(t.subtopics || []).map((st: any, stIdx: number) => (
+                                    <div
+                                      key={st.id || stIdx}
+                                      className="group flex items-center justify-between gap-2 rounded-lg bg-slate-50/70 px-2.5 py-1.5 text-xs transition hover:bg-slate-100 dark:bg-slate-850/60 dark:hover:bg-slate-850"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                                        <span className="font-medium text-slate-700 dark:text-slate-200">
+                                          {st.subtopic_code ? `${st.subtopic_code} : ` : ""}{st.subtopic_name}
+                                        </span>
+                                        {st.subtopic_description && (
+                                          <span className="text-[11px] text-slate-400">
+                                            — {st.subtopic_description}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {canEdit && (
+                                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                          <button
+                                            type="button"
+                                            onClick={() => openSubtopicModal("edit", t.id, st)}
+                                            className="rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                            title="Edit Subtopic"
+                                          >
+                                            <Edit2 className="h-2.5 w-2.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteSubtopic(st.id)}
+                                            className="rounded p-0.5 text-slate-400 hover:text-rose-600"
+                                            title="Delete Subtopic"
+                                          >
+                                            <Trash2 className="h-2.5 w-2.5" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                  {(!t.subtopics || t.subtopics.length === 0) && (
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-400 italic">
+                                      <span>No subtopics nested.</span>
+                                      {canEdit && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openSubtopicModal("add", t.id)}
+                                          className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400 not-italic"
+                                        >
+                                          + Add Subtopic
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+
+                            {(!u.topics || u.topics.length === 0) && (
+                              <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
+                                <span>No topics in this unit yet.</span>
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openTopicModal("add", u.id)}
+                                    className="ml-2 font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                                  >
+                                    Add Topic
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {units.length === 0 && (
+                        <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center dark:border-slate-800">
+                          <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                            No curriculum units recorded
+                          </p>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => openUnitModal("add")}
+                              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Create First Unit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1104,6 +2290,268 @@ const InsCourseArtifacts = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+    </>
+  );
+
+  if (splitScreenView) {
+    return (
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column: 6 Cols - Sticky Document Viewer */}
+        <div className="lg:col-span-6 h-[calc(100vh-210px)] min-h-[680px] sticky top-6 rounded-2xl border border-slate-200/80 bg-slate-900 shadow-sm overflow-hidden dark:border-slate-800 flex flex-col">
+          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-slate-300">
+            <div className="flex items-center gap-2 truncate">
+              <FileText className="h-4 w-4 text-indigo-400 shrink-0" />
+              <span className="font-semibold truncate">
+                {activeSyllabus?.original_filename || "Syllabus Document"}
+              </span>
+              {activeSyllabus?.version_id && (
+                <span className="text-[10px] text-slate-400 font-mono">v{activeSyllabus.version_id}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSplitScreenView(false)}
+              className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded-lg hover:bg-slate-800 transition"
+            >
+              Close Split View ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {loadingDoc ? (
+              <div className="flex h-full items-center justify-center text-slate-400 text-xs">
+                <RefreshCw className="h-5 w-5 animate-spin mr-2 text-indigo-400" />
+                Loading document preview...
+              </div>
+            ) : (
+              <PDFViewer
+                file={documentBlobUrl}
+                fileName={activeSyllabus?.original_filename || "Syllabus_Document.pdf"}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: 6 Cols - Tab content with independent scroll */}
+        <div className="lg:col-span-6 h-[calc(100vh-210px)] min-h-[680px] overflow-y-auto pr-1 space-y-6">
+          {tabContent}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="mt-6 space-y-6">{tabContent}</div>;
+})()}
+
+      {/* ── Hierarchy CRUD Modal (Unit / Topic / Subtopic) ── */}
+      {hierarchyModal && canEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {hierarchyModal.type === "unit"
+                  ? hierarchyModal.mode === "add" ? "Add Curriculum Unit" : `Edit Unit ${modalForm.unit_number}`
+                  : hierarchyModal.type === "topic"
+                  ? hierarchyModal.mode === "add" ? "Add Topic to Unit" : "Edit Topic"
+                  : hierarchyModal.mode === "add" ? "Add Subtopic to Topic" : "Edit Subtopic"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setHierarchyModal(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleHierarchySubmit} className="mt-4 space-y-4">
+              {/* Unit Form */}
+              {hierarchyModal.type === "unit" && (
+                <>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="col-span-1">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Unit #</label>
+                      <input
+                        type="number"
+                        min={1}
+                        required
+                        value={modalForm.unit_number}
+                        onChange={(e) => setModalForm({ ...modalForm, unit_number: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Unit Title</label>
+                      <input
+                        type="text"
+                        required
+                        value={modalForm.unit_title}
+                        onChange={(e) => setModalForm({ ...modalForm, unit_title: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        placeholder="e.g., Introduction to Neural Networks"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Unit Overview</label>
+                    <textarea
+                      rows={3}
+                      value={modalForm.unit_overview}
+                      onChange={(e) => setModalForm({ ...modalForm, unit_overview: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="Brief overview or learning outcome of this unit..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Theory Hours</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={modalForm.theory_hours}
+                        onChange={(e) => setModalForm({ ...modalForm, theory_hours: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Lab Hours</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={modalForm.lab_hours}
+                        onChange={(e) => setModalForm({ ...modalForm, lab_hours: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tutorial Hours</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={modalForm.tutorial_hours}
+                        onChange={(e) => setModalForm({ ...modalForm, tutorial_hours: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Topic Form */}
+              {hierarchyModal.type === "topic" && (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Topic Code</label>
+                      <input
+                        type="text"
+                        value={modalForm.topic_code}
+                        onChange={(e) => setModalForm({ ...modalForm, topic_code: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        placeholder="e.g. 1.1"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Knowledge Level</label>
+                      <select
+                        value={modalForm.knowledge_level || "K2 - Understand"}
+                        onChange={(e) => setModalForm({ ...modalForm, knowledge_level: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Topic Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={modalForm.topic_name}
+                      onChange={(e) => setModalForm({ ...modalForm, topic_name: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="e.g., Perceptrons and Multi-layer Networks"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Topic Description</label>
+                    <textarea
+                      rows={3}
+                      value={modalForm.topic_description}
+                      onChange={(e) => setModalForm({ ...modalForm, topic_description: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="Summary of topics covered..."
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Subtopic Form */}
+              {hierarchyModal.type === "subtopic" && (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subtopic Code</label>
+                    <input
+                      type="text"
+                      value={modalForm.subtopic_code}
+                      onChange={(e) => setModalForm({ ...modalForm, subtopic_code: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="e.g. 1.1.1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subtopic Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={modalForm.subtopic_name}
+                      onChange={(e) => setModalForm({ ...modalForm, subtopic_name: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="e.g., Activation Functions & Sigmoid"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subtopic Description</label>
+                    <textarea
+                      rows={3}
+                      value={modalForm.subtopic_description}
+                      onChange={(e) => setModalForm({ ...modalForm, subtopic_description: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="Specific scope of this subtopic..."
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setHierarchyModal(null)}
+                  disabled={submittingModal}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingModal}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{submittingModal ? "Saving..." : "Save Changes"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

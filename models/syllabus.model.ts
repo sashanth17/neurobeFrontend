@@ -81,6 +81,28 @@ const syllabus = {
         });
     },
 
+    getFileBlob: (courseSyllabusId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/${courseSyllabusId}/file`, { responseType: "blob" })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    getActiveCourseFileBlob: (courseId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/active-file`, { responseType: "blob" })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
     update_hours: (extractionsId: number | string, data: any) => {
         return new Promise((resolve, reject) => {
             commonInstance()
@@ -642,181 +664,86 @@ const syllabus = {
     },
 
     // ─────────────────────────────────────────────────────────
-    // Direct Table CRUD Methods (Strict relational table endpoints)
+    // Extraction Relational Sub-Resource CRUD Methods
     // ─────────────────────────────────────────────────────────
-    createUnit: (courseId: string | number, extractionId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/extractions/${extractionId}/units`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addOutcome: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/outcomes`, data).then(r => r.data);
     },
-    updateUnit: (courseId: string | number, unitId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/units/${unitId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateOutcome: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/outcomes/${id}`, data).then(r => r.data);
     },
-    deleteUnit: (courseId: string | number, unitId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/units/${unitId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteOutcome: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/outcomes/${id}`).then(r => r.data);
     },
 
-    createTopic: (courseId: string | number, unitId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/units/${unitId}/topics`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addUnit: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/units`, data).then(r => r.data);
     },
-    updateTopic: (courseId: string | number, topicId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/topics/${topicId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateUnit: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/units/${id}`, data).then(r => r.data);
     },
-    deleteTopic: (courseId: string | number, topicId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/topics/${topicId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteUnit: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/units/${id}`).then(r => r.data);
     },
 
-    createSubtopic: (courseId: string | number, topicId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/topics/${topicId}/subtopics`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addTopic: (extractionId: number | string, unitId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/units/${unitId}/topics`, data).then(r => r.data);
     },
-    updateSubtopic: (courseId: string | number, subtopicId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/subtopics/${subtopicId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateTopic: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/topics/${id}`, data).then(r => r.data);
     },
-    deleteSubtopic: (courseId: string | number, subtopicId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/subtopics/${subtopicId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteTopic: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/topics/${id}`).then(r => r.data);
     },
 
-    createOutcome: (courseId: string | number, extractionId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/extractions/${extractionId}/outcomes`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addSubtopic: (extractionId: number | string, topicId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/topics/${topicId}/subtopics`, data).then(r => r.data);
     },
-    updateOutcome: (courseId: string | number, outcomeId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/outcomes/${outcomeId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateSubtopic: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/subtopics/${id}`, data).then(r => r.data);
     },
-    deleteOutcome: (courseId: string | number, outcomeId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/outcomes/${outcomeId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteSubtopic: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/subtopics/${id}`).then(r => r.data);
     },
 
-    createTextbook: (courseId: string | number, extractionId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/extractions/${extractionId}/textbooks`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addObjective: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/objectives`, data).then(r => r.data);
     },
-    updateTextbook: (courseId: string | number, textbookId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/textbooks/${textbookId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateObjective: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/objectives/${id}`, data).then(r => r.data);
     },
-    deleteTextbook: (courseId: string | number, textbookId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/textbooks/${textbookId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteObjective: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/objectives/${id}`).then(r => r.data);
     },
 
-    createReferenceBook: (courseId: string | number, extractionId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/extractions/${extractionId}/reference-books`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addTextbook: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/textbooks`, data).then(r => r.data);
     },
-    updateReferenceBook: (courseId: string | number, referenceId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/reference-books/${referenceId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateTextbook: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/textbooks/${id}`, data).then(r => r.data);
     },
-    deleteReferenceBook: (courseId: string | number, referenceId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/reference-books/${referenceId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteTextbook: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/textbooks/${id}`).then(r => r.data);
     },
 
-    createExperiment: (courseId: string | number, extractionId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .post(`course/syllabi/courses/${courseId}/extractions/${extractionId}/experiments`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    addReferenceBook: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/reference-books`, data).then(r => r.data);
     },
-    updateExperiment: (courseId: string | number, experimentId: number, data: any) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .put(`course/syllabi/courses/${courseId}/experiments/${experimentId}`, data)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    updateReferenceBook: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/reference-books/${id}`, data).then(r => r.data);
     },
-    deleteExperiment: (courseId: string | number, experimentId: number) => {
-        return new Promise((resolve, reject) => {
-            commonInstance()
-                .delete(`course/syllabi/courses/${courseId}/experiments/${experimentId}`)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
+    deleteReferenceBook: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/reference-books/${id}`).then(r => r.data);
+    },
+
+    addDigitalResource: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/digital-resources`, data).then(r => r.data);
+    },
+    updateDigitalResource: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/digital-resources/${id}`, data).then(r => r.data);
+    },
+    deleteDigitalResource: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/digital-resources/${id}`).then(r => r.data);
     },
 }
 
