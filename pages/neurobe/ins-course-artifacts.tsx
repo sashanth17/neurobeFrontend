@@ -189,6 +189,14 @@ const InsCourseArtifacts = () => {
     pedagogy_suggested_1?: string;
     description_1?: string;
     methodology_1?: string;
+    bloom_level_2?: string;
+    pedagogy_suggested_2?: string;
+    description_2?: string;
+    methodology_2?: string;
+    bloom_level_3?: string;
+    pedagogy_suggested_3?: string;
+    description_3?: string;
+    methodology_3?: string;
   }>({});
   const [savingPedagogyTopic, setSavingPedagogyTopic] = useState<boolean>(false);
 
@@ -200,6 +208,14 @@ const InsCourseArtifacts = () => {
     suggested_activity?: string;
   }>({});
   const [savingLpSlot, setSavingLpSlot] = useState<boolean>(false);
+
+  const [editingLpSubtopicSlotId, setEditingLpSubtopicSlotId] = useState<number | null>(null);
+  const [lpSubtopicSlotDraft, setLpSubtopicSlotDraft] = useState<{
+    time_allocated?: number;
+    bloom_level?: string;
+    suggested_activity?: string;
+  }>({});
+  const [savingLpSubtopicSlot, setSavingLpSubtopicSlot] = useState<boolean>(false);
 
   // ── Split-Screen Document Viewer State ─────────────────────────────────────
   const [splitScreenView, setSplitScreenView] = useState<boolean>(false);
@@ -733,7 +749,7 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  // ── Pedagogy Per-Topic Edit & Save ─────────────────────────────────────────
+  // ── Pedagogy Per-Topic Edit & Save (3 Pedagogies) ──────────────────────────
   const startEditPedagogyTopic = (sug: any) => {
     setEditingPedagogyTopicId(sug.id);
     setPedagogyDraft({
@@ -741,6 +757,14 @@ const InsCourseArtifacts = () => {
       pedagogy_suggested_1: sug.pedagogy_suggested_1 || "",
       description_1: sug.description_1 || "",
       methodology_1: sug.methodology_1 || "",
+      bloom_level_2: sug.bloom_level_2 || "K3 - Apply",
+      pedagogy_suggested_2: sug.pedagogy_suggested_2 || "",
+      description_2: sug.description_2 || "",
+      methodology_2: sug.methodology_2 || "",
+      bloom_level_3: sug.bloom_level_3 || "K4 - Analyze",
+      pedagogy_suggested_3: sug.pedagogy_suggested_3 || "",
+      description_3: sug.description_3 || "",
+      methodology_3: sug.methodology_3 || "",
     });
   };
 
@@ -753,8 +777,16 @@ const InsCourseArtifacts = () => {
         pedagogy_suggested_1: pedagogyDraft.pedagogy_suggested_1?.trim(),
         description_1: pedagogyDraft.description_1?.trim() || undefined,
         methodology_1: pedagogyDraft.methodology_1?.trim() || undefined,
+        bloom_level_2: pedagogyDraft.bloom_level_2,
+        pedagogy_suggested_2: pedagogyDraft.pedagogy_suggested_2?.trim(),
+        description_2: pedagogyDraft.description_2?.trim() || undefined,
+        methodology_2: pedagogyDraft.methodology_2?.trim() || undefined,
+        bloom_level_3: pedagogyDraft.bloom_level_3,
+        pedagogy_suggested_3: pedagogyDraft.pedagogy_suggested_3?.trim(),
+        description_3: pedagogyDraft.description_3?.trim() || undefined,
+        methodology_3: pedagogyDraft.methodology_3?.trim() || undefined,
       });
-      Success("Topic pedagogy strategy updated successfully!");
+      Success("Topic pedagogy strategies updated successfully!");
       setEditingPedagogyTopicId(null);
       fetchPortfolio(true);
     } catch (err: any) {
@@ -793,12 +825,40 @@ const InsCourseArtifacts = () => {
     }
   };
 
+  const startEditLpSubtopicSlot = (subSlot: any) => {
+    setEditingLpSubtopicSlotId(subSlot.id);
+    setLpSubtopicSlotDraft({
+      time_allocated: Number(subSlot.time_allocated) || 0.5,
+      bloom_level: subSlot.bloom_level || "Understand",
+      suggested_activity: subSlot.suggested_activity || "",
+    });
+  };
+
+  const saveLpSubtopicSlot = async (subSlotId: number) => {
+    if (!currentLessonPlan?.lesson_plan_id) return;
+    try {
+      setSavingLpSubtopicSlot(true);
+      await Models.lession_plan.update_subtopic_slot(currentLessonPlan.lesson_plan_id, subSlotId, {
+        time_allocated: Number(lpSubtopicSlotDraft.time_allocated) || 0.5,
+        bloom_level: lpSubtopicSlotDraft.bloom_level,
+        suggested_activity: lpSubtopicSlotDraft.suggested_activity?.trim() || undefined,
+      });
+      Success("Subtopic slot schedule updated successfully!");
+      setEditingLpSubtopicSlotId(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update subtopic slot"));
+    } finally {
+      setSavingLpSubtopicSlot(false);
+    }
+  };
+
   // Units list from current extraction
   const units = currentExt?.units || [];
   const selectedUnit = units[selectedUnitIndex] || units[0];
 
   // ── Coordinator CRUD & Section Edit State ─────────────────────────────────
-  const canEdit = Boolean(isCoord && currentExt && !currentExt.is_approved && !selectedVersionData.syllabus);
+  const canEdit = Boolean(isCoord && currentExt && !selectedVersionData.syllabus);
 
   const KNOWLEDGE_LEVELS = [
     "K1 - Remember",
@@ -809,7 +869,7 @@ const InsCourseArtifacts = () => {
     "K6 - Create",
   ];
 
-  // Section edit modes: null | "hours" | "objectives" | "outcomes" | "textbooks"
+  // Section edit modes: null | "hours" | "objectives" | "outcomes" | "textbooks" | "reference_books"
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [savingSection, setSavingSection] = useState<boolean>(false);
 
@@ -841,22 +901,24 @@ const InsCourseArtifacts = () => {
 
   // ── Section 1: Hours & Credits Handlers ────────────────────────────────────
   const startEditHours = () => {
+    const ext = currentExt || activeExt;
     setHoursDraft({
-      credits: activeExt?.credits ?? course.credits ?? 0,
-      lecture_hours: activeExt?.lecture_hours ?? 0,
-      tutorial_hours: activeExt?.tutorial_hours ?? 0,
-      practical_hours: activeExt?.practical_hours ?? 0,
-      total_theory_hours: activeExt?.total_theory_hours ?? course.total_theory_hours ?? 0,
-      total_lab_hours: activeExt?.total_lab_hours ?? course.total_lab_hours ?? 0,
+      credits: ext?.credits ?? course.credits ?? 0,
+      lecture_hours: ext?.lecture_hours ?? 0,
+      tutorial_hours: ext?.tutorial_hours ?? 0,
+      practical_hours: ext?.practical_hours ?? 0,
+      total_theory_hours: ext?.total_theory_hours ?? course.total_theory_hours ?? 0,
+      total_lab_hours: ext?.total_lab_hours ?? course.total_lab_hours ?? 0,
     });
     setEditingSection("hours");
   };
 
   const saveHours = async () => {
-    if (!activeExt?.extractions_id) return;
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     try {
       setSavingSection(true);
-      await Models.syllabus.update_hours(activeExt.extractions_id, {
+      await Models.syllabus.update_hours(extId, {
         credits: Number(hoursDraft.credits),
         lecture_hours: Number(hoursDraft.lecture_hours),
         tutorial_hours: Number(hoursDraft.tutorial_hours),
@@ -876,7 +938,8 @@ const InsCourseArtifacts = () => {
 
   // ── Section 2: Objectives Handlers ─────────────────────────────────────────
   const startEditObjectives = () => {
-    setObjectivesDraft((activeExt?.objectives || []).map((o: any) => ({ ...o })));
+    const ext = currentExt || activeExt;
+    setObjectivesDraft((ext?.objectives || []).map((o: any) => ({ ...o })));
     setEditingSection("objectives");
   };
 
@@ -897,28 +960,30 @@ const InsCourseArtifacts = () => {
   };
 
   const saveObjectives = async () => {
-    if (!activeExt?.extractions_id) return;
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     try {
       setSavingSection(true);
-      const original = activeExt.objectives || [];
+      const ext = currentExt || activeExt;
+      const original = ext?.objectives || [];
       const currentIds = new Set(objectivesDraft.filter((o) => !o.isNew).map((o) => o.id));
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
-          await Models.syllabus.deleteObjective(activeExt.extractions_id, orig.id);
+          await Models.syllabus.deleteObjective(extId, orig.id);
         }
       }
 
       for (const obj of objectivesDraft) {
         if (obj.isNew) {
           if (obj.description?.trim()) {
-            await Models.syllabus.addObjective(activeExt.extractions_id, {
+            await Models.syllabus.addObjective(extId, {
               objective_number: Number(obj.objective_number) || 1,
               description: obj.description.trim(),
             });
           }
         } else {
-          await Models.syllabus.updateObjective(activeExt.extractions_id, obj.id, {
+          await Models.syllabus.updateObjective(extId, obj.id, {
             objective_number: Number(obj.objective_number) || 1,
             description: obj.description?.trim() || "",
           });
@@ -937,8 +1002,9 @@ const InsCourseArtifacts = () => {
 
   // ── Section 3: Course Outcomes Handlers ────────────────────────────────────
   const startEditOutcomes = () => {
+    const ext = currentExt || activeExt;
     setOutcomesDraft(
-      (activeExt?.outcomes || []).map((co: any) => ({
+      (ext?.outcomes || []).map((co: any) => ({
         ...co,
         knowledge_level: co.knowledge_level || (co.bloom_level ? `K2 - ${co.bloom_level}` : "K2 - Understand"),
       }))
@@ -965,15 +1031,17 @@ const InsCourseArtifacts = () => {
   };
 
   const saveOutcomes = async () => {
-    if (!activeExt?.extractions_id) return;
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     try {
       setSavingSection(true);
-      const original = activeExt.outcomes || [];
+      const ext = currentExt || activeExt;
+      const original = ext?.outcomes || [];
       const currentIds = new Set(outcomesDraft.filter((co) => !co.isNew).map((co) => co.id));
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
-          await Models.syllabus.deleteOutcome(activeExt.extractions_id, orig.id);
+          await Models.syllabus.deleteOutcome(extId, orig.id);
         }
       }
 
@@ -983,7 +1051,7 @@ const InsCourseArtifacts = () => {
 
         if (co.isNew) {
           if (co.description?.trim()) {
-            await Models.syllabus.addOutcome(activeExt.extractions_id, {
+            await Models.syllabus.addOutcome(extId, {
               co_code: co.co_code?.trim() || "CO1",
               description: co.description.trim(),
               knowledge_level: kLevel,
@@ -991,7 +1059,7 @@ const InsCourseArtifacts = () => {
             });
           }
         } else {
-          await Models.syllabus.updateOutcome(activeExt.extractions_id, co.id, {
+          await Models.syllabus.updateOutcome(extId, co.id, {
             co_code: co.co_code?.trim() || "CO1",
             description: co.description?.trim() || "",
             knowledge_level: kLevel,
@@ -1012,8 +1080,9 @@ const InsCourseArtifacts = () => {
 
   // ── Section 4: Textbooks Handlers ──────────────────────────────────────────
   const startEditTextbooks = () => {
+    const ext = currentExt || activeExt;
     setTextbooksDraft(
-      (activeExt?.textbooks || []).map((t: any) => ({
+      (ext?.textbooks || []).map((t: any) => ({
         ...t,
         authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors || ""),
       }))
@@ -1041,15 +1110,17 @@ const InsCourseArtifacts = () => {
   };
 
   const saveTextbooks = async () => {
-    if (!activeExt?.extractions_id) return;
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     try {
       setSavingSection(true);
-      const original = activeExt.textbooks || [];
+      const ext = currentExt || activeExt;
+      const original = ext?.textbooks || [];
       const currentIds = new Set(textbooksDraft.filter((t) => !t.isNew).map((t) => t.id));
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
-          await Models.syllabus.deleteTextbook(activeExt.extractions_id, orig.id);
+          await Models.syllabus.deleteTextbook(extId, orig.id);
         }
       }
 
@@ -1061,7 +1132,7 @@ const InsCourseArtifacts = () => {
 
         if (t.isNew) {
           if (t.title?.trim()) {
-            await Models.syllabus.addTextbook(activeExt.extractions_id, {
+            await Models.syllabus.addTextbook(extId, {
               title: t.title.trim(),
               authors: authorsArr,
               publisher: t.publisher?.trim() || undefined,
@@ -1070,7 +1141,7 @@ const InsCourseArtifacts = () => {
             });
           }
         } else {
-          await Models.syllabus.updateTextbook(activeExt.extractions_id, t.id, {
+          await Models.syllabus.updateTextbook(extId, t.id, {
             title: t.title?.trim() || "",
             authors: authorsArr,
             publisher: t.publisher?.trim() || undefined,
@@ -1092,8 +1163,9 @@ const InsCourseArtifacts = () => {
 
   // ── Section 4b: Reference Books Handlers ────────────────────────────────────
   const startEditReferenceBooks = () => {
+    const ext = currentExt || activeExt;
     setReferenceBooksDraft(
-      (currentExt?.reference_books || []).map((t: any) => ({
+      (ext?.reference_books || []).map((t: any) => ({
         ...t,
         authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors || ""),
       }))
@@ -1121,15 +1193,17 @@ const InsCourseArtifacts = () => {
   };
 
   const saveReferenceBooks = async () => {
-    if (!currentExt?.extractions_id) return;
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     try {
       setSavingSection(true);
-      const original = currentExt.reference_books || [];
+      const ext = currentExt || activeExt;
+      const original = ext?.reference_books || [];
       const currentIds = new Set(referenceBooksDraft.filter((t) => !t.isNew).map((t) => t.id));
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
-          await Models.syllabus.deleteReferenceBook(currentExt.extractions_id, orig.id);
+          await Models.syllabus.deleteReferenceBook(extId, orig.id);
         }
       }
 
@@ -1141,7 +1215,7 @@ const InsCourseArtifacts = () => {
 
         if (t.isNew) {
           if (t.title?.trim()) {
-            await Models.syllabus.addReferenceBook(currentExt.extractions_id, {
+            await Models.syllabus.addReferenceBook(extId, {
               title: t.title.trim(),
               authors: authorsArr,
               publisher: t.publisher?.trim() || undefined,
@@ -1150,7 +1224,7 @@ const InsCourseArtifacts = () => {
             });
           }
         } else {
-          await Models.syllabus.updateReferenceBook(currentExt.extractions_id, t.id, {
+          await Models.syllabus.updateReferenceBook(extId, t.id, {
             title: t.title?.trim() || "",
             authors: authorsArr,
             publisher: t.publisher?.trim() || undefined,
@@ -1189,10 +1263,10 @@ const InsCourseArtifacts = () => {
             tutorial_hours: unit.tutorial_hours || 0,
           }
         : {
-            unit_number: (units.length || 0) + 1,
+            unit_number: units.length + 1,
             unit_title: "",
             unit_overview: "",
-            theory_hours: 8,
+            theory_hours: 0,
             lab_hours: 0,
             tutorial_hours: 0,
           }
@@ -1251,14 +1325,15 @@ const InsCourseArtifacts = () => {
 
   const handleHierarchySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hierarchyModal || !activeExt?.extractions_id) return;
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!hierarchyModal || !extId) return;
     try {
       setSubmittingModal(true);
       const { type, mode, unitId, topicId, subtopicId } = hierarchyModal;
 
       if (type === "unit") {
         if (mode === "add") {
-          await Models.syllabus.addUnit(activeExt.extractions_id, {
+          await Models.syllabus.addUnit(extId, {
             unit_number: Number(modalForm.unit_number) || 1,
             unit_title: modalForm.unit_title.trim(),
             unit_overview: modalForm.unit_overview?.trim() || undefined,
@@ -1268,7 +1343,7 @@ const InsCourseArtifacts = () => {
           });
           Success("Unit created successfully!");
         } else {
-          await Models.syllabus.updateUnit(activeExt.extractions_id, unitId!, {
+          await Models.syllabus.updateUnit(extId, unitId!, {
             unit_number: Number(modalForm.unit_number) || undefined,
             unit_title: modalForm.unit_title?.trim() || undefined,
             unit_overview: modalForm.unit_overview?.trim() || undefined,
@@ -1280,7 +1355,7 @@ const InsCourseArtifacts = () => {
         }
       } else if (type === "topic") {
         if (mode === "add") {
-          await Models.syllabus.addTopic(activeExt.extractions_id, unitId!, {
+          await Models.syllabus.addTopic(extId, unitId!, {
             topic_code: modalForm.topic_code?.trim() || "",
             topic_name: modalForm.topic_name.trim(),
             topic_description: modalForm.topic_description?.trim() || undefined,
@@ -1289,7 +1364,7 @@ const InsCourseArtifacts = () => {
           });
           Success("Topic created successfully!");
         } else {
-          await Models.syllabus.updateTopic(activeExt.extractions_id, topicId!, {
+          await Models.syllabus.updateTopic(extId, topicId!, {
             topic_code: modalForm.topic_code?.trim() || undefined,
             topic_name: modalForm.topic_name?.trim() || undefined,
             topic_description: modalForm.topic_description?.trim() || undefined,
@@ -1300,14 +1375,14 @@ const InsCourseArtifacts = () => {
         }
       } else if (type === "subtopic") {
         if (mode === "add") {
-          await Models.syllabus.addSubtopic(activeExt.extractions_id, topicId!, {
+          await Models.syllabus.addSubtopic(extId, topicId!, {
             subtopic_code: modalForm.subtopic_code?.trim() || "",
             subtopic_name: modalForm.subtopic_name.trim(),
             subtopic_description: modalForm.subtopic_description?.trim() || undefined,
           });
           Success("Subtopic created successfully!");
         } else {
-          await Models.syllabus.updateSubtopic(activeExt.extractions_id, subtopicId!, {
+          await Models.syllabus.updateSubtopic(extId, subtopicId!, {
             subtopic_code: modalForm.subtopic_code?.trim() || undefined,
             subtopic_name: modalForm.subtopic_name?.trim() || undefined,
             subtopic_description: modalForm.subtopic_description?.trim() || undefined,
@@ -1326,9 +1401,11 @@ const InsCourseArtifacts = () => {
   };
 
   const handleDeleteUnit = async (unitId: number) => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     if (!confirm("Are you sure you want to delete this Unit and all its topics and subtopics?")) return;
     try {
-      await Models.syllabus.deleteUnit(activeExt.extractions_id, unitId);
+      await Models.syllabus.deleteUnit(extId, unitId);
       Success("Unit deleted successfully!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -1337,9 +1414,11 @@ const InsCourseArtifacts = () => {
   };
 
   const handleDeleteTopic = async (topicId: number) => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     if (!confirm("Are you sure you want to delete this Topic and its subtopics?")) return;
     try {
-      await Models.syllabus.deleteTopic(activeExt.extractions_id, topicId);
+      await Models.syllabus.deleteTopic(extId, topicId);
       Success("Topic deleted successfully!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -1348,9 +1427,11 @@ const InsCourseArtifacts = () => {
   };
 
   const handleDeleteSubtopic = async (subtopicId: number) => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
     if (!confirm("Are you sure you want to delete this Subtopic?")) return;
     try {
-      await Models.syllabus.deleteSubtopic(activeExt.extractions_id, subtopicId);
+      await Models.syllabus.deleteSubtopic(extId, subtopicId);
       Success("Subtopic deleted successfully!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -2720,15 +2801,22 @@ const InsCourseArtifacts = () => {
               return numA - numB;
             });
 
-            const canEditMatrix = Boolean(isCoord && !currentCopo.is_approved && !selectedVersionData.copo);
+            const canEditMatrix = Boolean(isCoord && currentCopo && !selectedVersionData.copo);
 
             return (
               <div className="space-y-4">
                 <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Correlation Matrix ({cosList.length} COs × {posList.length} POs)
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Correlation Matrix ({cosList.length} COs × {posList.length} POs)
+                      </span>
+                      {canEditMatrix && (
+                        <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                          Click any cell to edit score & justification
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-[11px] text-slate-500">
                       <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 3 = High</span>
                       <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 2 = Medium</span>
@@ -2920,143 +3008,446 @@ const InsCourseArtifacts = () => {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {(currentPedagogy.topic_suggestions || []).map((sug: any, idx: number) => {
-                const isEditingThisTopic = editingPedagogyTopicId === sug.id;
-                const canEditThis = Boolean(isCoord && !currentPedagogy.is_approved && !selectedVersionData.pedagogy);
+          ) : (() => {
+            const unitsList = currentExt?.units || activeExt?.units || [];
+            const topicSuggestions = currentPedagogy.topic_suggestions || [];
+            const sugByTopicId = new Map<number, any>();
+            topicSuggestions.forEach((s: any) => sugByTopicId.set(s.topic_id, s));
 
-                return (
-                  <div
-                    key={sug.id || idx}
-                    className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
-                      <span className="font-bold text-xs text-slate-900 dark:text-white">
-                        {sug.topic_name || `Topic #${sug.topic_id}`}
+            const canEditPedagogy = Boolean(isCoord && currentPedagogy && !selectedVersionData.pedagogy);
+            const renderedSugIds = new Set<number>();
+            const hasUnits = unitsList.length > 0;
+
+            const renderStrategyCards = (sug: any) => (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Pedagogy 1: Primary Strategy */}
+                <div className="rounded-xl border border-emerald-200/80 bg-white p-3.5 shadow-2xs dark:border-emerald-900/60 dark:bg-slate-900 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        1. Primary Strategy
                       </span>
-                      <div className="flex items-center gap-2">
-                        {sug.bloom_level_1 && (
-                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                            {sug.bloom_level_1}
-                          </span>
-                        )}
-                        {canEditThis && !isEditingThisTopic && (
-                          <button
-                            type="button"
-                            onClick={() => startEditPedagogyTopic(sug)}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                          >
-                            <Edit2 className="h-3 w-3 text-indigo-500" />
-                            <span>Edit</span>
-                          </button>
-                        )}
-                      </div>
+                      {sug.bloom_level_1 && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {sug.bloom_level_1}
+                        </span>
+                      )}
                     </div>
-
-                    {isEditingThisTopic ? (
-                      <div className="mt-3 space-y-3">
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
-                          <select
-                            value={pedagogyDraft.bloom_level_1 || "K2 - Understand"}
-                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_1: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
-                          >
-                            {KNOWLEDGE_LEVELS.map((lvl) => (
-                              <option key={lvl} value={lvl}>{lvl}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Primary Strategy</label>
-                          <input
-                            type="text"
-                            value={pedagogyDraft.pedagogy_suggested_1 || ""}
-                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_1: e.target.value })}
-                            placeholder="e.g. Flipped Classroom / Problem-Based Learning"
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Description</label>
-                          <textarea
-                            rows={2}
-                            value={pedagogyDraft.description_1 || ""}
-                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_1: e.target.value })}
-                            placeholder="Brief description of instructional flow..."
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Suggested Methodology</label>
-                          <input
-                            type="text"
-                            value={pedagogyDraft.methodology_1 || ""}
-                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_1: e.target.value })}
-                            placeholder="e.g. Small group brainstorming & case study presentation"
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                          <button
-                            type="button"
-                            onClick={() => setEditingPedagogyTopicId(null)}
-                            className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => savePedagogyTopic(sug.id)}
-                            disabled={savingPedagogyTopic}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            <Save className="h-3 w-3" />
-                            <span>{savingPedagogyTopic ? "Saving..." : "Save Strategy"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-3 space-y-2 text-xs">
-                        <div>
-                          <p className="font-semibold text-indigo-600 dark:text-indigo-400">
-                            Primary Strategy: {sug.pedagogy_suggested_1}
-                          </p>
-                          {sug.description_1 && (
-                            <p className="mt-1 text-slate-600 dark:text-slate-400 leading-relaxed">
-                              {sug.description_1}
-                            </p>
-                          )}
-                        </div>
-
-                        {sug.methodology_1 && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
-                            Methodology: {sug.methodology_1}
-                          </p>
-                        )}
-
-                        {sug.pedagogy_suggested_2 && (
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
-                            <span className="font-semibold">Alternative Strategy:</span> {sug.pedagogy_suggested_2}
-                          </div>
-                        )}
-                      </div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                      {sug.pedagogy_suggested_1 || "Direct Instruction & Discussion"}
+                    </h5>
+                    {sug.methodology_1 && (
+                      <p className="mt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        {sug.methodology_1}
+                      </p>
+                    )}
+                    {sug.description_1 && (
+                      <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {sug.description_1}
+                      </p>
                     )}
                   </div>
-                );
-              })}
-              {(currentPedagogy.topic_suggestions || []).length === 0 && (
-                <div className="col-span-2 py-8 text-center text-xs text-slate-400 italic">
-                  No topic suggestions recorded in this pedagogy version.
+                  {Array.isArray(sug.advantages_1) && sug.advantages_1.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
+                      {sug.advantages_1.map((adv: string, aIdx: number) => (
+                        <span key={aIdx} className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300">
+                          ✓ {adv}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Pedagogy 2: Alternative 1 */}
+                <div className="rounded-xl border border-sky-200/80 bg-white p-3.5 shadow-2xs dark:border-sky-900/60 dark:bg-slate-900 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                        2. Alternative Strategy 1
+                      </span>
+                      {sug.bloom_level_2 && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {sug.bloom_level_2}
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                      {sug.pedagogy_suggested_2 || "Collaborative Problem Solving"}
+                    </h5>
+                    {sug.methodology_2 && (
+                      <p className="mt-1 text-[11px] font-medium text-sky-600 dark:text-sky-400">
+                        {sug.methodology_2}
+                      </p>
+                    )}
+                    {sug.description_2 && (
+                      <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {sug.description_2}
+                      </p>
+                    )}
+                  </div>
+                  {Array.isArray(sug.advantages_2) && sug.advantages_2.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
+                      {sug.advantages_2.map((adv: string, aIdx: number) => (
+                        <span key={aIdx} className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700 dark:bg-sky-950/70 dark:text-sky-300">
+                          ✓ {adv}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pedagogy 3: Alternative 2 */}
+                <div className="rounded-xl border border-violet-200/80 bg-white p-3.5 shadow-2xs dark:border-violet-900/60 dark:bg-slate-900 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                        3. Alternative Strategy 2
+                      </span>
+                      {sug.bloom_level_3 && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {sug.bloom_level_3}
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                      {sug.pedagogy_suggested_3 || "Flipped Classroom / Project Work"}
+                    </h5>
+                    {sug.methodology_3 && (
+                      <p className="mt-1 text-[11px] font-medium text-violet-600 dark:text-violet-400">
+                        {sug.methodology_3}
+                      </p>
+                    )}
+                    {sug.description_3 && (
+                      <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {sug.description_3}
+                      </p>
+                    )}
+                  </div>
+                  {Array.isArray(sug.advantages_3) && sug.advantages_3.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
+                      {sug.advantages_3.map((adv: string, aIdx: number) => (
+                        <span key={aIdx} className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-950/70 dark:text-violet-300">
+                          ✓ {adv}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+
+            const renderEditForm = (sug: any, topicName: string) => (
+              <div className="space-y-4 rounded-xl border border-indigo-200 bg-white p-4 dark:border-indigo-900 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
+                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    Edit 3 Pedagogical Delivery Strategies: {topicName}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingPedagogyTopicId(null)}
+                      className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => savePedagogyTopic(sug.id)}
+                      disabled={savingPedagogyTopic}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>{savingPedagogyTopic ? "Saving..." : "Save Strategies"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Strategy 1 Form */}
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/20 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/20 space-y-2.5">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">1. Primary Strategy</span>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Name</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.pedagogy_suggested_1 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_1: e.target.value })}
+                        placeholder="e.g. Flipped Classroom"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                      <select
+                        value={pedagogyDraft.bloom_level_1 || "K2 - Understand"}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_1: e.target.value })}
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Methodology</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.methodology_1 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_1: e.target.value })}
+                        placeholder="e.g. Direct Instruction & Guided Problem Solving"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Description</label>
+                      <textarea
+                        rows={2}
+                        value={pedagogyDraft.description_1 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_1: e.target.value })}
+                        placeholder="Brief instructional description..."
+                        className="mt-1 w-full rounded border border-slate-200 bg-white p-2 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Strategy 2 Form */}
+                  <div className="rounded-lg border border-sky-200 bg-sky-50/20 p-3.5 dark:border-sky-900/60 dark:bg-sky-950/20 space-y-2.5">
+                    <span className="text-xs font-bold text-sky-700 dark:text-sky-400">2. Alternative Strategy 1</span>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Name</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.pedagogy_suggested_2 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_2: e.target.value })}
+                        placeholder="e.g. Collaborative Problem Solving"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                      <select
+                        value={pedagogyDraft.bloom_level_2 || "K3 - Apply"}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_2: e.target.value })}
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Methodology</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.methodology_2 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_2: e.target.value })}
+                        placeholder="e.g. Small group case discussions"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Description</label>
+                      <textarea
+                        rows={2}
+                        value={pedagogyDraft.description_2 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_2: e.target.value })}
+                        placeholder="Brief instructional description..."
+                        className="mt-1 w-full rounded border border-slate-200 bg-white p-2 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Strategy 3 Form */}
+                  <div className="rounded-lg border border-violet-200 bg-violet-50/20 p-3.5 dark:border-violet-900/60 dark:bg-violet-950/20 space-y-2.5">
+                    <span className="text-xs font-bold text-violet-700 dark:text-violet-400">3. Alternative Strategy 2</span>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Name</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.pedagogy_suggested_3 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_3: e.target.value })}
+                        placeholder="e.g. Think-Pair-Share"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                      <select
+                        value={pedagogyDraft.bloom_level_3 || "K4 - Analyze"}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_3: e.target.value })}
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Methodology</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.methodology_3 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_3: e.target.value })}
+                        placeholder="e.g. Self-paced guided inquiry"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Description</label>
+                      <textarea
+                        rows={2}
+                        value={pedagogyDraft.description_3 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_3: e.target.value })}
+                        placeholder="Brief instructional description..."
+                        className="mt-1 w-full rounded border border-slate-200 bg-white p-2 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+
+            return (
+              <div className="space-y-6">
+                {hasUnits ? (
+                  unitsList.map((unit: any, uIdx: number) => {
+                    const uTopics = unit.topics || [];
+                    if (uTopics.length === 0) return null;
+
+                    return (
+                      <div
+                        key={unit.id || uIdx}
+                        className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4"
+                      >
+                        {/* Unit Card Header */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                          <div className="flex items-center gap-2.5">
+                            <span className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                              Unit {unit.unit_number}
+                            </span>
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                {unit.unit_title}
+                              </h4>
+                              {unit.unit_overview && (
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+                                  {unit.unit_overview}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            {uTopics.length} Topics
+                          </span>
+                        </div>
+
+                        {/* Topics List with 3 Pedagogies Card Views */}
+                        <div className="space-y-4">
+                          {uTopics.map((topic: any, tIdx: number) => {
+                            const sug = sugByTopicId.get(topic.id);
+                            if (sug) renderedSugIds.add(sug.id);
+                            const isEditingThisTopic = sug && editingPedagogyTopicId === sug.id;
+
+                            return (
+                              <div
+                                key={topic.id || tIdx}
+                                className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-3"
+                              >
+                                {/* Topic Card Header */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-750">
+                                  <div className="flex items-center gap-2">
+                                    <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                      Topic {unit.unit_number}.{topic.topic_number || tIdx + 1}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                      {topic.topic_name}
+                                    </span>
+                                  </div>
+
+                                  {canEditPedagogy && sug && !isEditingThisTopic && (
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditPedagogyTopic(sug)}
+                                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                    >
+                                      <Edit2 className="h-3 w-3 text-indigo-500" />
+                                      <span>Edit Pedagogies</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Body: 3 Pedagogies Cards or Edit Form */}
+                                {isEditingThisTopic ? (
+                                  renderEditForm(sug, topic.topic_name)
+                                ) : sug ? (
+                                  renderStrategyCards(sug)
+                                ) : (
+                                  <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
+                                    No pedagogy strategies recorded for this topic.
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : null}
+
+                {/* Fallback for unmapped suggestions (or if units list is empty) */}
+                {(() => {
+                  const unmapped = topicSuggestions.filter((s: any) => !renderedSugIds.has(s.id));
+                  if (unmapped.length === 0) return null;
+
+                  return (
+                    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 pb-2 dark:border-slate-800">
+                        {hasUnits ? "Additional Topic Pedagogies" : "Curriculum Topics Pedagogies"}
+                      </h4>
+                      <div className="space-y-4">
+                        {unmapped.map((sug: any, idx: number) => {
+                          const isEditingThisTopic = editingPedagogyTopicId === sug.id;
+                          const tName = sug.topic_name || `Topic #${sug.topic_id}`;
+
+                          return (
+                            <div
+                              key={sug.id || idx}
+                              className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-750">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                  {tName}
+                                </span>
+                                {canEditPedagogy && !isEditingThisTopic && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditPedagogyTopic(sug)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                                  >
+                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <span>Edit Pedagogies</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {isEditingThisTopic ? renderEditForm(sug, tName) : renderStrategyCards(sug)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {topicSuggestions.length === 0 && (
+                  <div className="py-8 text-center text-xs text-slate-400 italic">
+                    No topic suggestions recorded in this pedagogy version.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -3161,132 +3552,244 @@ const InsCourseArtifacts = () => {
             });
 
             const groupsList = Array.from(groupsMap.values());
-            const canEditLp = Boolean(isCoord && !currentLessonPlan.is_approved && !selectedVersionData.lesson_plan);
+            const canEditLp = Boolean(isCoord && currentLessonPlan && !selectedVersionData.lesson_plan);
 
             return (
               <div className="space-y-6">
                 {groupsList.map((group, gIdx) => (
-                  <div key={gIdx} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-indigo-500" />
-                        <span>{group.unitTitle}</span>
-                      </h4>
+                  <div
+                    key={gIdx}
+                    className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4"
+                  >
+                    {/* Unit Card Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                          Unit
+                        </span>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                          {group.unitTitle}
+                        </h4>
+                      </div>
                       <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                        {group.totalHours} Allocated Hours
+                        {group.totalHours} Total Allocated Hours
                       </span>
                     </div>
 
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
-                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-16">Slot #</th>
-                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 min-w-[220px]">Topic / Subtopic</th>
-                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-28">Allocated</th>
-                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-32">Bloom Level</th>
-                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300">Suggested Activity</th>
-                            {canEditLp && <th className="py-2.5 px-3 text-right font-bold text-slate-700 dark:text-slate-300 w-20">Actions</th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {group.slots.map((slot: any, sIdx: number) => {
-                            const isEditingThisSlot = editingLpSlotId === slot.id;
+                    {/* Topic Slots as Hierarchical Cards */}
+                    <div className="space-y-3.5">
+                      {group.slots.map((slot: any, sIdx: number) => {
+                        const isEditingThisSlot = editingLpSlotId === slot.id;
+                        const subSlots = slot.subtopic_slots || [];
 
-                            if (isEditingThisSlot) {
-                              return (
-                                <tr key={slot.id || sIdx} className="bg-indigo-50/40 dark:bg-indigo-950/30">
-                                  <td className="py-2.5 px-3 font-bold text-indigo-600">{sIdx + 1}</td>
-                                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                                    <div>{slot.topic_name || `Topic #${slot.topic_id}`}</div>
-                                    {slot.subtopic_name && <div className="text-[11px] text-slate-400">↳ {slot.subtopic_name}</div>}
-                                  </td>
-                                  <td className="py-2.5 px-3">
+                        return (
+                          <div
+                            key={slot.id || sIdx}
+                            className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40 space-y-3"
+                          >
+                            {/* Topic Slot Header */}
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                                    Slot #{sIdx + 1}
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                    {slot.topic_name || `Topic #${slot.topic_id}`}
+                                  </span>
+                                </div>
+                                {slot.subtopic_name && (
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    ↳ Subtopic: {slot.subtopic_name}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-lg bg-indigo-100/70 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                                  {slot.time_allocated || 1} Hr(s)
+                                </span>
+                                {slot.bloom_level && (
+                                  <span className="rounded bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    {slot.bloom_level}
+                                  </span>
+                                )}
+                                {canEditLp && !isEditingThisSlot && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditLpSlot(slot)}
+                                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  >
+                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <span>Edit Slot</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Editing Topic Slot Form */}
+                            {isEditingThisSlot ? (
+                              <div className="rounded-lg border border-indigo-200 bg-white p-3 dark:border-indigo-900 dark:bg-slate-900 space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Allocated Hours</label>
                                     <input
                                       type="number"
                                       min={0.5}
                                       step={0.5}
                                       value={lpSlotDraft.time_allocated}
                                       onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, time_allocated: Number(e.target.value) })}
-                                      className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                     />
-                                  </td>
-                                  <td className="py-2.5 px-3">
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
                                     <input
                                       type="text"
                                       value={lpSlotDraft.bloom_level}
                                       onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, bloom_level: e.target.value })}
                                       placeholder="e.g. Understand"
-                                      className="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                     />
-                                  </td>
-                                  <td className="py-2.5 px-3">
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Suggested Activity</label>
                                     <input
                                       type="text"
                                       value={lpSlotDraft.suggested_activity}
                                       onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, suggested_activity: e.target.value })}
-                                      placeholder="e.g. Interactive discussion & problem solving"
-                                      className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      placeholder="e.g. Interactive discussion & code walk"
+                                      className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                     />
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => saveLpSlot(slot.id)}
-                                        disabled={savingLpSlot}
-                                        className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                                      >
-                                        <Check className="h-3 w-3" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditingLpSlotId(null)}
-                                        className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            }
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-end gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveLpSlot(slot.id)}
+                                    disabled={savingLpSlot}
+                                    className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                    <span>{savingLpSlot ? "Saving..." : "Save"}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingLpSlotId(null)}
+                                    className="rounded border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">Activity: </span>
+                                <span>{slot.suggested_activity || "Interactive lecture with hands-on practice & discussion"}</span>
+                              </div>
+                            )}
 
-                            return (
-                              <tr key={slot.id || sIdx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition">
-                                <td className="py-2.5 px-3 font-bold text-slate-400">{sIdx + 1}</td>
-                                <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                                  <div>{slot.topic_name || `Topic #${slot.topic_id}`}</div>
-                                  {slot.subtopic_name && <div className="text-[11px] text-slate-400">↳ {slot.subtopic_name}</div>}
-                                </td>
-                                <td className="py-2.5 px-3 font-bold text-indigo-600 dark:text-indigo-400">
-                                  {slot.time_allocated || 1} Hr(s)
-                                </td>
-                                <td className="py-2.5 px-3">
-                                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                    {slot.bloom_level || "Understand"}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
-                                  {slot.suggested_activity || "Interactive Lecture & Discussion"}
-                                </td>
-                                {canEditLp && (
-                                  <td className="py-2.5 px-3 text-right">
-                                    <button
-                                      type="button"
-                                      onClick={() => startEditLpSlot(slot)}
-                                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                                    >
-                                      <Edit2 className="h-3 w-3 text-indigo-500" />
-                                      <span>Edit</span>
-                                    </button>
-                                  </td>
-                                )}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                            {/* Hierarchical Subtopic Slots (if any) */}
+                            {subSlots.length > 0 && (
+                              <div className="border-t border-slate-200/60 pt-2.5 dark:border-slate-750 space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  Subtopic Delivery Schedule ({subSlots.length})
+                                </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {subSlots.map((sub: any) => {
+                                    const isEditingSub = editingLpSubtopicSlotId === sub.id;
+
+                                    if (isEditingSub) {
+                                      return (
+                                        <div
+                                          key={sub.id}
+                                          className="rounded-lg border border-indigo-200 bg-white p-3 text-xs dark:border-indigo-900 dark:bg-slate-900 space-y-2"
+                                        >
+                                          <span className="font-bold text-slate-900 dark:text-white">
+                                            {sub.subtopic_name || `Subtopic #${sub.subtopic_id}`}
+                                          </span>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                              <label className="text-[10px] font-semibold text-slate-500">Hours</label>
+                                              <input
+                                                type="number"
+                                                min={0.25}
+                                                step={0.25}
+                                                value={lpSubtopicSlotDraft.time_allocated}
+                                                onChange={(e) => setLpSubtopicSlotDraft({ ...lpSubtopicSlotDraft, time_allocated: Number(e.target.value) })}
+                                                className="w-full rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="text-[10px] font-semibold text-slate-500">Activity</label>
+                                              <input
+                                                type="text"
+                                                value={lpSubtopicSlotDraft.suggested_activity}
+                                                onChange={(e) => setLpSubtopicSlotDraft({ ...lpSubtopicSlotDraft, suggested_activity: e.target.value })}
+                                                className="w-full rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center justify-end gap-1.5 pt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => saveLpSubtopicSlot(sub.id)}
+                                              disabled={savingLpSubtopicSlot}
+                                              className="rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+                                            >
+                                              {savingLpSubtopicSlot ? "..." : "Save"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingLpSubtopicSlotId(null)}
+                                              className="rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div
+                                        key={sub.id}
+                                        className="rounded-lg border border-slate-200/70 bg-white p-2.5 text-xs dark:border-slate-700/60 dark:bg-slate-900 flex items-start justify-between gap-2"
+                                      >
+                                        <div className="space-y-0.5">
+                                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                            {sub.subtopic_name || `Subtopic #${sub.subtopic_id}`}
+                                          </span>
+                                          {sub.suggested_activity && (
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                              {sub.suggested_activity}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <span className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                                            {sub.time_allocated}h
+                                          </span>
+                                          {canEditLp && (
+                                            <button
+                                              type="button"
+                                              onClick={() => startEditLpSubtopicSlot(sub)}
+                                              className="rounded p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                              title="Edit Subtopic Slot"
+                                            >
+                                              <Edit2 className="h-3 w-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
