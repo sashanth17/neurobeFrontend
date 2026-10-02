@@ -229,12 +229,6 @@ export const OwnmenuConfig = {
     },
     {
       type: "link",
-      icon: "IconMenuForms",
-      label: "Course Artifacts",
-      href: "/neurobe/ins-course-artifacts",
-    },
-    {
-      type: "link",
       icon: "IconMenuUsers",
       label: "Instance Management",
       href: "/neurobe/course-offering",
@@ -279,12 +273,6 @@ OwnmenuConfig.FACULTY = [
     type: "heading",
     label: "INSTRUCTOR FUNCTIONS",
     className: "pb-2 pt-2",
-  },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "Course Artifacts",
-    href: "/neurobe/ins-course-artifacts",
   },
   {
     type: "link",
