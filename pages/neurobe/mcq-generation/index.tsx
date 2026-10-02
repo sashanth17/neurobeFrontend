@@ -208,106 +208,72 @@ const MCQGenerationIndexPage = () => {
     try {
       setState({ loadingHierarchy: true });
 
-      // Step A: Check workflow status for active hierarchy version
-      const wfRes: any = await Models.syllabus.get_workflow_status(courseId).catch(() => null);
-      const wfObj = wfRes?.workflow || wfRes;
-      const stepExtraction = wfObj?.step_1_syllabus_extraction;
-      const step3 = wfObj?.step_3_topic_hierarchy;
-      const activeVersion =
-        stepExtraction?.active_version || step3?.active_version || (Number(stepExtraction?.total_versions) > 0 ? stepExtraction.total_versions : (Number(step3?.total_versions) > 0 ? step3.total_versions : 1));
+      // Step A: Fetch active extraction from course portfolio
+      const portRes: any = await Models.course.course_portfolio(courseId).catch((err) => {
+        console.warn("Course portfolio fetch error:", err);
+        return null;
+      });
 
-      let rawUnits: any[] = [];
+      let rawUnits: any[] =
+        portRes?.active_extraction?.units ||
+        portRes?.active_syllabus?.units ||
+        [];
 
-      if (activeVersion) {
-        // Try extraction version first (curriculum hierarchy is extracted in step 1)
-        const extSnap: any = await Models.syllabus
-          .get_specific_version(courseId, "extraction", activeVersion)
-          .catch(() => null);
-
-        rawUnits =
-          extSnap?.data_ai_gave?.units ||
-          extSnap?.data_ai_gave?.syllabus?.units ||
-          extSnap?.units ||
-          [];
-
-        if (!rawUnits.length) {
-          const hierSnap: any = await Models.syllabus
-            .get_specific_version(courseId, "hierarchy", activeVersion)
-            .catch(() => null);
-
-          rawUnits =
-            hierSnap?.data_ai_gave?.units ||
-            hierSnap?.data_ai_gave ||
-            hierSnap?.units ||
-            [];
-        }
+      // Step B: Fallback to syllabus units if portfolio didn't provide units
+      if (!rawUnits.length) {
+        const unitsRes: any = await Models.syllabus.get_units(courseId, { topic_status: "approved" }).catch(() => null);
+        rawUnits = Array.isArray(unitsRes) ? unitsRes : unitsRes?.units || [];
       }
 
-      // If version data exists, map topics and subtopics
+      // Step C: Map units and real topic names
       if (Array.isArray(rawUnits) && rawUnits.length > 0) {
         const mapped: HierarchyUnitItem[] = rawUnits.map((u: any, uIdx: number) => ({
-          unit_number: Number(u.unitNumber || u.unit_number || uIdx + 1),
-          unit_title: u.unitTitle || u.title || `Unit ${uIdx + 1}`,
-          topics: (u.topics || []).map((t: any, tIdx: number) => ({
-            id: String(t.topicId || t.code || `${uIdx + 1}.${tIdx + 1}`),
-            code: String(t.code || t.topicId || `${uIdx + 1}.${tIdx + 1}`),
-            title: t.title || t.topicName || t.topic_name || `Topic ${tIdx + 1}`,
-            subtopics: (t.subtopics || []).map((st: any, stIdx: number) => ({
-              id: String(st.subtopicId || st.code || `${uIdx + 1}.${tIdx + 1}.${stIdx + 1}`),
-              code: String(st.code || st.subtopicId || `${uIdx + 1}.${tIdx + 1}.${stIdx + 1}`),
-              title:
-                typeof st === "string"
-                  ? st
-                  : st.title || st.subtopicName || st.subtopic_name || `Subtopic ${stIdx + 1}`,
-            })),
-          })),
+          unit_number: Number(u.unit_number || u.unitNumber || uIdx + 1),
+          unit_title: u.unit_title || u.unitTitle || u.title || `Unit ${uIdx + 1}`,
+          topics: (u.topics || []).map((t: any, tIdx: number) => {
+            const topicTitle =
+              typeof t === "string"
+                ? t
+                : t.topic_name || t.topicName || t.title || t.name || `Topic ${tIdx + 1}`;
+            const topicCode =
+              typeof t === "object"
+                ? String(t.topic_code || t.topicId || t.code || `${uIdx + 1}.${tIdx + 1}`)
+                : `${uIdx + 1}.${tIdx + 1}`;
+            const rawSub = typeof t === "object" && Array.isArray(t.subtopics) ? t.subtopics : [];
+            return {
+              id: topicCode,
+              code: topicCode,
+              title: topicTitle,
+              subtopics: rawSub.map((st: any, sIdx: number) => ({
+                id:
+                  typeof st === "object"
+                    ? String(st.subtopic_code || st.subtopicId || st.code || `${topicCode}.${sIdx + 1}`)
+                    : `${topicCode}.${sIdx + 1}`,
+                code:
+                  typeof st === "object"
+                    ? String(st.subtopic_code || st.subtopicId || st.code || `${topicCode}.${sIdx + 1}`)
+                    : `${topicCode}.${sIdx + 1}`,
+                title:
+                  typeof st === "string"
+                    ? st
+                    : st.subtopic_name || st.subtopicName || st.title || st.name || `Subtopic ${sIdx + 1}`,
+              })),
+            };
+          }),
         }));
 
         setState({ hierarchyUnits: mapped, loadingHierarchy: false });
         return;
       }
 
-      // Fallback: Fetch approved units from syllabus
-      const unitsRes: any = await Models.syllabus.get_units(courseId, { topic_status: "approved" }).catch(() => null);
-      const arr = Array.isArray(unitsRes) ? unitsRes : unitsRes?.units || [];
-      if (arr.length > 0) {
-        const fallbackMapped: HierarchyUnitItem[] = arr.map((u: any, idx: number) => ({
-          unit_number: Number(u.unit_number || idx + 1),
-          unit_title: u.unit_title || u.title || `Unit ${idx + 1}`,
-          topics: (u.topics || []).map((t: any, tIdx: number) => {
-            const title = typeof t === "string" ? t : t.topic_name || t.title || t.name || `Topic ${tIdx + 1}`;
-            const rawSub = t.subtopics || [];
-            return {
-              id: String(idx + 1) + "." + String(tIdx + 1),
-              code: String(idx + 1) + "." + String(tIdx + 1),
-              title,
-              subtopics: rawSub.map((st: any, sIdx: number) => ({
-                id: `${idx + 1}.${tIdx + 1}.${sIdx + 1}`,
-                title: typeof st === "string" ? st : st.title || st.subtopic_name || st.name || `Subtopic ${sIdx + 1}`,
-              })),
-            };
-          }),
-        }));
-        setState({ hierarchyUnits: fallbackMapped, loadingHierarchy: false });
-        return;
-      }
-
-      // Default fallback
+      // If no extraction units found, avoid dummy "Topic 1.1" placeholders
       setState({
-        hierarchyUnits: UNITS_CONFIG.map((u) => ({
-          unit_number: Number(u.unitId),
-          unit_title: u.title,
-          topics: (u.topics || []).map((t, tidx) => ({
-            id: `${u.unitId}.${tidx + 1}`,
-            title: t,
-            subtopics: [],
-          })),
-        })),
+        hierarchyUnits: [],
         loadingHierarchy: false,
       });
     } catch (err) {
       console.error("Failed to load topic hierarchy units:", err);
-      setState({ loadingHierarchy: false });
+      setState({ hierarchyUnits: [], loadingHierarchy: false });
     }
   };
 
@@ -494,6 +460,8 @@ const MCQGenerationIndexPage = () => {
     activePresetDescription: string;
     includeExplanation: boolean;
     shuffleOptions: boolean;
+    enableBreakdown?: boolean;
+    difficultyBreakdown?: Record<string, { easy: number; medium: number; hard: number }>;
   }) => {
     if (!state.selectedCourse) return;
 
@@ -523,9 +491,26 @@ const MCQGenerationIndexPage = () => {
         language: "en",
         include_explanation: genData.includeExplanation,
         shuffle_options: genData.shuffleOptions,
-        distribution_mode: "knowledge_level",
-        knowledge_level_breakdown: genData.bloomCounts,
       };
+
+      if (genData.enableBreakdown && genData.difficultyBreakdown) {
+        payload.distribution_mode = "knowledge_and_difficulty";
+        const diffBreakdown: any = {};
+        ["K1", "K2", "K3", "K4", "K5", "K6"].forEach((k) => {
+          const bd = genData.difficultyBreakdown![k] || { easy: 0, medium: 0, hard: 0 };
+          diffBreakdown[k] = {
+            easy: Number(bd.easy) || 0,
+            medium: Number(bd.medium) || 0,
+            hard: Number(bd.hard) || 0,
+          };
+        });
+        payload.knowledge_difficulty_breakdown = diffBreakdown;
+        payload.knowledge_level_breakdown = null;
+      } else {
+        payload.distribution_mode = "knowledge_level";
+        payload.knowledge_level_breakdown = genData.bloomCounts;
+        payload.knowledge_difficulty_breakdown = null;
+      }
 
       if (genData.activePresetDescription) {
         payload.description = genData.activePresetDescription;

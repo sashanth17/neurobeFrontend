@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Sparkles,
   BookOpen,
@@ -50,6 +50,8 @@ export interface SimplifiedMCQGeneratorProps {
     activePresetDescription: string;
     includeExplanation: boolean;
     shuffleOptions: boolean;
+    enableBreakdown?: boolean;
+    difficultyBreakdown?: Record<string, { easy: number; medium: number; hard: number }>;
   }) => Promise<void>;
   isGeneratingAI: boolean;
 }
@@ -143,6 +145,51 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
     K6: 0,
   });
 
+  // Question Breakdown by difficulty toggle (Easy / Medium / Hard)
+  const [enableBreakdown, setEnableBreakdown] = useState<boolean>(false);
+
+  // Difficulty breakdown state per knowledge level
+  const [difficultyBreakdown, setDifficultyBreakdown] = useState<
+    Record<string, { easy: number; medium: number; hard: number }>
+  >({
+    K1: { easy: 2, medium: 0, hard: 0 },
+    K2: { easy: 1, medium: 1, hard: 0 },
+    K3: { easy: 0, medium: 1, hard: 0 },
+    K4: { easy: 0, medium: 0, hard: 0 },
+    K5: { easy: 0, medium: 0, hard: 0 },
+    K6: { easy: 0, medium: 0, hard: 0 },
+  });
+
+  // Automatically select first unit topics when hierarchyUnits are loaded/updated
+  useEffect(() => {
+    if (hierarchyUnits && hierarchyUnits.length > 0) {
+      setSelectedTopicKeys((prev) => {
+        // If selection is empty or has keys not present in current hierarchyUnits, reinitialize
+        const validKeyExists = Array.from(prev).some((k) => {
+          const match = k.match(/^u(\d+)-t(\d+)$/);
+          if (!match) return false;
+          const uNum = Number(match[1]);
+          const tIdx = Number(match[2]);
+          const u = hierarchyUnits.find((unit) => unit.unit_number === uNum);
+          return u && u.topics && u.topics[tIdx];
+        });
+
+        if (!validKeyExists || prev.size === 0) {
+          const initial = new Set<string>();
+          const u1 = hierarchyUnits[0];
+          (u1.topics || []).forEach((t, tIdx) => {
+            initial.add(`u${u1.unit_number}-t${tIdx}`);
+            (t.subtopics || []).forEach((_, sIdx) => {
+              initial.add(`u${u1.unit_number}-t${tIdx}-s${sIdx}`);
+            });
+          });
+          return initial;
+        }
+        return prev;
+      });
+    }
+  }, [hierarchyUnits]);
+
   // Pedagogical Focus: exactly the 4 presets
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
 
@@ -150,10 +197,16 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
   const [includeExplanation, setIncludeExplanation] = useState(true);
   const [shuffleOptions, setShuffleOptions] = useState(true);
 
-  // Total questions count derived from Bloom's level sum
+  // Total questions count derived from either difficulty breakdown or Bloom's levels
   const totalQuestions = useMemo(() => {
+    if (enableBreakdown) {
+      return Object.values(difficultyBreakdown).reduce(
+        (acc, diff) => acc + (diff.easy || 0) + (diff.medium || 0) + (diff.hard || 0),
+        0
+      );
+    }
     return Object.values(bloomCounts).reduce((acc, v) => acc + (Number(v) || 0), 0);
-  }, [bloomCounts]);
+  }, [enableBreakdown, difficultyBreakdown, bloomCounts]);
 
   // Topic Selection Helpers
   const toggleUnitAccordion = (uNum: number) => {
@@ -256,16 +309,119 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
     }));
   };
 
-  const applyPreset = (preset: "balanced" | "foundational" | "advanced" | "reset") => {
-    if (preset === "reset") {
-      setBloomCounts({ K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 });
-    } else if (preset === "foundational") {
-      setBloomCounts({ K1: 3, K2: 3, K3: 0, K4: 0, K5: 0, K6: 0 });
-    } else if (preset === "advanced") {
-      setBloomCounts({ K1: 0, K2: 1, K3: 3, K4: 3, K5: 1, K6: 0 });
-    } else {
-      setBloomCounts({ K1: 2, K2: 3, K3: 2, K4: 1, K5: 0, K6: 0 });
+  // Difficulty Breakdown Helpers (Easy / Medium / Hard)
+  const updateDifficultyCount = (level: string, diff: "easy" | "medium" | "hard", delta: number) => {
+    setDifficultyBreakdown((prev) => {
+      const current = prev[level] || { easy: 0, medium: 0, hard: 0 };
+      const nextVal = Math.max(0, (current[diff] || 0) + delta);
+      const updatedLevel = { ...current, [diff]: nextVal };
+      const nextBreakdown = { ...prev, [level]: updatedLevel };
+
+      // Sync bloomCounts[level] with the new level total
+      const newLevelTotal = updatedLevel.easy + updatedLevel.medium + updatedLevel.hard;
+      setBloomCounts((bPrev) => ({ ...bPrev, [level]: newLevelTotal }));
+
+      return nextBreakdown;
+    });
+  };
+
+  const setDifficultyExact = (level: string, diff: "easy" | "medium" | "hard", val: number) => {
+    const cleanVal = Math.max(0, Math.min(50, isNaN(val) ? 0 : val));
+    setDifficultyBreakdown((prev) => {
+      const current = prev[level] || { easy: 0, medium: 0, hard: 0 };
+      const updatedLevel = { ...current, [diff]: cleanVal };
+      const nextBreakdown = { ...prev, [level]: updatedLevel };
+
+      // Sync bloomCounts[level] with the new level total
+      const newLevelTotal = updatedLevel.easy + updatedLevel.medium + updatedLevel.hard;
+      setBloomCounts((bPrev) => ({ ...bPrev, [level]: newLevelTotal }));
+
+      return nextBreakdown;
+    });
+  };
+
+  const toggleBreakdown = () => {
+    const nextState = !enableBreakdown;
+    setEnableBreakdown(nextState);
+    if (nextState) {
+      // Synchronize difficulty breakdown so it matches the current bloomCounts
+      setDifficultyBreakdown((prev) => {
+        const updated = { ...prev };
+        BLOOM_LEVELS.forEach((bl) => {
+          const total = bloomCounts[bl.level] || 0;
+          const currentTotal =
+            (updated[bl.level]?.easy || 0) +
+            (updated[bl.level]?.medium || 0) +
+            (updated[bl.level]?.hard || 0);
+
+          if (currentTotal !== total) {
+            if (bl.level === "K1") {
+              updated[bl.level] = { easy: total, medium: 0, hard: 0 };
+            } else if (bl.level === "K2") {
+              const med = Math.floor(total / 2);
+              updated[bl.level] = { easy: total - med, medium: med, hard: 0 };
+            } else if (bl.level === "K3") {
+              const easy = Math.floor(total / 3);
+              const hard = Math.floor(total / 3);
+              updated[bl.level] = { easy, medium: total - easy - hard, hard };
+            } else if (bl.level === "K4") {
+              const hard = Math.floor(total / 2);
+              updated[bl.level] = { easy: 0, medium: total - hard, hard };
+            } else {
+              updated[bl.level] = { easy: 0, medium: 0, hard: total };
+            }
+          }
+        });
+        return updated;
+      });
     }
+  };
+
+  const applyPreset = (preset: "balanced" | "foundational" | "advanced" | "reset") => {
+    let nextBloom = { K1: 2, K2: 3, K3: 2, K4: 1, K5: 0, K6: 0 };
+    let nextDiff = {
+      K1: { easy: 2, medium: 0, hard: 0 },
+      K2: { easy: 1, medium: 2, hard: 0 },
+      K3: { easy: 0, medium: 2, hard: 0 },
+      K4: { easy: 0, medium: 0, hard: 1 },
+      K5: { easy: 0, medium: 0, hard: 0 },
+      K6: { easy: 0, medium: 0, hard: 0 },
+    };
+
+    if (preset === "reset") {
+      nextBloom = { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 };
+      nextDiff = {
+        K1: { easy: 0, medium: 0, hard: 0 },
+        K2: { easy: 0, medium: 0, hard: 0 },
+        K3: { easy: 0, medium: 0, hard: 0 },
+        K4: { easy: 0, medium: 0, hard: 0 },
+        K5: { easy: 0, medium: 0, hard: 0 },
+        K6: { easy: 0, medium: 0, hard: 0 },
+      };
+    } else if (preset === "foundational") {
+      nextBloom = { K1: 3, K2: 3, K3: 0, K4: 0, K5: 0, K6: 0 };
+      nextDiff = {
+        K1: { easy: 2, medium: 1, hard: 0 },
+        K2: { easy: 1, medium: 2, hard: 0 },
+        K3: { easy: 0, medium: 0, hard: 0 },
+        K4: { easy: 0, medium: 0, hard: 0 },
+        K5: { easy: 0, medium: 0, hard: 0 },
+        K6: { easy: 0, medium: 0, hard: 0 },
+      };
+    } else if (preset === "advanced") {
+      nextBloom = { K1: 0, K2: 1, K3: 3, K4: 3, K5: 1, K6: 0 };
+      nextDiff = {
+        K1: { easy: 0, medium: 0, hard: 0 },
+        K2: { easy: 0, medium: 1, hard: 0 },
+        K3: { easy: 0, medium: 2, hard: 1 },
+        K4: { easy: 0, medium: 1, hard: 2 },
+        K5: { easy: 0, medium: 0, hard: 1 },
+        K6: { easy: 0, medium: 0, hard: 0 },
+      };
+    }
+
+    setBloomCounts(nextBloom);
+    setDifficultyBreakdown(nextDiff);
   };
 
   // Build the filtered selected units for payload
@@ -336,6 +492,8 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
       activePresetDescription: preset ? preset.description : "",
       includeExplanation,
       shuffleOptions,
+      enableBreakdown,
+      difficultyBreakdown,
     });
   };
 
@@ -563,7 +721,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
       {/* ── SECTION 2: Knowledge Levels (Bloom's Stratification 1D) ── */}
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-all">
         {/* Header */}
-        <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
               <Sparkles className="h-5 w-5" />
@@ -578,42 +736,79 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Specify the exact question count for each Bloom's level. The sum determines the total questions generated.
+                Specify question counts for each Bloom's level. The sum determines the total questions generated.
               </p>
             </div>
           </div>
 
-          {/* Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Presets:</span>
-            <button
-              type="button"
-              onClick={() => applyPreset("balanced")}
-              className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300"
-            >
-              Balanced (K1–K4)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset("foundational")}
-              className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300"
-            >
-              Foundational (K1–K2)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset("advanced")}
-              className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300"
-            >
-              Advanced (K3–K6)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset("reset")}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
-            >
-              Reset
-            </button>
+          {/* Controls: Breakdown Toggle & Preset Buttons */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Question Breakdown Toggle Button */}
+            <div className="flex items-center gap-2 rounded-xl border border-purple-200/80 bg-purple-50/50 px-3 py-1.5 dark:border-purple-800/60 dark:bg-purple-950/30">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enableBreakdown}
+                onClick={toggleBreakdown}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  enableBreakdown ? "bg-purple-600" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    enableBreakdown ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+              <label
+                onClick={toggleBreakdown}
+                className="cursor-pointer select-none text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5"
+              >
+                Question Breakdown
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold ${
+                    enableBreakdown
+                      ? "bg-purple-200 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                      : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {enableBreakdown ? "ON" : "OFF"}
+                </span>
+              </label>
+            </div>
+
+            {/* Presets */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Presets:</span>
+              <button
+                type="button"
+                onClick={() => applyPreset("balanced")}
+                className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300"
+              >
+                Balanced (K1–K4)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("foundational")}
+                className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300"
+              >
+                Foundational (K1–K2)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("advanced")}
+                className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300"
+              >
+                Advanced (K3–K6)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("reset")}
+                className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+              >
+                Reset
+              </button>
+            </div>
           </div>
         </div>
 
@@ -623,6 +818,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
             {BLOOM_LEVELS.map((bl) => {
               const count = bloomCounts[bl.level] || 0;
               const isFilled = count > 0;
+              const diff = difficultyBreakdown[bl.level] || { easy: 0, medium: 0, hard: 0 };
 
               return (
                 <div
@@ -647,36 +843,139 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
                     <div className="mt-1 text-xs font-bold text-gray-900 dark:text-white">
                       {bl.shortName}
                     </div>
-                    <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2">
-                      {bl.verbs}
-                    </p>
+                    {!enableBreakdown && (
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2">
+                        {bl.verbs}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Stepper Input */}
-                  <div className="mt-3 flex items-center justify-between gap-1 pt-2 border-t border-gray-100 dark:border-gray-700/60">
-                    <button
-                      type="button"
-                      onClick={() => updateBloomCount(bl.level, -1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200 active:scale-95 transition dark:bg-gray-700 dark:text-gray-200"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <input
-                      type="number"
-                      min={0}
-                      max={50}
-                      value={count}
-                      onChange={(e) => setBloomExact(bl.level, parseInt(e.target.value) || 0)}
-                      className="w-12 rounded-lg border border-gray-200 bg-gray-50 py-1 text-center text-xs font-extrabold text-gray-900 focus:border-purple-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => updateBloomCount(bl.level, 1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200 active:scale-95 transition dark:bg-gray-700 dark:text-gray-200"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  </div>
+                  {!enableBreakdown ? (
+                    /* Standard Stepper Input */
+                    <div className="mt-3 flex items-center justify-between gap-1 pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                      <button
+                        type="button"
+                        onClick={() => updateBloomCount(bl.level, -1)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200 active:scale-95 transition dark:bg-gray-700 dark:text-gray-200"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={count}
+                        onChange={(e) => setBloomExact(bl.level, parseInt(e.target.value) || 0)}
+                        className="w-12 rounded-lg border border-gray-200 bg-gray-50 py-1 text-center text-xs font-extrabold text-gray-900 focus:border-purple-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateBloomCount(bl.level, 1)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200 active:scale-95 transition dark:bg-gray-700 dark:text-gray-200"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    /* Difficulty Breakdown Inputs (Easy / Medium / Hard) */
+                    <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-gray-700/60 space-y-1.5">
+                      {/* Easy */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          Easy
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateDifficultyCount(bl.level, "easy", -1)}
+                            className="flex h-5 w-5 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 text-xs font-bold dark:bg-gray-700 dark:text-gray-200"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={diff.easy}
+                            onChange={(e) => setDifficultyExact(bl.level, "easy", parseInt(e.target.value) || 0)}
+                            className="w-8 rounded border border-gray-200 bg-gray-50 py-0.5 text-center text-[11px] font-bold text-gray-900 focus:border-emerald-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateDifficultyCount(bl.level, "easy", 1)}
+                            className="flex h-5 w-5 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 text-xs font-bold dark:bg-gray-700 dark:text-gray-200"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Medium */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                          Med
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateDifficultyCount(bl.level, "medium", -1)}
+                            className="flex h-5 w-5 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 text-xs font-bold dark:bg-gray-700 dark:text-gray-200"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={diff.medium}
+                            onChange={(e) => setDifficultyExact(bl.level, "medium", parseInt(e.target.value) || 0)}
+                            className="w-8 rounded border border-gray-200 bg-gray-50 py-0.5 text-center text-[11px] font-bold text-gray-900 focus:border-amber-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateDifficultyCount(bl.level, "medium", 1)}
+                            className="flex h-5 w-5 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 text-xs font-bold dark:bg-gray-700 dark:text-gray-200"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Hard */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                          Hard
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateDifficultyCount(bl.level, "hard", -1)}
+                            className="flex h-5 w-5 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 text-xs font-bold dark:bg-gray-700 dark:text-gray-200"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={diff.hard}
+                            onChange={(e) => setDifficultyExact(bl.level, "hard", parseInt(e.target.value) || 0)}
+                            className="w-8 rounded border border-gray-200 bg-gray-50 py-0.5 text-center text-[11px] font-bold text-gray-900 focus:border-rose-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateDifficultyCount(bl.level, "hard", 1)}
+                            className="flex h-5 w-5 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 text-xs font-bold dark:bg-gray-700 dark:text-gray-200"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
