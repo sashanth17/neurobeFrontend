@@ -110,6 +110,7 @@ const StudentDashboard = () => {
     title: string;
     answered: string;
     total: string;
+    correct: string;
     time: string;
     switches: string;
   } | null>(null);
@@ -125,6 +126,7 @@ const StudentDashboard = () => {
         title: (router.query.title as string) || 'Assessment',
         answered: (router.query.answered as string) || '0',
         total: (router.query.total as string) || '0',
+        correct: (router.query.correct as string) || '0',
         time: (router.query.time as string) || 'N/A',
         switches: (router.query.switches as string) || '0',
       });
@@ -169,29 +171,34 @@ const StudentDashboard = () => {
 
   // Dynamically resolve test status: whenever current time is within test window, mark as Live!
   const resolvedTests = useMemo<ScheduledTest[]>(() => {
-    return scheduledTests.map((test) => {
-      const rawSt = (test.raw_status || test.status || '').toLowerCase();
-      if (rawSt === 'cancelled' || rawSt === 'canceled' || test.status === 'Cancelled') {
-        return { ...test, status: 'Cancelled' as const, can_start: false };
-      }
-      if (rawSt === 'completed' || rawSt === 'finished' || test.status === 'Completed') {
-        return { ...test, status: 'Completed' as const, can_start: false };
-      }
-      if (test.test_window_start && test.test_window_end) {
-        const ws = new Date(test.test_window_start).getTime();
-        const we = new Date(test.test_window_end).getTime();
-        if (currentTime >= ws && currentTime <= we) {
-          return { ...test, status: 'Live' as const, can_start: true };
+    return scheduledTests
+      .filter((test) => {
+        const rawSt = (test.raw_status || test.status || '').toLowerCase();
+        return rawSt !== 'draft' && rawSt !== 'setup_required';
+      })
+      .map((test) => {
+        const rawSt = (test.raw_status || test.status || '').toLowerCase();
+        if (rawSt === 'cancelled' || rawSt === 'canceled' || test.status === 'Cancelled') {
+          return { ...test, status: 'Cancelled' as const, can_start: false };
         }
-        if (currentTime > we) {
+        if (rawSt === 'completed' || rawSt === 'finished' || test.status === 'Completed') {
           return { ...test, status: 'Completed' as const, can_start: false };
         }
-        if (currentTime < ws) {
-          return { ...test, status: 'Upcoming' as const };
+        if (test.test_window_start && test.test_window_end) {
+          const ws = new Date(test.test_window_start).getTime();
+          const we = new Date(test.test_window_end).getTime();
+          if (currentTime >= ws && currentTime <= we) {
+            return { ...test, status: 'Live' as const, can_start: true };
+          }
+          if (currentTime > we) {
+            return { ...test, status: 'Completed' as const, can_start: false };
+          }
+          if (currentTime < ws) {
+            return { ...test, status: 'Upcoming' as const };
+          }
         }
-      }
-      return test;
-    });
+        return test;
+      });
   }, [scheduledTests, currentTime]);
 
   const dynamicStats = useMemo(() => {
@@ -316,87 +323,101 @@ const StudentDashboard = () => {
       {/* ── Metric Statistic Cards ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Scheduled Tests */}
-        <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Total Tests Scheduled
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 transition-transform group-hover:scale-110">
-              <IconCalendar className="h-5 w-5" />
+        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Total Tests Scheduled
+              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 transition-transform group-hover:scale-110">
+                <IconCalendar className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                {dynamicStats.total_tests}
+              </span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Exams</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-              {dynamicStats.total_tests}
-            </span>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Exams</span>
+          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-400">
+            Continuous & online assessments
           </div>
-          <div className="mt-2 text-xs text-gray-400">Continuous & online assessments</div>
         </div>
 
         {/* Upcoming Tests */}
-        <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Upcoming Exams
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 transition-transform group-hover:scale-110">
-              <IconClock className="h-5 w-5" />
+        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Upcoming Exams
+              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 transition-transform group-hover:scale-110">
+                <IconClock className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                {dynamicStats.upcoming_tests}
+              </span>
+              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Scheduled</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-              {dynamicStats.upcoming_tests}
-            </span>
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Scheduled</span>
+          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-400">
+            Prepare before start time
           </div>
-          <div className="mt-2 text-xs text-gray-400">Prepare before start time</div>
         </div>
 
         {/* Live / Active Tests */}
-        <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-emerald-900/40 dark:bg-emerald-900/20">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-emerald-900/40 dark:bg-emerald-900/20">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                </span>
+                Live Assessments
               </span>
-              Live Assessments
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300 transition-transform group-hover:scale-110">
-              <IconBolt className="h-5 w-5" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300 transition-transform group-hover:scale-110">
+                <IconBolt className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100">
+                {dynamicStats.live_tests}
+              </span>
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                Ready to take
+              </span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100">
-              {dynamicStats.live_tests}
-            </span>
-            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-              Ready to take
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
+          <div className="mt-3 pt-2.5 border-t border-emerald-200/50 dark:border-emerald-900/40 text-xs text-emerald-600 dark:text-emerald-400">
             {dynamicStats.live_tests > 0 ? 'Active window open now' : 'No tests currently in session'}
           </div>
         </div>
 
         {/* Enrolled Courses */}
-        <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-              Enrolled Courses
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 transition-transform group-hover:scale-110">
-              <IconBook className="h-5 w-5" />
+        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                Enrolled Courses
+              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 transition-transform group-hover:scale-110">
+                <IconBook className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                {dynamicStats.enrolled_courses_count}
+              </span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Courses</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-              {dynamicStats.enrolled_courses_count}
-            </span>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Courses</span>
+          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-400">
+            Current academic term
           </div>
-          <div className="mt-2 text-xs text-gray-400">Current academic term</div>
         </div>
       </div>
 
@@ -540,12 +561,12 @@ const StudentDashboard = () => {
                 return (
                   <div
                     key={test.id}
-                    className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white p-6 shadow-sm transition-all hover:shadow-lg dark:bg-gray-900 ${isLive
+                    className={`group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border bg-white p-6 shadow-sm transition-all hover:shadow-lg dark:bg-gray-900 ${isLive
                       ? 'border-emerald-300 ring-2 ring-emerald-500/20 dark:border-emerald-700'
                       : 'border-gray-200 dark:border-gray-800'
                       }`}
                   >
-                    <div>
+                    <div className="flex-1 flex flex-col">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
@@ -572,92 +593,117 @@ const StudentDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Title & Description */}
-                      <h3 className="mt-4 text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors dark:text-white dark:group-hover:text-blue-400 line-clamp-2">
-                        {test.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-500 line-clamp-1 dark:text-gray-400">
-                        {test.course_name}
-                      </p>
+                      {/* Title & Description with balanced height */}
+                      <div className="mt-4 mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors dark:text-white dark:group-hover:text-blue-400 line-clamp-2 min-h-[3.25rem]">
+                          {test.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 line-clamp-1 dark:text-gray-400">
+                          {test.course_name}
+                        </p>
+                      </div>
+
+                      {/* Optional Viva & Passcode Badges */}
+                      <div className="space-y-2 mt-auto pt-3">
+                        {test.have_viva && (
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-3 py-2 rounded-lg">
+                            <IconAward className="h-4 w-4 shrink-0" />
+                            <span>Includes AI Viva Voce Assessment</span>
+                          </div>
+                        )}
+
+                        {test.secure_code && (
+                          <div className="flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-2 border border-indigo-100 text-xs dark:bg-indigo-900/30 dark:border-indigo-800/50">
+                            <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">Passcode:</span>
+                            <span className="font-mono font-bold tracking-widest text-indigo-900 dark:text-indigo-100 bg-white dark:bg-indigo-950 px-2 py-0.5 rounded">{test.secure_code}</span>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Meta Grid */}
-                      <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 text-xs dark:bg-gray-800/60">
-                        <div>
-                          <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Date</span>
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 text-xs dark:bg-gray-800/60">
+                        <div className="col-span-2">
+                          <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Test Window</span>
                           <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {test.test_date || 'TBA'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Time</span>
-                          <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {test.start_time || 'Scheduled Slot'}
+                            {(() => {
+                              if (test.test_window_start && test.test_window_end) {
+                                try {
+                                  const ws = new Date(test.test_window_start);
+                                  const we = new Date(test.test_window_end);
+                                  if (!isNaN(ws.getTime()) && !isNaN(we.getTime())) {
+                                    const dateStr = ws.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                    const startStr = ws.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    const endStr = we.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    return `${dateStr}  ${startStr} – ${endStr}`;
+                                  }
+                                } catch { }
+                              }
+                              return test.test_date ? `${test.test_date}${test.start_time ? '  ' + test.start_time : ''}` : 'TBA';
+                            })()}
                           </span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Duration</span>
                           <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {test.duration_minutes} Mins
+                            {(() => {
+                              const num = Number(test.duration_minutes);
+                              if (!num) return 'TBA';
+                              if (num >= 60) {
+                                const hrs = Math.floor(num / 60);
+                                const mins = num % 60;
+                                return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+                              }
+                              return `${num} Mins`;
+                            })()}
                           </span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Total Marks</span>
                           <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {test.total_marks} Marks
+                            {test.total_marks ? `${test.total_marks} Marks` : 'N/A'}
                           </span>
                         </div>
                       </div>
-
-                      {test.have_viva && (
-                        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-3 py-2 rounded-lg">
-                          <IconAward className="h-4 w-4" />
-                          <span>Includes AI Viva Voce Assessment</span>
-                        </div>
-                      )}
-
-                      {test.secure_code && (
-                        <div className="mt-3 flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-2 border border-indigo-100 text-xs dark:bg-indigo-900/30 dark:border-indigo-800/50">
-                          <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">Passcode:</span>
-                          <span className="font-mono font-bold tracking-widest text-indigo-900 dark:text-indigo-100 bg-white dark:bg-indigo-950 px-2 py-0.5 rounded">{test.secure_code}</span>
-                        </div>
-                      )}
                     </div>
 
                     {/* Actions */}
-                    <div className="mt-6 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <div className="mt-5 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
                       <button
                         onClick={() => setSelectedTest(test)}
-                        className="flex-1 rounded-xl border border-gray-200 bg-white py-2.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className="flex-1 h-10 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 cursor-pointer"
                       >
                         Details
                       </button>
 
                       {isCancelled ? (
-                        <div className="flex-1 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 py-2.5 text-center text-xs font-bold text-rose-600 dark:text-rose-400 select-none">
+                        <div className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 select-none">
                           Cancelled
                         </div>
                       ) : isCompleted ? (
-                        <div className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/60 py-2.5 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 select-none">
-                          Completed
-                        </div>
+                        <button
+                          onClick={() => router.push(`/neurobe/student-report?test_id=${test.raw_id}&student_email=${encodeURIComponent(student?.email || '')}`)}
+                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] cursor-pointer"
+                        >
+                          View Results →
+                        </button>
                       ) : isLive ? (
                         <button
                           onClick={() => handleStartTest(test)}
-                          className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow active:scale-[0.98]"
+                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow active:scale-[0.98] cursor-pointer"
                         >
                           Start Test Now
                         </button>
                       ) : test.source === 'online_mcq' ? (
                         <button
                           onClick={() => handleStartTest(test)}
-                          className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow active:scale-[0.98]"
+                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow active:scale-[0.98] cursor-pointer"
                         >
                           Join Screen →
                         </button>
                       ) : (
                         <button
                           onClick={() => setSelectedTest(test)}
-                          className="flex-1 rounded-xl bg-blue-50 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-blue-50 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 cursor-pointer"
                         >
                           Upcoming
                         </button>
@@ -689,25 +735,27 @@ const StudentDashboard = () => {
               {enrolledCourses.map((c) => (
                 <div
                   key={c.course_id}
-                  className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+                  className="group flex flex-col justify-between h-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                      {c.course_code}
-                    </span>
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50">
-                      {c.enrollment_status || 'Active'}
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        {c.course_code}
+                      </span>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50">
+                        {c.enrollment_status || 'Active'}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-2 min-h-[3rem]">
+                      {c.course_name}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5 line-clamp-1">
+                      Instance: {c.instance_name || 'Standard Curriculum'}
+                    </p>
                   </div>
 
-                  <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                    {c.course_name}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
-                    Instance: {c.instance_name || 'Standard Curriculum'}
-                  </p>
-
-                  <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                  <div className="mt-auto pt-5 flex items-center justify-between border-t border-gray-100 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
                     <span className="font-medium text-gray-600 dark:text-gray-300">Semester {c.semester || 1}</span>
                     <span className="font-semibold text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 px-3 py-1 rounded-lg">
                       {c.credits || 3} Credits
@@ -811,7 +859,7 @@ const StudentDashboard = () => {
       {/* Completion Report Modal (When returned from test without viva) */}
       {completionReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 border border-emerald-100 dark:border-emerald-950/40">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900 border border-emerald-100 dark:border-emerald-950/40">
             <div className="flex flex-col items-center text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 mb-4 shadow-sm">
                 <IconCircleCheck className="h-10 w-10" />
@@ -823,37 +871,73 @@ const StudentDashboard = () => {
                 {completionReport.title}
               </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Your responses have been successfully submitted and your test is marked as completed.
+                Your responses have been successfully submitted and recorded.
               </p>
             </div>
 
-            <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="rounded-lg bg-white p-3 shadow-xs dark:bg-gray-900">
-                  <span className="block text-xs font-medium text-gray-500 dark:text-gray-400">Answered Questions</span>
-                  <span className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                    {completionReport.answered} / {completionReport.total}
-                  </span>
-                </div>
-                <div className="rounded-lg bg-white p-3 shadow-xs dark:bg-gray-900">
-                  <span className="block text-xs font-medium text-gray-500 dark:text-gray-400">Time Taken</span>
-                  <span className="mt-1 text-lg font-bold text-gray-900 dark:text-white">
-                    {completionReport.time}
-                  </span>
-                </div>
-                <div className="rounded-lg bg-white p-3 shadow-xs dark:bg-gray-900">
-                  <span className="block text-xs font-medium text-gray-500 dark:text-gray-400">Tab Switches</span>
-                  <span className={`mt-1 text-lg font-bold ${Number(completionReport.switches) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-white'}`}>
-                    {completionReport.switches}
-                  </span>
-                </div>
-                <div className="rounded-lg bg-white p-3 shadow-xs dark:bg-gray-900">
-                  <span className="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</span>
-                  <span className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span> Completed
-                  </span>
-                </div>
+            {/* Score summary */}
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/30 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Correct</span>
+                <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
+                  {completionReport.correct}
+                  <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-500"> / {completionReport.total}</span>
+                </span>
               </div>
+              <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">Score</span>
+                <span className={`text-2xl font-black ${
+                  Number(completionReport.total) > 0
+                    ? Math.round((Number(completionReport.correct) / Number(completionReport.total)) * 100) >= 40
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : 'text-red-600 dark:text-red-400'
+                    : 'text-gray-500'
+                }`}>
+                  {Number(completionReport.total) > 0
+                    ? `${Math.round((Number(completionReport.correct) / Number(completionReport.total)) * 100)}%`
+                    : '—'}
+                </span>
+              </div>
+              <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-800/30 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-400 mb-1">Unanswered</span>
+                <span className="text-2xl font-black text-amber-700 dark:text-amber-300">
+                  {Math.max(0, Number(completionReport.total) - Number(completionReport.answered))}
+                </span>
+              </div>
+              <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/30 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Incorrect</span>
+                <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">
+                  {Math.max(0, Number(completionReport.answered) - Number(completionReport.correct))}
+                </span>
+              </div>
+            </div>
+            {/* Time + Tab Switches row */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">Time Taken</span>
+                <span className="text-lg font-black text-gray-700 dark:text-gray-200">{completionReport.time}</span>
+              </div>
+              <div className="rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/30 p-4 text-center">
+                <span className="block text-[10px] uppercase font-bold tracking-wider text-rose-600 dark:text-rose-400 mb-1">Tab Switches</span>
+                <span className={`text-2xl font-black ${
+                  Number(completionReport.switches) === 0
+                    ? 'text-emerald-700 dark:text-emerald-300'
+                    : Number(completionReport.switches) >= 2
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                }`}>
+                  {completionReport.switches}
+                </span>
+              </div>
+            </div>
+
+            {/* Detailed results locked notice */}
+            <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/30 p-3 text-xs text-indigo-700 dark:text-indigo-300">
+              <IconEye className="h-4 w-4 mt-0.5 shrink-0 text-indigo-500" />
+              <span>
+                Detailed question-level results (which questions were correct) will be available after the test window closes.
+                You can access them via the <strong>View Results</strong> button on your dashboard.
+              </span>
             </div>
 
             <div className="mt-6 flex justify-center">

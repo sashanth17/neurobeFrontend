@@ -16,6 +16,25 @@ module.exports = {
         },
         extend: {
             colors: {
+                accent: {
+                    DEFAULT: '#6366f1',
+                    light: 'rgba(99,102,241,0.15)',
+                },
+                surface: {
+                    DEFAULT: '#cbd5e1',
+                    light: '#f8fafc',
+                    dark: '#0f172a',
+                },
+                error: {
+                    DEFAULT: '#ef4444',
+                    light: 'rgba(239,68,68,0.15)',
+                },
+                muted: {
+                    DEFAULT: '#94a3b8',
+                },
+                background: {
+                    DEFAULT: '#0B0F19',
+                },
                 primary: {
                     DEFAULT: '#4361ee',
                     light: '#eaf1ff',

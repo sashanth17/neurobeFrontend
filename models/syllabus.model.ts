@@ -2,9 +2,23 @@ import { commonInstance } from '@/utils/axios.utils';
 
 const syllabus = {
 
+    upload: (formData: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/upload`;
+            commonInstance()
+                .post(url, formData, {
+                    headers: { "Content-Type": "multipart/form-data" },
+                })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
     create: (data: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/extract-document`;
+            let url = `course/syllabi/upload`;
             commonInstance()
                 .post(url, data, {
                     headers: { "Content-Type": "multipart/form-data" },
@@ -14,13 +28,101 @@ const syllabus = {
                 })
                 .catch((error) => {
                     if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
+                        reject(error.response.data?.detail || error.response.data?.message || error.response.data);
                     } else {
                         reject(error);
                     }
                 });
         });
         return promise;
+    },
+
+    approve: (syllabusId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/syllabi/${syllabusId}/approve`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    activate: (syllabusId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/syllabi/${syllabusId}/activate`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    extraction_approve: (extractionsId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/extractions/${extractionsId}/approve`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    extraction_activate: (extractionsId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/extractions/${extractionsId}/activate`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    get_extraction: (extractionsId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/extractions/${extractionsId}`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    getFileBlob: (courseSyllabusId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/${courseSyllabusId}/file`, { responseType: "blob" })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    getActiveCourseFileBlob: (courseId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/active-file`, { responseType: "blob" })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    update_hours: (extractionsId: number | string, data: any) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/extractions/${extractionsId}/hours`, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
     },
 
     detail: (id: string | number) => {
@@ -48,6 +150,25 @@ const syllabus = {
             let url = `course/syllabi/${syllabus_id}`;
             commonInstance()
                 .put(url,data)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
+
+    patch_syllabus: (syllabus_id: string | number, data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/syllabi/${syllabus_id}`;
+            commonInstance()
+                .patch(url, data)
                 .then((res) => {
                     resolve(res.data);
                 })
@@ -384,6 +505,18 @@ const syllabus = {
         });
     },
 
+    get_specific_version: (id: string | number, stage: string, ver: number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/versions/${stage}/${ver}`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
+
     activate_version: (id: string | number, stage: string, ver: number) => {
         return new Promise((resolve, reject) => {
             let url = `course/courses/${id}/versions/${stage}/${ver}/activate`;
@@ -408,9 +541,36 @@ const syllabus = {
         });
     },
 
+    update_version: (id: string | number, stage: string, ver: number, body: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/versions/${stage}/${ver}`;
+            commonInstance()
+                .patch(url, body)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
+
     approve_stage: (id: string | number, stage: string, ver?: number) => {
         return new Promise((resolve, reject) => {
             let url = `course/courses/${id}/stages/${stage}/approve`;
+            if (ver !== undefined && ver !== null) {
+                url += `?version=${ver}`;
+            }
+            commonInstance()
+                .post(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error.response?.data?.message || error.response?.data || error);
+                });
+        });
+    },
+
+    reject_stage: (id: string | number, stage: string, ver?: number) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/courses/${id}/stages/${stage}/reject`;
             if (ver !== undefined && ver !== null) {
                 url += `?version=${ver}`;
             }
@@ -481,6 +641,121 @@ const syllabus = {
         });
     },
 
+    /** Serve the PDF file for a specific versioned file upload */
+    getFileVersionFile: (courseId: string | number, versionNumber: number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/file`, {
+                    responseType: 'blob',
+                    transformResponse: [(data) => data],
+                })
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    /** Get the extraction snapshot (data_ai_gave + status) for a specific file version */
+    getFileVersionExtraction: (courseId: string | number, versionNumber: number) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/extraction`)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    /** Update the extraction snapshot (data_ai_gave) for a specific file version */
+    updateFileVersionExtraction: (courseId: string | number, versionNumber: number, data: any) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .put(`course/syllabi/courses/${courseId}/file-versions/${versionNumber}/extraction`, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+    },
+
+    // ─────────────────────────────────────────────────────────
+    // Extraction Relational Sub-Resource CRUD Methods
+    // ─────────────────────────────────────────────────────────
+    addOutcome: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/outcomes`, data).then(r => r.data);
+    },
+    updateOutcome: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/outcomes/${id}`, data).then(r => r.data);
+    },
+    deleteOutcome: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/outcomes/${id}`).then(r => r.data);
+    },
+
+    addUnit: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/units`, data).then(r => r.data);
+    },
+    updateUnit: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/units/${id}`, data).then(r => r.data);
+    },
+    deleteUnit: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/units/${id}`).then(r => r.data);
+    },
+
+    addTopic: (extractionId: number | string, unitId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/units/${unitId}/topics`, data).then(r => r.data);
+    },
+    updateTopic: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/topics/${id}`, data).then(r => r.data);
+    },
+    deleteTopic: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/topics/${id}`).then(r => r.data);
+    },
+
+    addSubtopic: (extractionId: number | string, topicId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/topics/${topicId}/subtopics`, data).then(r => r.data);
+    },
+    updateSubtopic: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/subtopics/${id}`, data).then(r => r.data);
+    },
+    deleteSubtopic: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/subtopics/${id}`).then(r => r.data);
+    },
+
+    addObjective: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/objectives`, data).then(r => r.data);
+    },
+    updateObjective: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/objectives/${id}`, data).then(r => r.data);
+    },
+    deleteObjective: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/objectives/${id}`).then(r => r.data);
+    },
+
+    addTextbook: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/textbooks`, data).then(r => r.data);
+    },
+    updateTextbook: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/textbooks/${id}`, data).then(r => r.data);
+    },
+    deleteTextbook: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/textbooks/${id}`).then(r => r.data);
+    },
+
+    addReferenceBook: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/reference-books`, data).then(r => r.data);
+    },
+    updateReferenceBook: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/reference-books/${id}`, data).then(r => r.data);
+    },
+    deleteReferenceBook: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/reference-books/${id}`).then(r => r.data);
+    },
+
+    addDigitalResource: (extractionId: number | string, data: any) => {
+        return commonInstance().post(`course/extractions/${extractionId}/digital-resources`, data).then(r => r.data);
+    },
+    updateDigitalResource: (extractionId: number | string, id: number | string, data: any) => {
+        return commonInstance().patch(`course/extractions/${extractionId}/digital-resources/${id}`, data).then(r => r.data);
+    },
+    deleteDigitalResource: (extractionId: number | string, id: number | string) => {
+        return commonInstance().delete(`course/extractions/${extractionId}/digital-resources/${id}`).then(r => r.data);
+    },
 }
 
 export default syllabus;

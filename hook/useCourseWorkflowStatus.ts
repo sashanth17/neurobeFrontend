@@ -40,9 +40,14 @@ export interface SyllabusFileVersion {
 export interface CourseWorkflow {
   step_1_syllabus_extraction: StageWorkflowData;
   step_2_copo_mapping: StageWorkflowData;
-  step_3_topic_hierarchy: StageWorkflowData;
-  step_4_pedagogy_generation: StageWorkflowData;
-  step_5_lesson_plan_schedules: StageWorkflowData;
+  step_3_pedagogy_generation: StageWorkflowData;
+  step_4_lesson_plan_schedules: StageWorkflowData;
+  // Backward compatibility aliases
+  step_3_topic_hierarchy?: StageWorkflowData;
+  step_4_pedagogy_generation?: StageWorkflowData;
+  step_4_pedagogy_suggestions?: StageWorkflowData;
+  step_5_lesson_plan_schedules?: StageWorkflowData;
+  [key: string]: StageWorkflowData | undefined;
 }
 
 export interface WorkflowStatusResponse {

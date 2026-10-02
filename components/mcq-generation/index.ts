@@ -9,3 +9,4 @@ export * from "./DistributionModeSelector";
 export * from "./PedagogicalFocusCard";
 export * from "./OutputConfigCard";
 export * from "./MCQStudioWorkspace";
+export * from "./SimplifiedMCQGenerator";

@@ -21,8 +21,9 @@ interface StudentReport {
   student_email: string;
   score_pct: number;
   correct: number;
-  incorrect: number;
   unanswered: number;
+  incorrect?: number;
+  total_questions?: number;
   tab_switch_count: number;
   time_taken_seconds: number;
   auto_submitted: boolean;
@@ -32,9 +33,14 @@ interface StudentReport {
 
 interface QuestionReport {
   question_id: string;
+  question_index?: number;
+  question_text?: string;
+  options?: string[];
+  correct_answer?: string;
   correct_count: number;
-  incorrect_count: number;
   unanswered_count: number;
+  incorrect_count?: number;
+  total_attempts?: number;
   correct_pct: number;
 }
 
@@ -87,7 +93,6 @@ const MCQTestReport = () => {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<ReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"students" | "questions">("students");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -113,12 +118,23 @@ const MCQTestReport = () => {
 
   const filteredStudents = useMemo(() => {
     if (!report) return [];
-    if (!search.trim()) return report.students;
+    // Only show students who actually submitted (answered at least 1 question or spent time)
+    const attended = report.students.filter(
+      (st) => (st.correct + (st.incorrect ?? 0) + st.unanswered) > 0 || st.time_taken_seconds > 0 || (st.per_question?.length || 0) > 0
+    );
+    if (!search.trim()) return attended;
     const s = search.toLowerCase();
-    return report.students.filter((st) =>
+    return attended.filter((st) =>
       st.student_email.toLowerCase().includes(s)
     );
   }, [report, search]);
+
+  const nonAttendingStudents = useMemo(() => {
+    if (!report) return [];
+    return report.students.filter(
+      (st) => (st.correct + (st.incorrect ?? 0) + st.unanswered) === 0 && st.time_taken_seconds === 0 && (st.per_question?.length || 0) === 0
+    );
+  }, [report]);
 
   if (loading) {
     return (
@@ -186,50 +202,32 @@ const MCQTestReport = () => {
       </div>
 
       {/* KPI Summary Row */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {[
-          { label: "Total Students", value: report.total_students, icon: <Users className="h-4 w-4" />, cls: "text-indigo-600 bg-indigo-50 border-indigo-200" },
-          { label: "Submitted", value: report.submitted_count, icon: <CheckCircle className="h-4 w-4" />, cls: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-          { label: "Class Avg", value: `${report.class_avg_pct.toFixed(1)}%`, icon: <BarChart2 className="h-4 w-4" />, cls: "text-purple-600 bg-purple-50 border-purple-200" },
-          { label: "Passed", value: report.pass_count, icon: <Trophy className="h-4 w-4" />, cls: "text-amber-600 bg-amber-50 border-amber-200" },
-          { label: "Failed", value: report.fail_count, icon: <XCircle className="h-4 w-4" />, cls: "text-red-600 bg-red-50 border-red-200" },
-          { label: "Highest Score", value: `${report.highest_score_pct.toFixed(1)}%`, icon: <TrendingUp className="h-4 w-4" />, cls: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-          { label: "Flagged", value: report.flagged_students, icon: <AlertTriangle className="h-4 w-4" />, cls: "text-red-600 bg-red-50 border-red-200" },
+          { label: "Total Students", value: report.total_students, icon: <Users className="h-4 w-4" />, cls: "text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900/40" },
+          { label: "Submitted", value: report.submitted_count, icon: <CheckCircle className="h-4 w-4" />, cls: "text-emerald-600 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40" },
+          { label: "Not Attended", value: nonAttendingStudents.length, icon: <AlertTriangle className="h-4 w-4" />, cls: "text-amber-600 dark:text-amber-400 bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/40" },
+          { label: "Class Avg", value: `${report.class_avg_pct.toFixed(1)}%`, icon: <BarChart2 className="h-4 w-4" />, cls: "text-purple-600 dark:text-purple-400 bg-purple-50/70 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/40" },
+          { label: "Passed", value: report.pass_count, icon: <Trophy className="h-4 w-4" />, cls: "text-teal-600 dark:text-teal-400 bg-teal-50/70 dark:bg-teal-950/30 border-teal-200 dark:border-teal-900/40" },
+          { label: "Failed", value: report.fail_count, icon: <XCircle className="h-4 w-4" />, cls: "text-rose-600 dark:text-rose-400 bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/40" },
+          { label: "Highest Score", value: `${report.highest_score_pct.toFixed(1)}%`, icon: <TrendingUp className="h-4 w-4" />, cls: "text-emerald-600 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40" },
+          { label: "Flagged", value: report.flagged_students, icon: <AlertTriangle className="h-4 w-4" />, cls: "text-rose-600 dark:text-rose-400 bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/40" },
         ].map((kpi, i) => (
           <div key={i} className={`rounded-2xl border p-3 ${kpi.cls}`}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">{kpi.label}</span>
-              <span className="opacity-70">{kpi.icon}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">{kpi.label}</span>
+              <span className="opacity-80">{kpi.icon}</span>
             </div>
             <p className="mt-1.5 text-xl font-black">{kpi.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900 w-fit">
-        {(["students", "questions"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`rounded-lg px-4 py-2 text-xs font-bold capitalize transition-all ${
-              activeTab === tab
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            }`}
-          >
-            {tab === "students" ? "Per Student" : "Per Question"} Analysis
-          </button>
-        ))}
-      </div>
-
       {/* Per Student Table */}
-      {activeTab === "students" && (
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
             <h2 className="text-sm font-bold text-gray-900 dark:text-white">
-              Student Results ({filteredStudents.length} students)
+              Student Results ({filteredStudents.length} attended)
             </h2>
             <input
               type="text"
@@ -258,7 +256,7 @@ const MCQTestReport = () => {
                 {filteredStudents.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-8 text-center text-gray-400">
-                      No students found
+                      No students have submitted this assessment yet.
                     </td>
                   </tr>
                 ) : (
@@ -293,7 +291,7 @@ const MCQTestReport = () => {
                           {s.correct}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-red-500 dark:text-red-400">
-                          {s.incorrect}
+                          {s.incorrect ?? Math.max(0, (report?.questions?.length || s.total_questions || 0) - s.correct - s.unanswered)}
                         </td>
                         <td className="px-4 py-3 text-center text-gray-500">
                           {s.unanswered}
@@ -331,72 +329,48 @@ const MCQTestReport = () => {
             </table>
           </div>
         </div>
-      )}
 
-      {/* Per Question Table */}
-      {activeTab === "questions" && (
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
-          <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white">
-              Question Analysis ({report.questions.length} questions)
-            </h2>
+      {/* Not Attended Students */}
+      {nonAttendingStudents.length > 0 && (
+        <div className="rounded-2xl border border-orange-200 bg-white shadow-xs dark:border-orange-900/40 dark:bg-gray-900">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-6 py-4 dark:border-orange-900/30">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">
+                Did Not Attend ({nonAttendingStudents.length} students)
+              </h2>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">These students were enrolled but did not submit the assessment.</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:text-gray-400">
                   <th className="px-6 py-3">#</th>
-                  <th className="px-4 py-3">Question ID</th>
-                  <th className="px-4 py-3 text-center">Correct</th>
-                  <th className="px-4 py-3 text-center">Incorrect</th>
-                  <th className="px-4 py-3 text-center">Unanswered</th>
-                  <th className="px-4 py-3 text-center">Accuracy</th>
+                  <th className="px-4 py-3">Student Email</th>
+                  <th className="px-4 py-3 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {report.questions.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
-                      No per-question data available
+                {nonAttendingStudents.map((s, idx) => (
+                  <tr key={s.student_email} className="hover:bg-orange-50/30 dark:hover:bg-orange-950/10 transition-colors">
+                    <td className="px-6 py-3 text-gray-400">{idx + 1}</td>
+                    <td className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{s.student_email}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[10px] font-bold text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        Not Attended
+                      </span>
                     </td>
                   </tr>
-                ) : (
-                  report.questions.map((q, idx) => (
-                    <tr
-                      key={q.question_id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
-                    >
-                      <td className="px-6 py-3 text-gray-400">{idx + 1}</td>
-                      <td className="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">
-                        {q.question_id}
-                      </td>
-                      <td className="px-4 py-3 text-center font-semibold text-emerald-600 dark:text-emerald-400">
-                        {q.correct_count}
-                      </td>
-                      <td className="px-4 py-3 text-center font-semibold text-red-500 dark:text-red-400">
-                        {q.incorrect_count}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-500">
-                        {q.unanswered_count}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="space-y-1">
-                          <span className={`font-bold ${scoreColor(q.correct_pct)}`}>
-                            {q.correct_pct.toFixed(0)}%
-                          </span>
-                          <ScoreBar pct={q.correct_pct} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
         </div>
       )}
     </div>
-  );
-};
+    );
+  };
 
 export default PrivateRouter(MCQTestReport);

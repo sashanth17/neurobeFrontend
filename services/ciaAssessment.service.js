@@ -1,4 +1,5 @@
 import instance, { commonInstance } from "@/utils/axios.utils";
+import { isLimitExhaustion, LIMIT_EXHAUSTED_MESSAGE } from "@/utils/function.utils";
 
 /**
  * CIA Assessment & Question Paper Template API Service
@@ -357,7 +358,11 @@ export const ciaAssessmentService = {
       }
 
       if (status === "failed" || status === "error") {
-        throw new Error(state.error || state.message || "Question generation failed in ai-worker");
+        const errMsg = state.error || state.message || "Question generation failed in ai-worker";
+        if (isLimitExhaustion(state) || isLimitExhaustion(errMsg)) {
+          throw new Error(LIMIT_EXHAUSTED_MESSAGE);
+        }
+        throw new Error(errMsg);
       }
     }
     throw new Error("Question generation timed out after 5 minutes. Please try again.");

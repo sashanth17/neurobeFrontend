@@ -351,18 +351,7 @@ export const AddPedagogyModal = ({
           />
         </div>
 
-        <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 p-2.5 dark:bg-gray-800">
-          <input
-            id="mark-selected-cb"
-            type="checkbox"
-            checked={isSelected}
-            onChange={(e) => setIsSelected(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-color2 focus:ring-color2 cursor-pointer"
-          />
-          <label htmlFor="mark-selected-cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-            Mark as selected / active teaching method for this topic
-          </label>
-        </div>
+
 
         <div className="mt-6 flex justify-end gap-3">
           <button

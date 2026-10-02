@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Plus,
   Lock,
+  Pencil,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useCourseWorkflowStatus, StageWorkflowData } from "@/hook/useCourseWorkflowStatus";
@@ -97,6 +98,35 @@ export default function CourseCard(props: any) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [optimisticVersions, setOptimisticVersions] = useState<Record<string, number>>({});
+  const [isEditingCredits, setIsEditingCredits] = useState(false);
+  const [editCreds, setEditCreds] = useState<number>(data?.credits ?? credits);
+  const [editL, setEditL] = useState<number>(data?.lecture_hours ?? 3);
+  const [editT, setEditT] = useState<number>(data?.tutorial_hours ?? 0);
+  const [editP, setEditP] = useState<number>(data?.practical_hours ?? 0);
+  const [isSavingCredits, setIsSavingCredits] = useState(false);
+  const [localFormattedCredits, setLocalFormattedCredits] = useState<string | null>(null);
+
+  const handleSaveCredits = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setIsSavingCredits(true);
+      const payload = {
+        credits: Number(editCreds),
+        lecture_hours: Number(editL),
+        tutorial_hours: Number(editT),
+        practical_hours: Number(editP),
+      };
+      await Models.course.update(targetCourseId, payload);
+      setLocalFormattedCredits(`${payload.credits} Credits • L: ${payload.lecture_hours} • T: ${payload.tutorial_hours} • P: ${payload.practical_hours}`);
+      Success("Course credits updated successfully!");
+      setIsEditingCredits(false);
+      refetch?.();
+    } catch (err: any) {
+      Failure(typeof err === "string" ? err : err?.message || "Failed to update credits");
+    } finally {
+      setIsSavingCredits(false);
+    }
+  };
 
   const getRolesList = (roleData: any): string[] => {
     if (!roleData) return [];
@@ -112,43 +142,56 @@ export default function CourseCard(props: any) {
     return normalized.includes("instructor");
   });
 
-  // Calculate live readiness percentage based on workflowStatus or data
-  const calculateReadiness = () => {
-    if (!workflowStatus) return data?.readiness_percentage ?? 0;
-    const stages = Object.values(workflowStatus) as StageWorkflowData[];
-    let points = 0;
-    stages.forEach((st) => {
-      if (st?.status === "approved") points += 20;
-      else if (st?.status === "draft") points += 10;
-    });
-    return Math.min(points, 100);
-  };
-
-  const readinessPct = calculateReadiness();
-
   // Compute live stage state from workflowStatus if available, otherwise fallback to data
   const getStageInfo = (
     stageKey: string,
-    wfItem?: StageWorkflowData,
+    wfItem?: any,
     fallbackState?: string
   ) => {
-    const status = wfItem?.status || fallbackState || "not_started";
+    const versionsList: any[] = wfItem?.versions || wfItem?.versions_detailed || [];
+    const activeFromList = versionsList.find((v: any) => v.is_active);
+    // Prioritize is_active=true from the versions list (source of truth), fall back to wfItem.active_version
+    const currentVer =
+      optimisticVersions[stageKey] ||
+      activeFromList?.version_number ||
+      activeFromList?.version ||
+      wfItem?.active_version ||
+      (versionsList.length > 0 ? versionsList[versionsList.length - 1]?.version_number || versionsList[versionsList.length - 1]?.version : null);
+
+    const currentVersionObj = versionsList.find(
+      (v: any) => (v.version_number ?? v.version) === currentVer
+    );
+
+    let status = currentVersionObj?.status || wfItem?.status || fallbackState || "not_started";
+    status = String(status).toLowerCase().trim();
+
     const hasVersions =
+      versionsList.length > 0 ||
       (wfItem?.total_versions !== undefined && wfItem.total_versions > 0) ||
       (wfItem?.available_versions && wfItem.available_versions.length > 0) ||
-      (wfItem?.active_version !== undefined && wfItem.active_version > 0 && status !== "not_started");
-    const ver = hasVersions ? (wfItem?.active_version || 1) : null;
-    const totalVers = hasVersions ? (wfItem?.total_versions || wfItem?.available_versions?.length || 1) : 0;
-    // Derive real available versions: strictly what backend reports or 1..totalVers, never synthesize beyond totalVers
-    const availableVersions: number[] =
-      hasVersions
-        ? (wfItem?.available_versions && wfItem.available_versions.length > 0
+      (currentVer !== null && status !== "not_started");
+
+    const totalVers = versionsList.length > 0
+      ? versionsList.length
+      : (wfItem?.total_versions || wfItem?.available_versions?.length || (currentVer ? 1 : 0));
+
+    const availableVersions: number[] = versionsList.length > 0
+      ? versionsList.map((v: any) => v.version_number ?? v.version)
+      : (wfItem?.available_versions && wfItem.available_versions.length > 0
           ? wfItem.available_versions
           : totalVers > 1
           ? Array.from({ length: totalVers }, (_, i) => i + 1)
-          : (ver ? [ver] : []))
-        : [];
-    return { status, ver, totalVers, availableVersions, canGenerate: wfItem?.can_generate ?? true, hasVersions };
+          : (currentVer ? [currentVer] : []));
+
+    return {
+      status,
+      ver: currentVer,
+      totalVers,
+      availableVersions,
+      versions: versionsList,
+      canGenerate: wfItem?.can_generate ?? true,
+      hasVersions,
+    };
   };
 
   const sSyllabus = getStageInfo("extraction", workflowStatus?.step_1_syllabus_extraction, data?.academic_preparation?.syllabus?.state);
@@ -156,39 +199,42 @@ export default function CourseCard(props: any) {
 
   const activeExtractionVer =
     optimisticVersions.extraction ||
-    syllabusFiles?.find((f: any) => f.is_active)?.version_number ||
     sSyllabus.ver ||
-    (syllabusFiles && syllabusFiles.length > 0 ? syllabusFiles[syllabusFiles.length - 1]?.version_number : 1);
+    syllabusFiles?.find((f: any) => f.is_active)?.version_number ||
+    1;
 
-  // Filter CO-PO versions to only children of the currently active extraction version
-  const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed;
+  // Filter CO-PO versions to children of active extraction version, or fall back to all CO-PO versions
+  const copoDetailed = (workflowStatus?.step_2_copo_mapping as any)?.versions_detailed || (workflowStatus?.step_2_copo_mapping as any)?.versions;
   let copoStatus = sCopo.status;
   let copoVer = optimisticVersions.copo || sCopo.ver;
   let copoTotalVers = sCopo.totalVers;
   let copoAvailableVersions = sCopo.availableVersions;
 
-  if (Array.isArray(copoDetailed)) {
+  if (Array.isArray(copoDetailed) && copoDetailed.length > 0) {
     const matchingChildCopo = copoDetailed.filter(
       (v: any) => (v.extraction_version_used ?? v.parent_version ?? 1) === activeExtractionVer
     );
-    if (matchingChildCopo.length === 0) {
-      copoStatus = "not_started";
-      copoVer = undefined;
-      copoTotalVers = 0;
-      copoAvailableVersions = [];
+    const candidates = matchingChildCopo.length > 0 ? matchingChildCopo : copoDetailed;
+    const activeMatch =
+      candidates.find((v: any) => (v.version_number ?? v.version) === copoVer) ||
+      candidates.find((v: any) => v.is_active) ||
+      candidates[candidates.length - 1];
+
+    copoVer = optimisticVersions.copo || activeMatch?.version_number || activeMatch?.version || sCopo.ver;
+    copoTotalVers = candidates.length;
+    copoAvailableVersions = candidates.map((v: any) => v.version_number ?? v.version);
+
+    if (activeMatch?.status) {
+      copoStatus = String(activeMatch.status).toLowerCase();
+    } else if (sCopo.status === "generating" || sCopo.status === "redis_queued") {
+      copoStatus = sCopo.status;
     } else {
-      const activeMatch =
-        matchingChildCopo.find((v: any) => v.is_active) || matchingChildCopo[matchingChildCopo.length - 1];
-      copoVer = optimisticVersions.copo || activeMatch.version;
-      copoStatus = activeMatch.status === "approved" ? "approved" : "draft";
-      copoTotalVers = matchingChildCopo.length;
-      copoAvailableVersions = matchingChildCopo.map((v: any) => v.version);
+      copoStatus = sCopo.status || "not_started";
     }
   }
 
-  const sTopics = getStageInfo("hierarchy", workflowStatus?.step_3_topic_hierarchy, data?.academic_preparation?.topics?.state);
-  const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
-  const sLesson = getStageInfo("schedule", workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
+  const sPedagogy = getStageInfo("pedagogy", workflowStatus?.step_3_pedagogy_generation || workflowStatus?.step_4_pedagogy_generation, data?.academic_preparation?.pedagogy?.state);
+  const sLesson = getStageInfo("schedule", workflowStatus?.step_4_lesson_plan_schedules || workflowStatus?.step_5_lesson_plan_schedules, data?.academic_preparation?.lesson_plan?.state);
   const sQuestionBank = getStageInfo("question-bank", (workflowStatus as any)?.step_6_question_bank, data?.academic_preparation?.question_bank?.state);
 
   const qbData = data?.academic_preparation?.question_bank;
@@ -196,9 +242,21 @@ export default function CourseCard(props: any) {
 
   // Approval status indicators for topological gating
   const isSyllabusApproved = sSyllabus.status === "approved";
-  const isTopicsApproved = sTopics.status === "approved";
   const isPedagogyApproved = sPedagogy.status === "approved";
   const isLessonApproved = sLesson.status === "approved";
+
+  // Calculate live readiness percentage dynamically from active/toggled stage states
+  const calculateReadiness = () => {
+    const stageStatuses = [sSyllabus.status, copoStatus, sPedagogy.status, sLesson.status];
+    let points = 0;
+    stageStatuses.forEach((st: string) => {
+      if (st === "approved") points += 25;
+      else if (st === "draft") points += 12;
+    });
+    return Math.min(points, 100);
+  };
+
+  const readinessPct = calculateReadiness();
 
   const preparations = [
     {
@@ -208,6 +266,7 @@ export default function CourseCard(props: any) {
       version: optimisticVersions.extraction || sSyllabus.ver,
       totalVersions: sSyllabus.totalVers,
       availableVersions: sSyllabus.availableVersions,
+      versions: sSyllabus.versions,
       extra: syllabusFiles && syllabusFiles.length > 0 ? `${syllabusFiles.length} file${syllabusFiles.length > 1 ? "s" : ""}` : undefined,
       route: `/neurobe/syllabus?course_id=${targetCourseId}`,
       artifactsTab: "syllabus",
@@ -221,20 +280,9 @@ export default function CourseCard(props: any) {
       version: copoVer,
       totalVersions: copoTotalVers,
       availableVersions: copoAvailableVersions,
+      versions: sCopo.versions,
       route: `/neurobe/co-po-mapping?course_id=${targetCourseId}`,
       artifactsTab: "copo",
-      isUnlocked: isSyllabusApproved,
-      unlockMessage: "Requires Syllabus Extraction to be approved first.",
-    },
-    {
-      label: "TOPICS",
-      stageKey: "hierarchy",
-      status: sTopics.status,
-      version: optimisticVersions.hierarchy || sTopics.ver,
-      totalVersions: sTopics.totalVers,
-      availableVersions: sTopics.availableVersions,
-      route: `/neurobe/topics?course_id=${targetCourseId}`,
-      artifactsTab: "topics",
       isUnlocked: isSyllabusApproved,
       unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
@@ -245,10 +293,11 @@ export default function CourseCard(props: any) {
       version: optimisticVersions.pedagogy || sPedagogy.ver,
       totalVersions: sPedagogy.totalVers,
       availableVersions: sPedagogy.availableVersions,
+      versions: sPedagogy.versions,
       route: `/neurobe/pedagogy?course_id=${targetCourseId}`,
       artifactsTab: "pedagogy",
-      isUnlocked: isTopicsApproved,
-      unlockMessage: "Requires Topic Hierarchy to be approved first.",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
       label: "LESSON PLAN",
@@ -257,6 +306,7 @@ export default function CourseCard(props: any) {
       version: optimisticVersions.schedule || sLesson.ver,
       totalVersions: sLesson.totalVers,
       availableVersions: sLesson.availableVersions,
+      versions: sLesson.versions,
       route: `/neurobe/lesson-plan?course_id=${targetCourseId}`,
       artifactsTab: "lesson-plan",
       isUnlocked: isPedagogyApproved,
@@ -281,8 +331,8 @@ export default function CourseCard(props: any) {
       extra: qbCount !== undefined ? `${qbCount} Questions` : undefined,
       route: `/neurobe/mcq-generation/bank?course_id=${targetCourseId}`,
       artifactsTab: "question-bank",
-      isUnlocked: isTopicsApproved,
-      unlockMessage: "Requires Topic Hierarchy to be approved first.",
+      isUnlocked: isSyllabusApproved,
+      unlockMessage: "Requires Syllabus Extraction to be approved first.",
     },
     {
       label: "CIA QUESTION PAPER",
@@ -298,7 +348,6 @@ export default function CourseCard(props: any) {
   // Dynamic Next Action computation
   const getComputedNextAction = () => {
     if (sSyllabus.status === "not_started") return "Upload Syllabus & Extract";
-    if (sTopics.status === "not_started") return "Generate Topics Hierarchy";
     if (sCopo.status === "not_started") return "Generate CO-PO Mapping";
     if (sPedagogy.status === "not_started") return "Generate Pedagogy Suggestions";
     if (sLesson.status === "not_started") return "Generate Lesson Plan / Schedule";
@@ -330,9 +379,9 @@ export default function CourseCard(props: any) {
     const stepKeyMap: Record<string, string> = {
       extraction: "step_1_syllabus_extraction",
       copo: "step_2_copo_mapping",
-      hierarchy: "step_3_topic_hierarchy",
-      pedagogy: "step_4_pedagogy_generation",
-      schedule: "step_5_lesson_plan_schedules",
+      hierarchy: "step_1_syllabus_extraction",
+      pedagogy: "step_3_pedagogy_generation",
+      schedule: "step_4_lesson_plan_schedules",
     };
     try {
       setActionLoading(stageKey);
@@ -362,8 +411,13 @@ export default function CourseCard(props: any) {
       setOptimisticVersions((prev) => ({ ...prev, extraction: newVer }));
       try {
         await (Models.syllabus as any).activateFileVersion(targetCourseId, newVer);
-      } catch {
+      } catch (err) {
+        console.warn("activateFileVersion warning:", err);
+      }
+      try {
         await Models.syllabus.activate_version(targetCourseId, "extraction", newVer);
+      } catch (err) {
+        console.warn("activate_version extraction warning:", err);
       }
       Success(`Activated Version ${newVer} for SYLLABUS`);
       await refetch();
@@ -434,9 +488,99 @@ export default function CourseCard(props: any) {
               {courseCode}
             </span>
           )}
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {data?.formatted_credits || credits || ""}
-          </span>
+          <div className="relative flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              {localFormattedCredits || data?.formatted_credits || (credits ? `${credits} Credits` : "4 Credits")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditingCredits(!isEditingCredits)}
+              className="inline-flex items-center justify-center p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+              title="Edit Course Credits & L-T-P"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+
+            {isEditingCredits && (
+              <div
+                className="absolute left-0 top-full mt-2 z-50 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2 dark:border-slate-700">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                    Edit Course Credits
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCredits(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Credits</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      value={editCreds}
+                      onChange={(e) => setEditCreds(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-500 mb-1">L</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editL}
+                      onChange={(e) => setEditL(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-500 mb-1">T</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editT}
+                      onChange={(e) => setEditT(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-500 mb-1">P</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editP}
+                      onChange={(e) => setEditP(Number(e.target.value))}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCredits(false)}
+                    className="rounded px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingCredits}
+                    onClick={handleSaveCredits}
+                    className="rounded bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {isSavingCredits ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-1">
           {rolesList.length > 0 ? (
@@ -555,9 +699,7 @@ export default function CourseCard(props: any) {
                               className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all dark:bg-slate-700 dark:text-slate-300"
                               title="Click to toggle version"
                             >
-                              <span>
-                                v{syllabusFiles.find((f: any) => f.is_active)?.version_number || sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1}
-                              </span>
+                              <span>v{item.version || 1}</span>
                               <ChevronDown className="h-3 w-3 opacity-60" />
                             </button>
 
@@ -574,22 +716,33 @@ export default function CourseCard(props: any) {
                               <Plus className="h-3.5 w-3.5" />
                             </button>
 
-                            {/* Syllabus File Version Dropdown Menu */}
+                            {/* Syllabus File/Extraction Version Dropdown Menu */}
                             {isMenuOpen && (
-                              <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                              <div className="absolute left-0 top-full z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-800">
                                 <div className="mb-1 px-2 py-1 text-[10px] font-bold text-slate-400">
                                   Select Active Version
                                 </div>
                                 <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
-                                  {syllabusFiles.map((fv: any) => {
-                                    const currentActiveVer = syllabusFiles.find((f: any) => f.is_active)?.version_number || sSyllabus.ver || syllabusFiles[syllabusFiles.length - 1]?.version_number || 1;
-                                    const isCurrent = fv.version_number === currentActiveVer;
+                                  {((item.versions && item.versions.length > 0)
+                                    ? item.versions
+                                    : (syllabusFiles && syllabusFiles.length > 0)
+                                    ? syllabusFiles
+                                    : [{ version: item.version || 1, status: item.status }]
+                                  ).map((fv: any) => {
+                                    const vNum = fv.version_number ?? fv.version;
+                                    const isCurrent = vNum === item.version;
+                                    const vStatus = (fv.status || "draft").toLowerCase();
+                                    const matchingFile = syllabusFiles?.find(
+                                      (sf: any) => (sf.version_number ?? sf.id) === (fv.syllabus_file_version_id ?? vNum)
+                                    );
+                                    const fileName = matchingFile?.original_filename || fv.original_filename || "";
+
                                     return (
                                       <button
-                                        key={fv.id || fv.version_number}
+                                        key={fv.id || vNum}
                                         type="button"
                                         disabled={actionLoading === "extraction"}
-                                        onClick={(e) => handleActivateSyllabusVersion(fv.version_number, e)}
+                                        onClick={(e) => handleActivateSyllabusVersion(vNum, e)}
                                         className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-all ${
                                           isCurrent
                                             ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
@@ -598,20 +751,33 @@ export default function CourseCard(props: any) {
                                       >
                                         <div className="min-w-0 pr-1">
                                           <div className="flex items-center gap-1.5">
-                                            <span className="font-bold">v{fv.version_number}</span>
+                                            <span className="font-bold">v{vNum}</span>
+                                            <span
+                                              className={`rounded px-1.5 py-0.2 text-[9px] font-bold capitalize ${
+                                                vStatus === "approved"
+                                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                                  : vStatus === "redis_queued"
+                                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
+                                                  : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                              }`}
+                                            >
+                                              {vStatus === "redis_queued" ? "Queued" : vStatus}
+                                            </span>
                                             {isCurrent && (
                                               <span className="rounded bg-indigo-100 px-1 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
                                                 Active
                                               </span>
                                             )}
                                           </div>
-                                          {fv.original_filename && (
+                                          {fileName && (
                                             <span className="block truncate text-[10px] text-slate-400">
-                                              {fv.original_filename}
+                                              {fileName}
                                             </span>
                                           )}
                                         </div>
-                                        {isCurrent && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />}
+                                        {isCurrent && (
+                                          <CheckCircle className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                                        )}
                                       </button>
                                     );
                                   })}
@@ -660,25 +826,44 @@ export default function CourseCard(props: any) {
 
                             {/* Version Dropdown Menu */}
                             {isMenuOpen && (
-                              <div className="absolute left-0 top-full z-20 mt-1 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                              <div className="absolute left-0 top-full z-20 mt-1 w-36 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
                                 <div className="px-2 py-1 text-[9px] font-semibold text-slate-400">
                                   Switch Version
                                 </div>
-                                {item.availableVersions.map((v: number) => (
-                                  <button
-                                    key={v}
-                                    type="button"
-                                    onClick={(e) => handleToggleVersion(item.stageKey, v, e)}
-                                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs ${
-                                      v === item.version
-                                        ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
-                                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
-                                    }`}
-                                  >
-                                    <span>Version {v}</span>
-                                    {v === item.version && <CheckCircle className="h-3 w-3 text-indigo-600" />}
-                                  </button>
-                                ))}
+                                {item.availableVersions.map((v: number) => {
+                                  const matchVerObj = item.versions?.find(
+                                    (vo: any) => (vo.version_number ?? vo.version) === v
+                                  );
+                                  const vStat = matchVerObj?.status ? String(matchVerObj.status).toLowerCase() : null;
+                                  return (
+                                    <button
+                                      key={v}
+                                      type="button"
+                                      onClick={(e) => handleToggleVersion(item.stageKey, v, e)}
+                                      className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs ${
+                                        v === item.version
+                                          ? "bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
+                                          : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span>v{v}</span>
+                                        {vStat && (
+                                          <span
+                                            className={`rounded px-1 text-[8px] font-bold capitalize ${
+                                              vStat === "approved"
+                                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                            }`}
+                                          >
+                                            {vStat === "redis_queued" ? "Queued" : vStat}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {v === item.version && <CheckCircle className="h-3 w-3 text-indigo-600" />}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             )}
                           </>

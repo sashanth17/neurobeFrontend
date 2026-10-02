@@ -1,1422 +1,453 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Success, Failure, useSetState } from "@/utils/function.utils";
+import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import SyllabusStepper from "@/components/academic-setup/SyllabusStepper";
-import StepHeader from "@/components/academic-setup/StepHeader";
-import NeuroAIInfo from "@/components/academic-setup/NeuroAIInfo";
-import ExtractionComplete from "@/components/academic-setup/ExtractionComplete";
+import SyllabusUpload from "@/components/academic-setup/SyllabusUpload";
+import FileVersionCard, {
+  FileVersionItem,
+} from "@/components/academic-setup/FileVersionCard";
 import ReviewModeBar from "@/components/academic-setup/ReviewModeBar";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
 import ExtractedDataPanel from "@/components/academic-setup/ExtractedDataPanel";
 import { useRouter, useSearchParams } from "next/navigation";
 import Models from "@/imports/models.import";
-import {
-  Upload,
-  FileText,
-  Plus,
-  Sparkles,
-  Clock,
-  CheckCircle,
-  RotateCw,
-  ArrowRight,
-  Layers,
-  Eye,
-} from "lucide-react";
-
-type ImportType = "user" | "course";
+import { Sparkles, Layers, ArrowRight, RotateCw, FileText } from "lucide-react";
 
 const Syllabus = () => {
   const dispatch = useDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const course_id = searchParams.get("course_id");
-  const job_id = searchParams.get("job_id");
-  const fromParam = searchParams.get("from");
+  const courseIdParam = searchParams.get("course_id");
+  const codeParam = searchParams.get("code");
 
-  const stepKey = `syllabus_step_${course_id ?? "default"}`;
-  const jobKey = `syllabus_job_${course_id ?? "default"}`;
-  const syllabusKey = `syllabus_id_${course_id ?? "default"}`;
+  // State
+  const [courseData, setCourseData] = useState<any>(null);
+  const [fileVersions, setFileVersions] = useState<FileVersionItem[]>([]);
+  const [workflowStatus, setWorkflowStatus] = useState<any>(null);
+  const [loadingInitial, setLoadingInitial] = useState(true);
 
-  const getSavedStep = () => {
-    try {
-      const saved = sessionStorage.getItem(stepKey);
-      return saved ? Number(saved) : 1;
-    } catch {
-      return 1;
-    }
-  };
+  // Upload & Extraction states
+  const [isUploading, setIsUploading] = useState(false);
+  const [extractingId, setExtractingId] = useState<number | null>(null);
 
-  const getSavedJobId = () => {
-    try {
-      return sessionStorage.getItem(jobKey) || null;
-    } catch {
-      return null;
-    }
-  };
+  // Review & Split-Screen View states
+  const [viewMode, setViewMode] = useState<"files" | "review">("files");
+  const [loadingReviewId, setLoadingReviewId] = useState<number | null>(null);
+  const [reviewFileVersion, setReviewFileVersion] = useState<FileVersionItem | null>(null);
+  const [reviewExtractionData, setReviewExtractionData] = useState<any>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
-  const getSavedSyllabusId = () => {
-    try {
-      return sessionStorage.getItem(syllabusKey) || null;
-    } catch {
-      return null;
-    }
-  };
-
-  const setStep = (step: number) => {
-    try {
-      sessionStorage.setItem(stepKey, String(step));
-    } catch { }
-    setState({ currentStep: step });
-  };
-
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
-
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  };
-
-  // clear poll on unmount
-  useEffect(() => () => stopPolling(), []);
-
-  const [state, setState] = useSetState({
-    importType: "user" as ImportType,
-    currentStep: getSavedStep(),
-    selectedFile: null as File | null,
-    showReview: false,
-    activeTab: "coordinator",
-    courseData: null as any,
-    jobData: null as any,
-    syllabusData: null as any,
-    course_list: [],
-    keep_file: false,
-    showKeepFilePrompt: true,
-    isJobLoading: false,
-    pdfBlobUrl: null as string | null,
-    lastLoadedSyllabusId: null as string | number | null,
-    // Versioned file upload state
-    fileVersions: [] as any[],
-    isUploadingFile: false,
-    pendingUploadFile: null as File | null,
-    extractingFileVersionId: null as number | null,
-    // Extraction error state — set when a job fails or is cancelled
-    extractionError: null as string | null,
-  });
+  // Poll timer
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    dispatch(setPageTitle("Syllabus"));
-  }, []);
+    dispatch(setPageTitle("Syllabus Extraction & Curriculum"));
+  }, [dispatch]);
 
+  // Clean up blob URL on unmount
   useEffect(() => {
-    if (course_id) {
-      course_data(course_id);
-      coordinator_course_data();
-      // Load file versions
-      loadFileVersions(course_id);
-
-      const explicitStep = searchParams.get("step");
-      const explicitView = searchParams.get("view");
-      const action = searchParams.get("action");
-
-      // If job_id is explicitly passed in URL from an active action, poll it
-      if (job_id) {
-        try { sessionStorage.setItem(jobKey, String(job_id)); } catch { }
-        setStep(3);
-        job_Data(job_id);
-      } else if (explicitStep === "3" || explicitView === "review") {
-        setStep(3);
-        const sid = searchParams.get("syllabus_id") || getSavedSyllabusId();
-        if (sid) syllabus_detail(sid);
-      } else if (explicitStep === "1" || action === "upload") {
-        // Explicitly routed to upload screen (e.g. from '+' button)
-        setStep(1);
-      } else {
-        // Cold-load or navigation: dynamically restore last left state from live workflow
-        restoreStepFromWorkflow(course_id);
+    return () => {
+      if (pdfBlobUrl) {
+        try {
+          URL.revokeObjectURL(pdfBlobUrl);
+        } catch {}
       }
-    }
-  }, [course_id, job_id, searchParams]);
-
-  // When step 4 is reached, refresh course and syllabus data
-  useEffect(() => {
-    if (state.currentStep === 4 && course_id) {
-      console.log("Step 4 reached, refreshing data...");
-      course_data(course_id);
-      if (state.courseData?.latest_syllabus?.id) {
-        syllabus_detail(state.courseData.latest_syllabus.id);
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
       }
-    }
-  }, [state.currentStep]);
+    };
+  }, [pdfBlobUrl]);
 
-  const course_data = async (id: string) => {
+  /** Load course details, versions list, and workflow status */
+  const loadCourseData = useCallback(async () => {
+    if (!courseIdParam) return;
     try {
-      const res = await Models.course.detail(id);
-      setState({ courseData: res });
-    } catch (error) {
-      console.log("error", error);
-    }
-  };
+      const [cRes, fvRes, wfRes]: [any, any, any] = await Promise.all([
+        Models.course.detail(courseIdParam).catch(() => null),
+        Models.syllabus.listFileVersions(courseIdParam).catch(() => null),
+        Models.syllabus.get_workflow_status(courseIdParam).catch(() => null),
+      ]);
 
-  /** Restore current step from live workflow status on navigation or cold-load */
-  const restoreStepFromWorkflow = async (cid: string) => {
-    try {
-      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
-      const extraction = wfRes?.workflow?.step_1_syllabus_extraction;
-      if (!extraction) {
-        setStep(1);
-        return;
+      if (cRes) setCourseData(cRes);
+      if (fvRes?.file_versions && Array.isArray(fvRes.file_versions)) {
+        setFileVersions(fvRes.file_versions);
       }
-      const { status } = extraction;
-      if (status === "redis_queued" || status === "generating") {
-        // Extraction is in-progress — show loading step
-        setStep(3);
-        setState({ isJobLoading: true, extractionError: null });
-        const jobId = extraction.job_id;
-        if (jobId) { 
-          try { sessionStorage.setItem(jobKey, jobId); } catch { } 
-          job_Data(jobId); 
-        }
-      } else if (status === "approved") {
-        // Extraction already approved — show Review with Approved state (step 4)
-        setStep(4);
-        setState({ isJobLoading: false, showReview: true, extractionError: null });
-        const sid = wfRes?.syllabus_id || getSavedSyllabusId();
-        if (sid) {
-          try { sessionStorage.setItem(syllabusKey, String(sid)); } catch { }
-          syllabus_detail(sid);
-        }
-      } else if (status === "draft") {
-        // Extraction in draft — jump to Review & Edit (step 3)
-        setStep(3);
-        setState({ isJobLoading: false, showReview: true, extractionError: null });
-        const sid = wfRes?.syllabus_id || getSavedSyllabusId();
-        if (sid) {
-          try { sessionStorage.setItem(syllabusKey, String(sid)); } catch { }
-          syllabus_detail(sid);
-        }
-      } else if (status === "failed" || status?.startsWith("cancelled")) {
-        // Extraction failed or was cancelled — stay on Step 1 with an error banner
-        setStep(1);
-        setState({ isJobLoading: false, extractionError: status });
-      } else {
-        // Not started or only file uploaded without extraction — stay on Step 1
-        setStep(1);
-        setState({ isJobLoading: false, extractionError: null });
-      }
+      if (wfRes) setWorkflowStatus(wfRes.workflow || wfRes);
     } catch (err) {
-      console.warn("restoreStepFromWorkflow error:", err);
-      setStep(1);
+      console.warn("Error fetching course data:", err);
+    } finally {
+      setLoadingInitial(false);
     }
-  };
+  }, [courseIdParam]);
 
-  /** Load all versioned file uploads for the course */
-  const loadFileVersions = async (cid: string | number) => {
-    try {
-      const res: any = await Models.syllabus.listFileVersions(cid);
-      setState({ fileVersions: res?.file_versions || [] });
-    } catch {
-      setState({ fileVersions: [] });
+  useEffect(() => {
+    loadCourseData();
+  }, [loadCourseData]);
+
+  /** 1. Upload Syllabus File -> Creates new file version */
+  const handleUploadFile = async (file: File) => {
+    if (!courseIdParam) {
+      Failure("No course selected.");
+      return;
     }
-  };
 
-  /** Upload a new syllabus file version (no extraction triggered yet) */
-  const uploadAndSaveFileVersion = async (file: File) => {
-    if (!course_id) return;
     try {
-      setState({ isUploadingFile: true });
+      setIsUploading(true);
       const formData = new FormData();
       formData.append("file", file);
-      const res: any = await Models.syllabus.uploadFileVersion(course_id, formData);
-      Success(`Syllabus v${res.version_number} uploaded — "${res.original_filename}"`);
-      await loadFileVersions(course_id);
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Upload failed");
+
+      const res: any = await Models.syllabus.uploadFileVersion(courseIdParam, formData);
+      const newVerNum = res?.version_number || fileVersions.length + 1;
+      Success(`Syllabus uploaded successfully as Version ${newVerNum}`);
+
+      // Refresh list
+      await loadCourseData();
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to upload syllabus file"));
+      throw err;
     } finally {
-      setState({ isUploadingFile: false, pendingUploadFile: null });
+      setIsUploading(false);
     }
   };
 
-  /** Activate a specific syllabus file version */
-  const handleActivateFileVersion = async (versionNumber: number) => {
-    if (!course_id) return;
+  /** 2. Trigger Extraction from a specific file version */
+  const handleExtract = async (version: FileVersionItem) => {
+    if (!courseIdParam) return;
+
     try {
-      setState({ isActivatingFileVersion: true });
-      await Models.syllabus.activateFileVersion(course_id, versionNumber);
-      Success(`Syllabus v${versionNumber} is now active.`);
-      await loadFileVersions(course_id);
-      await course_data(course_id as string);
-      const updatedSid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-      if (updatedSid) {
-        await syllabus_detail(updatedSid);
-      }
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Failed to activate version");
-    } finally {
-      setState({ isActivatingFileVersion: false });
-    }
-  };
+      setExtractingId(version.id);
+      await Models.syllabus.extractFromFileVersion(courseIdParam, version.id);
+      Success(`AI Extraction started for File Version ${version.version_number}`);
 
-  /** Load a specific file version into review */
-  const handleLoadFileVersion = async (fv: any) => {
-    try {
-      if (!fv.is_active) {
-        await handleActivateFileVersion(fv.version_number);
-      } else {
-        const sid = state.courseData?.latest_syllabus?.id || state.courseData?.syllabus_id;
-        if (sid) {
-          await syllabus_detail(sid);
-        }
-      }
-      setStep(3);
-      setState({ showReview: true });
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Failed to load version");
-    }
-  };
-
-  /** Trigger AI extraction from a specific file version */
-  const extractFromVersion = async (fileVersionId: number, versionNumber: number) => {
-    if (!course_id) return;
-    try {
-      setState({ extractingFileVersionId: fileVersionId });
-      const res: any = await Models.syllabus.extractFromFileVersion(course_id, fileVersionId);
-      Success(`Extraction started for v${versionNumber}`);
-      if (res?.job_id) {
-        try { sessionStorage.setItem(jobKey, String(res.job_id)); } catch { }
-        setStep(3);
-        setState({ isJobLoading: true });
-        job_Data(res.job_id);
-      }
-    } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Extraction failed to start");
-    } finally {
-      setState({ extractingFileVersionId: null });
-    }
-  };
-
-
-  const coordinator_course_data = async () => {
-    try {
-      const user = localStorage.getItem("user");
-      const u = JSON.parse(user);
-      const body = {
-        coordinator_id: u?.id,
-      };
-      const res = await Models.course.list(body);
-      const dropdown = Dropdown(res, "course_code");
-      // setState({ courseData: res });
-      console.log("coordinator_course_data detail →", dropdown);
-      setState({ course_list: dropdown });
-    } catch (error) {
-      console.log("error", error);
-    }
-  };
-
-  const onKeep = () => {
-    setState({ keep_file: true, showKeepFilePrompt: false });
-    console.log("Keep file");
-  };
-
-  const onDiscard = () => {
-    setState({ keep_file: false, showKeepFilePrompt: false });
-  };
-
-  const normalizeSyllabusData = (data: any) => {
-    if (!data) return null;
-
-    const source = data?.course_data || data?.result?.course_data || data?.result || data;
-
-    // 1. Outcomes
-    const rawOutcomes = source?.outcomes || source?.courseOutcomes || data?.outcomes || data?.courseOutcomes || [];
-    const outcomes = rawOutcomes.map((co: any, idx: number) => ({
-      id: co.id ?? idx + 1,
-      co_code: co.co_code || co.coCode || `CO${idx + 1}`,
-      description: co.description || co.statement || "",
-      knowledge_level: co.knowledge_level || co.knowledgeLevel || co.bloomLevel || "K2",
-      is_accepted: co.is_accepted ?? false,
-      reason_for_inferred_level: co.reason_for_inferred_level || co.reason || "",
-    }));
-
-    // 2. Units & Topics
-    const rawUnits = source?.units || data?.units || [];
-    const units = rawUnits.map((u: any, idx: number) => {
-      const uNum = u.unit_number ?? u.unitNumber ?? (idx + 1);
-      const rawTopics = u.topics || [];
-      const topics = rawTopics.map((t: any, tIdx: number) => {
-        const topicText = typeof t === "string" ? t : (t.topic_name || t.title || t.name || "");
-        const topicCode = (typeof t === "object" && (t.topic_code || t.topicId))
-          ? (t.topic_code || t.topicId)
-          : `${uNum}.${tIdx + 1}`;
-        const topicId = (typeof t === "object" && t.id) ? t.id : tIdx + 1;
-        const seq = (typeof t === "object" && (t.learning_sequence || t.sequence))
-          ? (t.learning_sequence || t.sequence)
-          : tIdx + 1;
-        return {
-          id: topicId,
-          topic_code: topicCode,
-          topicId: topicCode,
-          topic_name: topicText,
-          title: topicText,
-          learning_sequence: seq,
-        };
-      });
-
-      const uTitle = u.unit_title || u.title || `UNIT ${uNum}`;
-      const thHours = Number(u.theory_hours ?? u.hours ?? 0);
-      const lbHours = Number(u.lab_hours ?? 0);
-      return {
-        id: u.id ?? idx + 1,
-        unit_number: uNum,
-        unitNumber: uNum,
-        unit_title: uTitle,
-        title: uTitle,
-        theory_hours: thHours,
-        hours: thHours,
-        lab_hours: lbHours,
-        syllabus_id: u.syllabus_id || data?.id || source?.syllabus_id,
-        topics,
-      };
-    });
-
-    // 3. Textbooks
-    const rawTextbooks = source?.textbooks || source?.textBooks || data?.textbooks || data?.textBooks || [];
-    const textbooks = rawTextbooks.map((b: any, idx: number) => ({
-      id: b.id ?? idx + 1,
-      title: b.title || "",
-      authors: Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || ""),
-      edition: b.edition || "",
-      publisher: b.publisher || "",
-      publication_year: b.publication_year ?? b.publicationYear ?? "",
-    }));
-
-    // 4. Reference Books
-    const rawReferences = source?.reference_books || source?.references || data?.reference_books || data?.references || [];
-    const reference_books = rawReferences.map((b: any, idx: number) => ({
-      id: b.id ?? idx + 1,
-      title: b.title || "",
-      authors: Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || ""),
-      edition: b.edition || "",
-      publisher: b.publisher || "",
-      publication_year: b.publication_year ?? b.publicationYear ?? "",
-    }));
-
-    // 5. Laboratory Experiments
-    const rawExperiments =
-      source?.laboratory_experiments ||
-      source?.laboratoryExperiments ||
-      source?.experiments ||
-      data?.laboratory_experiments ||
-      data?.laboratoryExperiments ||
-      data?.experiments ||
-      [];
-    const laboratory_experiments = rawExperiments.map((e: any, idx: number) => {
-      if (typeof e === "string") {
-        return {
-          id: idx + 1,
-          experiment_number: idx + 1,
-          number: idx + 1,
-          title: e,
-          allocated_hours: 0,
-          hours: 0,
-          description: "",
-        };
-      }
-      const expNum = e.experiment_number ?? e.experimentNumber ?? e.number ?? (idx + 1);
-      const hrs = e.allocated_hours ?? e.hours ?? 0;
-      return {
-        id: e.id ?? idx + 1,
-        experiment_number: expNum,
-        experimentNumber: expNum,
-        number: expNum,
-        title: e.title || e.experiment_title || `Experiment ${idx + 1}`,
-        allocated_hours: hrs,
-        hours: hrs,
-        description: e.description || "",
-      };
-    });
-
-    const lecture_hours = Number(source?.lecture_hours ?? source?.lectureHours ?? data?.lecture_hours ?? data?.lectureHours ?? 0);
-    const tutorial_hours = Number(source?.tutorial_hours ?? source?.tutorialHours ?? data?.tutorial_hours ?? data?.tutorialHours ?? 0);
-    const practical_hours = Number(source?.practical_hours ?? source?.practicalHours ?? data?.practical_hours ?? data?.practicalHours ?? 0);
-    const credits = Number(source?.credits ?? source?.total_credits ?? data?.credits ?? 0);
-
-    return {
-      ...data,
-      ...source,
-      course_data: source,
-      lecture_hours,
-      lectureHours: lecture_hours,
-      tutorial_hours,
-      tutorialHours: tutorial_hours,
-      practical_hours,
-      practicalHours: practical_hours,
-      credits,
-      outcomes,
-      units,
-      textbooks,
-      reference_books,
-      laboratory_experiments,
-      laboratoryExperiments: laboratory_experiments,
-      experiments: laboratory_experiments,
-    };
-  };
-
-  const startAIExtraction = async () => {
-    try {
-      const body = {
-        file: state.selectedFile,
-        course_id: course_id,
-        keep_permanently: state.keep_file,
-      };
-      console.log("body", body);
-
-      const formData = new FormData();
-      formData.append("file", state.selectedFile);
-      formData.append("course_id", course_id);
-      formData.append("regulation", state.courseData?.regulation);
-      formData.append("programme", state.courseData?.programme_id);
-      formData.append("academic_year", state.courseData?.academic_year);
-
-      formData.append("keep_permanently", state.keep_file);
-
-      const res: any = await Models.syllabus.create(formData);
-      console.log("res", res);
-
-      if (res?.job_id) {
-        try {
-          sessionStorage.setItem(jobKey, String(res.job_id));
-        } catch { }
-        const sId = res?.syllabus_id || res?.result?.syllabus_id;
-        if (sId) {
-          try {
-            sessionStorage.setItem(syllabusKey, String(sId));
-          } catch { }
-        }
-        job_Data(res.job_id);
-      }
-    } catch (error) {
-      console.log("error", error);
-    }
-  };
-
-  const job_Data = async (id: string | number) => {
-    stopPolling();
-    setState({ isJobLoading: true });
-
-    let retries = 0;
-    const maxRetries = 15; // Max 15 retries (about 30 minutes with 2-minute interval)
-    const pollInterval = 120000; // 2 minutes (120,000 ms)
-    const startTime = Date.now();
-    const MAX_DURATION_MS = 15 * 60 * 1000; // 15 minutes
-
-    const fetchOnce = async () => {
-      try {
-        if (Date.now() - startTime > MAX_DURATION_MS) {
-          console.log("Extraction job polling timed out after 10 minutes");
-          stopPolling();
-          setState({ isJobLoading: false, extractionError: "Extraction timed out after 10 minutes. Please try again." });
-          Failure("Extraction timed out after 10 minutes. Please try again.");
+      // Poll until extraction completes
+      const pollExtraction = async (attempts = 0) => {
+        if (attempts > 30) {
+          setExtractingId(null);
           return;
         }
 
-        let res: any = null;
         try {
-          res = await Models.job.detail(id);
-          console.log("job_Data response:", res);
-        } catch (jobErr) {
-          console.log("Job detail error, will cross-check workflow status:", jobErr);
-        }
+          const [fvRes, wfRes]: [any, any] = await Promise.all([
+            Models.syllabus.listFileVersions(courseIdParam).catch(() => null),
+            Models.syllabus.get_workflow_status(courseIdParam).catch(() => null),
+          ]);
 
-        setStep(3);
+          if (fvRes?.file_versions) {
+            setFileVersions(fvRes.file_versions);
+            const currentFv = fvRes.file_versions.find((v: any) => v.id === version.id);
+            const st = currentFv?.extraction_status?.toLowerCase();
 
-        // Cross-check master workflow status if course_id is present
-        let wfExtraction: any = null;
-        if (course_id) {
-          try {
-            const wfRes: any = await Models.syllabus.get_workflow_status(course_id);
-            wfExtraction = wfRes?.workflow?.step_1_syllabus_extraction;
-          } catch (wfErr) {
-            console.log("Workflow status check error:", wfErr);
-          }
-        }
-
-        if (res?.status === "not_found") {
-          console.log("Job status is not_found, stopping polling");
-          setState({ isJobLoading: false });
-          stopPolling();
-          return;
-        }
-
-        const isCompleted =
-          res?.status === "complete" ||
-          res?.status === "completed" ||
-          wfExtraction?.status === "draft" ||
-          wfExtraction?.status === "approved";
-
-        if (isCompleted) {
-          const syllabusId =
-            res?.result?.syllabus_id ||
-            res?.syllabus_id ||
-            res?.result?.course_data?.syllabus_id ||
-            getSavedSyllabusId();
-
-          if (syllabusId) {
-            try {
-              sessionStorage.setItem(syllabusKey, String(syllabusId));
-            } catch { }
-          }
-
-          setState({ isJobLoading: false, showReview: true });
-
-          // Populate jobData from extracted job result immediately
-          if (res?.result) {
-            const normalized = normalizeSyllabusData(res.result);
-            console.log("Normalized extracted job result:", normalized);
-            setState({ jobData: normalized });
-          }
-
-          if (syllabusId) {
-            syllabus_detail(syllabusId);
-          }
-          stopPolling();
-        } else if (res?.status === "failed" || wfExtraction?.status === "failed") {
-          console.log("Job marked as failed");
-          setState({ isJobLoading: false, extractionError: "failed" });
-          stopPolling();
-        } else if (
-          wfExtraction?.status?.startsWith("cancelled")
-        ) {
-          console.log("Job was cancelled:", wfExtraction.status);
-          setState({ isJobLoading: false, extractionError: wfExtraction.status });
-          stopPolling();
-        } else {
-          console.log(`Job status: ${res?.status || wfExtraction?.status || "processing"}, continuing to poll...`);
-        }
-      } catch (error: any) {
-        console.log("job_Data error:", error);
-        setState({ isJobLoading: false });
-        stopPolling();
-      }
-    };
-
-    await fetchOnce();
-    pollRef.current = setInterval(fetchOnce, pollInterval);
-  };
-
-  const syllabus_detail = async (id: string | number) => {
-    try {
-      const res: any = await Models.syllabus.detail(id);
-      console.log("syllabus_detail →", res);
-
-      if (res?.id && res?.id !== state.lastLoadedSyllabusId) {
-        uploded_file(res?.id);
-        setState({ lastLoadedSyllabusId: res?.id });
-      }
-
-      const normalizedDetail = normalizeSyllabusData(res);
-
-      setState((prev: any) => {
-        const existingData = prev.jobData;
-        const hasDbContent =
-          (normalizedDetail?.outcomes && normalizedDetail.outcomes.length > 0) ||
-          (normalizedDetail?.units && normalizedDetail.units.length > 0) ||
-          (normalizedDetail?.laboratory_experiments && normalizedDetail.laboratory_experiments.length > 0);
-
-        if (hasDbContent || !existingData) {
-          const mergedUnits = (normalizedDetail?.units || []).map((u: any) => {
-            if (!u.topics || u.topics.length === 0) {
-              const matched = existingData?.units?.find(
-                (eu: any) => (eu.unit_number === u.unit_number || eu.unitNumber === u.unitNumber || eu.id === u.id)
-              );
-              if (matched?.topics && matched.topics.length > 0) {
-                return { ...u, topics: matched.topics };
+            if (st === "draft" || st === "approved" || st === "failed") {
+              setExtractingId(null);
+              if (st === "failed") {
+                Failure("Extraction failed. Please check the PDF document.");
+              } else {
+                Success(`Extraction completed for Version ${version.version_number}!`);
               }
+              if (wfRes) setWorkflowStatus(wfRes.workflow || wfRes);
+              return;
             }
-            return u;
-          });
-          return { jobData: { ...normalizedDetail, units: mergedUnits } };
-        } else {
-          // Keep existing extracted jobData but merge DB metadata like id, etc.
-          return {
-            jobData: {
-              ...existingData,
-              ...res,
-              outcomes: existingData.outcomes?.length > 0 ? existingData.outcomes : normalizedDetail.outcomes,
-              units: existingData.units?.length > 0 ? existingData.units : normalizedDetail.units,
-              textbooks: existingData.textbooks?.length > 0 ? existingData.textbooks : normalizedDetail.textbooks,
-              reference_books: existingData.reference_books?.length > 0 ? existingData.reference_books : normalizedDetail.reference_books,
-              laboratory_experiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
-              laboratoryExperiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
-              experiments: existingData.laboratory_experiments?.length > 0 ? existingData.laboratory_experiments : normalizedDetail.laboratory_experiments,
-            },
-          };
+          }
+
+          pollTimerRef.current = setTimeout(() => pollExtraction(attempts + 1), 3000);
+        } catch {
+          setExtractingId(null);
         }
-      });
-    } catch (error) {
-      console.log("syllabus_detail error", error);
-    }
-  };
-
-  const uploded_file = async (id: string | number) => {
-    try {
-      const res: any = await Models.syllabus.uploded_file(id);
-      console.log("uploded_file response →", res);
-      console.log("uploded_file response type →", typeof res);
-      console.log("uploded_file is Blob? →", res instanceof Blob);
-      console.log("uploded_file is ArrayBuffer? →", res instanceof ArrayBuffer);
-
-      // API should return a Blob (due to responseType: 'blob')
-      if (res instanceof Blob) {
-        console.log("Creating blob URL from Blob");
-        const pdfBlobUrl = URL.createObjectURL(res);
-        console.log("Blob URL created:", pdfBlobUrl);
-        setState({ pdfBlobUrl });
-      } else if (typeof res === "string") {
-        console.log("Using response as string URL");
-        // Fallback: if it's a URL string, use directly
-        setState({ pdfBlobUrl: res });
-      } else {
-        console.log("Unknown response type, attempting to create blob");
-        // Try to convert to blob as last resort
-        const blob = new Blob([res], { type: "application/pdf" });
-        const pdfBlobUrl = URL.createObjectURL(blob);
-        setState({ pdfBlobUrl });
-      }
-    } catch (error) {
-      console.log("uploded_file error", error);
-    }
-  };
-
-  const handleAddTopic = async (
-    unitId: number,
-    body: { topic_code: string; topic_name: string; learning_sequence: number }
-  ) => {
-    try {
-      const res = await Models.syllabus.create_unit_topic(unitId, body);
-      Success("Topics added");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-    } catch (error: any) {
-      console.log("create_unit_topic error", error);
-      throw error;
-    }
-  };
-
-  const onDeleteTopic = async (id: string | number) => {
-    try {
-      const res = await Models.syllabus.delete_unit_topic(id);
-      Success("Topics deleted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-
-      console.log("syllabus_status →", res);
-    } catch (error) {
-      console.log("syllabus_detail error", error);
-    }
-  };
-
-  const handleAddTextbook = async (body: {
-    syllabus_id: number;
-    title: string;
-    authors: string[];
-    edition: string;
-    publisher: string;
-    publication_year: number;
-  }) => {
-    try {
-      const res = await Models.syllabus.create_unit_textbook(body.syllabus_id, {
-        title: body.title,
-        authors: body.authors,
-        edition: body.edition,
-        publisher: body.publisher,
-        publication_year: body.publication_year,
-      });
-      Success("Textbook added");
-      if (body.syllabus_id) syllabus_detail(body.syllabus_id);
-    } catch (error: any) {
-      console.log("create_unit_textbook error", error);
-      throw error;
-    }
-  };
-
-  const handleAddReference = async (body: {
-    syllabus_id: number;
-    title: string;
-    authors: string[];
-    edition: string;
-    publisher: string;
-    publication_year: number;
-  }) => {
-    console.log("✌️reference body --->", body);
-
-    try {
-      const res = await Models.syllabus.create_unit_reference_book(
-        body.syllabus_id,
-        {
-          title: body.title,
-          authors: body.authors,
-          edition: body.edition,
-          publisher: body.publisher,
-          publication_year: body.publication_year,
-        }
-      );
-      Success("Reference book added");
-      if (body.syllabus_id) syllabus_detail(body.syllabus_id);
-    } catch (error: any) {
-      console.log("create_unit_reference_book error", error);
-      throw error;
-    }
-  };
-
-  const onDeleteTextbook = async (id: string | number) => {
-    try {
-      const res = await Models.syllabus.delete_unit_textbook(id);
-      Success("Textbook deleted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-    } catch (error) {
-      console.log("delete_unit_textbook error", error);
-    }
-  };
-
-  const onDeleteReference = async (id: string | number) => {
-    try {
-      const res = await Models.syllabus.delete_unit_reference_book(id);
-      Success("Reference book deleted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-    } catch (error) {
-      console.log("delete_unit_reference_book error", error);
-    }
-  };
-
-  const handleSaveOutcome = async (id: number, description: string, co_code: string) => {
-    setState((prev: any) => ({
-      ...prev,
-      jobData: {
-        ...prev.jobData,
-        outcomes: prev.jobData?.outcomes?.map((co: any) =>
-          co.id === id ? { ...co, description, co_code } : co
-        ),
-      },
-    }));
-
-    try {
-      await Models.syllabus.edit_unit_outcome(id, {
-        co_code: co_code,
-        description: description.trim(),
-      });
-      Success("Outcome updated");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-    } catch (error: any) {
-      console.log("edit_unit_outcome error (preserved in draft):", error);
-    }
-  };
-
-  const handleAcceptOutcome = async (id: number) => {
-    setState((prev: any) => ({
-      ...prev,
-      jobData: {
-        ...prev.jobData,
-        outcomes: prev.jobData?.outcomes?.map((co: any) =>
-          co.id === id ? { ...co, is_accepted: true } : co
-        ),
-      },
-    }));
-
-    try {
-      await Models.syllabus.accept_outcome(id);
-      Success("Outcome accepted");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-    } catch (error: any) {
-      console.log("accept_outcome error (preserved in draft):", error);
-    }
-  };
-
-  const handleKnowledgeLevelChange = async (id: number, value: string) => {
-    setState((prev: any) => ({
-      ...prev,
-      jobData: {
-        ...prev.jobData,
-        outcomes: prev.jobData?.outcomes?.map((co: any) =>
-          co.id === id ? { ...co, knowledge_level: value } : co
-        ),
-      },
-    }));
-
-    try {
-      await Models.syllabus.update_knw_level_outcome(id, {
-        knowledge_level: value,
-      });
-      Success("Knowledge level updated");
-      if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-    } catch (error: any) {
-      console.log("update_knw_level_outcome error (preserved in draft):", error);
-    }
-  };
-
-  const handleUpdateUnitHours = async (unitId: number, hours: number) => {
-    setState((prev: any) => ({
-      ...prev,
-      jobData: {
-        ...prev.jobData,
-        units: prev.jobData?.units?.map((u: any) =>
-          u.id === unitId ? { ...u, theory_hours: hours, hours } : u
-        ),
-      },
-    }));
-
-    try {
-      await Models.syllabus.update_unit(unitId, { theory_hours: hours });
-      Success("Unit hours updated");
-      if (state.courseData?.latest_syllabus?.id) {
-        syllabus_detail(state.courseData.latest_syllabus.id);
-      }
-    } catch (error: any) {
-      console.log("update_unit hours error (preserved in draft):", error);
-    }
-  };
-
-  const handleUpdateUnitTitle = async (unitId: number, title: string) => {
-    setState((prev: any) => ({
-      ...prev,
-      jobData: {
-        ...prev.jobData,
-        units: prev.jobData?.units?.map((u: any) =>
-          u.id === unitId ? { ...u, unit_title: title, title } : u
-        ),
-      },
-    }));
-
-    try {
-      await Models.syllabus.update_unit(unitId, { unit_title: title });
-      Success("Unit title updated");
-      if (state.courseData?.latest_syllabus?.id) {
-        syllabus_detail(state.courseData.latest_syllabus.id);
-      }
-    } catch (error: any) {
-      console.log("update_unit title error (preserved in draft):", error);
-    }
-  };
-
-  const getEffectiveSyllabusId = async (): Promise<string | number | null> => {
-    if (state.courseData?.latest_syllabus?.id) return state.courseData.latest_syllabus.id;
-    if (state.lastLoadedSyllabusId) return state.lastLoadedSyllabusId;
-    if (state.jobData?.syllabus_id) return state.jobData.syllabus_id;
-    if (state.jobData?.id) return state.jobData.id;
-    const saved = getSavedSyllabusId();
-    if (saved) return saved;
-    if (course_id) {
-      try {
-        const wf: any = await Models.syllabus.get_workflow_status(course_id);
-        if (wf?.syllabus_id) return wf.syllabus_id;
-      } catch {}
-    }
-    return null;
-  };
-
-  const syllabus_status = async () => {
-    try {
-      const sid = await getEffectiveSyllabusId();
-
-      // 1. Update syllabus repository status if syllabus ID is present
-      if (sid) {
-        try {
-          const body = {
-            approval_status: "approved_by_bos",
-          };
-          await Models.syllabus.status(sid, body);
-        } catch (err) {
-          console.warn("Update syllabus status warning:", err);
-        }
-      }
-
-      // 2. Approve the workflow stage so downstream steps (CO-PO mapping, topics) unlock
-      if (course_id) {
-        try {
-          await (Models.syllabus as any).approve_stage(course_id, "extraction");
-        } catch (stgErr) {
-          console.warn("approve_stage warning:", stgErr);
-        }
-      } else if (sid) {
-        try {
-          await (Models.syllabus as any).approve_stage(sid, "extraction");
-        } catch (stgErr) {
-          console.warn("approve_stage warning:", stgErr);
-        }
-      }
-
-      Success("Syllabus extraction approved successfully!");
-      setStep(4);
-      if (course_id) {
-        course_data(course_id);
-      }
-      if (sid) {
-        syllabus_detail(sid);
-      }
-    } catch (error: any) {
-      console.log("syllabus approval error", error);
-      Failure(typeof error === "string" ? error : error?.message || "Failed to approve syllabus");
-    }
-  };
-  console.log('✌️state.course_data --->', state.courseData);
-
-  const handleUpdateLTPC = async (hours: { lecture_hours?: number; tutorial_hours?: number; practical_hours?: number; credits?: number }) => {
-    setState((prev: any) => ({
-      jobData: {
-        ...(prev.jobData || {}),
-        ...hours,
-        lectureHours: hours.lecture_hours,
-        tutorialHours: hours.tutorial_hours,
-        practicalHours: hours.practical_hours,
-      },
-      courseData: {
-        ...(prev.courseData || {}),
-        latest_syllabus: {
-          ...(prev.courseData?.latest_syllabus || {}),
-          ...hours,
-        },
-      },
-    }));
-
-    try {
-      const sid = await getEffectiveSyllabusId();
-      if (sid) {
-        const body: any = {
-          lecture_hours: hours.lecture_hours,
-          tutorial_hours: hours.tutorial_hours,
-          practical_hours: hours.practical_hours,
-        };
-        if (hours.credits !== undefined) body.credits = hours.credits;
-        await Models.syllabus.update_syllabus(sid, body);
-        Success("L-T-P hours updated successfully");
-      }
-    } catch (error: any) {
-      console.log("update_syllabus LTPC error:", error);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    try {
-      const sid = await getEffectiveSyllabusId();
-      if (!sid) {
-        Failure("No syllabus ID found to save draft");
-        return;
-      }
-
-      const body = {
-        credits: state?.jobData?.credits,
-        lecture_hours: state?.jobData?.lecture_hours,
-        tutorial_hours: state?.jobData?.tutorial_hours,
-        practical_hours: state?.jobData?.practical_hours,
-        regulation: state?.jobData?.regulation,
-        programme: state?.jobData?.programme,
       };
 
-      const res: any = await Models.syllabus.update_syllabus(sid, body);
-      Success("Draft changes saved successfully.");
-      console.log("syllabus draft saved →", res);
-    } catch (error) {
-      console.log("handleSaveDraft error", error);
+      pollExtraction();
+    } catch (err: any) {
+      setExtractingId(null);
+      Failure(getErrorMessage(err, "Failed to trigger extraction"));
     }
   };
+
+  /** 3. Review a File Version & Populate Extraction Data in Split-Screen */
+  const handleReview = async (version: FileVersionItem) => {
+    if (!courseIdParam) return;
+
+    try {
+      setLoadingReviewId(version.id);
+
+      // Fetch PDF Blob and Extraction Data in parallel
+      const [blobRes, extRes]: [any, any] = await Promise.all([
+        Models.syllabus.getFileVersionFile(courseIdParam, version.version_number).catch(() => null),
+        Models.syllabus.getFileVersionExtraction(courseIdParam, version.version_number).catch(() => null),
+      ]);
+
+      // Set PDF blob with fallback
+      let urlToUse: string | null = null;
+      if (blobRes instanceof Blob && blobRes.size > 0) {
+        const pdfBlob =
+          blobRes.type === "application/pdf"
+            ? blobRes
+            : new Blob([blobRes], { type: "application/pdf" });
+        if (pdfBlobUrl) {
+          try {
+            URL.revokeObjectURL(pdfBlobUrl);
+          } catch {}
+        }
+        urlToUse = URL.createObjectURL(pdfBlob);
+      } else if (blobRes && !(blobRes instanceof Blob)) {
+        const pdfBlob = new Blob([blobRes], { type: "application/pdf" });
+        urlToUse = URL.createObjectURL(pdfBlob);
+      } else {
+        // Direct stream fallback
+        urlToUse = `http://localhost:8080/course/syllabi/courses/${courseIdParam}/file-versions/${version.version_number}/file`;
+      }
+      setPdfBlobUrl(urlToUse);
+
+      // Populate extracted data
+      let finalData = extRes?.data_ai_gave;
+
+      // If data_ai_gave has no nested units, fall back to master syllabus detail
+      if (!finalData || (!finalData.units && !finalData.outcomes && !finalData.courseOutcomes)) {
+        const sid = courseData?.latest_syllabus?.id || courseData?.syllabus_id || extRes?.extraction_id;
+        if (sid) {
+          try {
+            const masterSyl: any = await Models.syllabus.detail(sid);
+            if (masterSyl) finalData = masterSyl;
+          } catch {}
+        }
+      }
+
+      setReviewFileVersion(version);
+      setReviewExtractionData(finalData || {});
+      setViewMode("review");
+      Success(`Loaded Version ${version.version_number} data into Review`);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to load version review data"));
+    } finally {
+      setLoadingReviewId(null);
+    }
+  };
+
+  /** 4. Save Draft Changes */
+  const handleSaveDraft = async () => {
+    if (!courseIdParam || !reviewFileVersion) return;
+    try {
+      setIsSavingDraft(true);
+      await (Models.syllabus as any).updateFileVersionExtraction(
+        courseIdParam,
+        reviewFileVersion.version_number,
+        reviewExtractionData
+      );
+      Success("Draft saved successfully.");
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save draft"));
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  /** 5. Approve Extraction */
+  const handleApprove = async () => {
+    if (!courseIdParam || !reviewFileVersion) return;
+    try {
+      setIsApproving(true);
+      const extVer = reviewFileVersion.extraction_version || 1;
+
+      // Auto-save any pending changes to extraction snapshot before approving
+      if (reviewExtractionData) {
+        await (Models.syllabus as any)
+          .updateFileVersionExtraction(
+            courseIdParam,
+            reviewFileVersion.version_number,
+            reviewExtractionData
+          )
+          .catch(() => null);
+      }
+
+      await Models.syllabus.approve_stage(courseIdParam, "extraction", extVer);
+      Success("Syllabus Extraction Approved! You can now proceed to CO-PO Mapping.");
+
+      // Update local state to reflect approved status
+      setReviewFileVersion((prev) =>
+        prev ? { ...prev, extraction_status: "approved" } : null
+      );
+
+      // Refresh master course data & workflow status
+      await loadCourseData();
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to approve extraction"));
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  /** 6. Make a File Version Active */
+  const handleActivate = async (version: FileVersionItem) => {
+    if (!courseIdParam) return;
+    try {
+      await Models.syllabus.activateFileVersion(courseIdParam, version.version_number);
+      if (version.extraction_version) {
+        await Models.syllabus
+          .activate_version(courseIdParam, "extraction", version.extraction_version)
+          .catch(() => null);
+      }
+      Success(`Version ${version.version_number} is now the active syllabus.`);
+      await loadCourseData();
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to activate version"));
+    }
+  };
+
+  /** 6. Proceed to CO-PO Mapping */
+  const handleProceedToCopo = () => {
+    const code = courseData?.course_code || codeParam || "";
+    router.push(
+      `/neurobe/co-po-mapping?course_id=${courseIdParam}&code=${code}&from=syllabus`
+    );
+  };
+
+  /** Update LTPC from ExtractedDataPanel */
+  const handleUpdateLTPC = async (ltpc: any) => {
+    if (!courseIdParam) return;
+    try {
+      await Models.course.update(courseIdParam, ltpc);
+      setCourseData((prev: any) => ({ ...prev, ...ltpc }));
+    } catch {}
+  };
+
+  // Derive stepper step: 1 = Upload, 2 = AI Extraction, 3 = Review & Edit, 4 = Approve & Save
+  const currentStep =
+    viewMode === "review"
+      ? reviewFileVersion?.extraction_status === "approved"
+        ? 4
+        : 3
+      : fileVersions.length > 0
+      ? 2
+      : 1;
+
+  const currentStatusLabel =
+    workflowStatus?.step_1_syllabus_extraction?.status === "approved"
+      ? "Approved"
+      : workflowStatus?.step_1_syllabus_extraction?.status === "draft"
+      ? "Draft"
+      : "Not Started";
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-12">
+      {/* ── Course Banner ── */}
       <CourseBanner
-        courseCode={state.courseData?.course_code || ""}
-        courseTitle={state.courseData?.course_title || ""}
-        description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
-        programme={state.courseData?.programme || ""}
-        batch={state.courseData?.batch_name || ""}
-        academicYear={state.courseData?.academic_year || ""}
-        students={`${state.courseData?.students_count ?? 0} Students`}
-        selectedCourse={state.courseData?.course_code || ""}
-        courseOptions={state.course_list}
-        onCourseChange={(val) => console.log("course", val)}
-        activeView={state.activeTab}
-        onBack={() => {
-          if (fromParam === "my-courses") {
-            router.push("/neurobe/my-assigned-courses");
-          } else {
-            router.back();
-          }
-        }}
-        onViewChange={(view) => setState({ activeTab: view })}
+        courseCode={courseData?.course_code || codeParam || "Course"}
+        courseTitle={courseData?.course_title || "Course Workspace"}
+        description="Academic course preparation, syllabus extraction, outcomes mapping, and curriculum design."
+        programme={courseData?.programme || "B.Tech CSE"}
+        batch={courseData?.batch_name || "Batch 2025-2029"}
+        academicYear={courseData?.academic_year || "2026-2027"}
+        students={String(courseData?.students_count || 0)}
+        onBack={() => router.push("/neurobe/my-assigned-courses")}
       />
-      <div className="">
+
+      {/* ── Progress Stepper ── */}
+      <div className="mt-4">
         <SyllabusStepper
-          currentStep={state.currentStep}
-          statusLabel={
-            state.currentStep === 4
-              ? "Approved"
-              : state.currentStep === 3
-                ? "Review Required"
-                : "Awaiting Upload"
-          }
-          statusClassName={
-            state.currentStep === 4
-              ? "border-green-300 bg-green-50 text-green-600 font-bold"
-              : state.currentStep === 3
-                ? "border-orange-200 bg-orange-50 text-orange-600 font-bold"
-                : ""
-          }
+          currentStep={currentStep}
+          statusLabel={currentStatusLabel}
         />
-        <div className=" mx-6 border-t border-gray-200 dark:border-gray-700" />
-        {state.currentStep === 1 && (
-          <div className="py-3 pt-2 px-4 max-w-2xl mx-auto">
-            <StepHeader
-              title="Syllabus File Versions"
-              description={`Upload one or more syllabus PDF versions, then press Extract on any version to start AI extraction.`}
-            />
+      </div>
 
-            {/* Extraction error / cancelled banner */}
-            {state.extractionError && (
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50/70 p-3.5 dark:border-red-800/50 dark:bg-red-950/30">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <RotateCw className="h-5 w-5 shrink-0 text-red-500" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-red-800 dark:text-red-200">
-                      {state.extractionError === "failed"
-                        ? "Extraction Failed"
-                        : "Extraction Cancelled"}
-                    </p>
-                    <p className="text-[11px] text-red-600 dark:text-red-400 truncate">
-                      {state.extractionError === "failed"
-                        ? "The AI extraction encountered an error. Please try again with the same or a new file."
-                        : "The extraction was cancelled. You can retry by clicking Extract on any file below."}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setState({ extractionError: null })}
-                  className="shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 shadow-sm hover:bg-red-50 active:scale-95 dark:border-red-700 dark:bg-red-950 dark:text-red-300"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
+      {/* ── VIEW A: Files & Versions View ── */}
+      {viewMode === "files" && (
+        <div className="mt-6 space-y-6">
+          {/* Upload Dropzone */}
+          <SyllabusUpload
+            isUploading={isUploading}
+            onUploadFile={handleUploadFile}
+          />
 
-            {/* Previously extracted syllabus available banner */}
-            {state.courseData?.latest_syllabus?.id && !state.extractionError && (
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-800/50 dark:bg-emerald-950/30">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                      Extracted Syllabus Available
-                    </p>
-                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 truncate">
-                      An extracted syllabus is saved. You can upload new files below or review the current syllabus.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep(3);
-                    syllabus_detail(state.courseData.latest_syllabus.id);
-                  }}
-                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 active:scale-95"
-                >
-                  Review Syllabus →
-                </button>
-              </div>
-            )}
-
-            {/* File Version List */}
-            <div className="mt-4 flex flex-col gap-3">
-              {state.fileVersions.length === 0 && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/40 py-10 text-center dark:border-indigo-800/40 dark:bg-indigo-950/20">
-                  <Layers className="h-10 w-10 text-indigo-300" />
-                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">No syllabus files uploaded yet</p>
-                  <p className="text-xs text-slate-400">Upload a PDF to get started</p>
-                </div>
-              )}
-
-              {state.fileVersions.map((fv: any) => {
-                const isExtracting = state.extractingFileVersionId === fv.id;
-                const isActive = Boolean(fv.is_active);
-                return (
-                  <div
-                    key={fv.id}
-                    className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 shadow-sm transition-all ${
-                      isActive
-                        ? "border-emerald-300 bg-emerald-50/20 dark:border-emerald-800 dark:bg-emerald-950/20"
-                        : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                        isActive ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-indigo-50 dark:bg-indigo-950/40"
-                      }`}>
-                        <FileText className={`h-5 w-5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-indigo-500"}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${
-                            isActive
-                              ? "bg-emerald-600 text-white"
-                              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
-                          }`}>
-                            v{fv.version_number}
-                          </span>
-                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                            {fv.original_filename}
-                          </p>
-                          {isActive ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                              <CheckCircle className="h-3 w-3" /> Active
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-400">
-                              Inactive
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          {fv.uploaded_by} &bull; {fv.created_at ? new Date(fv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : ""}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!isActive && (
-                        <button
-                          type="button"
-                          onClick={() => handleActivateFileVersion(fv.version_number)}
-                          className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 shadow-xs hover:bg-emerald-50 active:scale-95 dark:border-emerald-700 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-slate-700"
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" /> Set Active
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleLoadFileVersion(fv)}
-                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                      >
-                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Review
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={isExtracting}
-                        onClick={() => extractFromVersion(fv.id, fv.version_number)}
-                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-60"
-                      >
-                        {isExtracting ? (
-                          <><RotateCw className="h-3 w-3 animate-spin" /> Extracting...</>
-                        ) : (
-                          <><Sparkles className="h-3 w-3" /> Extract</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Upload New Version */}
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50/30 px-4 py-3 transition-all hover:border-indigo-400 hover:bg-indigo-50/60 dark:border-indigo-800/40 dark:bg-indigo-950/20">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  className="sr-only"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadAndSaveFileVersion(file);
-                    e.target.value = "";
-                  }}
-                />
-                {state.isUploadingFile ? (
-                  <RotateCw className="h-5 w-5 animate-spin text-indigo-400" />
-                ) : (
-                  <Plus className="h-5 w-5 text-indigo-400" />
-                )}
-                <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                  {state.isUploadingFile ? "Uploading..." : state.fileVersions.length === 0 ? "Upload Syllabus PDF" : "Upload New Version"}
+          {/* Uploaded File Versions List */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Syllabus File Versions
+                </h3>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {fileVersions.length} {fileVersions.length === 1 ? "Version" : "Versions"}
                 </span>
-              </label>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                Each upload saves document location and allows independent AI extraction.
+              </p>
             </div>
 
-            <NeuroAIInfo />
-          </div>
-        )}
-
-        {(state.currentStep === 3 || state.currentStep === 4) && (
-          <div className=" py-3 pt-2">
-            {!state.showReview && state.currentStep !== 4 ? (
-              <ExtractionComplete
-                fileName={state.selectedFile?.name}
-                isLoading={state.isJobLoading}
-                isApproved={state.currentStep === 4 || state.syllabusData?.status === "approved" || state.syllabusData?.is_approved}
-                onReview={() => {
-                  if (state.courseData?.latest_syllabus?.id) syllabus_detail(state.courseData.latest_syllabus.id);
-                  setState({ showReview: true });
-                }}
-                progress={state.isJobLoading ? 75 : 100}
-              />
+            {loadingInitial ? (
+              <div className="flex items-center justify-center py-12 text-xs text-slate-400">
+                <RotateCw className="mr-2 h-4 w-4 animate-spin text-indigo-500" />
+                Loading syllabus files...
+              </div>
+            ) : fileVersions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-xs text-slate-400 dark:border-slate-700">
+                No syllabus documents uploaded yet. Upload a PDF above to create Version 1.
+              </div>
             ) : (
-              <>
-                {state.fileVersions.length > 0 && (
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
-                        <Layers className="h-4 w-4" />
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                          Syllabus File Versions:
-                        </span>
-                        {state.fileVersions.map((fv: any) => {
-                          const isAct = Boolean(fv.is_active);
-                          return (
-                            <button
-                              key={fv.id}
-                              type="button"
-                              onClick={() => handleLoadFileVersion(fv)}
-                              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                                isAct
-                                  ? "bg-indigo-600 text-white shadow-xs"
-                                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                              }`}
-                            >
-                              v{fv.version_number} {isAct ? "(Active)" : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep(1);
-                        setState({ showReview: false });
-                      }}
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                    >
-                      <RotateCw className="h-3 w-3" /> Manage File Versions
-                    </button>
-                  </div>
-                )}
-                {state.currentStep === 4 ? (
-                  <div className="mb-5 mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-5 py-4 dark:border-green-800 dark:bg-green-950/20">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white dark:bg-green-900">
-                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-green-900 dark:text-green-200">
-                            SYLLABUS EXTRACTION APPROVED
-                          </p>
-                          <span className="rounded-full border border-green-400 bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900 dark:text-green-300">
-                            Approved by BoS
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-green-700 dark:text-green-400">
-                          Extraction is verified and approved. You can now generate CO-PO Mapping and Topic Hierarchy.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 transition-all"
-                      >
-                        CO-PO Mapping <ArrowRight className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/neurobe/topics?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-purple-700 transition-all"
-                      >
-                        Topic Hierarchy <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <ReviewModeBar
-                    isApproved={state.currentStep === 4 || state.syllabusData?.status === "approved" || state.syllabusData?.is_approved}
-                    status={state.syllabusData?.status}
-                    onSaveDraft={() => handleSaveDraft()}
-                    onContinue={() => syllabus_status()}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {fileVersions.map((fv) => (
+                  <FileVersionCard
+                    key={fv.id}
+                    version={fv}
+                    isExtracting={extractingId === fv.id}
+                    isLoadingReview={loadingReviewId === fv.id}
+                    onExtract={handleExtract}
+                    onReview={handleReview}
+                    onActivate={handleActivate}
                   />
-                )}
-                <div
-                  className="grid gap-5"
-                  style={{
-                    height: "74vh",
-                    overflow: "hidden",
-                    gridTemplateColumns: "2fr 3fr",
-                  }}
-                >
-                  <div className="min-h-0 overflow-hidden">
-                    {state.pdfBlobUrl ? (
-                      <iframe
-                        src={state.pdfBlobUrl}
-                        className="h-full w-full rounded-xl border border-gray-200 dark:border-gray-700"
-                        title="PDF Viewer"
-                      />
-                    ) : (
-                      <PDFViewer
-                        file={state.selectedFile}
-                        fileName={state.selectedFile?.name}
-                        fileSize={
-                          state.selectedFile
-                            ? `${(state.selectedFile.size / (1024 * 1024)).toFixed(1)} MB`
-                            : ""
-                        }
-                      />
-                    )}
-                  </div>
-                  <div className="min-h-0 overflow-auto flex flex-col gap-3">
-                    <ExtractedDataPanel
-                      data={state.jobData}
-                      courseData={state.courseData}
-                      onAddTopic={handleAddTopic}
-                      onDeleteTopic={onDeleteTopic}
-                      handleAddTextbook={handleAddTextbook}
-                      onDeleteTextbook={onDeleteTextbook}
-                      handleAddReference={handleAddReference}
-                      onDeleteReference={onDeleteReference}
-                      handleSaveOutcome={handleSaveOutcome}
-                      handleAcceptOutcome={handleAcceptOutcome}
-                      handleKnowledgeLevelChange={handleKnowledgeLevelChange}
-                      onUpdateUnitHours={handleUpdateUnitHours}
-                      onUpdateUnitTitle={handleUpdateUnitTitle}
-                      onUpdateLTPC={handleUpdateLTPC}
-                      syllabusId={state.courseData?.latest_syllabus?.id || state.lastLoadedSyllabusId || state.jobData?.syllabus_id || state.jobData?.id}
-                    />
-
-                    {/* Navigation buttons to downstream stages */}
-                    <div className="flex items-center gap-3 border-t border-slate-200 pt-4 mt-2 pb-4 dark:border-slate-700">
-                      <p className="text-xs font-semibold text-slate-500 flex-1">Approve this extraction, then proceed to:</p>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/neurobe/co-po-mapping?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300"
-                      >
-                        CO-PO Mapping <ArrowRight className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/neurobe/topics?course_id=${course_id}`)}
-                        className="flex items-center gap-1.5 rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:bg-purple-950/30 dark:text-purple-300"
-                      >
-                        Topic Hierarchy <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
+                ))}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* ── VIEW B: Split-Screen Review View ── */}
+      {viewMode === "review" && reviewFileVersion && (
+        <div className="mt-6">
+          {/* Top Review Mode Action Bar */}
+          <ReviewModeBar
+            fileVersionNumber={reviewFileVersion.version_number}
+            extractionVersion={reviewFileVersion.extraction_version}
+            extractionStatus={reviewFileVersion.extraction_status || "draft"}
+            isSaving={isSavingDraft}
+            isApproving={isApproving}
+            onBackToVersions={() => setViewMode("files")}
+            onSaveDraft={handleSaveDraft}
+            onApprove={handleApprove}
+            onProceedToCopo={handleProceedToCopo}
+          />
+
+          {/* 50 / 50 Split-Screen Grid */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2" style={{ height: "calc(100vh - 260px)", minHeight: "650px" }}>
+            {/* Left Column: PDF Document Viewer */}
+            <div className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-900 shadow-xs dark:border-slate-800">
+              <PDFViewer
+                file={pdfBlobUrl}
+                fileName={reviewFileVersion.original_filename}
+              />
+            </div>
+
+            {/* Right Column: Extracted Structured Data Tabs */}
+            <div className="h-full overflow-hidden">
+              <ExtractedDataPanel
+                data={reviewExtractionData}
+                courseData={courseData}
+                courseId={courseIdParam}
+                versionNumber={reviewFileVersion.version_number}
+                onChangeData={(updatedData) => setReviewExtractionData(updatedData)}
+                onUpdateLTPC={handleUpdateLTPC}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,31 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  GraduationCap,
-  Lightbulb,
-  Check,
-  GitCompare,
-  Save,
-  Info,
-  ArrowRight,
   Cable,
   Sparkles,
   RotateCw,
+  Check,
+  ArrowRight,
+  Info,
+  Save,
+  Trash2,
+  CheckCircle2,
+  ChevronDown,
+  Layers,
+  AlertCircle,
+  Lightbulb,
+  GraduationCap,
+  GitBranch,
   Edit3,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Dropdown, Failure } from "@/utils/function.utils";
+import {
+  useSetState,
+  Success,
+  Dropdown,
+  Failure,
+  getErrorMessage,
+  isLimitExhaustion,
+  showLimitExhaustedModal,
+  LIMIT_EXHAUSTED_MESSAGE,
+} from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import StatTabCard from "@/components/academic-setup/StatTabCard";
-import MappingMatrixHeader from "@/components/co-po-mapping/MappingMatrixHeader";
-import COPOMappingModal from "@/components/co-po-mapping/COPOMappingModal";
-import TableComponent from "@/components/common-components/TableComponent";
-import PageFooter from "@/components/common-components/PageFooter";
-import KeepFilePrompt from "@/components/academic-setup/KeepFilePrompt";
-import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/common-components/PageHeader";
-import StageVersionHistoryPanel from "@/components/academic-setup/StageVersionHistoryPanel";
+import COPOMappingModal from "@/components/co-po-mapping/COPOMappingModal";
 import Models from "@/imports/models.import";
 
 export interface ProgramOutcome {
@@ -50,30 +59,28 @@ export interface MappingCell {
   mapping_id: number | null;
 }
 
-export interface COPOMatrixResponse {
-  syllabus_id: number;
-  course_id: number;
-  po_version: string;
-  mapping_status: string;
-  summary: {
-    course_outcomes_count: number;
-    program_outcomes_count: number;
-    ai_suggestions_count: number;
-    mappings_need_review_count: number;
-  };
-  program_outcomes: ProgramOutcome[];
-  course_outcomes: CourseOutcome[];
-  matrix: Record<string, Record<string, MappingCell>>;
+export interface COPOVersionItem {
+  id: number;
+  copo_mapping_id: number;
+  version_number: number;
+  version: number;
+  parent_extraction_id: number;
+  parent_extraction_version?: number;
+  job_id?: string;
+  status: string;
+  is_active: boolean;
+  created_at: string;
+  mapped_cells_count: number;
+  label: string;
 }
 
-const getErrorMessage = (error: any, fallback: string) => {
-  if (!error) return fallback;
-  if (typeof error === "string") return error;
-  if (typeof error?.message === "string") return error.message;
-  if (typeof error?.detail === "string") return error.detail;
-  if (typeof error?.error === "string") return error.error;
-  return fallback;
-};
+export interface ExtractionVersionItem {
+  id: number;
+  version_number: number;
+  status: string;
+  is_active: boolean;
+  label: string;
+}
 
 const COPOMapping = () => {
   const dispatch = useDispatch();
@@ -95,19 +102,38 @@ const COPOMapping = () => {
 
   const [state, setState] = useSetState({
     search: "",
-    selectedCourse: null,
-    activeCourse: null as any,
-    loading: false,
-    generatingCopo: false,
-    activeTab: "coordinator",
-    approvedMappings: [] as string[],
-    mappingApproved: false,
-    copoMatrix: null as any,
+    selectedCourse: null as any,
     courseDetail: null as any,
     courseList: [] as any[],
+    activeTab: "coordinator",
     organization_id: "",
-    coordinator_id: "",
-    isCourseCoordinator: false,
+
+    // Matrix state
+    loading: false,
+    matrixData: null as any,
+    courseOutcomes: [] as CourseOutcome[],
+    programOutcomes: [] as ProgramOutcome[],
+    matrix: {} as Record<string, Record<string, MappingCell>>,
+    poAverages: {} as Record<string, number>,
+    unmappedJustifications: {} as Record<string, string>,
+    versionNumber: null as number | null,
+    parentExtractionId: null as number | null,
+    parentExtractionVersion: null as number | null,
+    versionStatus: "draft",
+    isActive: false,
+
+    // Version management
+    versions: [] as COPOVersionItem[],
+    availableExtractions: [] as ExtractionVersionItem[],
+    selectedExtractionForGen: null as number | null,
+    loadingVersions: false,
+    generatingCopo: false,
+    savingDraft: false,
+    approvingMap: false,
+    activatingVersion: false,
+    deletingVersion: false,
+
+    // Modal state for editing single cell justification
     mappingModal: null as null | {
       coCode: string;
       coTitle?: string;
@@ -123,17 +149,11 @@ const COPOMapping = () => {
       isAiSuggested?: boolean;
       status?: string;
     },
-    fetchingCell: false,
     updatingCell: false,
-    savingDraft: false,
-    approvingMap: false,
-    versionRefreshKey: 0,
-    selectedExtractionVer: null as number | null,
-    copoVersionsDetailed: [] as any[],
-    extractionNotApproved: false,
-  });
 
-  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
+    // Unmapped panel collapse
+    showUnmappedPanel: false,
+  });
 
   useEffect(() => {
     dispatch(setPageTitle("CO-PO Mapping"));
@@ -141,371 +161,311 @@ const COPOMapping = () => {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (user?.role === "course_coordinator") {
-      setState({
-        isCourseCoordinator: true,
-        coordinator_id: user.id,
-      });
-    }
-    setState({
-      organization_id: user?.organization_id,
-    });
+    setState({ organization_id: user?.organization_id });
     if (user?.organization_id) {
-      getAllCourse(user.organization_id);
+      loadAllCourses(user.organization_id);
     } else {
-      getAllCourse();
+      loadAllCourses();
     }
   }, []);
 
   useEffect(() => {
     if (course_id) {
-      getCourseDetails();
-      restoreWorkflowState(course_id);
-      loadCopoVersions(course_id);
+      loadCourseDetails();
+      loadVersionsAndMatrix();
     }
   }, [course_id]);
 
-  const loadCopoVersions = async (cid: string | number) => {
-    try {
-      const res: any = await Models.syllabus.get_versions(cid, "copo");
-      if (res?.versions) {
-        setState({ copoVersionsDetailed: res.versions });
-      }
-    } catch (e) {
-      console.warn("loadCopoVersions error:", e);
-    }
-  };
-
-  // API integrations
-  const getAllCourse = async (orgId?: any) => {
+  const loadAllCourses = async (orgId?: any) => {
     try {
       const targetOrg = orgId || state?.organization_id;
       const res: any = await Models.course.list(targetOrg ? { organization_id: targetOrg } : {});
       const dropdown = Dropdown(res, "course_title");
-      setState({
-        courseList: dropdown,
-      });
+      setState({ courseList: dropdown });
     } catch (error: any) {
-      console.log("error fetching course list", error);
-      Failure(getErrorMessage(error, "Failed to fetch course list"));
+      console.error("Error fetching courses:", error);
     }
   };
 
-  const getCourseDetails = async () => {
+  const loadCourseDetails = async () => {
+    if (!course_id) return;
     try {
       const res: any = await Models.course.detail(course_id);
       setState({
         courseDetail: res,
         selectedCourse: res ? { value: res.id, label: `${res.course_code} - ${res.course_title}` } : null,
       });
-      const sid = res?.syllabus_id || res?.latest_syllabus?.id;
-      if (sid) {
-        getCOPOMatrix(sid);
-      } else {
-        setState({ loading: false, copoMatrix: null });
-      }
     } catch (error: any) {
-      console.log("error fetching course detail", error);
-      Failure(getErrorMessage(error, "Failed to fetch course detail"));
-      setState({ loading: false, copoMatrix: null });
+      console.error("Error fetching course detail:", error);
     }
   };
 
-  const getCOPOMatrix = async (syllabusId?: any, verNum?: number) => {
-    const sid = syllabusId || state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
-    if (!sid) {
-      setState({ loading: false, copoMatrix: null });
-      return;
-    }
-    const vToUse = verNum !== undefined ? verNum : loadedVersion;
+  const loadVersionsAndMatrix = async (targetVersion?: number) => {
+    if (!course_id) return;
     try {
-      setState({ loading: true });
-      const res: any = await Models.COPOMap.copo_map(sid, vToUse);
-      if (res && (res.matrix || res.data?.matrix)) {
-        const matrixObj = res.matrix ? res : res.data;
-        const isApprovedStatus = matrixObj?.mapping_status === "Approved";
+      setState({ loadingVersions: true });
+      const verRes: any = await Models.COPOMap.get_versions(course_id);
+      const vList: COPOVersionItem[] = verRes?.versions || [];
+      const availExt: ExtractionVersionItem[] = verRes?.available_extractions || [];
+
+      // Determine default extraction for generation
+      const activeExt = availExt.find((e) => e.is_active) || availExt[0];
+      const defaultExtId = activeExt ? activeExt.id : null;
+
+      // Determine which version to load
+      let verToLoad = targetVersion;
+      if (verToLoad === undefined) {
+        const activeV = vList.find((v) => v.is_active);
+        verToLoad = activeV ? activeV.version_number : vList.length > 0 ? vList[0].version_number : undefined;
+      }
+
+      setState({
+        versions: vList,
+        availableExtractions: availExt,
+        selectedExtractionForGen: defaultExtId,
+        loadingVersions: false,
+      });
+
+      if (verToLoad !== undefined) {
+        await loadMatrix(verToLoad);
+      } else {
         setState({
-          copoMatrix: matrixObj,
-          mappingApproved: isApprovedStatus,
+          matrixData: null,
+          courseOutcomes: [],
+          programOutcomes: [],
+          matrix: {},
+          poAverages: {},
+          unmappedJustifications: {},
+          versionNumber: null,
           loading: false,
         });
-      } else {
-        setState({ copoMatrix: res?.data || null, loading: false });
+      }
+    } catch (err: any) {
+      console.error("Error loading versions:", err);
+      setState({ loadingVersions: false, loading: false });
+    }
+  };
+
+  const loadMatrix = async (verNum?: number) => {
+    if (!course_id) return;
+    try {
+      setState({ loading: true });
+      const data: any = await Models.COPOMap.copo_map(course_id, verNum);
+      if (data) {
+        setState({
+          matrixData: data,
+          courseOutcomes: data.course_outcomes || [],
+          programOutcomes: data.program_outcomes || [],
+          matrix: data.matrix || {},
+          poAverages: data.po_averages || {},
+          unmappedJustifications: data.unmapped_justifications || {},
+          versionNumber: data.version_number,
+          parentExtractionId: data.parent_extraction_id,
+          parentExtractionVersion: data.parent_extraction_version,
+          versionStatus: data.status || "draft",
+          isActive: Boolean(data.is_active),
+          loading: false,
+        });
       }
     } catch (error: any) {
-      console.log("error fetching copo matrix", error);
-      Failure(getErrorMessage(error, "Failed to fetch CO-PO matrix"));
-      setState({ loading: false, copoMatrix: null });
+      console.error("Error loading CO-PO matrix:", error);
+      Failure(getErrorMessage(error, "Failed to load CO-PO matrix"));
+      setState({ loading: false });
     }
   };
 
-  const restoreWorkflowState = async (cid: string | number) => {
-    try {
-      const wfRes: any = await Models.syllabus.get_workflow_status(cid);
-      const extractionStep = wfRes?.workflow?.step_1_syllabus_extraction;
-      const isExtractionApproved = extractionStep?.status === "approved";
-      setState({ extractionNotApproved: !isExtractionApproved });
-
-      const copoStep = wfRes?.workflow?.step_2_copo_mapping;
-      if (!copoStep) return;
-
-      if (copoStep.versions_detailed) {
-        setState({ copoVersionsDetailed: copoStep.versions_detailed });
-      }
-
-      const { status, job_id } = copoStep;
-      if (status === "redis_queued" || status === "generating") {
-        setState({ generatingCopo: true });
-        startPolling(cid, job_id);
-      } else if (status === "approved") {
-        setState({ mappingApproved: true, generatingCopo: false });
-      } else {
-        setState({ generatingCopo: false });
-      }
-    } catch (err) {
-      console.warn("restoreWorkflowState warning:", err);
-    }
-  };
-
-  const startPolling = (cid: string | number, jobId?: string) => {
+  // Polling for AI worker generation
+  const startPolling = (jobId?: string) => {
     stopPolling();
     setState({ generatingCopo: true });
 
     let attempts = 0;
-    const maxAttempts = 15; // 15 attempts with 2-minute interval
-    const pollInterval = 120000; // 2 minutes (120,000 ms)
+    const maxAttempts = 100;
+    const pollInterval = 3000;
 
-    const checkCopoStatus = async () => {
+    const checkStatus = async () => {
       attempts++;
       try {
-        const wfRes: any = await Models.syllabus.get_workflow_status(cid);
-        const copoStep = wfRes?.workflow?.step_2_copo_mapping;
-        const currentStatus = copoStep?.status;
-
-        if (currentStatus === "draft" || currentStatus === "approved") {
+        if (!jobId) {
           stopPolling();
-          setState({
-            generatingCopo: false,
-            mappingApproved: currentStatus === "approved",
-            versionRefreshKey: Date.now(),
-          });
-          const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
-          await loadCopoVersions(cid);
-          await getCourseDetails();
-          await getCOPOMatrix(sid);
-          Success("CO-PO mapping generated successfully with NEURO AI!");
+          setState({ generatingCopo: false });
+          return;
+        }
+
+        const jobRes: any = await Models.COPOMap.get_job_status(jobId);
+        const jobStatus = jobRes?.status || jobRes?.state;
+
+        if (jobStatus === "completed" || jobStatus === "success") {
+          stopPolling();
+          setState({ generatingCopo: false });
+          Success("NEURO AI has successfully generated your CO-PO mapping!");
+          await loadVersionsAndMatrix();
+        } else if (jobStatus === "failed" || jobStatus === "error") {
+          stopPolling();
+          setState({ generatingCopo: false });
+          const errDetail = jobRes?.error || jobRes?.detail || "AI mapping generation failed.";
+          if (isLimitExhaustion(errDetail)) {
+            showLimitExhaustedModal(errDetail);
+            Failure(LIMIT_EXHAUSTED_MESSAGE);
+          } else {
+            Failure(errDetail);
+          }
         } else if (attempts >= maxAttempts) {
           stopPolling();
-          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
-          const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || cid;
-          await loadCopoVersions(cid);
-          await getCourseDetails();
-          await getCOPOMatrix(sid);
+          setState({ generatingCopo: false });
+          await loadVersionsAndMatrix();
         }
       } catch (pollErr) {
-        console.warn("COPO polling error:", pollErr);
+        console.warn("Polling warning:", pollErr);
         if (attempts >= maxAttempts) {
           stopPolling();
-          setState({ generatingCopo: false, versionRefreshKey: Date.now() });
+          setState({ generatingCopo: false });
         }
       }
     };
 
-    checkCopoStatus();
-    pollRef.current = setInterval(checkCopoStatus, pollInterval);
+    setTimeout(checkStatus, 1500);
+    pollRef.current = setInterval(checkStatus, pollInterval);
   };
 
-  const handleGenerateCopo = async (parentParams?: { extraction_version?: number }) => {
-    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
-    if (!sid) {
-      Failure("No syllabus found for this course. Please upload a syllabus first.");
-      return;
-    }
-    const extVerToUse = parentParams?.extraction_version ?? state.selectedExtractionVer;
+  const handleGenerate = async () => {
+    if (!course_id) return;
     try {
       setState({ generatingCopo: true });
-      const res: any = await Models.COPOMap.generate_copo(sid, {
-        extraction_version: extVerToUse,
-      });
-      Success("CO-PO mapping generation started with NEURO AI!");
-      startPolling(course_id || sid, res?.job_id);
-    } catch (error: any) {
-      console.error("Error generating CO-PO mapping:", error);
-      Failure(getErrorMessage(error, "Failed to generate CO-PO mapping"));
+      const payload: any = {};
+      if (state.selectedExtractionForGen) {
+        payload.parent_extraction_id = state.selectedExtractionForGen;
+      }
+
+      const res: any = await Models.COPOMap.generate_copo(course_id, payload);
+      Success("NEURO AI generation initiated! Formulating Bloom correlation mappings...");
+      if (res?.job_id) {
+        startPolling(res.job_id);
+      } else {
+        await loadVersionsAndMatrix();
+        setState({ generatingCopo: false });
+      }
+    } catch (err: any) {
       setState({ generatingCopo: false });
+      if (isLimitExhaustion(err)) {
+        showLimitExhaustedModal(err);
+        Failure(LIMIT_EXHAUSTED_MESSAGE);
+      } else {
+        Failure(getErrorMessage(err, "Failed to start AI generation"));
+      }
     }
   };
 
-  const handleVersionActivated = async (newVer: number) => {
-    setLoadedVersion(newVer);
-    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || course_id;
-    if (sid) {
-      await getCOPOMatrix(sid, newVer);
-    }
-    if (course_id) {
-      await loadCopoVersions(course_id);
-      await restoreWorkflowState(course_id);
-    }
-  };
-
-  // Matrix data resolution
-  const matrixData: COPOMatrixResponse = state.copoMatrix || {};
-  const programOutcomes = matrixData?.program_outcomes || [];
-  const courseOutcomes = matrixData?.course_outcomes || [];
-  const matrix = matrixData?.matrix || {};
-  const summary = matrixData?.summary;
-
-  // Filter CO-PO versions by selected extraction version (tactics identical to CourseCard)
-  const currentExtVer = state.selectedExtractionVer;
-  const matchingChildCopo = currentExtVer
-    ? (state.copoVersionsDetailed || []).filter(
-        (v: any) => Number(v.extraction_version_used ?? v.parent_version ?? 1) === Number(currentExtVer)
-      )
-    : state.copoVersionsDetailed || [];
-
-  const activeChild =
-    matchingChildCopo.find((v: any) => v.is_active) ||
-    (matchingChildCopo.length > 0 ? matchingChildCopo[matchingChildCopo.length - 1] : null);
-
-  const activeChildApproved = activeChild?.status === "approved";
-  const displayStatus = matchingChildCopo.length === 0 ? "Draft" : (activeChildApproved ? "Approved" : "Draft");
-  const isApproved = state.mappingApproved || activeChildApproved || matrixData?.mapping_status === "Approved";
-  const allMapped = state.approvedMappings.length > 0;
-
-  // Direct cell cycle handler (0 -> 1 -> 2 -> 3 -> 0)
-  const handleDirectCellCycle = async (row: any, po: any) => {
-    const co_code = row.co_code;
+  // Direct cell cycle: 0 -> 1 -> 2 -> 3 -> 0
+  const handleCellCycle = async (co: CourseOutcome, po: ProgramOutcome) => {
+    const co_code = co.co_code;
     const target_code = po.code;
-    const currentCell: any = matrix[co_code]?.[target_code] || {};
-    const currentScore = currentCell.correlation_level ?? 0;
-    const nextScore = (currentScore + 1) % 4; // Cycles: 0 -> 1 -> 2 -> 3 -> 0
+    const currentCell = state.matrix[co_code]?.[target_code] || {
+      correlation_level: 0,
+      strength_label: "- No Mapping",
+      is_ai_suggested: false,
+      justification: "",
+      status: "draft",
+      mapping_id: null,
+    };
+
+    const currentScore = currentCell.correlation_level || 0;
+    const nextScore = (currentScore + 1) % 4;
 
     const strengthMap: Record<number, string> = {
-      3: "3 – High",
-      2: "2 – Medium",
-      1: "1 – Low",
-      0: "– No Mapping",
+      3: "3 - High",
+      2: "2 - Medium",
+      1: "1 - Low",
+      0: "- No Mapping",
     };
 
-    // Optimistic UI update
-    const currentCoMap = matrix[co_code] || {};
-    const updatedMatrix = {
-      ...matrix,
-      [co_code]: {
-        ...currentCoMap,
-        [target_code]: {
-          ...currentCell,
-          correlation_level: nextScore,
-          strength_label: strengthMap[nextScore] || "– No Mapping",
-          status: "accepted",
-          is_ai_suggested: false,
-        },
+    // Optimistic local state update
+    const updatedRow = {
+      ...(state.matrix[co_code] || {}),
+      [target_code]: {
+        ...currentCell,
+        correlation_level: nextScore,
+        strength_label: strengthMap[nextScore],
+        status: "draft",
       },
     };
 
-    const mappingKey = `${co_code}-${target_code}`;
-    const updatedApproved = state.approvedMappings.includes(mappingKey)
-      ? state.approvedMappings
-      : [...state.approvedMappings, mappingKey];
+    const updatedMatrix = {
+      ...state.matrix,
+      [co_code]: updatedRow,
+    };
+
+    // Recalculate column average optimistically
+    const newAverages = { ...state.poAverages };
+    let sum = 0;
+    let count = 0;
+    state.courseOutcomes.forEach((r) => {
+      const cellVal = r.co_code === co_code ? nextScore : (state.matrix[r.co_code]?.[target_code]?.correlation_level || 0);
+      if (cellVal > 0) {
+        sum += cellVal;
+        count += 1;
+      }
+    });
+    newAverages[target_code] = count > 0 ? parseFloat((sum / count).toFixed(2)) : 0.0;
 
     setState({
-      approvedMappings: updatedApproved,
-      copoMatrix: {
-        ...matrixData,
-        matrix: updatedMatrix,
-      },
+      matrix: updatedMatrix,
+      poAverages: newAverages,
     });
 
-    const sid = state.courseDetail?.latest_syllabus?.id || state.courseDetail?.syllabus_id || state.copoMatrix?.syllabus_id || course_id;
+    // Save directly to relational outcome_mappings table
     try {
-      await Models.COPOMap.copo_update(sid, {
-        co_code,
-        target_code,
-        correlation_level: nextScore,
-        justification: currentCell.justification || `Updated correlation level to ${nextScore}`,
-        status: "accepted",
-      });
-    } catch (error: any) {
-      console.error("Error cycling cell score:", error);
-      Failure(getErrorMessage(error, `Failed to update ${co_code} × ${target_code}`));
+      await Models.COPOMap.copo_update(
+        course_id!,
+        {
+          co_code,
+          target_code,
+          correlation_level: nextScore,
+          justification: currentCell.justification || "",
+          version_number: state.versionNumber || undefined,
+        },
+        state.versionNumber
+      );
+    } catch (err: any) {
+      console.error("Cell update error:", err);
+      Failure(getErrorMessage(err, `Failed to update ${co_code} × ${target_code}`));
     }
   };
 
-  const handleCellClick = async (row: any, po: any) => {
-    const co_code = row.co_code;
+  // Open modal to view/edit academic justification
+  const handleOpenCellModal = (co: CourseOutcome, po: ProgramOutcome) => {
+    const co_code = co.co_code;
     const target_code = po.code;
-    const cell: any = matrix[co_code]?.[target_code] || {};
-    const score = cell.correlation_level ?? 0;
+    const cell = state.matrix[co_code]?.[target_code] || {
+      correlation_level: 0,
+      strength_label: "- No Mapping",
+      is_ai_suggested: false,
+      justification: "",
+      status: "draft",
+      mapping_id: null,
+    };
 
-    // Set immediate modal state with existing matrix/row info
     setState({
-      fetchingCell: true,
       mappingModal: {
         coCode: co_code,
         coTitle: "Course Outcome",
-        coDescription: row.description,
-        bloomLevel: row.bloom_level,
+        coDescription: co.description,
+        bloomLevel: co.bloom_level,
         poKey: target_code,
         poTitle: po.title,
         poDescription: po.description,
-        score: score,
-        strengthLabel: cell.strength_label || (score > 0 ? `Mapping Strength: ${score}` : "No Mapping"),
-        justification: cell.justification || null,
-        suggestedBy: "NEURO AI",
-        isAiSuggested: cell.is_ai_suggested ?? true,
-        status: cell.status || "suggested",
+        score: cell.correlation_level || 0,
+        strengthLabel: cell.strength_label,
+        justification: cell.justification || "",
+        suggestedBy: cell.is_ai_suggested ? "NEURO AI" : "Faculty",
+        isAiSuggested: cell.is_ai_suggested,
+        status: cell.status || "draft",
       },
     });
-
-    const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
-    try {
-      const res: any = await Models.COPOMap.get_cell_detail(sid, {
-        co_code,
-        target_code,
-      }, loadedVersion);
-      const data = res?.data || res;
-      if (data) {
-        const newScore =
-          data.suggested_mapping_value !== undefined ? data.suggested_mapping_value : score;
-        const mappingKey = `${co_code}-${target_code}`;
-        const isAccepted = data.status === "accepted";
-        const updatedApproved =
-          isAccepted && !state.approvedMappings.includes(mappingKey)
-            ? [...state.approvedMappings, mappingKey]
-            : state.approvedMappings;
-
-        setState({
-          fetchingCell: false,
-          approvedMappings: updatedApproved,
-          mappingModal: {
-            coCode: data.co_code || co_code,
-            coTitle: data.co_title || "Course Outcome",
-            coDescription: data.co_description || row.description,
-            bloomLevel: row.bloom_level,
-            poKey: data.target_code || target_code,
-            poTitle: data.target_title || po.title,
-            poDescription: data.target_description || po.description,
-            score: newScore,
-            strengthLabel:
-              data.strength_label ||
-              (newScore > 0 ? `Mapping Strength: ${newScore}` : "No Mapping"),
-            suggestedBy: data.suggested_by || "NEURO AI",
-            justification: data.rationale || data.justification || cell.justification,
-            isAiSuggested: cell.is_ai_suggested ?? true,
-            status: data.status || cell.status || "suggested",
-          },
-        });
-      } else {
-        setState({ fetchingCell: false });
-      }
-    } catch (error: any) {
-      console.log("error fetching cell detail", error);
-      setState({ fetchingCell: false });
-      Failure(getErrorMessage(error, "Failed to fetch cell details"));
-    }
   };
 
-  const handleUpdateMapping = async (payload: {
+  // Save changes from modal
+  const handleUpdateFromModal = async (payload: {
     co_code: string;
     target_code: string;
     correlation_level: number;
@@ -514,278 +474,189 @@ const COPOMapping = () => {
   }) => {
     try {
       setState({ updatingCell: true });
-      const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
-
-      console.log("Calling copo_update with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
-      await Models.COPOMap.copo_update(sid, payload, loadedVersion);
-
-      const { co_code, target_code, correlation_level, justification, status } = payload;
-      const strengthMap: Record<number, string> = {
-        3: "3 - High",
-        2: "2 - Medium",
-        1: "1 - Low",
-        0: "- No Mapping",
-      };
-
-      const currentCoMatrix = matrix[co_code] || {};
-      const currentCell = currentCoMatrix[target_code] || {};
-
-      const updatedMatrix = {
-        ...matrix,
-        [co_code]: {
-          ...currentCoMatrix,
-          [target_code]: {
-            ...currentCell,
-            correlation_level,
-            strength_label: strengthMap[correlation_level] || "- No Mapping",
-            justification,
-            status,
-            is_ai_suggested: false,
-          },
+      await Models.COPOMap.copo_update(
+        course_id!,
+        {
+          co_code: payload.co_code,
+          target_code: payload.target_code,
+          correlation_level: payload.correlation_level,
+          justification: payload.justification,
+          version_number: state.versionNumber || undefined,
         },
-      };
+        state.versionNumber
+      );
 
-      const key = `${co_code}-${target_code}`;
-      const updatedApproved = state.approvedMappings.includes(key)
-        ? state.approvedMappings
-        : [...state.approvedMappings, key];
-
-      setState({
-        approvedMappings: updatedApproved,
-        copoMatrix: {
-          ...matrixData,
-          matrix: updatedMatrix,
-        },
-        mappingModal: null,
-        updatingCell: false,
-      });
-
-      Success(`Mapping for ${co_code} × ${target_code} updated successfully`);
-    } catch (error: any) {
-      console.log("error updating mapping", error);
+      // Refresh current version matrix
+      await loadMatrix(state.versionNumber || undefined);
+      setState({ mappingModal: null, updatingCell: false });
+      Success(`Mapping for ${payload.co_code} × ${payload.target_code} saved!`);
+    } catch (err: any) {
       setState({ updatingCell: false });
-      Failure(getErrorMessage(error, `Failed to update mapping for ${payload.co_code} × ${payload.target_code}`));
+      Failure(getErrorMessage(err, "Failed to update mapping justification"));
     }
   };
 
-  const handleAcceptMapping = async (payload: {
-    co_code: string;
-    target_code: string;
-  }) => {
-    try {
-      setState({ updatingCell: true });
-      const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
-
-      console.log("Calling accept_map with syllabus_id:", sid, "payload:", payload, "version:", loadedVersion);
-      await Models.COPOMap.accept_map(sid, payload, loadedVersion);
-
-      const { co_code, target_code } = payload;
-      const currentCoMatrix = matrix[co_code] || {};
-      const currentCell = currentCoMatrix[target_code] || {};
-
-      const updatedMatrix = {
-        ...matrix,
-        [co_code]: {
-          ...currentCoMatrix,
-          [target_code]: {
-            ...currentCell,
-            status: "accepted",
-          },
-        },
-      };
-
-      const key = `${co_code}-${target_code}`;
-      const updatedApproved = state.approvedMappings.includes(key)
-        ? state.approvedMappings
-        : [...state.approvedMappings, key];
-
-      setState({
-        approvedMappings: updatedApproved,
-        copoMatrix: {
-          ...matrixData,
-          matrix: updatedMatrix,
-        },
-        mappingModal: state.mappingModal
-          ? {
-              ...state.mappingModal,
-              status: "accepted",
-            }
-          : null,
-        updatingCell: false,
-      });
-
-      Success(`Mapping for ${co_code} × ${target_code} accepted successfully`);
-    } catch (error: any) {
-      console.log("error accepting mapping", error);
-      setState({ updatingCell: false });
-      Failure(getErrorMessage(error, `Failed to accept mapping for ${payload.co_code} × ${payload.target_code}`));
-    }
-  };
-
-  const handleApproveMapping = async () => {
-    if (state.extractionNotApproved) {
-      Failure("Cannot approve CO-PO mapping: Syllabus extraction must be approved first.");
-      return;
-    }
-    try {
-      setState({ approvingMap: true });
-      const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
-
-      // Construct dynamic comments based on logged in user / course coordinator
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const fullName =
-        user?.first_name && user?.last_name
-          ? `${user.first_name} ${user.last_name}`
-          : user?.name || user?.full_name || "Faculty Member";
-      const formattedName = fullName.toLowerCase().includes("dr") ? fullName : `${fullName}`;
-      const roleName =
-        user?.role === "course_coordinator" || !user?.role ? "Course Coordinator" : user.role;
-      const comments = `Reviewed and ratified by ${roleName} ${formattedName}`;
-
-      const payload = {
-        comments,
-      };
-
-      console.log("Calling approve_map with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.approve_map(sid, payload);
-      try {
-        await Models.syllabus.approve_stage(course_id || sid, "copo");
-      } catch (e) {
-        console.warn("approve_stage warning:", e);
-      }
-      Success("CO-PO mapping approved successfully");
-      setState({ mappingApproved: true, approvingMap: false, versionRefreshKey: Date.now() });
-      if (course_id) {
-        await loadCopoVersions(course_id);
-        await restoreWorkflowState(course_id);
-      }
-      await getCourseDetails();
-      await getCOPOMatrix(sid);
-    } catch (error: any) {
-      console.log("error approving map", error);
-      setState({ approvingMap: false });
-      Failure(getErrorMessage(error, "Failed to approve CO-PO mapping"));
-    }
-  };
-
+  // Bulk save draft
   const handleSaveDraft = async () => {
+    if (!course_id) return;
     try {
       setState({ savingDraft: true });
-      const sid = state.courseDetail?.latest_syllabus?.id || state.copoMatrix?.syllabus_id ;
-
       const formattedMatrix: Record<string, Record<string, number>> = {};
       const formattedJustifications: Record<string, Record<string, string>> = {};
 
-      Object.keys(matrix).forEach((coCode) => {
-        formattedMatrix[coCode] = {};
-        formattedJustifications[coCode] = {};
-        Object.keys(matrix[coCode] || {}).forEach((poCode) => {
-          const cell: any = matrix[coCode][poCode];
-          if (cell !== undefined && cell !== null) {
-            formattedMatrix[coCode][poCode] =
-              typeof cell === "number" ? cell : (cell.correlation_level ?? 0);
+      Object.keys(state.matrix).forEach((co) => {
+        formattedMatrix[co] = {};
+        formattedJustifications[co] = {};
+        Object.keys(state.matrix[co] || {}).forEach((po) => {
+          const cell = state.matrix[co][po];
+          if (cell) {
+            formattedMatrix[co][po] = cell.correlation_level ?? 0;
             if (cell.justification) {
-              formattedJustifications[coCode][poCode] = cell.justification;
+              formattedJustifications[co][po] = cell.justification;
             }
           }
         });
       });
 
-      const payload = {
-        matrix: formattedMatrix,
-        justifications: formattedJustifications,
-      };
+      await Models.COPOMap.save_draft(
+        course_id,
+        {
+          matrix: formattedMatrix,
+          justifications: formattedJustifications,
+          unmapped_justifications: state.unmappedJustifications,
+          version_number: state.versionNumber || undefined,
+        },
+        state.versionNumber
+      );
 
-      console.log("Calling save_draft with syllabus_id:", sid, "payload:", payload);
-      await Models.COPOMap.save_draft(sid, payload);
-      Success("CO-PO mapping draft saved successfully");
+      Success("CO-PO mapping draft saved to database.");
       setState({ savingDraft: false });
-    } catch (error: any) {
-      console.log("error saving draft", error);
+    } catch (err: any) {
       setState({ savingDraft: false });
-      Failure(getErrorMessage(error, "Failed to save CO-PO mapping draft"));
+      Failure(getErrorMessage(err, "Failed to save draft"));
     }
   };
 
-  const filteredRecords = courseOutcomes.filter((row) => {
-    const s = state.search.toLowerCase();
-    return (
-      !s ||
-      row.co_code.toLowerCase().includes(s) ||
-      row.description.toLowerCase().includes(s) ||
-      row.bloom_level.toLowerCase().includes(s)
-    );
-  });
-
-  const getScoreBadge = (score: number) => {
-    if (score === 3)
-      return (
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-800 text-xs font-bold text-white shadow-sm">
-          3
-        </span>
-      );
-    if (score === 2)
-      return (
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white shadow-sm">
-          2
-        </span>
-      );
-    if (score === 1)
-      return (
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white shadow-sm">
-          1
-        </span>
-      );
-    return (
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-xs font-bold text-[#000]">
-        -
-      </span>
-    );
+  // Approve version
+  const handleApprove = async () => {
+    if (!course_id || !state.versionNumber) return;
+    try {
+      setState({ approvingMap: true });
+      await Models.COPOMap.approve_map(course_id, {
+        version_number: state.versionNumber,
+      });
+      Success(`CO-PO mapping Version ${state.versionNumber} approved!`);
+      setState({ approvingMap: false, versionStatus: "approved" });
+      await loadVersionsAndMatrix(state.versionNumber);
+    } catch (err: any) {
+      setState({ approvingMap: false });
+      Failure(getErrorMessage(err, "Failed to approve CO-PO mapping"));
+    }
   };
 
-  const verifiedCount = state.approvedMappings.length;
-  const needReviewCount = Math.max(
-    0,
-    (summary?.mappings_need_review_count ?? summary?.ai_suggestions_count ?? 0) - verifiedCount
-  );
+  // Reject / Disapprove version
+  const handleReject = async () => {
+    if (!course_id || !state.versionNumber) return;
+    try {
+      setState({ approvingMap: true });
+      await Models.COPOMap.reject_map(course_id, {
+        version_number: state.versionNumber,
+      });
+      Success(`CO-PO mapping Version ${state.versionNumber} marked as draft.`);
+      setState({ approvingMap: false, versionStatus: "draft" });
+      await loadVersionsAndMatrix(state.versionNumber);
+    } catch (err: any) {
+      setState({ approvingMap: false });
+      Failure(getErrorMessage(err, "Failed to update version status"));
+    }
+  };
 
-  const TABS = [
-    {
-      key: "course_outcome",
-      label: "Course Outcome",
-      count: summary?.course_outcomes_count ?? courseOutcomes.length,
-      subLabel: "Course outcomes to map",
-      icon: <Lightbulb className="h-5 w-5" />,
-    },
-    {
-      key: "program_outcome",
-      label: "Program Outcome",
-      count: summary?.program_outcomes_count ?? programOutcomes.length,
-      subLabel: matrixData?.po_version || "—",
-      icon: <GraduationCap className="h-5 w-5" />,
-    },
-    {
-      key: "ai_suggestions",
-      label: "AI Generated Mapping Suggestions",
-      subLabel: "Mappings Need Review",
-      count: summary?.ai_suggestions_count ?? 0,
-      icon: <GitCompare className="h-5 w-5" />,
-    },
-    {
-      key: "mapping_verified",
-      label: "Mapping Verified",
-      subLabel: "AI-generated mappings verified by Coordinator",
-      count: verifiedCount,
-      icon: <Check className="h-5 w-5" />,
-    },
-  ];
+  // Activate version
+  const handleActivate = async (verNum: number) => {
+    if (!course_id) return;
+    try {
+      setState({ activatingVersion: true });
+      await Models.COPOMap.activate_version(course_id, verNum);
+      Success(`Version ${verNum} is now active.`);
+      setState({ activatingVersion: false, isActive: true });
+      await loadVersionsAndMatrix(verNum);
+    } catch (err: any) {
+      setState({ activatingVersion: false });
+      Failure(getErrorMessage(err, "Failed to activate version"));
+    }
+  };
+
+  // Delete version
+  const handleDeleteVersion = async (verNum: number) => {
+    if (!course_id) return;
+    if (!window.confirm(`Are you sure you want to permanently delete CO-PO Version ${verNum}?`)) {
+      return;
+    }
+    try {
+      setState({ deletingVersion: true });
+      await Models.COPOMap.delete_version(course_id, verNum);
+      Success(`Version ${verNum} deleted successfully.`);
+      setState({ deletingVersion: false });
+      await loadVersionsAndMatrix();
+    } catch (err: any) {
+      setState({ deletingVersion: false });
+      Failure(getErrorMessage(err, "Failed to delete version"));
+    }
+  };
+
+  // KPI Calculations
+  const stats = useMemo(() => {
+    let high = 0;
+    let med = 0;
+    let low = 0;
+    let unmapped = 0;
+    let totalMapped = 0;
+
+    state.courseOutcomes.forEach((co) => {
+      state.programOutcomes.forEach((po) => {
+        const lvl = state.matrix[co.co_code]?.[po.code]?.correlation_level || 0;
+        if (lvl === 3) high++;
+        else if (lvl === 2) med++;
+        else if (lvl === 1) low++;
+      });
+    });
+
+    totalMapped = high + med + low;
+
+    // Count POs with 0 mapping across all COs
+    state.programOutcomes.forEach((po) => {
+      const avg = state.poAverages[po.code] || 0;
+      if (avg === 0) unmapped++;
+    });
+
+    return { high, med, low, unmapped, totalMapped };
+  }, [state.matrix, state.courseOutcomes, state.programOutcomes, state.poAverages]);
+
+  const filteredCOs = useMemo(() => {
+    const s = state.search.toLowerCase().trim();
+    if (!s) return state.courseOutcomes;
+    return state.courseOutcomes.filter(
+      (co) =>
+        co.co_code.toLowerCase().includes(s) ||
+        co.description.toLowerCase().includes(s) ||
+        co.bloom_level.toLowerCase().includes(s)
+    );
+  }, [state.courseOutcomes, state.search]);
+
+  // Check unmapped POs list
+  const unmappedPOs = useMemo(() => {
+    return state.programOutcomes.filter((po) => (state.poAverages[po.code] || 0) === 0);
+  }, [state.programOutcomes, state.poAverages]);
+
+  const isApproved = state.versionStatus === "approved";
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-16">
+      {/* Course Banner */}
       <CourseBanner
         courseCode={state?.courseDetail?.course_code}
         courseTitle={state?.courseDetail?.course_title}
-        description="Coordinator View — Academic course preparation, syllabus, outcomes mapping, lesson plans, question banking, and CIA paper generation."
+        description="Coordinator View — Academic course preparation, syllabus extraction, CO-PO matrix alignment, pedagogy selection, and lesson schedule."
         programme={state?.courseDetail?.programme}
         batch={state?.courseDetail?.batch_name}
         academicYear={state?.courseDetail?.academic_year || state?.courseDetail?.batch_name || ""}
@@ -808,252 +679,577 @@ const COPOMapping = () => {
       />
 
       <PageHeader
-        title="CO–PO Mapping"
-        records={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
-        subtitle="AI-assisted mapping between approved Course Outcomes and the selected Program Outcome version. Hover over any cell to see strength & rationale, or click to cycle strength."
-        icon={<Cable className="h-5 w-5 text-color2" />}
+        title="CO–PO Mapping Matrix"
+        records={state.versionNumber ? `Version ${state.versionNumber} (Syllabus v${state.parentExtractionVersion || "—"})` : undefined}
+        subtitle="AI-assisted alignment matrix connecting Course Outcomes (CO) with Program Outcomes (PO1-PO12 & PSOs) with Bloom taxonomy compliance."
+        icon={<Cable className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-        {TABS.map((tab) => (
-          <StatTabCard
-            key={tab.key}
-            icon={tab.icon}
-            label={tab.label}
-            subLabel={tab.subLabel}
-            count={tab.count}
-            active={state.activeTab === tab.key}
-            onClick={() => setState({ activeTab: tab.key })}
-          />
-        ))}
-      </div>
+      {/* Version Selector & Generation Bar */}
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Left: Version pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">
+              <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <span>CO-PO Versions:</span>
+            </div>
 
-      <KeepFilePrompt
-        icon={<Info className="text-color2 h-4 w-4" />}
-        title="Hover over any cell to inspect correlation strength, Bloom level, and NEURO AI rationale. Click any cell to cycle strength directly."
-      />
+            {state.versions.length === 0 ? (
+              <span className="text-xs text-slate-400 italic">No versions created yet</span>
+            ) : (
+              state.versions.map((v) => {
+                const isSelected = v.version_number === state.versionNumber;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => loadMatrix(v.version_number)}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300 dark:ring-indigo-800"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <span>{v.label}</span>
+                    {v.is_active && (
+                      <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase ${isSelected ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"}`}>
+                        Active
+                      </span>
+                    )}
+                    {v.status === "approved" && (
+                      <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase ${isSelected ? "bg-white/20 text-white" : "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"}`}>
+                        Approved
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
 
-      {course_id && (
-        <StageVersionHistoryPanel
-          key={state.versionRefreshKey}
-          stage="copo"
-          stageLabel="CO-PO Mapping"
-          courseId={course_id}
-          onVersionActivated={handleVersionActivated}
-          onVersionLoad={handleVersionActivated}
-          onGenerateNew={handleGenerateCopo}
-          isGenerating={state.generatingCopo}
-          refreshTrigger={state.versionRefreshKey}
-          onExtractionChange={(extVer) => setState({ selectedExtractionVer: extVer })}
-        />
-      )}
+          {/* Right: Parent Extraction Selector & Generate Action */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {state.availableExtractions.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-500">Parent Syllabus:</span>
+                <select
+                  value={state.selectedExtractionForGen || ""}
+                  onChange={(e) => setState({ selectedExtractionForGen: Number(e.target.value) })}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  {state.availableExtractions.map((ext) => (
+                    <option key={ext.id} value={ext.id}>
+                      {ext.label} {ext.status === "approved" ? "(Approved)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-      {/* CO-PO Mapping Matrix */}
-      <div className="panel">
-        <MappingMatrixHeader
-          title={
-            courseOutcomes.length > 0 && programOutcomes.length > 0
-              ? `${courseOutcomes[0]?.co_code}–${courseOutcomes[courseOutcomes.length - 1]?.co_code} × ${programOutcomes[0]?.code}–${programOutcomes[programOutcomes.length - 1]?.code} Mapping Matrix`
-              : "CO–PO Mapping Matrix"
-          }
-          version={matrixData?.po_version || "PO 2025 v1"}
-          status={displayStatus}
-          onGenerate={() => handleGenerateCopo()}
-          isGenerating={state.generatingCopo}
-        />
-
-        {(courseOutcomes.length === 0 || (state.selectedExtractionVer && matchingChildCopo.length === 0)) && !state.loading ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/30">
-            <Sparkles className="h-10 w-10 text-indigo-500 mb-3 animate-pulse" />
-            <h4 className="text-base font-bold text-gray-900 dark:text-white">
-              {state.selectedExtractionVer && matchingChildCopo.length === 0
-                ? `No CO-PO Mapping Generated Yet for Extraction v${state.selectedExtractionVer}`
-                : "No CO-PO Mapping Generated Yet"}
-            </h4>
-            <p className="mt-1 text-sm text-gray-500 max-w-md">
-              Generate AI-assisted mapping between approved Course Outcomes from Extraction v{state.selectedExtractionVer || 1} and Program Outcomes with academic rationales.
-            </p>
             <button
               type="button"
-              onClick={() => handleGenerateCopo({ extraction_version: state.selectedExtractionVer || 1 })}
-              disabled={state.generatingCopo}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+              onClick={handleGenerate}
+              disabled={state.generatingCopo || state.availableExtractions.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
             >
               {state.generatingCopo ? (
                 <>
-                  <RotateCw className="h-4 w-4 animate-spin" />
-                  <span>Generating Mapping with AI...</span>
+                  <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                  <span>Generating with AI...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" />
-                  <span>Generate CO-PO Mapping (Extraction v{state.selectedExtractionVer || 1})</span>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Generate New Version</span>
                 </>
               )}
             </button>
+
+            {state.versionNumber && !state.isActive && (
+              <button
+                type="button"
+                onClick={() => handleActivate(state.versionNumber!)}
+                disabled={state.activatingVersion}
+                className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Set Active</span>
+              </button>
+            )}
+
+            {state.versionNumber && (
+              <button
+                type="button"
+                onClick={() => handleDeleteVersion(state.versionNumber!)}
+                disabled={state.deletingVersion}
+                className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300"
+                title="Delete this version"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      {state.versionNumber && (
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTabCard
+            icon={<Lightbulb className="h-5 w-5" />}
+            label="Course Outcomes"
+            count={state.courseOutcomes.length}
+            subLabel={`Ext v${state.parentExtractionVersion || "—"} Approved`}
+            active={false}
+          />
+          <StatTabCard
+            icon={<GraduationCap className="h-5 w-5" />}
+            label="Program Outcomes"
+            count={state.programOutcomes.length}
+            subLabel="12 POs + 4 PSOs"
+            active={false}
+          />
+          <StatTabCard
+            icon={<GitBranch className="h-5 w-5" />}
+            label="Correlations Mapped"
+            count={stats.totalMapped}
+            subLabel={`H: ${stats.high} | M: ${stats.med} | L: ${stats.low}`}
+            active={false}
+          />
+          <StatTabCard
+            icon={<CheckCircle2 className="h-5 w-5" />}
+            label="Mapping Status"
+            count={isApproved ? "Approved" : "Draft"}
+            subLabel={state.isActive ? "Active Version" : "Historical Version"}
+            active={isApproved}
+          />
+        </div>
+      )}
+
+      {/* Mapping Matrix Container */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {/* Matrix Header Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              CO-PO Correlation Matrix
+            </h3>
+            {state.versionNumber && (
+              <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                v{state.versionNumber}
+              </span>
+            )}
+            <span
+              className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                isApproved
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+              }`}
+            >
+              {isApproved ? "Approved" : "Draft"}
+            </span>
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+            <span className="font-semibold text-slate-500">Legend:</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">3</span>
+              <span>High (3)</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">2</span>
+              <span>Medium (2)</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">1</span>
+              <span>Low (1)</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">-</span>
+              <span>No Map</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Matrix Loading / Empty / Content */}
+        {state.generatingCopo ? (
+          <div className="flex flex-col items-center justify-center p-16 text-center">
+            <RotateCw className="h-10 w-10 text-indigo-600 mb-3 animate-spin dark:text-indigo-400" />
+            <h4 className="text-base font-bold text-slate-900 dark:text-white">
+              NEURO AI Mapping Generation in Progress
+            </h4>
+            <p className="mt-1 text-sm text-slate-500 max-w-md">
+              Evaluating parent Course Outcomes against 12 Program Outcomes with Bloom's taxonomy & generating rigorous academic justifications...
+            </p>
+          </div>
+        ) : state.versions.length === 0 && !state.loading ? (
+          <div className="flex flex-col items-center justify-center p-16 text-center">
+            <Sparkles className="h-12 w-12 text-indigo-500 mb-4 animate-pulse" />
+            <h4 className="text-base font-bold text-slate-900 dark:text-white">
+              No CO-PO Mapping Generated Yet
+            </h4>
+            <p className="mt-2 text-sm text-slate-500 max-w-sm">
+              Generate your first AI-assisted CO-PO correlation matrix using approved Course Outcomes.
+            </p>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={state.generatingCopo || state.availableExtractions.length === 0}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Generate CO-PO Mapping</span>
+            </button>
           </div>
         ) : (
-          <TableComponent
-            records={filteredRecords}
-            loading={state.loading}
-            noRecordsText="No CO-PO mappings found"
-            columns={[
-              {
-                accessor: "co_code",
-                title: "COURSE OUTCOME",
-                render: ({ co_code, bloom_level, description }: any) => (
-                  <div className="min-w-[220px] max-w-[280px] py-1">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-color2-l text-color2 rounded-md px-2 py-0.5 text-xs font-bold">
-                        {co_code}
-                      </span>
-                      {bloom_level && (
-                        <span className="rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-color2 dark:bg-purple-900/30">
-                          {bloom_level}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-[#000] dark:text-gray-300" title={description}>
-                      {description}
-                    </p>
-                  </div>
-                ),
-              },
-              ...programOutcomes.map((po, poIndex) => ({
-                accessor: po.code,
-                title: (
-                  <div
-                    className="flex flex-col items-center justify-center text-center cursor-help"
-                    title={`${po.code}: ${po.title}\n${po.description}`}
-                  >
-                    <span className="font-bold text-xs">{po.code}</span>
-                  </div>
-                ),
-                render: (row: any, rowIndex: number) => {
-                  const cell = matrix[row.co_code]?.[po.code] || {
-                    correlation_level: 0,
-                    strength_label: "– No Mapping",
-                    is_ai_suggested: false,
-                    justification: null,
-                    status: "suggested",
-                  };
-                  const mappingKey = `${row.co_code}-${po.code}`;
-                  const isMappingApproved = state.approvedMappings.includes(mappingKey);
-                  const score = cell.correlation_level ?? 0;
-
-                  // Top row/layer cells open downwards (top-full) so the card is never clipped by the header or top boundary
-                  const isTopRow = (rowIndex ?? 0) < 2;
-                  const isRightEdge = poIndex >= programOutcomes.length - 2;
-                  const isLeftEdge = poIndex === 0;
-
-                  const positionClass = `${isTopRow ? "top-full mt-2" : "bottom-full mb-2"} ${
-                    isRightEdge
-                      ? "right-0"
-                      : isLeftEdge
-                      ? "left-0"
-                      : "left-1/2 -translate-x-1/2"
-                  }`;
-
-                  return (
-                    <div className="relative group flex items-center justify-center py-1 group-hover:z-50 hover:z-50">
-                      {/* Clickable Badge: direct cycle 0 -> 1 -> 2 -> 3 -> 0 */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDirectCellCycle(row, po);
-                        }}
-                        className="relative p-1 rounded-lg transition-transform hover:scale-110 active:scale-95 focus:outline-none cursor-pointer"
-                        title="Click to cycle correlation strength (0 → 1 → 2 → 3)"
-                      >
-                        {getScoreBadge(score)}
-                        {cell.is_ai_suggested && score > 0 && !isMappingApproved && (
-                          <div
-                            title="AI Suggested (Review Required)"
-                            className="bg-color2 absolute right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white animate-pulse"
-                          />
-                        )}
-                        {isMappingApproved && !isApproved && (
-                          <div
-                            title="Mapping Verified"
-                            className="bg-green-600 absolute right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white"
-                          />
-                        )}
-                      </button>
-
-                      {/* Floating Hover Card on Cell (Strength, Bloom level, and Justification without opening any dropdown or modal!) */}
-                      <div className={`pointer-events-none absolute z-50 hidden w-80 rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl group-hover:block dark:border-slate-700 dark:bg-slate-900 ${positionClass}`}>
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs text-slate-800 dark:text-slate-100">
-                              {row.co_code} × {po.code}
-                            </span>
-                            {row.bloom_level && (
-                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
-                                {row.bloom_level}
-                              </span>
-                            )}
-                          </div>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                              score === 3
-                                ? "bg-green-100 text-green-800"
-                                : score === 2
-                                ? "bg-blue-100 text-blue-800"
-                                : score === 1
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {score === 3
-                              ? "3 – High"
-                              : score === 2
-                              ? "2 – Medium"
-                              : score === 1
-                              ? "1 – Low"
-                              : "– No Mapping"}
-                          </span>
-                        </div>
-
-                        <div className="mt-2">
-                          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                            Target Program Outcome ({po.code})
-                          </p>
-                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
-                            {po.title || po.code}
-                          </p>
-                          {po.description && (
-                            <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2">
-                              {po.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/60">
-                          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                            <Sparkles className="h-3 w-3" /> Academic Rationale
-                          </p>
-                          <p className="mt-1 text-xs leading-relaxed text-slate-700 dark:text-slate-300 break-words whitespace-normal">
-                            {cell.justification || "No rationale provided yet. Click cell to cycle strength."}
-                          </p>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 dark:border-slate-800">
-                          <span>💡 Click cell to cycle: 0 → 1 → 2 → 3</span>
-                          {cell.is_ai_suggested && (
-                            <span className="font-medium text-indigo-500">NEURO AI</span>
-                          )}
-                        </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
+                  <th className="sticky left-0 z-20 min-w-[220px] max-w-[280px] bg-slate-50/95 p-3.5 font-bold text-slate-700 backdrop-blur dark:bg-slate-800/95 dark:text-slate-200">
+                    Course Outcome
+                  </th>
+                  {state.programOutcomes.map((po) => (
+                    <th
+                      key={po.code}
+                      className="min-w-[56px] p-2 text-center font-bold text-slate-700 dark:text-slate-200"
+                      title={`${po.code}: ${po.title}\n${po.description}`}
+                    >
+                      <div className="flex flex-col items-center cursor-help">
+                        <span className="font-extrabold">{po.code}</span>
                       </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredCOs.map((co, rIdx) => (
+                  <tr
+                    key={co.co_code}
+                    className="hover:bg-slate-50/50 transition-colors dark:hover:bg-slate-800/40"
+                  >
+                    {/* Row Header: CO Code + Bloom + Description */}
+                    <td className="sticky left-0 z-10 bg-white/95 p-3 font-medium text-slate-800 backdrop-blur dark:bg-slate-900/95 dark:text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                          {co.co_code}
+                        </span>
+                        {co.bloom_level && (
+                          <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                            {co.bloom_level}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[11px] text-slate-500 leading-relaxed" title={co.description}>
+                        {co.description}
+                      </p>
+                    </td>
+
+                    {/* Correlation Cells */}
+                    {state.programOutcomes.map((po, poIdx) => {
+                      const cell = state.matrix[co.co_code]?.[po.code] || {
+                        correlation_level: 0,
+                        strength_label: "- No Mapping",
+                        is_ai_suggested: false,
+                        justification: "",
+                        status: "draft",
+                        mapping_id: null,
+                      };
+                      const score = cell.correlation_level || 0;
+
+                      return (
+                        <td key={po.code} className="p-1 text-center relative group">
+                          <div className="flex items-center justify-center">
+                            {/* Interactive Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleCellCycle(co, po)}
+                              className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:scale-110 active:scale-95 focus:outline-none cursor-pointer"
+                              title={`Click to cycle correlation (${co.co_code} × ${po.code})`}
+                            >
+                              {score === 3 && (
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white shadow-sm ring-2 ring-emerald-200 dark:ring-emerald-900">
+                                  3
+                                </span>
+                              )}
+                              {score === 2 && (
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-sm ring-2 ring-blue-200 dark:ring-blue-900">
+                                  2
+                                </span>
+                              )}
+                              {score === 1 && (
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white shadow-sm ring-2 ring-amber-200 dark:ring-amber-900">
+                                  1
+                                </span>
+                              )}
+                              {score === 0 && (
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-400 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-500">
+                                  -
+                                </span>
+                              )}
+
+                              {cell.is_ai_suggested && score > 0 && (
+                                <span
+                                  className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-900"
+                                  title="NEURO AI Suggested"
+                                />
+                              )}
+                            </button>
+
+                            {/* Small pencil icon on hover to open detail modal */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenCellModal(co, po);
+                              }}
+                              className="absolute top-1 right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded bg-slate-200/80 text-slate-600 hover:bg-indigo-600 hover:text-white dark:bg-slate-700 dark:text-slate-300"
+                              title="Edit academic rationale"
+                            >
+                              <Edit3 className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+
+                          {/* Hover Card for Rationale */}
+                          <div
+                            className={`pointer-events-none absolute z-50 hidden w-80 rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl group-hover:block dark:border-slate-700 dark:bg-slate-900 ${
+                              rIdx < 2 ? "top-full mt-2" : "bottom-full mb-2"
+                            } ${poIdx >= state.programOutcomes.length - 2 ? "right-0" : poIdx === 0 ? "left-0" : "left-1/2 -translate-x-1/2"}`}
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-xs text-slate-800 dark:text-slate-100">
+                                  {co.co_code} × {po.code}
+                                </span>
+                                {co.bloom_level && (
+                                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+                                    {co.bloom_level}
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  score === 3
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : score === 2
+                                    ? "bg-blue-100 text-blue-800"
+                                    : score === 1
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {cell.strength_label}
+                              </span>
+                            </div>
+
+                            <div className="mt-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                Target Outcome ({po.code})
+                              </p>
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
+                                {po.title || po.code}
+                              </p>
+                              {po.description && (
+                                <p className="mt-0.5 text-[10px] text-slate-500 line-clamp-2">
+                                  {po.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-800/60">
+                              <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                <Sparkles className="h-3 w-3" /> Academic Rationale
+                              </p>
+                              <p className="mt-1 text-xs leading-relaxed text-slate-700 dark:text-slate-300 break-words whitespace-normal">
+                                {cell.justification || "No justification entered. Click cell to cycle strength or edit icon to enter rationale."}
+                              </p>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 dark:border-slate-800">
+                              <span>Click cell: 0 → 1 → 2 → 3</span>
+                              {cell.is_ai_suggested && (
+                                <span className="font-semibold text-indigo-600 dark:text-indigo-400">NEURO AI</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+
+                {/* Average Row */}
+                <tr className="border-t-2 border-slate-300 bg-slate-50/95 font-bold dark:border-slate-700 dark:bg-slate-800/90">
+                  <td className="sticky left-0 z-20 bg-slate-100/95 p-3 text-xs font-bold text-slate-800 backdrop-blur dark:bg-slate-850 dark:text-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span>AVERAGE CORRELATION</span>
+                      <span className="text-[10px] text-slate-400 font-normal">OBE Score</span>
                     </div>
-                  );
-                },
-              })),
-            ]}
-          />
+                  </td>
+                  {state.programOutcomes.map((po) => {
+                    const avg = state.poAverages[po.code] || 0.0;
+                    return (
+                      <td key={po.code} className="p-2 text-center text-xs">
+                        <span
+                          className={`inline-block font-extrabold ${
+                            avg >= 2.5
+                              ? "text-emerald-700 dark:text-emerald-400"
+                              : avg >= 1.5
+                              ? "text-blue-700 dark:text-blue-400"
+                              : avg > 0
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-slate-400 dark:text-slate-500"
+                          }`}
+                        >
+                          {avg.toFixed(2)}
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
+      {/* Unmapped Outcomes Justification Section */}
+      {unmappedPOs.length > 0 && state.versionNumber && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/40 p-5 dark:border-amber-900/50 dark:bg-amber-950/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Unmapped Program Outcomes ({unmappedPOs.length})
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  For NBA/OBE compliance, specify why certain Program Outcomes or PSOs are not addressed by this course.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setState({ showUnmappedPanel: !state.showUnmappedPanel })}
+              className="text-xs font-bold text-amber-700 hover:text-amber-800 dark:text-amber-400 flex items-center gap-1"
+            >
+              <span>{state.showUnmappedPanel ? "Hide Justifications" : "Review Justifications"}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${state.showUnmappedPanel ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+
+          {state.showUnmappedPanel && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {unmappedPOs.map((po) => (
+                <div
+                  key={po.code}
+                  className="rounded-xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                    <span className="font-bold text-xs text-slate-900 dark:text-white">
+                      {po.code}: {po.title}
+                    </span>
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      Unmapped
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={state.unmappedJustifications[po.code] || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setState({
+                        unmappedJustifications: {
+                          ...state.unmappedJustifications,
+                          [po.code]: val,
+                        },
+                      });
+                    }}
+                    placeholder={`Provide academic rationale why ${po.code} is not directly mapped...`}
+                    className="mt-2 w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floating Action Bar */}
+      {state.versionNumber && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-6 py-3.5 backdrop-blur shadow-lg dark:border-slate-800 dark:bg-slate-900/95">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Status:</span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                  isApproved
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                }`}
+              >
+                {isApproved ? "Approved" : "Draft"}
+              </span>
+              <span className="text-xs text-slate-400">|</span>
+              <span className="text-xs text-slate-500">
+                Version {state.versionNumber} (Syllabus v{state.parentExtractionVersion || "—"})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={state.savingDraft}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <Save className="h-4 w-4" />
+                <span>{state.savingDraft ? "Saving Draft..." : "Save Draft"}</span>
+              </button>
+
+              {isApproved ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleReject}
+                    disabled={state.approvingMap}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800 shadow-sm hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                  >
+                    <RotateCw className="h-4 w-4" />
+                    <span>Revert to Draft</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cid = course_id || state.selectedCourse?.value;
+                      router.push(cid ? `/neurobe/pedagogy?course_id=${cid}` : "/neurobe/pedagogy");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700"
+                  >
+                    <span>Next: Pedagogy</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={state.approvingMap}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>{state.approvingMap ? "Approving..." : "Approve CO-PO Mapping"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Justification Modal */}
       {state.mappingModal && (
         <COPOMappingModal
           open={!!state.mappingModal}
@@ -1071,64 +1267,10 @@ const COPOMapping = () => {
           suggestedBy={state.mappingModal.suggestedBy}
           isAiSuggested={state.mappingModal.isAiSuggested}
           status={state.mappingModal.status}
-          fetching={state.fetchingCell}
           loading={state.updatingCell}
-          onUpdate={handleUpdateMapping}
+          onUpdate={handleUpdateFromModal}
         />
       )}
-
-      <div className="mt-4">
-        <PageFooter
-          batch={!allMapped && displayStatus !== "Approved"}
-          status={{
-            label: displayStatus,
-            color: displayStatus === "Approved" ? "#16a34a" : "#ea580c",
-          }}
-          content1={
-            state.courseDetail?.course_code
-              ? `Course: ${state.courseDetail?.course_code} – ${state.courseDetail?.course_title || ""}`
-              : ""
-          }
-          content2={matrixData?.po_version ? `PO Version: ${matrixData.po_version}` : "PO Version: PO 2025 v1"}
-          actionBtn1={
-            displayStatus === "Approved"
-              ? {
-                  label: "Next: Topic",
-                  icon: <ArrowRight className="h-4 w-4" />,
-                  onClick: () => {
-                    const cid = course_id || state.selectedCourse?.value || state.courseDetail?.id;
-                    router.push(cid ? `/neurobe/topics?course_id=${cid}` : "/neurobe/topics");
-                  },
-                  className: "create-btn",
-                }
-              : {
-                  label: state.approvingMap
-                    ? "Approving..."
-                    : state.extractionNotApproved
-                    ? "Requires Syllabus Approval"
-                    : "Approve Mapping",
-                  icon: <Check className="h-4 w-4" />,
-                  onClick: handleApproveMapping,
-                  disabled: state.approvingMap || state.extractionNotApproved,
-                }
-          }
-          actionBtn2={
-            displayStatus === "Approved"
-              ? {
-                  label: "Mapping Approved",
-                  icon: <Check className="h-4 w-4" />,
-                  onClick: () => {},
-                  className: "create-btn !bg-green-600 cursor-default",
-                }
-              : {
-                  label: state.savingDraft ? "Saving..." : "Save Draft",
-                  icon: <Save className="h-4 w-4" />,
-                  onClick: handleSaveDraft,
-                  disabled: state.savingDraft,
-                }
-          }
-        />
-      </div>
     </div>
   );
 };

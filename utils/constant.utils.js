@@ -181,19 +181,13 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "Course Artifacts",
-      href: "/neurobe/course-artifacts",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
       label: "Instance Management",
       href: "/neurobe/course-offering",
     },
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "MCQ Generation",
+      label: "MCQ",
       href: "/neurobe/mcq-generation",
     },
     {
@@ -208,12 +202,6 @@ export const OwnmenuConfig = {
       label: "Live Test Monitor",
       href: "/neurobe/ins-mcq-live-monitor",
     },
-    // {
-    //   type: "link",
-    //   icon: "IconMenuNotes",
-    //   label: "Results & Analysis",
-    //   href: "/neurobe/result-analysis",
-    // },
     {
       type: "link",
       icon: "IconMenuNotes",
@@ -271,10 +259,9 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "MCQ Generation",
+      label: "MCQ",
       href: "/neurobe/mcq-generation",
     },
-
     {
       type: "link",
       icon: "IconMenuTables",
@@ -288,12 +275,6 @@ export const OwnmenuConfig = {
       label: "Live Test Monitor",
       href: "/neurobe/ins-mcq-live-monitor",
     },
-    // {
-    //   type: "link",
-    //   icon: "IconMenuNotes",
-    //   label: "Results & Analysis",
-    //   href: "/neurobe/ins-result-analysis",
-    // },
 
     {
       type: "link",
@@ -338,7 +319,7 @@ OwnmenuConfig.FACULTY = [
   {
     type: "link",
     icon: "IconMenuNotes",
-    label: "MCQ Generation",
+    label: "MCQ",
     href: "/neurobe/mcq-generation",
   },
   {
@@ -353,12 +334,6 @@ OwnmenuConfig.FACULTY = [
     label: "Live Test Monitor",
     href: "/neurobe/ins-mcq-live-monitor",
   },
-  // {
-  //   type: "link",
-  //   icon: "IconMenuNotes",
-  //   label: "Results & Analysis",
-  //   href: "/neurobe/ins-result-analysis",
-  // },
   {
     type: "link",
     icon: "IconMenuNotes",

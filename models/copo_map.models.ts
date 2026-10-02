@@ -1,181 +1,112 @@
-import  { commonInstance } from '@/utils/axios.utils';
+import { commonInstance } from "@/utils/axios.utils";
+
+export interface COPOCellUpdatePayload {
+  matrix_value?: number;
+  justification?: string;
+}
+
+export interface COPOGeneratePayload {
+  extractions_id: number;
+}
 
 const COPOMap = {
-copo_map: (syllabus_id?: any, version_number?: any) => {
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/copo-matrix`;
-            if (version_number !== undefined && version_number !== null) {
-                url += `?version_number=${version_number}`;
-            }
-
-            commonInstance()
-                .get(url)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
-                    } else {
-                        reject(error?.message || error);
-                    }
-                });
+  generate: (payload: { extractions_id: number }) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .post(`course/copo/generate`, payload)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-        return promise;
-    },
-    copo_update: (syllabus_id?: any, body?: any, version_number?: any) => { 
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/copo-matrix/cell`;
-            if (version_number !== undefined && version_number !== null) {
-                url += `?version_number=${version_number}`;
-            }
+    });
+  },
 
-            commonInstance()
-                .put(url, body)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
-                    } else {
-                        reject(error?.message || error);
-                    }
-                });
+  get: (copo_id: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .get(`course/copo/${copo_id}`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-        return promise;
-    },
+    });
+  },
 
-    get_cell_detail : (syllabus_id?: any, body?: any, version_number?: any) => { 
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/copo-matrix/cell`;
-            const params = { ...(body || {}) };
-            if (version_number !== undefined && version_number !== null) {
-                params.version_number = version_number;
-            }
-
-            commonInstance()
-                .get(url, { params })
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
-                    } else {
-                        reject(error?.message || error);
-                    }
-                });
+  list: (params?: { course_id?: number | string; extractions_id?: number | string }) => {
+    return new Promise((resolve, reject) => {
+      const q = new URLSearchParams();
+      if (params?.course_id) q.append("course_id", String(params.course_id));
+      if (params?.extractions_id) q.append("extractions_id", String(params.extractions_id));
+      commonInstance()
+        .get(`course/copo?${q.toString()}`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-        return promise;
-    },
+    });
+  },
 
-    accept_map : (syllabus_id?: any, body?: any, version_number?: any) => { 
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/copo-matrix/cell/accept`;
-            if (version_number !== undefined && version_number !== null) {
-                url += `?version_number=${version_number}`;
-            }
-
-            const config: any = {};
-            if (body instanceof FormData) {
-                config.headers = { "Content-Type": "multipart/form-data" };
-            }
-
-            commonInstance()
-                 .post(url, body || {}, config)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
-                    } else {
-                        reject(error?.message || error);
-                    }
-                });
+  approve: (copo_id: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .patch(`course/copo/${copo_id}/approve`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-        return promise;
-    },
+    });
+  },
 
-    save_draft: (syllabus_id?: any, body?: any, version_number?: any) => { 
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/copo-matrix/draft`;
-            if (version_number !== undefined && version_number !== null) {
-                url += `?version_number=${version_number}`;
-            }
-
-            commonInstance()
-                .put(url, body)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
-                    } else {
-                        reject(error?.message || error);
-                    }
-                });
+  activate: (copo_id: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .patch(`course/copo/${copo_id}/activate`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-        return promise;
-    },
+    });
+  },
 
-    approve_map : (syllabus_id?: any, body?: any) => { 
-        let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/${syllabus_id}/copo-matrix/approve`;
-
-            const config: any = {};
-            if (body instanceof FormData) {
-                config.headers = { "Content-Type": "multipart/form-data" };
-            }
-
-            commonInstance()
-                 .post(url, body || {}, config)
-                .then((res) => {
-                    resolve(res.data);
-                })
-                .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data?.detail || error.response.data);
-                    } else {
-                        reject(error?.message || error);
-                    }
-                });
+  update_matrix_cell: (copo_id: number | string, cell_id: number | string, data: COPOCellUpdatePayload) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .patch(`course/copo/${copo_id}/matrix/${cell_id}`, data)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-        return promise;
-    },
+    });
+  },
 
-    get_matrix: (id: string | number) => {
-        return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/matrix`;
-            commonInstance()
-                .get(url)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+  delete_version: (copo_id: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .delete(`course/copo/${copo_id}`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
         });
-    },
+    });
+  },
 
-    generate_copo: (id: string | number, body?: any) => {
-        return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/copo-mapping`;
-            commonInstance()
-                .post(url, body || {})
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
-    },
+  // Legacy compatibility helpers
+  generate_copo: (courseId: string | number, body?: any) => {
+    const extractionsId = body?.extractions_id || body?.parent_extraction_id || body?.extraction_id;
+    return COPOMap.generate({ extractions_id: Number(extractionsId) });
+  },
 
-    approve_copo: (id: string | number) => {
-        return new Promise((resolve, reject) => {
-            let url = `course/syllabi/${id}/approve-copo`;
-            commonInstance()
-                .post(url)
-                .then((res) => resolve(res.data))
-                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
-        });
-    }
+  copo_map: (courseId: string | number, version_number?: number | null) => {
+    return COPOMap.list({ course_id: courseId });
+  },
 
-}
+  approve_map: (copo_id: string | number) => {
+    return COPOMap.approve(copo_id);
+  },
+
+  activate_version: (copo_id: string | number) => {
+    return COPOMap.activate(copo_id);
+  },
+};
 
 export default COPOMap;

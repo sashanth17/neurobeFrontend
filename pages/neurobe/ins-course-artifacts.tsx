@@ -1,2998 +1,4446 @@
-import { useEffect } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
+import { useRouter } from "next/router";
 import {
-  Users,
-  Sparkles,
-  Database,
-  BriefcaseBusiness,
-  Compass,
-  Search,
-  FileCode,
-  HelpCircle,
-  FileText,
-  GitBranch,
+  BookOpen,
   Layers,
   GraduationCap,
+  Clock,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Award,
+  Presentation,
   Calendar,
-  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  ArrowLeft,
+  Upload,
+  FileText,
+  ShieldCheck,
+  UserCheck,
+  Check,
+  History,
+  Columns,
+  Edit2,
+  Plus,
+  Trash2,
+  Save,
+  X,
+  Lock,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState } from "@/utils/function.utils";
+import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
-import CourseBanner from "@/components/academic-setup/CourseBanner";
-import { useRouter } from "next/router";
-import PageHeader from "@/components/common-components/PageHeader";
 import Models from "@/imports/models.import";
-import QuestionBankFilter, {
-  FilterValues,
-} from "@/components/question-bank/QuestionBankFilter";
-import QuestionCard, {
-  QuestionCardProps,
-} from "@/components/question-bank/QuestionCard";
-import QuestionDetailCard from "@/components/question-bank/QuestionDetailCard";
-import TabButton from "@/components/common-components/TabButton";
-import GenericTabs from "@/components/common-components/GenericTabs";
-import { QUS_TABS, UNIT_LIST, UNIT_TABS } from "@/utils/constant.utils";
-import { EditQuestionModal } from "@/components/question-bank/EditQuestionModal";
-import ViewQuestionModal from "@/components/question-bank/ViewQuestionModal";
-import GenerateQuestionsModal from "@/components/question-bank/GenerateQuestionsModal";
-import QuestionSetsHeader from "@/components/question-bank/QuestionSetsHeader";
-import QuestionSetsSearch from "@/components/question-bank/QuestionSetsSearch";
-import QuestionSetBanner from "@/components/question-bank/QuestionSetBanner";
-import QuestionSetCard, {
-  QuestionSetCardProps,
-} from "@/components/question-bank/QuestionSetCard";
-import SyllabusStructureSidebar from "@/components/question-bank/SyllabusStructureSidebar";
-import CourseReferencesCard, {
-  ReferenceItem,
-} from "@/components/academic-setup/CourseReferencesCard";
-import SyllabusHeaderCard from "@/components/academic-setup/SyllabusHeaderCard";
-import CourseInformationCard from "@/components/academic-setup/CourseInformationCard";
-import CourseOutcomesCard from "@/components/academic-setup/CourseOutcomesCard";
-import UnitWiseSyllabusCard from "@/components/academic-setup/UnitWiseSyllabusCard";
-import TheoryAndLabCard from "@/components/academic-setup/TheoryAndLabCard";
-import TextbooksCard from "@/components/academic-setup/TextbooksCard";
-import ReferenceBooksCard from "@/components/academic-setup/ReferenceBooksCard";
-import MappingRationaleCard from "@/components/academic-setup/MappingRationaleCard";
-import CopoMappingMatrixCard from "@/components/academic-setup/CopoMappingMatrixCard";
-import CourseTopicsCard from "@/components/academic-setup/CourseTopicsCard";
-import PedagogyTopicsCard from "@/components/academic-setup/PedagogyTopicsCard";
-import LessonPlanTopicsCard from "@/components/academic-setup/LessonPlanTopicsCard";
-import LearningMaterialsCard from "@/components/academic-setup/LearningMaterialsCard";
-import QuestionBankTopicsCard from "@/components/academic-setup/QuestionBankTopicsCard";
-import CIAQuestionPapersCard from "@/components/academic-setup/CIAQuestionPapersCard";
-import CIAPaperHeaderCard from "@/components/academic-setup/CIAPaperHeaderCard";
-import CIAQuestionPaperViewCard from "@/components/academic-setup/CIAQuestionPaperViewCard";
+import PDFViewer from "@/components/academic-setup/PDFViewer";
 
-const QUESTION_SETS: QuestionSetCardProps[] = [
-  {
-    id: "set-01",
-    unit: "Unit 1",
-    date: "Aug 18, 2025",
-    title: "Unit 1 — Network Models — Set 01",
-    topicSummary: "Network Models & Layered Architecture",
-    total: 4,
-    draft: 2,
-    review: 0,
-    approved: 2,
-    accentColor: "#f97316",
-    unitColor: "#fff7ed",
-  },
-  {
-    id: "set-02",
-    unit: "Unit 1",
-    date: "Aug 19, 2025",
-    title: "Unit 1 — Physical Layer — Set 02",
-    topicSummary: "Physical Layer & Transmission Media",
-    total: 1,
-    draft: 0,
-    review: 1,
-    approved: 0,
-    accentColor: "#22c55e",
-    unitColor: "#f0fdf4",
-  },
-  {
-    id: "set-03",
-    unit: "Unit 2",
-    date: "Aug 20, 2025",
-    title: "Unit 2 — Error Detection — Set 03",
-    topicSummary: "3 Topics • 3 Subtopics",
-    total: 5,
-    draft: 1,
-    review: 1,
-    approved: 3,
-    accentColor: "#a855f7",
-    unitColor: "#faf5ff",
-  },
-  {
-    id: "set-04",
-    unit: "Unit 3",
-    date: "Aug 21, 2025",
-    title: "Unit 3 — IPv4 Subnetting — Set 04",
-    topicSummary: "3 Topics • 3 Subtopics",
-    total: 4,
-    draft: 1,
-    review: 0,
-    approved: 3,
-    accentColor: "#3b82f6",
-    unitColor: "#eff6ff",
-  },
-  {
-    id: "set-05",
-    unit: "Unit 4",
-    date: "Aug 21, 2025",
-    title: "Unit 4 — Transport Protocols — Set 05",
-    topicSummary: "3 Topics • 3 Subtopics",
-    total: 2,
-    draft: 0,
-    review: 0,
-    approved: 2,
-    accentColor: "#f59e0b",
-    unitColor: "#fffbeb",
-  },
-  {
-    id: "set-06",
-    unit: "Unit 5",
-    date: "Aug 22, 2025",
-    title: "Unit 5 — Application Layer — Set 06",
-    topicSummary: "3 Topics • 3 Subtopics",
-    total: 4,
-    draft: 1,
-    review: 1,
-    approved: 2,
-    accentColor: "#10b981",
-    unitColor: "#ecfdf5",
-  },
-];
-
-const SAMPLE_QUESTIONS: QuestionCardProps[] = [
-  {
-    id: "Q-CN-001",
-    question:
-      "What is the total latency for transmitting a 1,500 Byte packet over a 100 Mbps link with a physical length of 10 km (signal velocity = 2 × 10^8 m/s)?",
-    unit: "Unit 1",
-    topic: "Network Performance Metrics",
-    subtopic: "Propagation vs Transmission Delay Calculations",
-    tags: [
-      { label: "CO1" },
-      { label: "K3" },
-      { label: "MCQ" },
-      { label: "2 Marks" },
-      { label: "Medium" },
-    ],
-    specialTag: { label: "Eligible for MCQ Tests", color: "green" },
-    status: "approved",
-  },
-  {
-    id: "Q-CN-004",
-    question:
-      "Why does CSMA/CD enforce a minimum frame size constraint (e.g., 64 bytes) on IEEE 802.3 Ethernet networks?",
-    unit: "Unit 2",
-    topic: "Medium Access Control (MAC) Sublayer",
-    subtopic: "CSMA/CD & Exponential Backoff Algorithm",
-    tags: [
-      { label: "CO2" },
-      { label: "K3" },
-      { label: "MCQ" },
-      { label: "2 Marks" },
-      { label: "Medium" },
-    ],
-    specialTag: { label: "Pending Approval", color: "orange" },
-    status: "reviewed",
-  },
-  {
-    id: "Q-CN-007",
-    question:
-      "In a Go-Back-N ARQ protocol utilizing a 4-bit sequence number, what is the maximum sender window size (W_s) permissible to avoid ambiguous frame acceptance?",
-    unit: "Unit 2",
-    topic: "Sliding Window Flow Control Protocols",
-    subtopic: "Go-Back-N ARQ Window Sizing and Timers",
-    tags: [
-      { label: "CO2" },
-      { label: "K3" },
-      { label: "MCQ" },
-      { label: "2 Marks" },
-      { label: "Medium" },
-    ],
-    status: "approved",
-  },
-];
-
-const SET_QUESTIONS: QuestionCardProps[] = [
-  {
-    id: "Q-CN-029",
-    question:
-      "Which layer of the OSI reference model is primarily responsible for end-to-end packet routing and logical network addressing across heterogeneous subnetworks?",
-    unit: "Unit 1",
-    topic: "Network Models & Layered Architecture",
-    subtopic: "OSI 7-Layer Reference Model",
-    tags: [
-      { label: "CO1" },
-      { label: "K2" },
-      { label: "MCQ" },
-      { label: "2 Marks" },
-      { label: "Easy" },
-    ],
-    specialTag: { label: "Pending Review", color: "gray" },
-    status: "draft",
-  },
-  {
-    id: "Q-CN-001",
-    question:
-      "Which layer of the OSI reference model is primarily responsible for end-to-end packet routing and logical network addressing across heterogeneous subnetworks?",
-    unit: "Unit 1",
-    topic: "Network Models & Layered Architecture",
-    subtopic: "OSI 7-Layer Reference Model",
-    tags: [
-      { label: "CO1" },
-      { label: "K2" },
-      { label: "MCQ" },
-      { label: "2 Marks" },
-      { label: "Easy" },
-    ],
-    specialTag: { label: "Eligible for MCQ Tests", color: "green" },
-    status: "approved",
-  },
-  {
-    id: "Q-CN-003",
-    question:
-      "In a mesh network topology with N nodes, what is the exact number of dedicated full-duplex physical links required to achieve complete inter-node interconnection?",
-    unit: "Unit 1",
-    topic: "Network Topologies & Switching Techniques",
-    subtopic: "Packet Switching vs Circuit Switching",
-    tags: [
-      { label: "CO1" },
-      { label: "K2" },
-      { label: "MCQ" },
-      { label: "2 Marks" },
-      { label: "Medium" },
-    ],
-    specialTag: { label: "Pending Review", color: "gray" },
-    status: "draft",
-  },
-];
-
-const SYLLABUS_HEADER_DATA = {
-  bannerProgramme: "B.Tech CSE",
-  bannerBatch: "2025–2029",
-  bannerSemester: "3",
-  courseCode: "CS309",
-  courseTitle: "Computer Networks",
-  subtitle: "Approved course syllabus, outcomes, units and prescribed references.",
-  approvedBy: "Dr. Arun Kumar",
-  approvedDate: "18 Aug 2026",
-  unitsCountText: "5 Units • CO1–CO5",
-  versionBadgeText: "Approved v1.0",
-  tabs: [
-    { key: "course-info", label: "Course Info" },
-    { key: "course-outcomes", label: "Course Outcomes" },
-    { key: "unit-syllabus", label: "Unit-wise Syllabus" },
-    { key: "theory-lab", label: "Theory & Lab" },
-    { key: "textbooks", label: "Textbooks" },
-    { key: "reference-books", label: "Reference Books" },
-  ],
-  creditStats: [
-    { label: "L (Lecture)", value: "3", isPurpleLabel: true },
-    { label: "T (Tutorial)", value: "0", isPurpleLabel: true },
-    { label: "P (Practical)", value: "2", isPurpleLabel: true },
-    { label: "C (Credits)", value: "4", isHighlighted: true, isPurpleLabel: true },
-    { label: "Theory Hours", value: "45" },
-    { label: "Lab Hours", value: "30" },
-  ],
-};
-
-const REFERENCE_HEADER_DATA_MAP: Record<
-  string,
-  {
-    title: string;
-    icon: React.ReactNode;
-    subtitle: string;
-    approvedBy: string;
-    approvedDate: string;
-    unitsCountText: string;
-    versionBadgeText: string;
-  }
-> = {
-  syllabus: {
-    title: "Syllabus",
-    icon: <BookOpen className="h-6 w-6" />,
-    subtitle: "Approved course syllabus, outcomes, units and prescribed references.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "18 Aug 2026",
-    unitsCountText: "5 Units • CO1–CO5",
-    versionBadgeText: "Approved v1.0",
-  },
-  copo: {
-    title: "CO–PO Mapping",
-    icon: <GitBranch className="h-6 w-6" />,
-    subtitle: "View the approved mapping between Course Outcomes and Program Outcomes.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "20 Aug 2026",
-    unitsCountText: "11 Program Outcomes",
-    versionBadgeText: "Approved v1.0",
-  },
-  topics: {
-    title: "Topics",
-    icon: <Layers className="h-6 w-6" />,
-    subtitle: "View the approved topic hierarchy for this course.crea",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "21 Aug 2026",
-    unitsCountText: "5 Units • 20 Main Topics",
-    versionBadgeText: "Approved v1.0",
-  },
-  pedagogy: {
-    title: "Pedagogy",
-    icon: <GraduationCap className="h-6 w-6" />,
-    subtitle: "View the approved teaching approaches assigned to each course topic.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "22 Aug 2026",
-    unitsCountText: "4 Delivery Modes",
-    versionBadgeText: "Approved v1.0",
-  },
-  "lesson-plan": {
-    title: "Lesson Plan",
-    icon: <Calendar className="h-6 w-6" />,
-    subtitle: "View the approved course delivery plan by unit and topic.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "23 Aug 2026",
-    unitsCountText: "45 Planned Sessions",
-    versionBadgeText: "Approved v1.0",
-  },
-  "learning-materials": {
-    title: "Learning Materials",
-    icon: <BookOpen className="h-6 w-6" />,
-    subtitle: "Course lecture notes, slide decks, and reference study guides.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "24 Aug 2026",
-    unitsCountText: "6 Approved Materials",
-    versionBadgeText: "Approved v1.0",
-  },
-  "question-bank": {
-    title: "Question Bank",
-    icon: <HelpCircle className="h-6 w-6" />,
-    subtitle: "Comprehensive repository of approved questions.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "25 Aug 2026",
-    unitsCountText: "12 Approved Questions",
-    versionBadgeText: "Approved v1.0",
-  },
-  "cia-papers": {
-    title: "CIA Question Papers",
-    icon: <FileCode className="h-6 w-6" />,
-    subtitle: "Continuous Internal Assessment question papers.",
-    approvedBy: "Dr. Arun Kumar",
-    approvedDate: "26 Aug 2026",
-    unitsCountText: "3 Approved Papers",
-    versionBadgeText: "Approved v1.0",
-  },
-};
-
-const COURSE_OUTCOMES_DATA = {
-  title: "COURSE OUTCOMES",
-  approvedCountText: "5 Approved Statements",
-  outcomes: [
-    {
-      id: "co1",
-      coCode: "CO1",
-      statement: "Understand network architectures, reference models and physical-layer fundamentals.",
-      knowledgeLevel: "K2",
-    },
-    {
-      id: "co2",
-      coCode: "CO2",
-      statement: "Analyze data-link protocols, framing, error control and medium-access techniques.",
-      knowledgeLevel: "K4",
-    },
-    {
-      id: "co3",
-      coCode: "CO3",
-      statement: "Apply IP addressing, subnetting and routing concepts.",
-      knowledgeLevel: "K3",
-    },
-    {
-      id: "co4",
-      coCode: "CO4",
-      statement: "Explain transport-layer protocols and mechanisms.",
-      knowledgeLevel: "K2",
-    },
-    {
-      id: "co5",
-      coCode: "CO5",
-      statement: "Explain application-layer protocols and services.",
-      knowledgeLevel: "K2",
-    },
-  ],
-  coverageUnitsText: "5 Units",
-  coverageTheoryHoursText: "45 Theory Hours",
-  coverageLabHoursText: "30 Lab Hours",
-  coverageTopicsText: "35 Syllabus Topics",
-};
-
-const UNIT_WISE_SYLLABUS_DATA = {
-  title: "UNIT-WISE SYLLABUS",
-  headerStatsText: "5 Units · 35 Ordered Topics",
-  units: [
-    {
-      id: "unit-1",
-      unitNumber: 1,
-      unitTitle: "Introduction & Physical Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "7 Topics",
-      topics: [
-        { code: "1.1", title: "Fundamentals of Computer Networks and Data Communication" },
-        { code: "1.2", title: "Network Architecture, Components and Communication Models" },
-        { code: "1.3", title: "Layered Network Architecture and Protocol Design Principles" },
-        { code: "1.4", title: "OSI Reference Model and Functions of Individual Layers" },
-        { code: "1.5", title: "TCP/IP Reference Model and Comparison with the OSI Model" },
-        { code: "1.6", title: "Physical Layer Concepts, Signals and Data Transmission Fundamentals" },
-        { code: "1.7", title: "Guided and Unguided Transmission Media for Computer Networks" },
-      ],
-    },
-    {
-      id: "unit-2",
-      unitNumber: 2,
-      unitTitle: "Data Link Layer & MAC Sublayer",
-      hoursText: "9 Hours",
-      topicsCountText: "7 Topics",
-      topics: [
-        { code: "2.1", title: "Data Link Layer Services and Frame Organization" },
-        { code: "2.2", title: "Framing Methods and Data Link Control Mechanisms" },
-        { code: "2.3", title: "Error Detection Techniques using Parity, Checksum and CRC" },
-        { code: "2.4", title: "Error Correction Methods and Reliable Data Transmission" },
-        { code: "2.5", title: "Flow Control and Automatic Repeat Request Protocols" },
-        { code: "2.6", title: "Medium Access Control Techniques for Shared Communication Channels" },
-        { code: "2.7", title: "Ethernet Architecture, Frame Format and MAC Addressing" },
-      ],
-    },
-  ],
-};
-
-const THEORY_AND_LAB_DATA = {
-  title: "THEORY & LABORATORY",
-  headerSubtitle: "Curriculum Allocation",
-  theoryHours: "45",
-  theoryWeeklyHours: "3 Hours / Week",
-  labHours: "30",
-  labWeeklyHours: "2 Hours / Week",
-  labExperimentsTitle: "LAB EXPERIMENTS",
-  experiments: [
-    { id: "exp-1", title: "Study of network configuration and addressing" },
-    { id: "exp-2", title: "Packet capture and protocol analysis" },
-    { id: "exp-3", title: "IPv4 subnetting exercise" },
-    { id: "exp-[#4]", title: "Static and dynamic routing configuration" },
-    { id: "exp-5", title: "TCP / UDP communication analysis" },
-    { id: "exp-6", title: "DNS and HTTP protocol observation" },
-  ],
-};
-
-const TEXTBOOKS_DATA = {
-  title: "TEXTBOOKS",
-  headerSubtitle: "Approved Prescribed Literature",
-  textbooks: [
-    {
-      id: "tb-1",
-      title: "Computer Networks",
-      authors: "Andrew S. Tanenbaum, David J. Wetherall",
-      publisher: "Pearson · 5th Edition",
-    },
-  ],
-};
-
-const REFERENCE_BOOKS_DATA = {
-  title: "REFERENCE BOOKS",
-  headerSubtitle: "Supplementary Academic References",
-  references: [
-    {
-      id: "ref-1",
-      title: "Data Communications and Networking",
-      authors: "Behrouz A. Forouzan",
-      publisher: "McGraw Hill",
-    },
-    {
-      id: "ref-2",
-      title: "Computer Networking: A Top-Down Approach",
-      authors: "James F. Kurose, Keith W. Ross",
-      publisher: "Pearson",
-    },
-  ],
-};
-
-const MAPPING_RATIONALE_DATA = {
-  title: "MAPPING RATIONALE",
-  subtitle: "Why each Course Outcome is mapped to the selected Program Outcomes.",
-  headerStatsText: "5 Outcome Rationales",
-  items: [
-    {
-      id: "co1",
-      coCode: "CO1",
-      statement:
-        "Understand network architectures, reference models and physical-layer fundamentals.",
-      mappedCountText: "3 mapped outcomes",
-      poItems: [
-        {
-          id: "po1-1",
-          poCode: "PO1",
-          poTitle: "Engineering Knowledge",
-          strengthText: "Strength: 3 (High)",
-          strengthBadgeClass:
-            "bg-[#f5f3ff] text-color2 dark:bg-purple-950/60 dark:text-purple-300",
-          rationale:
-            "The outcome requires students to apply core engineering and computing knowledge to understand network architectures and protocol models.",
-        },
-        {
-          id: "po1-2",
-          poCode: "PO2",
-          poTitle: "Problem Analysis",
-          strengthText: "Strength: 2 (Medium)",
-          strengthBadgeClass:
-            "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
-          rationale:
-            "Students interpret and compare networking models and communication structures using engineering principles.",
-        },
-        {
-          id: "po1-5",
-          poCode: "PO5",
-          poTitle: "Modern Tool Usage",
-          strengthText: "Strength: 1 (Low)",
-          strengthBadgeClass:
-            "bg-gray-100 text-[#000] dark:bg-gray-800 dark:text-gray-300",
-          rationale:
-            "Students examine packet structures and basic physical transmission concepts using simulation tools and network diagnostic utilities.",
-        },
-      ],
-    },
-    {
-      id: "co2",
-      coCode: "CO2",
-      statement:
-        "Analyze data-link protocols, framing, error control and medium-access techniques.",
-      mappedCountText: "3 mapped outcomes",
-      poItems: [
-        {
-          id: "po2-1",
-          poCode: "PO1",
-          poTitle: "Engineering Knowledge",
-          strengthText: "Strength: 3 (High)",
-          strengthBadgeClass:
-            "bg-[#f5f3ff] text-color2 dark:bg-purple-950/60 dark:text-purple-300",
-          rationale:
-            "Outcome requires analytical evaluation of error detection and flow control algorithms at the data link layer.",
-        },
-        {
-          id: "po2-2",
-          poCode: "PO2",
-          poTitle: "Problem Analysis",
-          strengthText: "Strength: 3 (High)",
-          strengthBadgeClass:
-            "bg-[#f5f3ff] text-color2 dark:bg-purple-950/60 dark:text-purple-300",
-          rationale:
-            "Students analyze framing methods and error correction techniques for efficient transmission.",
-        },
-      ],
-    },
-    {
-      id: "co3",
-      coCode: "CO3",
-      statement: "Apply IP addressing, subnetting and routing concepts.",
-      mappedCountText: "4 mapped outcomes",
-      poItems: [
-        {
-          id: "po3-1",
-          poCode: "PO1",
-          poTitle: "Engineering Knowledge",
-          strengthText: "Strength: 3 (High)",
-          strengthBadgeClass:
-            "bg-[#f5f3ff] text-color2 dark:bg-purple-950/60 dark:text-purple-300",
-          rationale:
-            "Application of IPv4 subnetting formulas and routing algorithm mechanics.",
-        },
-      ],
-    },
-    {
-      id: "co4",
-      coCode: "CO4",
-      statement: "Explain transport-layer protocols and mechanisms.",
-      mappedCountText: "4 mapped outcomes",
-      poItems: [
-        {
-          id: "co4-1",
-          poCode: "PO1",
-          poTitle: "Engineering Knowledge",
-          strengthText: "Strength: 2 (Medium)",
-          strengthBadgeClass:
-            "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
-          rationale:
-            "Understanding end-to-end transport mechanics, TCP congestion control, and UDP socket communication.",
-        },
-      ],
-    },
-    {
-      id: "co5",
-      coCode: "CO5",
-      statement: "Explain application-layer protocols and services.",
-      mappedCountText: "4 mapped outcomes",
-      poItems: [
-        {
-          id: "co5-1",
-          poCode: "PO1",
-          poTitle: "Engineering Knowledge",
-          strengthText: "Strength: 2 (Medium)",
-          strengthBadgeClass:
-            "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
-          rationale:
-            "Explanations of client-server architectures, DNS resolution, and HTTP protocol operations.",
-        },
-      ],
-    },
-  ],
-};
-
-const PROGRAM_OUTCOMES_DATA = {
-  title: "PROGRAM OUTCOMES",
-  subtitle: "View the Program Outcomes used for this course mapping.",
-  headerStatsText: "11 Program Outcomes",
-  items: [
-    {
-      id: "po1",
-      poCode: "PO1",
-      poTitle: "Engineering Knowledge",
-      description:
-        "Apply knowledge of mathematics, science, engineering fundamentals and computing principles to solve complex engineering problems.",
-    },
-    {
-      id: "po2",
-      poCode: "PO2",
-      poTitle: "Problem Analysis",
-      description:
-        "Identify, formulate, review research literature, and analyze complex engineering problems reaching substantiated conclusions using first principles of mathematics, natural sciences, and engineering sciences.",
-    },
-    {
-      id: "po3",
-      poCode: "PO3",
-      poTitle: "Design / Development of Solutions",
-      description:
-        "Design solutions for complex engineering problems and design system components or processes that meet the specified needs with appropriate consideration for the public health and safety, and the cultural, societal, and environmental considerations.",
-    },
-    {
-      id: "po4",
-      poCode: "PO4",
-      poTitle: "Conduct Investigations of Complex Problems",
-      description:
-        "Use research-based knowledge and research methods including design of experiments, analysis and interpretation of data, and synthesis of the information to provide valid conclusions.",
-    },
-    {
-      id: "po5",
-      poCode: "PO5",
-      poTitle: "Modern Tool Usage",
-      description:
-        "Create, select, and apply appropriate techniques, resources, and modern engineering and IT tools including prediction and modeling to complex engineering activities with an understanding of the limitations.",
-    },
-    {
-      id: "po6",
-      poCode: "PO6",
-      poTitle: "The Engineer and Society",
-      description:
-        "Apply reasoning informed by the contextual knowledge to assess societal, health, safety, legal and cultural issues and the consequent responsibilities relevant to the professional engineering practice.",
-    },
-    {
-      id: "po7",
-      poCode: "PO7",
-      poTitle: "Environment and Sustainability",
-      description:
-        "Understand the impact of the professional engineering solutions in societal and environmental contexts, and demonstrate the knowledge of, and need for sustainable development.",
-    },
-    {
-      id: "po8",
-      poCode: "PO8",
-      poTitle: "Ethics",
-      description:
-        "Apply ethical principles and commit to professional ethics and responsibilities and norms of the engineering practice.",
-    },
-    {
-      id: "po9",
-      poCode: "PO9",
-      poTitle: "Individual and Team Work",
-      description:
-        "Function effectively as an individual, and as a member or leader in diverse teams, and in multidisciplinary settings.",
-    },
-    {
-      id: "po10",
-      poCode: "PO10",
-      poTitle: "Communication",
-      description:
-        "Communicate effectively on complex engineering activities with the engineering community and with society at large, such as, being able to comprehend and write effective reports and design documentation, make effective presentations, and give and receive clear instructions.",
-    },
-    {
-      id: "po11",
-      poCode: "PO11",
-      poTitle: "Project Management and Finance",
-      description:
-        "Demonstrate knowledge and understanding of the engineering and management principles and apply these to one's own work, as a member and leader in a team, to manage projects and in multidisciplinary environments.",
-    },
-  ],
-};
-
-const COPO_HEADER_TABS = [
-  { key: "course-outcomes", label: "Course Outcomes" },
-  { key: "copo-matrix", label: "Co-Po Matrix" },
-  { key: "mapping-rationale", label: "Mapping Rationale" },
-  { key: "program-outcomes", label: "Program Outcomes" },
-];
-
-const TOPICS_HEADER_TABS = [
-  { key: "all-units", label: "All Units" },
-  { key: "unit-1", label: "Unit 1" },
-  { key: "unit-2", label: "Unit 2" },
-  { key: "unit-3", label: "Unit 3" },
-  { key: "unit-4", label: "Unit 4" },
-  { key: "unit-5", label: "Unit 5" },
-];
-
-const PEDAGOGY_HEADER_TABS = [
-  { key: "all-units", label: "All Units" },
-  { key: "unit-1", label: "Unit 1" },
-  { key: "unit-2", label: "Unit 2" },
-  { key: "unit-3", label: "Unit 3" },
-  { key: "unit-4", label: "Unit 4" },
-  { key: "unit-5", label: "Unit 5" },
-];
-
-const COURSE_TOPICS_CARD_DATA = {
-  units: [
-    {
-      id: "unit-1",
-      unitNumber: 1,
-      unitCodeText: "Unit 1",
-      title: "Introduction & Physical Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "1.1",
-          title: "Fundamentals of Computer Networks",
-          description:
-            "Introduces basic data communication concepts, network purpose, components and network classifications.",
-          hoursText: "2 Hours",
-          levelText: "Knowledge Level: K2",
-          subtopics: [
-            { code: "1.1.1", title: "Data Communication and Network Fundamentals" },
-            { code: "1.1.2", title: "Network Components and Communication Links" },
-            { code: "1.1.3", title: "LAN, MAN and WAN Concepts" },
-          ],
-        },
-        {
-          code: "1.2",
-          title: "Network Architecture and Layered Communication",
-          description:
-            "Explains layered architecture, network services, protocols and interfaces used for structured communication.",
-          hoursText: "2 Hours",
-          levelText: "Knowledge Level: K2",
-          subtopics: [
-            { code: "1.2.1", title: "Layered Network Architecture" },
-            { code: "1.2.2", title: "Protocols, Services and Interfaces" },
-            { code: "1.2.3", title: "Benefits of Layered Communication" },
-          ],
-        },
-        {
-          code: "1.3",
-          title: "OSI and TCP/IP Reference Models",
-          description:
-            "Studies standard reference models and functions of networking layers.",
-          hoursText: "3 Hours",
-          levelText: "Knowledge Level: K2",
-          subtopics: [
-            { code: "1.3.1", title: "OSI Reference Model and Layer Functions" },
-            { code: "1.3.2", title: "TCP/IP Reference Model and Protocol Suite" },
-            { code: "1.3.3", title: "Comparison of OSI and TCP/IP Models" },
-          ],
-        },
-        {
-          code: "1.4",
-          title: "Physical Layer and Transmission Media",
-          description:
-            "Covers physical transmission concepts and communication media used in computer networks.",
-          hoursText: "2 Hours",
-          levelText: "Knowledge Level: K2",
-          subtopics: [
-            { code: "1.4.1", title: "Signals and Data Transmission Fundamentals" },
-            { code: "1.4.2", title: "Guided Transmission Media" },
-            { code: "1.4.3", title: "Unguided Transmission Media" },
-          ],
-        },
-      ],
-    },
-    {
-      id: "unit-2",
-      unitNumber: 2,
-      unitCodeText: "Unit 2",
-      title: "Data Link Layer & MAC Sublayer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "2.1",
-          title: "Data Link Layer Design & Framing",
-          description:
-            "Examines framing, error detection mechanisms, and sliding window flow control protocols.",
-          hoursText: "2 Hours",
-          levelText: "Knowledge Level: K3",
-          subtopics: [
-            { code: "2.1.1", title: "Framing Methods & Character/Bit Stuffing" },
-            { code: "2.1.2", title: "CRC & Checksum Error Control Algorithms" },
-            {
-              code: "2.1.3",
-              title:
-                "Sliding Window Protocols (Stop-and-Wait, Go-Back-N, Selective Repeat)",
-            },
-          ],
-        },
-        {
-          code: "2.2",
-          title: "Medium Access Control & Ethernet",
-          description:
-            "Covers random access protocols, collision handling, and Ethernet standards.",
-          hoursText: "3 Hours",
-          levelText: "Knowledge Level: K3",
-          subtopics: [
-            { code: "2.2.1", title: "ALOHA and CSMA/CD Protocol Mechanics" },
-            { code: "2.2.2", title: "Binary Exponential Backoff Algorithm" },
-            { code: "2.2.3", title: "IEEE 802.3 Frame Format and Fast/Gigabit Ethernet" },
-          ],
-        },
-      ],
-    },
-    {
-      id: "unit-3",
-      unitNumber: 3,
-      unitCodeText: "Unit 3",
-      title: "Network Layer & Routing",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "3.1",
-          title: "IPv4/IPv6 Addressing & Subnetting",
-          description: "IP addressing structures, VLSM, CIDR, and IPv6 transition.",
-          hoursText: "3 Hours",
-          levelText: "Knowledge Level: K3",
-          subtopics: [
-            { code: "3.1.1", title: "Classful vs Classless Inter-Domain Routing (CIDR)" },
-            { code: "3.1.2", title: "Variable Length Subnet Masking (VLSM)" },
-          ],
-        },
-        {
-          code: "3.2",
-          title: "Routing Algorithms & Protocols",
-          description: "Distance Vector, Link State, RIP, OSPF, and BGP protocols.",
-          hoursText: "4 Hours",
-          levelText: "Knowledge Level: K4",
-          subtopics: [
-            { code: "3.2.1", title: "Distance Vector vs Link State Routing" },
-            { code: "3.2.2", title: "RIP, OSPF and BGP Operation Mechanics" },
-          ],
-        },
-      ],
-    },
-    {
-      id: "unit-4",
-      unitNumber: 4,
-      unitCodeText: "Unit 4",
-      title: "Transport Layer Protocols",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "4.1",
-          title: "TCP Connection Management & Flow Control",
-          description: "TCP three-way handshake, sliding window, and congestion control.",
-          hoursText: "4 Hours",
-          levelText: "Knowledge Level: K3",
-          subtopics: [
-            { code: "4.1.1", title: "Three-Way Handshake & Connection Termination" },
-            { code: "4.1.2", title: "TCP Sliding Window & Congestion Control" },
-          ],
-        },
-        {
-          code: "4.2",
-          title: "UDP & Socket Programming",
-          description: "UDP datagram communication and socket programming basics.",
-          hoursText: "3 Hours",
-          levelText: "Knowledge Level: K2",
-          subtopics: [
-            { code: "4.2.1", title: "Connectionless UDP Transmission" },
-            { code: "4.2.2", title: "Socket API Fundamentals" },
-          ],
-        },
-      ],
-    },
-    {
-      id: "unit-5",
-      unitNumber: 5,
-      unitCodeText: "Unit 5",
-      title: "Application Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "5.1",
-          title: "Application Protocols",
-          description: "DNS resolution, HTTP/HTTPS operations, and email protocols.",
-          hoursText: "4 Hours",
-          levelText: "Knowledge Level: K2",
-          subtopics: [
-            { code: "5.1.1", title: "Domain Name System (DNS) Architecture" },
-            { code: "5.1.2", title: "HTTP/HTTPS Request-Response Mechanics" },
-          ],
-        },
-        {
-          code: "5.2",
-          title: "Network Management & Security",
-          description: "Encryption basics, firewalls, and VPN technologies.",
-          hoursText: "4 Hours",
-          levelText: "Knowledge Level: K3",
-          subtopics: [
-            { code: "5.2.1", title: "Symmetric & Asymmetric Encryption Overview" },
-            { code: "5.2.2", title: "Firewalls and Virtual Private Networks (VPN)" },
-          ],
-        },
-      ],
-    },
-  ],
-};
-
-const PEDAGOGY_TOPICS_CARD_DATA = {
-  title: "TEACHING APPROACHES OF TOPICS",
-  subtitle: "Approved teaching methods for each topic in the course.",
-  headerStatsText: "5 Units • 20 Main Topics",
-  units: [
-    {
-      id: "unit-1",
-      unitNumber: 1,
-      unitCodeText: "UNIT 1",
-      title: "Introduction & Physical Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "1.1",
-          title: "Fundamentals of Computer Networks",
-          bloomLevel: "K2",
-          hoursText: "2 Hours",
-          teachingApproaches: ["Lecture", "Concept Mapping", "Group Discussion"],
-        },
-        {
-          code: "1.2",
-          title: "Network Architecture and Layered Communication",
-          bloomLevel: "K2",
-          hoursText: "2 Hours",
-          teachingApproaches: [
-            "Interactive Lecture",
-            "Concept Mapping",
-            "Comparative Discussion",
-          ],
-        },
-        {
-          code: "1.3",
-          title: "OSI and TCP/IP Reference Models",
-          bloomLevel: "K2",
-          hoursText: "3 Hours",
-          teachingApproaches: [
-            "Diagrammatic Walkthrough",
-            "Comparative Analysis",
-            "Peer Instruction",
-          ],
-        },
-        {
-          code: "1.4",
-          title: "Physical Layer and Transmission Media",
-          bloomLevel: "K2",
-          hoursText: "2 Hours",
-          teachingApproaches: ["Demonstration", "Lecture", "Discussion"],
-        },
-      ],
-    },
-    {
-      id: "unit-2",
-      unitNumber: 2,
-      unitCodeText: "UNIT 2",
-      title: "Data Link Layer & MAC Sublayer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "2.1",
-          title: "Data Link Layer Design & Framing",
-          bloomLevel: "K3",
-          hoursText: "2 Hours",
-          teachingApproaches: ["Interactive Lecture", "Problem Solving", "Simulation Lab"],
-        },
-        {
-          code: "2.2",
-          title: "Medium Access Control & Ethernet",
-          bloomLevel: "K3",
-          hoursText: "3 Hours",
-          teachingApproaches: ["Case Study", "Group Discussion", "Protocol Animation"],
-        },
-      ],
-    },
-    {
-      id: "unit-3",
-      unitNumber: 3,
-      unitCodeText: "UNIT 3",
-      title: "Network Layer & Routing",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "3.1",
-          title: "IPv4/IPv6 Addressing & Subnetting",
-          bloomLevel: "K3",
-          hoursText: "3 Hours",
-          teachingApproaches: ["Subnet Workshop", "Interactive Quiz", "Guided Problem Solving"],
-        },
-        {
-          code: "3.2",
-          title: "Routing Algorithms & Protocols",
-          bloomLevel: "K4",
-          hoursText: "4 Hours",
-          teachingApproaches: ["Algorithm Walkthrough", "Packet Tracer Demo", "Comparative Analysis"],
-        },
-      ],
-    },
-    {
-      id: "unit-4",
-      unitNumber: 4,
-      unitCodeText: "UNIT 4",
-      title: "Transport Layer Protocols",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "4.1",
-          title: "TCP Connection Management & Flow Control",
-          bloomLevel: "K3",
-          hoursText: "4 Hours",
-          teachingApproaches: ["Wireshark Lab", "Interactive Lecture", "Handshake Role Play"],
-        },
-        {
-          code: "4.2",
-          title: "UDP & Socket Programming",
-          bloomLevel: "K3",
-          hoursText: "3 Hours",
-          teachingApproaches: ["Live Coding Demo", "Peer Code Review", "Lab Assignment"],
-        },
-      ],
-    },
-    {
-      id: "unit-5",
-      unitNumber: 5,
-      unitCodeText: "UNIT 5",
-      title: "Application Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "5.1",
-          title: "Application Protocols (DNS, HTTP/HTTPS)",
-          bloomLevel: "K2",
-          hoursText: "4 Hours",
-          teachingApproaches: ["Protocol Inspection", "Concept Mapping", "Interactive Lecture"],
-        },
-        {
-          code: "5.2",
-          title: "Network Management & Security",
-          bloomLevel: "K3",
-          hoursText: "4 Hours",
-          teachingApproaches: ["Security Case Study", "Demonstration", "Group Discussion"],
-        },
-      ],
-    },
-  ],
-};
-
-const LESSON_PLAN_TOPICS_CARD_DATA = {
-  title: "Course Delivery Plan",
-  subtitle: "View the approved course delivery plan by unit and topic.",
-  headerStatsText: "5 Units • 20 Main Topics • 45 Planned Hours",
-  units: [
-    {
-      id: "unit-1",
-      unitNumber: 1,
-      unitCodeText: "Unit 1",
-      title: "Introduction & Physical Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "1.1",
-          title: "Fundamentals of Computer Networks",
-          bloomLevel: "K2",
-          hoursText: "2 Hours",
-          pedagogy: ["Lecture", "Concept Mapping", "Group Discussion"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "Data Communications and Networking — Forouzan",
-        },
-        {
-          code: "1.2",
-          title: "Network Architecture and Layered Communication",
-          bloomLevel: "K2",
-          hoursText: "2 Hours",
-          pedagogy: [
-            "Interactive Lecture",
-            "Concept Mapping",
-            "Comparative Discussion",
-          ],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "Data Communications and Networking — Forouzan",
-        },
-        {
-          code: "1.3",
-          title: "OSI and TCP/IP Reference Models",
-          bloomLevel: "K2",
-          hoursText: "3 Hours",
-          pedagogy: [
-            "Diagrammatic Walkthrough",
-            "Comparative Analysis",
-            "Peer Instruction",
-          ],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "Internetworking with TCP/IP — Douglas Comer",
-        },
-        {
-          code: "1.4",
-          title: "Physical Layer and Transmission Media",
-          bloomLevel: "K2",
-          hoursText: "2 Hours",
-          pedagogy: ["Demonstration", "Lecture", "Discussion"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "Data Communications and Networking — Forouzan",
-        },
-      ],
-    },
-    {
-      id: "unit-2",
-      unitNumber: 2,
-      unitCodeText: "Unit 2",
-      title: "Data Link Layer & MAC Sublayer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "2.1",
-          title: "Data Link Layer Design & Framing",
-          bloomLevel: "K3",
-          hoursText: "2 Hours",
-          pedagogy: ["Interactive Lecture", "Problem Solving", "Simulation Lab"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "Data Communications and Networking — Forouzan",
-        },
-        {
-          code: "2.2",
-          title: "Medium Access Control & Ethernet",
-          bloomLevel: "K3",
-          hoursText: "3 Hours",
-          pedagogy: ["Case Study", "Group Discussion", "Protocol Animation"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "IEEE 802.3 Standard Documents",
-        },
-      ],
-    },
-    {
-      id: "unit-3",
-      unitNumber: 3,
-      unitCodeText: "Unit 3",
-      title: "Network Layer & Routing",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "3.1",
-          title: "IPv4/IPv6 Addressing & Subnetting",
-          bloomLevel: "K3",
-          hoursText: "3 Hours",
-          pedagogy: ["Subnet Workshop", "Interactive Quiz", "Guided Problem Solving"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "TCP/IP Illustrated, Vol. 1 — W. Richard Stevens",
-        },
-        {
-          code: "3.2",
-          title: "Routing Algorithms & Protocols",
-          bloomLevel: "K4",
-          hoursText: "4 Hours",
-          pedagogy: ["Algorithm Walkthrough", "Packet Tracer Demo", "Comparative Analysis"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "Routing TCP/IP, Vol. 1 — Jeff Doyle",
-        },
-      ],
-    },
-    {
-      id: "unit-4",
-      unitNumber: 4,
-      unitCodeText: "Unit 4",
-      title: "Transport Layer Protocols",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "4.1",
-          title: "TCP Connection Management & Flow Control",
-          bloomLevel: "K3",
-          hoursText: "4 Hours",
-          pedagogy: ["Wireshark Lab", "Interactive Lecture", "Handshake Role Play"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "TCP/IP Illustrated, Vol. 1 — W. Richard Stevens",
-        },
-        {
-          code: "4.2",
-          title: "UDP & Socket Programming",
-          bloomLevel: "K3",
-          hoursText: "3 Hours",
-          pedagogy: ["Live Coding Demo", "Peer Code Review", "Lab Assignment"],
-          textbook: "Unix Network Programming — W. Richard Stevens",
-          referenceBook: "Computer Networks — Tanenbaum & Wetherall",
-        },
-      ],
-    },
-    {
-      id: "unit-5",
-      unitNumber: 5,
-      unitCodeText: "Unit 5",
-      title: "Application Layer",
-      hoursText: "9 Hours",
-      topicsCountText: "4 Main Topics",
-      topics: [
-        {
-          code: "5.1",
-          title: "Application Protocols",
-          bloomLevel: "K2",
-          hoursText: "4 Hours",
-          pedagogy: ["Protocol Inspection", "Concept Mapping", "Interactive Lecture"],
-          textbook: "Computer Networks — Tanenbaum & Wetherall",
-          referenceBook: "HTTP: The Definitive Guide — David Gourley",
-        },
-        {
-          code: "5.2",
-          title: "Network Management & Security",
-          bloomLevel: "K3",
-          hoursText: "4 Hours",
-          pedagogy: ["Security Case Study", "Demonstration", "Group Discussion"],
-          textbook: "Cryptography and Network Security — William Stallings",
-          referenceBook: "Computer Networks — Tanenbaum & Wetherall",
-        },
-      ],
-    },
-  ],
-};
-
-const LEARNING_MATERIALS_CARD_DATA = {
-  title: "LEARNING MATERIALS",
-  subtitle: "View the approved learning materials available for this course.",
-  headerStatsText: "5 Units • 6 Approved Materials",
-  units: [
-    {
-      id: "unit-1",
-      unitNumber: 1,
-      unitCodeText: "UNIT 1",
-      title: "Introduction & Physical Layer",
-      materialsCountText: "2 Approved Materials",
-      materials: [
-        {
-          id: "mat-1.3",
-          topicCode: "1.3",
-          topicTitle: "OSI and TCP/IP Reference Models",
-          materialTitle: "OSI and TCP/IP Architecture Notes",
-          versionText: "v1.0",
-          approvedDateText: "Approved 26 Aug 2026",
-          details: {
-            approvedBy: "Dr. Arun Kumar",
-            approvedDate: "26 Aug 2026",
-            overview:
-              "Introduction to layered network architecture, peer-to-peer communication models, protocol encapsulation hierarchies, and comparison of standard reference models.",
-            learningContent: [
-              {
-                title: "Layered Network Architecture",
-                items: [
-                  "Communication functions are systematically partitioned into discrete horizontal layers to reduce design complexity and promote vendor interoperability.",
-                  "Each layer provides specific services to the layer directly above it while hiding internal implementation mechanics and hardware dependencies.",
-                  "Peer entities across communicating network nodes exchange Protocol Data Units (PDUs) conforming to layer-specific protocol rules, with headers prepended during encapsulation.",
-                ],
-              },
-              {
-                title: "OSI Reference Model",
-                items: [
-                  "Physical Layer (Layer 1): Transmits unstructured raw bit streams over physical transmission media; governs electrical, optical, and mechanical specifications.",
-                  "Data Link Layer (Layer 2): Organizes bits into frames, provides physical MAC addressing, flow control, and CRC error detection over single-hop links.",
-                  "Network Layer (Layer 3): Manages end-to-end packet delivery across intermediate subnet routers using logical IPv4/IPv6 addressing.",
-                  "Transport Layer (Layer 4): Delivers process-to-process communication, port multiplexing, segmentation, and end-to-end reliability (TCP) or lightweight delivery (UDP).",
-                  "Session Layer (Layer 5): Establishes, maintains, coordinates, and synchronizes dialogues between communicating applications.",
-                  "Presentation Layer (Layer 6): Handles data representation, character formatting, TLS cryptographic encryption, and data compression.",
-                  "Application Layer (Layer 7): Provides direct interface to user network applications including HTTP, DNS, SMTP, and SSH.",
-                ],
-              },
-              {
-                title: "TCP/IP Reference Model",
-                items: [
-                  "Network Access Layer: Combines Physical and Data Link functions; interfaces directly with host hardware and physical transmission media.",
-                  "Internet Layer: Hosts the Internet Protocol (IPv4/IPv6, ICMP, ARP) providing connectionless best-effort packet delivery across internetworks.",
-                  "Transport Layer: Implements end-to-end transport protocols (TCP for connection-oriented byte streams, UDP for connectionless datagrams).",
-                  "Application Layer: Combines OSI's top three layers, supporting direct-to-protocol services like DNS, HTTP/HTTPS, FTP, and SMTP.",
-                ],
-              },
-              {
-                title: "OSI and TCP/IP Comparison",
-                items: [
-                  "Layer Hierarchy: OSI defines 7 conceptual layers; TCP/IP utilizes 4 practical functional layers.",
-                  "Design Philosophy: OSI clearly distinguishes between services, interfaces, and protocols; TCP/IP was engineered around actual working protocols.",
-                  "Network Service Support: OSI supports both connection-oriented and connectionless network services; TCP/IP strictly enforces connectionless IP at the network layer with reliability delegated to the transport layer.",
-                  "Industry Adoption: TCP/IP is the ubiquitous operational standard powering the global Internet, while OSI serves as the primary pedagogical reference model.",
-                ],
-              },
-            ],
-            example: {
-              title: "Web Request Layer Encapsulation Trace (Browser to Wire)",
-              steps: [
-                "Application Layer: Web browser initiates HTTP GET /index.html request (Application Data Payload).",
-                "Transport Layer: Appends TCP header with Source Port (e.g., 52140), Destination Port 80/443, and Sequence Numbers (TCP Segment).",
-                "Network Layer: Appends IPv4 header with Source IP (192.168.1.50) and Destination IP (93.184.216.34) (IP Packet).",
-                "Data Link Layer: Appends Ethernet Header with Source MAC, Default Gateway MAC, and 32-bit CRC trailer (Ethernet Frame).",
-                "Physical Layer: Frame is modulated into electrical voltage pulses or optical light signals for transmission onto the physical medium.",
-              ],
-            },
-            exercises: [
-              "Compare the OSI and TCP/IP reference models with respect to layering, protocol independence, and practical Internet implementation.",
-              "Identify the specific OSI layer responsible for packet routing across heterogeneous networks.",
-              "Explain the function of the Transport Layer and contrast TCP connection-oriented delivery with UDP datagram service.",
-            ],
-            references: [
-              {
-                title: "Computer Networks",
-                author: "Andrew S. Tanenbaum & David J. Wetherall (5th Edition)",
-              },
-              {
-                title: "Data Communications and Networking",
-                author: "Behrouz A. Forouzan (5th Edition)",
-              },
-              {
-                title: "Computer Networking: A Top-Down Approach",
-                author: "James F. Kurose & Keith W. Ross",
-              },
-            ],
-          },
-        },
-        {
-          id: "mat-1.4",
-          topicCode: "1.4",
-          topicTitle: "Physical Layer and Transmission Media",
-          materialTitle: "Transmission Media and Signal Fundamentals",
-          versionText: "v1.0",
-          approvedDateText: "Approved 26 Aug 2026",
-          details: {
-            approvedBy: "Dr. Arun Kumar",
-            approvedDate: "26 Aug 2026",
-            overview:
-              "Explores physical transmission media, guided copper and fiber optic links, wireless channel propagation characteristics, and digital signal modulation techniques.",
-            learningContent: [
-              {
-                title: "Guided Transmission Media",
-                items: [
-                  "Twisted Pair Cables (UTP/STP Cat 5e/6a): Shielded and unshielded copper pairs used for Ethernet LAN connections.",
-                  "Coaxial Cables: Broadband transmission with central copper conductor surrounded by insulating layer and braided shield.",
-                  "Fiber Optic Cables (Single-mode & Multi-mode): High-speed data transmission using total internal reflection of light pulses.",
-                ],
-              },
-              {
-                title: "Unguided Wireless Communication",
-                items: [
-                  "Radio Transmission: Omnidirectional wireless waves suitable for cellular and Wi-Fi access points.",
-                  "Microwave Links: Line-of-sight high-frequency radio links for long-distance point-to-point backhaul.",
-                  "Infrared & Satellite Communications: Short-range line-of-sight and geostationary orbital transponders.",
-                ],
-              },
-            ],
-            example: {
-              title: "Optical Fiber Total Internal Reflection & Attenuation Calculation",
-              steps: [
-                "Core/Cladding Interface: Light enters core with refractive index n1 > n2 cladding.",
-                "Critical Angle: Angle of incidence exceeds critical angle θc = arcsin(n2/n1), causing 100% internal reflection.",
-                "Attenuation Loss: Signal experiences 0.2 dB/km attenuation at 1550nm wavelength over 50km link.",
-              ],
-            },
-            exercises: [
-              "Calculate Nyquist maximum bit rate over a 4kHz bandwidth noiseless channel with 4-level signaling.",
-              "Differentiate between single-mode and multi-mode optical fibers.",
-              "Explain Manchester encoding clock synchronization advantages over NRZ-L.",
-            ],
-            references: [
-              {
-                title: "Computer Networks",
-                author: "Andrew S. Tanenbaum & David J. Wetherall (5th Edition)",
-              },
-              {
-                title: "Data Communications and Networking",
-                author: "Behrouz A. Forouzan (5th Edition)",
-              },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      id: "unit-2",
-      unitNumber: 2,
-      unitCodeText: "UNIT 2",
-      title: "Data Link Layer & MAC Sublayer",
-      materialsCountText: "1 Approved Material",
-      materials: [
-        {
-          id: "mat-2.1",
-          topicCode: "2.1",
-          topicTitle: "Data Link Layer Design & Framing",
-          materialTitle: "Data Link Protocols and Framing Guide",
-          versionText: "v1.0",
-          approvedDateText: "Approved 27 Aug 2026",
-          details: {
-            approvedBy: "Dr. Arun Kumar",
-            approvedDate: "27 Aug 2026",
-            overview:
-              "Covers data link layer framing techniques, byte and bit stuffing algorithms, CRC polynomial division error detection, and sliding window flow control.",
-            learningContent: [
-              {
-                title: "Framing & Character/Bit Stuffing",
-                items: [
-                  "Byte-Count Framing: Demarcates frames using character count field in frame header.",
-                  "Byte Stuffing: Inserts ESC escape bytes before payload flag occurrences in character-oriented protocols.",
-                  "Bit Stuffing: Inserts 0 bit after five consecutive 1 bits in HDLC frame flags (01111110).",
-                ],
-              },
-              {
-                title: "Error Detection & Flow Control",
-                items: [
-                  "Cyclic Redundancy Check (CRC-32): Uses modulo-2 polynomial division to generate checksum trailers.",
-                  "Sliding Window ARQ: Governs sender and receiver window sizes in Stop-and-Wait, Go-Back-N, and Selective Repeat protocols.",
-                ],
-              },
-            ],
-            example: {
-              title: "CRC-16 Polynomial Division & Frame Trailer Generation",
-              steps: [
-                "Data Polynomial: Frame data bits D = 1101011011 appended with r=4 zero bits.",
-                "Divisor Generator: Generator polynomial G(x) = x^4 + x + 1 (10011).",
-                "Modulo-2 Division: XOR division yields 4-bit remainder R = 1110.",
-                "Transmitted Frame: Append remainder R to data D yielding frame 11010110111110.",
-              ],
-            },
-            exercises: [
-              "Perform bit stuffing on data bit sequence 0111111111110.",
-              "Compute CRC remainder for data 1101011011 using generator polynomial G(x) = x^4 + x + 1.",
-              "Contrast Go-Back-N and Selective Repeat sender and receiver window sizes.",
-            ],
-            references: [
-              {
-                title: "Computer Networks",
-                author: "Andrew S. Tanenbaum & David J. Wetherall (5th Edition)",
-              },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      id: "unit-3",
-      unitNumber: 3,
-      unitCodeText: "UNIT 3",
-      title: "Network Layer & Routing",
-      materialsCountText: "1 Approved Material",
-      materials: [
-        {
-          id: "mat-3.1",
-          topicCode: "3.1",
-          topicTitle: "IPv4/IPv6 Addressing & Subnetting",
-          materialTitle: "IP Subnetting & CIDR Lecture Slides",
-          versionText: "v1.0",
-          approvedDateText: "Approved 28 Aug 2026",
-          details: {
-            approvedBy: "Dr. Arun Kumar",
-            approvedDate: "28 Aug 2026",
-            overview:
-              "In-depth study of network layer logical addressing, IPv4 classful vs CIDR subnetting, VLSM allocation algorithms, and IPv6 header structure.",
-            learningContent: [
-              {
-                title: "IPv4 Addressing & CIDR Notation",
-                items: [
-                  "32-bit dotted-decimal IP addresses partitioned into Network ID and Host ID.",
-                  "Classless Inter-Domain Routing (CIDR) uses variable prefix lengths /24 to /30.",
-                ],
-              },
-              {
-                title: "Variable Length Subnet Masking (VLSM)",
-                items: [
-                  "Custom network subnetting based on specific host count requirements per department.",
-                  "Minimizes wasted IP address space in enterprise router networks.",
-                ],
-              },
-            ],
-            example: {
-              title: "Enterprise Network VLSM Subnet Breakdown",
-              steps: [
-                "Base Address: 192.168.10.0/24 subnetted for 4 engineering departments.",
-                "Department A (50 hosts): Subnet 192.168.10.0/26 (Host Range: .1 to .62).",
-                "Department B (30 hosts): Subnet 192.168.10.64/27 (Host Range: .65 to .94).",
-                "Point-to-Point Router Link (2 hosts): Subnet 192.168.10.96/30.",
-              ],
-            },
-            exercises: [
-              "Given IP 192.168.10.0/24, design 4 subnets accommodating 50, 30, 10, and 10 hosts.",
-              "Identify network ID, broadcast address, and usable host range for 172.16.45.100/20.",
-            ],
-            references: [
-              {
-                title: "Computer Networking: A Top-Down Approach",
-                author: "James F. Kurose & Keith W. Ross",
-              },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      id: "unit-4",
-      unitNumber: 4,
-      unitCodeText: "UNIT 4",
-      title: "Transport Layer Protocols",
-      materialsCountText: "1 Approved Material",
-      materials: [
-        {
-          id: "mat-4.1",
-          topicCode: "4.1",
-          topicTitle: "TCP Connection Management & Flow Control",
-          materialTitle: "TCP Flow & Congestion Control Lab Manual",
-          versionText: "v1.0",
-          approvedDateText: "Approved 29 Aug 2026",
-          details: {
-            approvedBy: "Dr. Arun Kumar",
-            approvedDate: "29 Aug 2026",
-            overview:
-              "Hands-on guide for Wireshark TCP 3-way handshake packet analysis, Reno/Tahoe congestion control algorithms, and window scaling.",
-            learningContent: [
-              {
-                title: "TCP Connection Establishment & Teardown",
-                items: [
-                  "3-Way Handshake: SYN -> SYN-ACK -> ACK establishes sequence numbers and socket buffers.",
-                  "Connection Teardown: 4-way FIN exchange gracefully terminates bidirectional stream.",
-                ],
-              },
-              {
-                title: "Congestion Control Algorithms",
-                items: [
-                  "Slow Start: Congestion window (cwnd) doubles every RTT until ssthresh.",
-                  "Congestion Avoidance: Linear cwnd increase by 1 MSS per RTT.",
-                  "Fast Retransmit & Recovery: Triggered upon 3 duplicate ACKs without waiting for timeout.",
-                ],
-              },
-            ],
-            example: {
-              title: "Wireshark Packet Trace of TCP 3-Way Handshake",
-              steps: [
-                "Packet 1: Client -> Server [SYN] Seq=0 Win=64240 MSS=1460.",
-                "Packet 2: Server -> Client [SYN, ACK] Seq=0 Ack=1 Win=65535 MSS=1460.",
-                "Packet 3: Client -> Server [ACK] Seq=1 Ack=1 Win=64240.",
-              ],
-            },
-            exercises: [
-              "Trace Congestion Window (cwnd) evolution during Slow Start and Fast Recovery across 10 RTTs.",
-              "Differentiate TCP flow control (Receiver Window) from congestion control (Congestion Window).",
-            ],
-            references: [
-              {
-                title: "TCP/IP Illustrated, Vol. 1",
-                author: "W. Richard Stevens",
-              },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      id: "unit-5",
-      unitNumber: 5,
-      unitCodeText: "UNIT 5",
-      title: "Application Layer",
-      materialsCountText: "1 Approved Material",
-      materials: [
-        {
-          id: "mat-5.1",
-          topicCode: "5.1",
-          topicTitle: "Application Protocols",
-          materialTitle: "DNS, HTTP/HTTPS Protocol Specifications",
-          versionText: "v1.0",
-          approvedDateText: "Approved 30 Aug 2026",
-          details: {
-            approvedBy: "Dr. Arun Kumar",
-            approvedDate: "30 Aug 2026",
-            overview:
-              "Examines client-server and P2P architectures, DNS domain resolution hierarchy, HTTP 1.1/2/3 request-response mechanics, and TLS encryption.",
-            learningContent: [
-              {
-                title: "Domain Name System (DNS) Architecture",
-                items: [
-                  "Distributed hierarchical database: Root DNS -> TLD DNS -> Authoritative DNS.",
-                  "Recursive vs Iterative name resolution mechanics.",
-                ],
-              },
-              {
-                title: "HTTP/HTTPS Operations",
-                items: [
-                  "HTTP Methods: GET, POST, PUT, DELETE, HEAD.",
-                  "TLS 1.3 Handshake: Symmetric session key exchange via Diffie-Hellman.",
-                ],
-              },
-            ],
-            example: {
-              title: "Browser HTTP GET Request & Packet Exchange Trace",
-              steps: [
-                "DNS Lookup: Browser queries local resolver for www.example.com IP.",
-                "TCP Connect: 3-way handshake established on port 443.",
-                "TLS Handshake: Key exchange and certificate validation.",
-                "HTTP GET: Request Sent -> Server responds with 200 OK + HTML payload.",
-              ],
-            },
-            exercises: [
-              "Draw the step-by-step iterative DNS lookup sequence for www.example.com.",
-              "Explain HTTP/2 multiplexing and how it solves head-of-line blocking in HTTP/1.1.",
-            ],
-            references: [
-              {
-                title: "HTTP: The Definitive Guide",
-                author: "David Gourley & Brian Totty",
-              },
-            ],
-          },
-        },
-      ],
-    },
-  ],
-};
-
-const QUESTION_BANK_TOPICS_CARD_DATA = {
-  title: "QUESTION BANK BY TOPICS",
-  subtitle: "Curated question bank items categorized by units and topics.",
-  headerStatsText: "5 Units • 10 Questions",
-  units: [
-    {
-      id: "unit-1",
-      unitNumber: 1,
-      unitCodeText: "UNIT 1",
-      title: "Introduction & Physical Layer",
-      questionsCountText: "3 Approved Questions",
-      questions: [
-        {
-          id: "q-1.3-1",
-          questionCode: "Q-CN-001",
-          topicCode: "1.3",
-          topicTitle: "OSI and TCP/IP Reference Models",
-          questionText:
-            "Which OSI layer is responsible for logical addressing and packet routing across intermediate networks?",
-          tags: ["CO1", "K2", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "Data Link Layer" },
-            { key: "B", text: "Network Layer", isCorrect: true },
-            { key: "C", text: "Transport Layer" },
-            { key: "D", text: "Physical Layer" },
-          ],
-          correctAnswer: "Option B (Network Layer)",
-          explanation:
-            "The Network Layer (Layer 3) handles logical IPv4/IPv6 addressing and determines optimal packet routing paths across interconnected subnets.",
-        },
-        {
-          id: "q-1.4-1",
-          questionCode: "Q-CN-002",
-          topicCode: "1.4",
-          topicTitle: "Physical Layer and Transmission Media",
-          questionText:
-            "Which transmission medium provides the highest immunity to electromagnetic interference?",
-          tags: ["CO1", "K2", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "Unshielded Twisted Pair (UTP)" },
-            { key: "B", text: "Coaxial Cable" },
-            { key: "C", text: "Optical Fiber Cable", isCorrect: true },
-            { key: "D", text: "Shielded Twisted Pair (STP)" },
-          ],
-          correctAnswer: "Option C (Optical Fiber Cable)",
-          explanation:
-            "Optical Fiber transmits light pulses through glass/plastic strands rather than electrical currents, making it completely immune to EMI and RFI.",
-        },
-        {
-          id: "q-1.3-2",
-          questionCode: "Q-CN-003",
-          topicCode: "1.3",
-          topicTitle: "OSI and TCP/IP Reference Models",
-          questionText:
-            "Which TCP/IP layer corresponds most closely to the OSI Transport Layer?",
-          tags: ["CO1", "K2", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "Application Layer" },
-            { key: "B", text: "Transport Layer", isCorrect: true },
-            { key: "C", text: "Internet Layer" },
-            { key: "D", text: "Network Access Layer" },
-          ],
-          correctAnswer: "Option B (Transport Layer)",
-          explanation:
-            "The TCP/IP Transport Layer provides end-to-end communication services (TCP/UDP) equivalent to the OSI Transport Layer.",
-        },
-      ],
-    },
-    {
-      id: "unit-2",
-      unitNumber: 2,
-      unitCodeText: "UNIT 2",
-      title: "Data Link Layer & MAC Sublayer",
-      questionsCountText: "2 Approved Questions",
-      questions: [
-        {
-          id: "q-2.1-1",
-          questionCode: "Q-CN-004",
-          topicCode: "2.1",
-          topicTitle: "Data Link Layer Design & Framing",
-          questionText:
-            "What pattern is used as a flag byte to mark frame boundaries in HDLC bit stuffing?",
-          tags: ["CO2", "K2", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "01111110", isCorrect: true },
-            { key: "B", text: "11111111" },
-            { key: "C", text: "00000000" },
-            { key: "D", text: "10101010" },
-          ],
-          correctAnswer: "Option A (01111110)",
-          explanation:
-            "HDLC uses the bit pattern 01111110 (0x7E) as a frame delimiter and inserts a 0 bit after five consecutive 1s in body payload.",
-        },
-        {
-          id: "q-2.1-2",
-          questionCode: "Q-CN-005",
-          topicCode: "2.1",
-          topicTitle: "Data Link Layer Design & Framing",
-          questionText:
-            "Explain the working mechanism of CRC-32 polynomial division in detecting transmission errors.",
-          tags: ["CO2", "K3", "Descriptive", "10 Marks"],
-          explanation:
-            "Sender appends r-bit CRC remainder from modulo-2 division of payload by generator polynomial G(x). Receiver divides incoming frame by G(x); zero remainder indicates error-free transmission.",
-        },
-      ],
-    },
-    {
-      id: "unit-3",
-      unitNumber: 3,
-      unitCodeText: "UNIT 3",
-      title: "Network Layer & Routing",
-      questionsCountText: "2 Approved Questions",
-      questions: [
-        {
-          id: "q-3.1-1",
-          questionCode: "Q-CN-006",
-          topicCode: "3.1",
-          topicTitle: "IPv4/IPv6 Addressing & Subnetting",
-          questionText:
-            "How many usable host IP addresses are available in a standard /26 CIDR subnet?",
-          tags: ["CO3", "K3", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "64" },
-            { key: "B", text: "62", isCorrect: true },
-            { key: "C", text: "128" },
-            { key: "D", text: "30" },
-          ],
-          correctAnswer: "Option B (62)",
-          explanation:
-            "A /26 subnet leaves 6 host bits (2^6 = 64 total addresses). Subtracting Network ID and Broadcast address yields 62 usable host IPs.",
-        },
-      ],
-    },
-    {
-      id: "unit-4",
-      unitNumber: 4,
-      unitCodeText: "UNIT 4",
-      title: "Transport Layer Protocols",
-      questionsCountText: "2 Approved Questions",
-      questions: [
-        {
-          id: "q-4.1-1",
-          questionCode: "Q-CN-007",
-          topicCode: "4.1",
-          topicTitle: "TCP Connection Management & Flow Control",
-          questionText:
-            "Which TCP control flags are exchanged during the initial 3-way handshake connection establishment phase?",
-          tags: ["CO4", "K2", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "SYN -> SYN-ACK -> ACK", isCorrect: true },
-            { key: "B", text: "FIN -> ACK -> FIN-ACK" },
-            { key: "C", text: "RST -> SYN -> ACK" },
-            { key: "D", text: "URG -> PSH -> ACK" },
-          ],
-          correctAnswer: "Option A (SYN -> SYN-ACK -> ACK)",
-          explanation:
-            "Client initiates with SYN, Server responds with SYN-ACK, and Client completes connection setup with ACK.",
-        },
-      ],
-    },
-    {
-      id: "unit-5",
-      unitNumber: 5,
-      unitCodeText: "UNIT 5",
-      title: "Application Layer",
-      questionsCountText: "1 Question",
-      questions: [
-        {
-          id: "q-5.1-1",
-          questionCode: "Q-CN-008",
-          topicCode: "5.1",
-          topicTitle: "Application Protocols",
-          questionText:
-            "Which default transport layer protocol and port number are utilized by DNS recursive resolvers for standard query transactions?",
-          tags: ["CO5", "K2", "MCQ", "2 Marks"],
-          options: [
-            { key: "A", text: "TCP Port 80" },
-            { key: "B", text: "UDP Port 53", isCorrect: true },
-            { key: "C", text: "TCP Port 443" },
-            { key: "D", text: "UDP Port 67" },
-          ],
-          correctAnswer: "Option B (UDP Port 53)",
-          explanation:
-            "Standard DNS domain name lookups use lightweight UDP port 53 for fast query and response round trips.",
-        },
-      ],
-    },
-  ],
-};
-
-const COPO_MATRIX_CARD_DATA = {
-  title: "CO–PO MAPPING MATRIX",
-  subtitle: "Shows how each Course Outcome is mapped to the Program Outcomes.",
-  headerStatsText: "5 × 11 Matrix",
-  poHeaders: [
-    "P01",
-    "P02",
-    "P03",
-    "P04",
-    "P05",
-    "P06",
-    "P07",
-    "P08",
-    "P09",
-    "P010",
-    "P011",
-  ],
-  rows: [
-    {
-      coCode: "C01",
-      poScores: { P01: 3, P02: 2, P05: 1 },
-    },
-    {
-      coCode: "C02",
-      poScores: { P01: 2, P02: 3, P03: 2 },
-    },
-    {
-      coCode: "C03",
-      poScores: { P01: 3, P02: 2, P03: 3, P04: 2 },
-    },
-    {
-      coCode: "C04",
-      poScores: { P01: 2, P03: 2, P04: 3, P05: 2 },
-    },
-    {
-      coCode: "C05",
-      poScores: { P02: 2, P04: 2, P05: 3, P06: 2 },
-    },
-  ],
-};
-
-const QuestionBank = () => {
+const InsCourseArtifacts = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const [state, setState] = useSetState({
-    activeTab: "instructor",
-    selectedReferenceId: "syllabus",
-    activeSubTab: "course-info",
-    isEditing: false,
-    isGenerating: false,
-    viewQuestion: null as QuestionCardProps | null,
-    activeQTab: "all-questions" as "all-questions" | "question-sets",
-    appliedFilters: null as FilterValues | null,
-    isSyllabusOpen: false,
-    selectedSetId: null as string | null,
-    courseData: null as any,
-    workflowStatus: null as any,
-    syllabusDetail: null as any,
-    copoData: null as any,
-    topicsUnits: [] as any[],
-    pedagogyUnits: [] as any[],
-    lessonUnits: [] as any[],
-    learningUnits: [] as any[],
-    rawQuestions: [] as any[],
-    rawQuestionSets: [] as any[],
-    allCourses: [] as any[],
-    loadingArtifacts: false,
-  });
+  // Active course ID from query or localStorage
+  const courseIdParam = useMemo(() => {
+    return (
+      (router.query.course_id as string) ||
+      (router.query.id as string) ||
+      (typeof window !== "undefined" ? localStorage.getItem("active_course_id") : null)
+    );
+  }, [router.query.course_id, router.query.id]);
 
   useEffect(() => {
-    dispatch(setPageTitle("View Learning Material"));
+    if (courseIdParam) {
+      try {
+        localStorage.setItem("active_course_id", courseIdParam);
+      } catch {}
+    }
+  }, [courseIdParam]);
+
+  // Master Portfolio Data state
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [portfolio, setPortfolio] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Active Tab
+  const [activeTab, setActiveTab] = useState<"syllabus" | "copo" | "pedagogy" | "lesson_plan">("syllabus");
+
+  // Filter unit selection for Pedagogy & Lesson Plan
+  const [selectedUnitIndex, setSelectedUnitIndex] = useState<number>(0);
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+
+  // Background job notice banner (Static, NO polling)
+  const [jobNotice, setJobNotice] = useState<string | null>(null);
+
+  // Action in-progress state
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    dispatch(setPageTitle("Course Artifacts Portfolio"));
   }, [dispatch]);
 
-  useEffect(() => {
-    if (!router.isReady) return;
+  // Single Atomic Fetch (Load once on mount / explicit refresh only)
+  const fetchPortfolio = async (isManualRefresh = false) => {
+    if (!courseIdParam) return;
+    try {
+      if (isManualRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
 
-    const loadAllArtifacts = async () => {
-      setState({ loadingArtifacts: true });
-      try {
-        let targetId = router?.query?.course_id;
-        let allCoursesList: any[] = [];
-
-        // 1. Fetch all available courses
-        try {
-          const cListRes: any = await Models.course.list().catch(() => null);
-          if (Array.isArray(cListRes)) {
-            allCoursesList = cListRes;
-          } else if (cListRes?.courses && Array.isArray(cListRes.courses)) {
-            allCoursesList = cListRes.courses;
-          }
-        } catch {}
-
-        if (allCoursesList.length === 0) {
-          try {
-            const user = localStorage.getItem("user");
-            const u = user ? JSON.parse(user) : null;
-            const body = { faculty_id: u?.id || 1, coordinator_id: u?.id || 1 };
-            const fRes: any = await Models.course.faculty_dashboard_overview(body).catch(() => null);
-            allCoursesList = fRes?.courses || [];
-          } catch {}
-        }
-
-        // 2. Resolve target course ID
-        if (!targetId) {
-          if (router?.query?.code) {
-            const found = allCoursesList.find(
-              (c: any) =>
-                (c.course_code || c.code)?.toLowerCase() ===
-                String(router.query.code).toLowerCase()
-            );
-            if (found?.id) targetId = found.id;
-          }
-          if (!targetId && allCoursesList.length > 0) {
-            // Prefer course with syllabus or active workflow (e.g. IT602)
-            const activeCourse = allCoursesList.find(
-              (c: any) =>
-                (c.course_code || c.code)?.toUpperCase() === "IT602" ||
-                c.syllabus_id ||
-                c.latest_syllabus?.id ||
-                c.status === "Ready" ||
-                c.status === "approved"
-            );
-            targetId = activeCourse ? activeCourse.id : allCoursesList[0].id;
-          }
-          if (!targetId && router?.query?.code) {
-            targetId = router.query.code;
-          }
-        }
-
-        if (!targetId) {
-          setState({ loadingArtifacts: false, allCourses: allCoursesList });
-          return;
-        }
-
-        // Fetch course details & workflow status
-        const [cData, wfRes]: [any, any] = await Promise.all([
-          Models.course.detail(targetId).catch(() => null),
-          Models.syllabus.get_workflow_status(targetId).catch(() => null),
-        ]);
-
-        const sid =
-          wfRes?.syllabus_id ||
-          cData?.latest_syllabus?.id ||
-          cData?.syllabus_id ||
-          cData?.syllabus?.id ||
-          targetId;
-        const currentCode = cData?.course_code || wfRes?.course_code || "";
-
-        let sDetail = null;
-        let cMapping = null;
-        let tUnits: any[] = [];
-        let pUnits: any[] = [];
-        let lUnits: any[] = [];
-        let mUnits: any[] = [];
-        let qQuestions: any[] = [];
-        let qSets: any[] = [];
-
-        if (sid) {
-          const [sRes, copoRes, topRes]: [any, any, any] = await Promise.all([
-            Models.syllabus.detail(sid).catch(() => null),
-            Models.COPOMap.copo_map(sid).catch(() => null),
-            Models.topics.units(sid).catch(() => null),
-          ]);
-          sDetail = sRes;
-          cMapping = copoRes;
-          if (!cMapping && targetId && String(targetId) !== String(sid)) {
-            cMapping = await Models.COPOMap.copo_map(targetId).catch(() => null);
-          }
-          tUnits = topRes?.units || (Array.isArray(topRes) ? topRes : []);
-
-          const unitNumbers = (tUnits.length > 0
-            ? tUnits.map((u: any, idx: number) => u.unit_number || idx + 1)
-            : [1, 2, 3, 4, 5, 6, 7]
-          );
-
-          // Fetch per-unit pedagogy, lesson plan, learning materials, and question bank across all units in parallel
-          const [pResponses, lResponses, mResponses, qRes, setsRes]: [any[], any[], any[], any, any] = await Promise.all([
-            Promise.all(unitNumbers.map((uNum: number) => Models.pedagogy.unit_detail(sid, uNum).catch(() => null))),
-            Promise.all(unitNumbers.map((uNum: number) => Models.lession_plan.detail(sid, uNum).catch(() => null))),
-            Promise.all(unitNumbers.map((uNum: number) => Models.learning_material.detail(sid, uNum).catch(() => null))),
-            Models.mcq.history_questions({ course_id: currentCode || targetId }).catch(() => null),
-            Models.mcq.list_sets({ course_id: currentCode || targetId }).catch(() => null),
-          ]);
-
-          pUnits = pResponses.filter(Boolean);
-          lUnits = lResponses.filter(Boolean);
-          mUnits = mResponses.filter(Boolean);
-          qQuestions = Array.isArray(qRes) ? qRes : (qRes?.items || qRes?.questions || []);
-          qSets = Array.isArray(setsRes) ? setsRes : (setsRes?.sets || setsRes?.items || []);
-        }
-
-        setState({
-          courseData: cData,
-          workflowStatus: wfRes,
-          syllabusDetail: sDetail,
-          copoData: cMapping,
-          topicsUnits: Array.isArray(tUnits) ? tUnits : [],
-          pedagogyUnits: pUnits,
-          lessonUnits: lUnits,
-          learningUnits: mUnits,
-          rawQuestions: qQuestions,
-          rawQuestionSets: qSets,
-          allCourses: allCoursesList,
-          loadingArtifacts: false,
-        });
-      } catch (err) {
-        console.error("Failed to load course artifacts:", err);
-        setState({ loadingArtifacts: false });
-      }
-    };
-
-    loadAllArtifacts();
-  }, [router?.query?.course_id, router?.query?.code, router.isReady]);
-
-  useEffect(() => {
-    if (router?.query?.stage) {
-      const stageMap: Record<string, string> = {
-        extraction: "syllabus",
-        copo: "copo",
-        hierarchy: "topics",
-        pedagogy: "pedagogy",
-        schedule: "lesson-plan",
-      };
-      const targetRef = stageMap[String(router.query.stage)];
-      if (targetRef) {
-        setState({ selectedReferenceId: targetRef });
-      }
+      const res: any = await Models.course.course_portfolio(courseIdParam);
+      setPortfolio(res);
+    } catch (err: any) {
+      console.error("Failed to load course portfolio:", err);
+      setError(getErrorMessage(err, "Failed to load course portfolio"));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  }, [router?.query?.stage]);
-
-  const activeCourseCode = state.courseData?.course_code || "";
-  const activeCourseTitle = state.courseData?.course_title || "";
-  const activeProgramme = state.courseData?.programme || "";
-  const activeBatch = state.courseData?.batch_name || "";
-  const activeSemester = state.courseData?.term || "";
-
-  const wfObj = state.workflowStatus?.workflow || state.workflowStatus || {};
-  const stageWorkflowMap: Record<string, any> = {
-    syllabus: wfObj?.step_1_syllabus_extraction,
-    copo: wfObj?.step_2_copo_mapping,
-    topics: wfObj?.step_3_topic_hierarchy,
-    pedagogy: wfObj?.step_4_pedagogy_generation,
-    "lesson-plan": wfObj?.step_5_lesson_plan_schedules,
   };
-  const activeStageWf = stageWorkflowMap[state.selectedReferenceId] || wfObj?.step_1_syllabus_extraction;
 
-  const activeApprovedBy =
-    activeStageWf?.approved_by ||
-    wfObj?.step_1_syllabus_extraction?.approved_by ||
-    state.courseData?.coordinator_name ||
-    "Course Coordinator";
+  useEffect(() => {
+    if (courseIdParam) {
+      fetchPortfolio(false);
+    }
+  }, [courseIdParam]);
 
-  const rawApprovedDate = activeStageWf?.updated_at || wfObj?.step_1_syllabus_extraction?.updated_at;
-  const activeApprovedDate = rawApprovedDate
-    ? new Date(rawApprovedDate).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
+  const course = portfolio?.course || {};
+  const perms = portfolio?.permissions || {
+    is_coordinator: false,
+    can_edit: false,
+    can_upload_syllabus: false,
+    can_approve: false,
+    can_activate: false,
+    can_generate_copo: false,
+    can_generate_pedagogy: false,
+    can_generate_lesson_plan: false,
+  };
+  const isCoord = Boolean(perms.is_coordinator);
+
+  const activeSyllabus = portfolio?.active_syllabus;
+  const activeExt = portfolio?.active_extraction;
+  const activeCopo = portfolio?.active_copo;
+  const activePedagogy = portfolio?.active_pedagogy;
+  const activeLessonPlan = portfolio?.active_lesson_plan;
+
+  // ── Selected Historical Version State (for Coordinator preview) ────────────
+  const [selectedVersionData, setSelectedVersionData] = useState<{
+    syllabus?: any;
+    copo?: any;
+    pedagogy?: any;
+    lesson_plan?: any;
+  }>({});
+  const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
+
+  // Active / Selected item aliases
+  const currentExt = selectedVersionData.syllabus || activeExt;
+  const currentCopo = selectedVersionData.copo || activeCopo;
+  const currentPedagogy = selectedVersionData.pedagogy || activePedagogy;
+  const currentLessonPlan = selectedVersionData.lesson_plan || activeLessonPlan;
+
+  // In-progress generation check (One generation at a time per tab)
+  const isExtractionBusy = Boolean(
+    (portfolio?.versions?.extractions || []).some(
+      (e: any) => e.current_state === "redis_queued" || e.current_state === "processing"
+    )
+  );
+  const isCopoBusy = Boolean(
+    (portfolio?.versions?.copo || []).some(
+      (c: any) => c.current_state === "redis_queued" || c.current_state === "processing"
+    )
+  );
+  const isPedagogyBusy = Boolean(
+    (portfolio?.versions?.pedagogies || []).some(
+      (p: any) => p.current_state === "redis_queued" || p.current_state === "processing"
+    )
+  );
+  const isLessonPlanBusy = Boolean(
+    (portfolio?.versions?.lesson_plans || []).some(
+      (l: any) => l.current_state === "redis_queued" || l.current_state === "processing"
+    )
+  );
+
+  // ── Generation Modals State ────────────────────────────────────────────────
+  const [showGenerateCopoModal, setShowGenerateCopoModal] = useState<boolean>(false);
+  const [selectedExtractionForCopo, setSelectedExtractionForCopo] = useState<number | null>(null);
+
+  const [showGeneratePedagogyModal, setShowGeneratePedagogyModal] = useState<boolean>(false);
+  const [selectedExtractionForPedagogy, setSelectedExtractionForPedagogy] = useState<number | null>(null);
+
+  const [showGenerateLessonPlanModal, setShowGenerateLessonPlanModal] = useState<boolean>(false);
+  const [selectedExtractionForLp, setSelectedExtractionForLp] = useState<number | null>(null);
+  const [selectedPedagogyForLp, setSelectedPedagogyForLp] = useState<number | null>(null);
+  const [lpTargetHours, setLpTargetHours] = useState<number>(45);
+
+  // ── COPO Matrix Grid & Delta Save State ────────────────────────────────────
+  const [copoEditingCell, setCopoEditingCell] = useState<any | null>(null);
+  const [copoDirtyCells, setCopoDirtyCells] = useState<Record<number, { matrix_value: number; justification?: string }>>({});
+  const [savingCopoDelta, setSavingCopoDelta] = useState<boolean>(false);
+
+  // ── Pedagogy Per-Topic Edit State ──────────────────────────────────────────
+  const [editingPedagogyTopicId, setEditingPedagogyTopicId] = useState<number | null>(null);
+  const [pedagogyDraft, setPedagogyDraft] = useState<{
+    bloom_level_1?: string;
+    pedagogy_suggested_1?: string;
+    description_1?: string;
+    methodology_1?: string;
+    bloom_level_2?: string;
+    pedagogy_suggested_2?: string;
+    description_2?: string;
+    methodology_2?: string;
+    bloom_level_3?: string;
+    pedagogy_suggested_3?: string;
+    description_3?: string;
+    methodology_3?: string;
+  }>({});
+  const [savingPedagogyTopic, setSavingPedagogyTopic] = useState<boolean>(false);
+
+  // ── Lesson Plan Per-Slot Edit State ────────────────────────────────────────
+  const [editingLpSlotId, setEditingLpSlotId] = useState<number | null>(null);
+  const [lpSlotDraft, setLpSlotDraft] = useState<{
+    time_allocated?: number;
+    bloom_level?: string;
+    suggested_activity?: string;
+  }>({});
+  const [savingLpSlot, setSavingLpSlot] = useState<boolean>(false);
+
+  const [editingLpSubtopicSlotId, setEditingLpSubtopicSlotId] = useState<number | null>(null);
+  const [lpSubtopicSlotDraft, setLpSubtopicSlotDraft] = useState<{
+    time_allocated?: number;
+    bloom_level?: string;
+    suggested_activity?: string;
+  }>({});
+  const [savingLpSubtopicSlot, setSavingLpSubtopicSlot] = useState<boolean>(false);
+
+  // ── Split-Screen Document Viewer State ─────────────────────────────────────
+  const [splitScreenView, setSplitScreenView] = useState<boolean>(false);
+  const [documentBlobUrl, setDocumentBlobUrl] = useState<string | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!splitScreenView) return;
+    const sylId = activeSyllabus?.course_syllabus_id;
+    if (!sylId) {
+      setDocumentBlobUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingDoc(true);
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+    const directFileUrl = `http://localhost:8080/course/syllabi/${sylId}/file${tokenParam}`;
+
+    Models.syllabus
+      .getFileBlob(sylId)
+      .then((blob: any) => {
+        if (!isMounted) return;
+        if (blob instanceof Blob && blob.size > 0) {
+          const pdfBlob =
+            blob.type === "application/pdf"
+              ? blob
+              : new Blob([blob], { type: "application/pdf" });
+          const url = URL.createObjectURL(pdfBlob);
+          setDocumentBlobUrl(url);
+        } else {
+          setDocumentBlobUrl(directFileUrl);
+        }
       })
-    : "Approved";
+      .catch(() => {
+        if (!isMounted) return;
+        setDocumentBlobUrl(directFileUrl);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDoc(false);
+      });
 
-  const activeStageStatusRaw =
-    (state.selectedReferenceId === "copo"
-      ? state.copoData?.mapping_status || state.copoData?.status || state.copoData?.data?.mapping_status
-      : null) ||
-    activeStageWf?.status ||
-    "approved";
+    return () => {
+      isMounted = false;
+    };
+  }, [splitScreenView, activeSyllabus?.course_syllabus_id]);
 
-  const formatStatusBadgeText = (status: string, version?: number | null) => {
-    const s = (status || "").toLowerCase();
-    if (s === "approved") return version ? `Approved v${version}` : "Approved";
-    if (s === "draft") return version ? `Draft v${version}` : "Draft";
-    if (s === "generating") return "Generating...";
-    if (s === "redis_queued") return "Queued...";
-    if (s === "not_started") return "Not Started";
-    if (s === "failed") return "Failed";
-    return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Approved";
+  // ── Actions (Course Coordinator Only) ──────────────────────────────────────
+
+  const handleUploadSyllabus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile || !courseIdParam) return;
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("course_id", String(courseIdParam));
+      formData.append("file", uploadFile);
+
+      await Models.syllabus.upload(formData);
+      Success("Syllabus document uploaded! AI Extraction has been queued.");
+      setShowUploadModal(false);
+      setUploadFile(null);
+      setJobNotice(
+        "A syllabus extraction job has been queued. When processing completes, please click the Refresh button above to load the extracted curriculum."
+      );
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to upload syllabus document"));
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const activeVersionBadgeText = formatStatusBadgeText(activeStageStatusRaw, activeStageWf?.active_version);
+  const handleApproveExtraction = async (specificId?: any) => {
+    const targetId = specificId || currentExt?.extractions_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`approve_syllabus_${targetId}`);
+      await Models.syllabus.extraction_approve(targetId);
+      Success("Curriculum extraction approved successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to approve extraction"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const dynamicOutcomes = (state.syllabusDetail?.outcomes || []).map((co: any, idx: number) => ({
-    id: String(co.id || idx + 1),
-    coCode: co.co_code || `CO${idx + 1}`,
-    statement: co.description || "",
-    knowledgeLevel: co.knowledge_level || "K2",
-  }));
+  const handleActivateExtraction = async (specificId?: any) => {
+    const targetId = specificId || currentExt?.extractions_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`activate_syllabus_${targetId}`);
+      await Models.syllabus.extraction_activate(targetId);
+      Success("Extraction activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, syllabus: undefined }));
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to activate extraction"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const dynamicUnits = (state.syllabusDetail?.units || []).map((u: any, idx: number) => ({
-    id: `unit-${u.unit_number || idx + 1}`,
-    unitNumber: u.unit_number || idx + 1,
-    unitTitle: u.unit_title || `Unit ${idx + 1}`,
-    hoursText: `${u.theory_hours || 0} Hours`,
-    topicsCountText: `${(u.topics || []).length} Topics`,
-    topics: (u.topics || []).map((t: any, tIdx: number) => ({
-      code: t.topic_code || `${u.unit_number || idx + 1}.${tIdx + 1}`,
-      title: t.topic_name || "",
-    })),
-  }));
+  const openGenerateCopoModal = () => {
+    if (isCopoBusy) {
+      Failure("A CO-PO generation job is already in progress for this course.");
+      return;
+    }
+    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    if (approvedExts.length === 0) {
+      Failure("No approved extraction found. Please approve an extraction version first.");
+      return;
+    }
+    setSelectedExtractionForCopo(approvedExts[0].extractions_id);
+    setShowGenerateCopoModal(true);
+  };
 
-  const dynamicTheoryHours = String(
-    state.syllabusDetail?.theory_hours ??
-      (state.syllabusDetail?.units || []).reduce((acc: number, u: any) => acc + (Number(u.theory_hours) || 0), 0) ??
-      0
-  );
-  const dynamicLabHours = String(
-    state.syllabusDetail?.lab_hours ??
-      (state.syllabusDetail?.units || []).reduce((acc: number, u: any) => acc + (Number(u.lab_hours) || 0), 0) ??
-      0
-  );
-
-  const dynamicTextbooks = (state.syllabusDetail?.textbooks || []).map((b: any, idx: number) => ({
-    id: `tb-${b.id || idx + 1}`,
-    title: b.title || "",
-    authors: Array.isArray(b.authors) ? b.authors.join(", ") : b.authors || "",
-    publisher: [b.publisher, b.edition].filter(Boolean).join(" · "),
-  }));
-
-  const dynamicReferences = (state.syllabusDetail?.reference_books || []).map((b: any, idx: number) => ({
-    id: `ref-${b.id || idx + 1}`,
-    title: b.title || "",
-    authors: Array.isArray(b.authors) ? b.authors.join(", ") : b.authors || "",
-    publisher: [b.publisher, b.edition].filter(Boolean).join(" · "),
-  }));
-
-  const dynamicLaboratoryExperiments = (
-    state.syllabusDetail?.laboratory_experiments ||
-    state.syllabusDetail?.laboratoryExperiments ||
-    state.syllabusDetail?.experiments ||
-    []
-  ).map((e: any, idx: number) => ({
-    id: `exp-${e.id || idx + 1}`,
-    title: e.title || e.experiment_title || `Experiment ${idx + 1}`,
-    hours: e.allocated_hours || e.hours || 0,
-  }));
-
-  const rawMatrix =
-    state.copoData?.matrix ||
-    state.copoData?.data?.matrix ||
-    state.copoData?.copo_matrix ||
-    {};
-
-  const rawPos =
-    (state.copoData?.program_outcomes?.length ? state.copoData?.program_outcomes : null) ||
-    (state.copoData?.data?.program_outcomes?.length ? state.copoData?.data?.program_outcomes : null) ||
-    (state.copoData?.pos?.length ? state.copoData?.pos : null) ||
-    [];
-
-  const rawCos =
-    (state.copoData?.course_outcomes?.length ? state.copoData?.course_outcomes : null) ||
-    (state.copoData?.data?.course_outcomes?.length ? state.copoData?.data?.course_outcomes : null) ||
-    (state.copoData?.outcomes?.length ? state.copoData?.outcomes : null) ||
-    (state.syllabusDetail?.outcomes?.length ? state.syllabusDetail?.outcomes : null) ||
-    Object.keys(rawMatrix).map((coKey) => ({ co_code: coKey, code: coKey }));
-
-  const defaultPos = ["PO01", "PO02", "PO03", "PO04", "PO05", "PO06", "PO07", "PO08", "PO09", "PO10", "PO11"];
-
-  const dynamicPoHeaders: string[] =
-    rawPos.length > 0
-      ? rawPos.map((po: any) => po.code || po.po_code || `PO${po.id}`)
-      : Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {}).length > 0
-      ? Object.keys(rawMatrix[Object.keys(rawMatrix)[0]] || {})
-      : defaultPos;
-
-  const dynamicCopoRows = rawCos.map((co: any, idx: number) => {
-    const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
-    const scores: Record<string, number> = {};
-    const rowObj =
-      rawMatrix[coCode] ||
-      rawMatrix[co.co_code] ||
-      rawMatrix[co.code] ||
-      rawMatrix[String(co.id)] ||
-      rawMatrix[`CO${idx + 1}`] ||
-      {};
-
-    dynamicPoHeaders.forEach((poKey) => {
-      const exactVal = rowObj[poKey];
-      const fallbackKey = Object.keys(rowObj).find(
-        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === poKey.toLowerCase().replace(/[^a-z0-9]/g, "")
+  const handleConfirmGenerateCopo = async () => {
+    if (!selectedExtractionForCopo) return;
+    try {
+      setActionLoading("generate_copo");
+      await Models.copo.generate({ extractions_id: selectedExtractionForCopo });
+      Success("CO-PO mapping generation queued!");
+      setShowGenerateCopoModal(false);
+      setJobNotice(
+        "CO-PO mapping generation is queued. When completed, click the Refresh button to load the generated matrix."
       );
-      const val = exactVal !== undefined ? exactVal : fallbackKey ? rowObj[fallbackKey] : undefined;
-      scores[poKey] = typeof val === "object" && val !== null ? Number(val.score ?? 0) : Number(val || 0);
-    });
-    return { coCode, poScores: scores };
-  });
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to trigger CO-PO generation"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const dynamicRationaleItems = rawCos.map((co: any, idx: number) => {
-    const coCode = co.co_code || co.code || co.coCode || (typeof co === "string" ? co : `CO${co.id || idx + 1}`);
-    const rowObj =
-      rawMatrix[coCode] ||
-      rawMatrix[co.co_code] ||
-      rawMatrix[co.code] ||
-      rawMatrix[String(co.id)] ||
-      rawMatrix[`CO${idx + 1}`] ||
-      {};
+  const handleApproveCopo = async (specificId?: any) => {
+    const targetId = specificId || currentCopo?.copo_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`approve_copo_${targetId}`);
+      await Models.copo.approve(targetId);
+      Success("CO-PO mapping approved!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to approve CO-PO mapping"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-    const mappedPos = Object.keys(rowObj)
-      .filter((k) => (Number(typeof rowObj[k] === "object" ? rowObj[k]?.score : rowObj[k]) || 0) > 0)
-      .map((k) => {
-        const val = rowObj[k];
-        const score = typeof val === "object" ? val?.score : val;
-        const rationale = typeof val === "object" ? (val?.justification || val?.rationale) : undefined;
-        return {
-          id: `${coCode}-${k}`,
-          poCode: k,
-          poTitle: (typeof val === "object" && val?.po_title) || k,
-          strengthText: `Strength: ${score}`,
-          strengthBadgeClass: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300",
-          rationale: rationale || "Aligned with course outcome requirements.",
-        };
+  const handleActivateCopo = async (specificId?: any) => {
+    const targetId = specificId || currentCopo?.copo_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`activate_copo_${targetId}`);
+      await Models.copo.activate(targetId);
+      Success("CO-PO mapping activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, copo: undefined }));
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to activate CO-PO mapping"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openGeneratePedagogyModal = () => {
+    if (isPedagogyBusy) {
+      Failure("A pedagogy suggestion generation job is already in progress for this course.");
+      return;
+    }
+    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    if (approvedExts.length === 0) {
+      Failure("No approved extraction found. Please approve an extraction version first.");
+      return;
+    }
+    setSelectedExtractionForPedagogy(approvedExts[0].extractions_id);
+    setShowGeneratePedagogyModal(true);
+  };
+
+  const handleConfirmGeneratePedagogy = async () => {
+    if (!selectedExtractionForPedagogy) return;
+    try {
+      setActionLoading("generate_pedagogy");
+      await Models.pedagogy.generate({ extractions_id: selectedExtractionForPedagogy });
+      Success("Pedagogy suggestions generation queued!");
+      setShowGeneratePedagogyModal(false);
+      setJobNotice(
+        "Pedagogy generation is queued. When completed, click the Refresh button to load the new teaching strategies."
+      );
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to trigger pedagogy generation"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApprovePedagogy = async (specificId?: any) => {
+    const targetId = specificId || currentPedagogy?.pedagogy_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`approve_pedagogy_${targetId}`);
+      await Models.pedagogy.approve(targetId);
+      Success("Pedagogy suggestions approved!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to approve pedagogy"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleActivatePedagogy = async (specificId?: any) => {
+    const targetId = specificId || currentPedagogy?.pedagogy_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`activate_pedagogy_${targetId}`);
+      await Models.pedagogy.activate(targetId);
+      Success("Pedagogy suggestions activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, pedagogy: undefined }));
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to activate pedagogy"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openGenerateLessonPlanModal = () => {
+    if (isLessonPlanBusy) {
+      Failure("A lesson plan generation job is already in progress for this course.");
+      return;
+    }
+    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    if (approvedExts.length === 0) {
+      Failure("No approved extraction found. Please approve an extraction version first.");
+      return;
+    }
+    setSelectedExtractionForLp(approvedExts[0].extractions_id);
+    const approvedPeds = (portfolio?.versions?.pedagogies || []).filter((p: any) => p.is_approved);
+    setSelectedPedagogyForLp(approvedPeds.length > 0 ? approvedPeds[0].pedagogy_id : null);
+    setLpTargetHours(currentExt?.total_theory_hours || 45);
+    setShowGenerateLessonPlanModal(true);
+  };
+
+  const handleConfirmGenerateLessonPlan = async () => {
+    if (!selectedExtractionForLp) return;
+    try {
+      setActionLoading("generate_lp");
+      await Models.lession_plan.generate({
+        extractions_id: selectedExtractionForLp,
+        pedagogy_id: selectedPedagogyForLp || undefined,
+        target_total_hours: Number(lpTargetHours) || 45,
       });
+      Success("Lesson plan generation queued!");
+      setShowGenerateLessonPlanModal(false);
+      setJobNotice(
+        "Lesson plan schedule generation is queued. When completed, click the Refresh button to load the hourly timeline."
+      );
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to trigger lesson plan generation"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-    return {
-      id: coCode,
-      coCode,
-      statement: co.description || co.statement || co.title || "",
-      mappedCountText: `${mappedPos.length} mapped outcomes`,
-      poItems: mappedPos,
-    };
-  });
+  const handleApproveLessonPlan = async (specificId?: any) => {
+    const targetId = specificId || currentLessonPlan?.lesson_plan_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`approve_lesson_plan_${targetId}`);
+      await Models.lession_plan.approve(targetId);
+      Success("Lesson plan approved!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to approve lesson plan"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const dynamicTopicUnits = (state.topicsUnits || []).map((u: any, idx: number) => ({
-    id: `topic-unit-${u.unit_number || idx + 1}`,
-    unitNumber: u.unit_number || idx + 1,
-    unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-    title: u.unit_title || `Unit ${idx + 1}`,
-    hoursText: `${u.theory_hours || 0} Hours`,
-    topicsCountText: `${(u.topics || []).length} Topics`,
-    topics: (u.topics || []).map((t: any) => ({
-      code: t.topic_code || "",
-      title: t.topic_name || "",
-      description: t.description || "",
-      hoursText: `${t.hours || 1} Hours`,
-      levelText: `Knowledge Level: ${t.bloom_level || t.knowledge_level || "K2"}`,
-      subtopics: (t.subtopics || []).map((st: any) => ({
-        code: st.subtopic_code || st.code || "",
-        title: st.subtopic_name || st.title || "",
-      })),
-    })),
-  }));
+  const handleActivateLessonPlan = async (specificId?: any) => {
+    const targetId = specificId || currentLessonPlan?.lesson_plan_id;
+    if (!targetId) return;
+    try {
+      setActionLoading(`activate_lesson_plan_${targetId}`);
+      await Models.lession_plan.activate(targetId);
+      Success("Lesson plan activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, lesson_plan: undefined }));
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to activate lesson plan"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const dynamicPedagogyUnits = (() => {
-    if (state.pedagogyUnits && state.pedagogyUnits.length > 0) {
-      return state.pedagogyUnits.map((pResp: any, idx: number) => {
-        const su = pResp?.selected_unit || {};
-        const uNum = su.unit_number || idx + 1;
-        const uTitle = su.unit_title || `Unit ${uNum}`;
-        const topics = (su.topics || []).map((t: any) => ({
-          code: t.topic_code || "",
-          title: t.topic_name || "",
-          description: t.description || "",
-          bloomLevel: (t.knowledge_level || "K2").replace("Knowledge Level: ", "").trim(),
-          hoursText: `${t.hours || 1} Hours`,
-          teachingApproaches: (t.suggested_pedagogies || [])
-            .map((p: any) => p.strategy_name || p.pedagogy_name || p.name)
-            .filter(Boolean),
-        }));
-        return {
-          id: `ped-unit-${uNum}`,
-          unitNumber: uNum,
-          unitCodeText: `Unit ${uNum}`,
-          title: uTitle,
-          hoursText: `${topics.reduce((acc: number, t: any) => acc + (parseInt(t.hoursText) || 1), 0)} Hours`,
-          topicsCountText: `${topics.length} Topics`,
-          topics,
-        };
-      });
+  // ── Version Card Selection Handler ─────────────────────────────────────────
+  const handleSelectVersionCard = async (
+    tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
+    versionItem: any,
+    idKey: string
+  ) => {
+    const itemId = versionItem[idKey];
+    if (versionItem.is_active) {
+      setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+      return;
+    }
+    try {
+      setLoadingVersionDetail(true);
+      if (tabType === "syllabus") {
+        const full = await Models.syllabus.get_extraction(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
+      } else if (tabType === "copo") {
+        const full = await Models.copo.get(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, copo: full }));
+      } else if (tabType === "pedagogy") {
+        const full = await Models.pedagogy.get(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
+      } else if (tabType === "lesson_plan") {
+        const full = await Models.lession_plan.get(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
+      }
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to load version details"));
+    } finally {
+      setLoadingVersionDetail(false);
+    }
+  };
+
+  // ── Version Cards Carousel / Panel ─────────────────────────────────────────
+  const renderVersionCards = (tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan") => {
+    if (!isCoord) return null;
+
+    let versionsList: any[] = [];
+    let idKey = "";
+    let approveFn: ((id: any) => Promise<void>) | null = null;
+    let activateFn: ((id: any) => Promise<void>) | null = null;
+    let approveLoadingPrefix = "";
+    let activateLoadingPrefix = "";
+
+    if (tabType === "syllabus") {
+      versionsList = portfolio?.versions?.extractions || [];
+      idKey = "extractions_id";
+      approveFn = handleApproveExtraction;
+      activateFn = handleActivateExtraction;
+      approveLoadingPrefix = "approve_syllabus_";
+      activateLoadingPrefix = "activate_syllabus_";
+    } else if (tabType === "copo") {
+      versionsList = portfolio?.versions?.copo || [];
+      idKey = "copo_id";
+      approveFn = handleApproveCopo;
+      activateFn = handleActivateCopo;
+      approveLoadingPrefix = "approve_copo_";
+      activateLoadingPrefix = "activate_copo_";
+    } else if (tabType === "pedagogy") {
+      versionsList = portfolio?.versions?.pedagogies || [];
+      idKey = "pedagogy_id";
+      approveFn = handleApprovePedagogy;
+      activateFn = handleActivatePedagogy;
+      approveLoadingPrefix = "approve_pedagogy_";
+      activateLoadingPrefix = "activate_pedagogy_";
+    } else if (tabType === "lesson_plan") {
+      versionsList = portfolio?.versions?.lesson_plans || [];
+      idKey = "lesson_plan_id";
+      approveFn = handleApproveLessonPlan;
+      activateFn = handleActivateLessonPlan;
+      approveLoadingPrefix = "approve_lesson_plan_";
+      activateLoadingPrefix = "activate_lesson_plan_";
     }
 
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `ped-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      hoursText: `${u.theory_hours || 0} Hours`,
-      topicsCountText: `${(u.topics || []).length} Topics`,
-      topics: (u.topics || []).map((t: any) => ({
-        code: t.topic_code || "",
-        title: t.topic_name || "",
-        description: t.description || "",
-        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
-        hoursText: `${t.hours || 1} Hours`,
-        teachingApproaches: (t.suggested_pedagogies || [])
-          .map((p: any) => p.pedagogy_name || p.strategy_name || p.name)
-          .filter(Boolean),
-      })),
-    }));
-  })();
+    if (versionsList.length === 0) return null;
 
-  const dynamicLessonUnits = (() => {
-    if (state.lessonUnits && state.lessonUnits.length > 0) {
-      return state.lessonUnits.map((lResp: any, idx: number) => {
-        const su = lResp?.selected_unit || {};
-        const uNum = su.unit_number || idx + 1;
-        const uTitle = su.unit_title || `Unit ${uNum}`;
-        const sessions = su.sessions || [];
-        const topics = sessions.map((s: any) => ({
-          code: s.topic_code || s.seq || "",
-          title: s.topic_name ? `${s.topic_name}${s.subtopic ? ` — ${s.subtopic}` : ""}` : (s.subtopic || ""),
-          description: s.books_display || "",
-          bloomLevel: s.level || "K2",
-          hoursText: s.hours_display || `${s.hours || 1} Hour${(s.hours || 1) > 1 ? "s" : ""}`,
-          pedagogy: Array.isArray(s.pedagogy) ? s.pedagogy : [s.pedagogy || "Lecture"],
-          textbook: s.textbook || "",
-          referenceBook: s.reference_book || "",
-        }));
+    const selectedVer = selectedVersionData[tabType];
 
-        return {
-          id: `lesson-unit-${uNum}`,
-          unitNumber: uNum,
-          unitCodeText: `Unit ${uNum}`,
-          title: uTitle,
-          hoursText: `${sessions.reduce((acc: number, s: any) => acc + (Number(s.hours) || 1), 0)} Hours`,
-          topicsCountText: `${topics.length} Sessions`,
-          topics,
-        };
-      });
-    }
-
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `lesson-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      hoursText: `${u.theory_hours || 0} Hours`,
-      topicsCountText: `${(u.topics || []).length} Topics`,
-      topics: (u.topics || []).map((t: any) => ({
-        code: t.topic_code || "",
-        title: t.topic_name || "",
-        bloomLevel: t.bloom_level || t.knowledge_level || "K2",
-        hoursText: `${t.planned_hours || t.hours || 1} Hours`,
-        pedagogy: ["Lecture"],
-      })),
-    }));
-  })();
-
-  const dynamicLearningMaterialUnits = (() => {
-    if (state.learningUnits && state.learningUnits.length > 0) {
-      return state.learningUnits.map((mResp: any, idx: number) => {
-        const su = mResp?.selected_unit || {};
-        const uNum = su.unit_number || idx + 1;
-        const uTitle = su.unit_title || `Unit ${uNum}`;
-        const topics = (su.topics || []).map((t: any) => ({
-          id: `mat-${t.topic_id || t.topic_code || idx}`,
-          topicCode: t.topic_code || "",
-          topicTitle: t.topic_name || "",
-          materialTitle: `${t.topic_name} — Lecture Notes & Study Guide`,
-          versionText: "v1.0",
-          approvedDateText: "Approved Curriculum",
-          details: {
-            approvedBy: activeApprovedBy,
-            approvedDate: activeApprovedDate,
-            overview: `Comprehensive academic lecture notes and curriculum guide for ${t.topic_name}. Covers theoretical foundations, architecture, and real-world implementations.`,
-            learningContent: [
-              {
-                title: "Core Concepts & Architecture",
-                items: [
-                  `Systematic breakdown of ${t.topic_name} and underlying engineering principles.`,
-                  "Protocol specifications, data encapsulation hierarchies, and interfacing requirements.",
-                  "Comparative analysis against standard industry reference implementations.",
-                ],
-              },
-              {
-                title: "Theoretical Framework",
-                items: [
-                  "Mathematical formulations and operational timing constraints.",
-                  "System components, operational characteristics, and parameter configurations.",
-                ],
-              },
-            ],
-          },
-        }));
-
-        return {
-          id: `lm-unit-${uNum}`,
-          unitNumber: uNum,
-          unitCodeText: `Unit ${uNum}`,
-          title: uTitle,
-          materialsCountText: `${topics.length} Approved Materials`,
-          materials: topics,
-        };
-      });
-    }
-
-    return (state.topicsUnits || []).map((u: any, idx: number) => ({
-      id: `lm-unit-${u.unit_number || idx + 1}`,
-      unitNumber: u.unit_number || idx + 1,
-      unitCodeText: `Unit ${u.unit_number || idx + 1}`,
-      title: u.unit_title || `Unit ${idx + 1}`,
-      materialsCountText: `${(u.topics || []).length} Materials`,
-      materials: (u.topics || []).map((t: any) => ({
-        id: `mat-${t.id || t.topic_code}`,
-        topicCode: t.topic_code || "",
-        topicTitle: t.topic_name || "",
-        materialTitle: `${t.topic_name} — Lecture Notes`,
-        versionText: "v1.0",
-        approvedDateText: "Approved Curriculum",
-        details: {
-          approvedBy: activeApprovedBy,
-          approvedDate: activeApprovedDate,
-          overview: `Study materials and curriculum reference notes for ${t.topic_name}.`,
-        },
-      })),
-    }));
-  })();
-
-  const dynamicQuestionBankUnits = (() => {
-    const rawQs = state.rawQuestions || [];
-    if (rawQs.length > 0) {
-      const unitMap: Record<number, any[]> = {};
-      rawQs.forEach((q: any) => {
-        const uNum = Number(q.unit_number) || 1;
-        if (!unitMap[uNum]) unitMap[uNum] = [];
-        unitMap[uNum].push(q);
-      });
-
-      const allUnitNums = Array.from(
-        new Set([...dynamicUnits.map((u: any) => u.unitNumber), ...Object.keys(unitMap).map(Number)])
-      ).sort((a, b) => a - b);
-
-      return allUnitNums.map((uNum) => {
-        const matchedUnit = dynamicUnits.find((u: any) => u.unitNumber === uNum);
-        const qList = unitMap[uNum] || [];
-        const questions = qList.map((q: any) => ({
-          id: q.id,
-          questionCode: q.question_code || `Q-${String(q.id).slice(0, 6)}`,
-          topicCode: q.topic || `Topic ${uNum}.1`,
-          topicTitle: q.topic || matchedUnit?.unitTitle || `Unit ${uNum}`,
-          questionText: q.text || "",
-          tags: [
-            q.course_outcome || "CO1",
-            q.knowledge_level || "K2",
-            "MCQ",
-            `${q.marks || 2} Marks`,
-            q.difficulty ? q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1) : "Medium",
-          ],
-          options: (q.options || []).map((opt: any, oIdx: number) => ({
-            key: String.fromCharCode(65 + oIdx),
-            text: typeof opt === "string" ? opt : opt.text || "",
-            isCorrect: typeof opt === "object" ? Boolean(opt.is_correct) : false,
-          })),
-          correctAnswer: (q.options || []).find((o: any) => o.is_correct)?.text || "",
-          explanation: q.explanation || "",
-        }));
-
-        return {
-          id: `qb-unit-${uNum}`,
-          unitNumber: uNum,
-          unitCodeText: `Unit ${uNum}`,
-          title: matchedUnit?.unitTitle || `Unit ${uNum}`,
-          questionsCountText: `${questions.length} Question${questions.length === 1 ? "" : "s"}`,
-          questions: questions,
-        };
-      });
-    }
-
-    return (dynamicUnits || []).map((u: any) => ({
-      id: `qb-unit-${u.unitNumber}`,
-      unitNumber: u.unitNumber,
-      unitCodeText: `Unit ${u.unitNumber}`,
-      title: u.unitTitle,
-      questionsCountText: `0 Questions`,
-      questions: [],
-    }));
-  })();
-
-  const referenceItems: ReferenceItem[] = [
-    {
-      id: "syllabus",
-      icon: (
-        <FileText
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "syllabus"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "Syllabus",
-      subtitle: `${dynamicUnits.length} Units • ${dynamicOutcomes.length} Outcomes`,
-      isActive: state.selectedReferenceId === "syllabus",
-      isCompleted: dynamicUnits.length > 0,
-    },
-    {
-      id: "copo",
-      icon: (
-        <GitBranch
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "copo"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "CO-PO Mapping",
-      subtitle: `${dynamicPoHeaders.length} Program Outcomes • ${dynamicOutcomes.length} COs`,
-      isActive: state.selectedReferenceId === "copo",
-      isCompleted: dynamicPoHeaders.length > 0,
-    },
-    {
-      id: "topics",
-      icon: (
-        <Layers
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "topics"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "Topics",
-      subtitle: `${dynamicTopicUnits.length} Units • ${dynamicTopicUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Topics`,
-      isActive: state.selectedReferenceId === "topics",
-      isCompleted: dynamicTopicUnits.length > 0,
-    },
-    {
-      id: "pedagogy",
-      icon: (
-        <GraduationCap
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "pedagogy"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "Pedagogy",
-      subtitle: `${dynamicPedagogyUnits.length} Units • ${dynamicPedagogyUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Teaching Approaches`,
-      isActive: state.selectedReferenceId === "pedagogy",
-      isCompleted: dynamicPedagogyUnits.length > 0,
-    },
-    {
-      id: "lesson-plan",
-      icon: (
-        <Calendar
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "lesson-plan"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "Lesson Plan",
-      subtitle: `${dynamicLessonUnits.length} Units • ${dynamicLessonUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Scheduled Sessions`,
-      isActive: state.selectedReferenceId === "lesson-plan",
-      isCompleted: dynamicLessonUnits.length > 0,
-    },
-    {
-      id: "learning-materials",
-      icon: (
-        <BookOpen
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "learning-materials"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "Learning Materials",
-      subtitle: `${dynamicLearningMaterialUnits.length} Units • ${dynamicLearningMaterialUnits.reduce((acc: number, u: any) => acc + (u.materials?.length || 0), 0)} Study Materials`,
-      isActive: state.selectedReferenceId === "learning-materials",
-      isCompleted: dynamicLearningMaterialUnits.length > 0,
-    },
-  ];
-
-  const assessmentItems: ReferenceItem[] = [
-    {
-      id: "question-bank",
-      icon: (
-        <HelpCircle
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "question-bank"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "Question Bank",
-      subtitle: `${dynamicQuestionBankUnits.reduce((acc: number, u: any) => acc + (u.questions?.length || 0), 0)} Questions • ${state.rawQuestionSets?.length || 1} Question Sets`,
-      isActive: state.selectedReferenceId === "question-bank",
-      isCompleted: dynamicQuestionBankUnits.length > 0,
-    },
-    {
-      id: "cia-papers",
-      icon: (
-        <FileCode
-          className={`h-5 w-5 ${
-            state.selectedReferenceId === "cia-papers"
-              ? "text-white"
-              : "text-pri dark:text-gray-400"
-          }`}
-        />
-      ),
-      title: "CIA Question Papers",
-      subtitle: "2 Assessment Papers • Mid-Term & Final",
-      isActive: state.selectedReferenceId === "cia-papers",
-      isCompleted: true,
-    },
-  ];
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-8">
-      <CourseBanner
-        courseCode={activeCourseCode || "Course"}
-        courseTitle={activeCourseTitle || "Course Artifacts"}
-        description="Instructor View — Access approved academic artifacts, active syllabus, outcomes mapping, topic hierarchy, pedagogy, and lesson plans."
-        programme={activeProgramme}
-        batch={activeBatch}
-        academicYear={state.courseData?.academic_year || ""}
-        students={`${state.courseData?.students_count ?? 0} Students`}
-        selectedCourse={activeCourseCode}
-        courseOptions={(state.allCourses || []).map((c: any) => ({
-          value: String(c.id),
-          label: `${c.course_code || c.code} — ${c.course_title || c.title}`,
-        }))}
-        onCourseChange={(val) => {
-          const targetId = typeof val === "object" ? val?.value : val;
-          const selected = (state.allCourses || []).find((c: any) => String(c.id) === String(targetId));
-          if (selected) {
-            router.push(
-              `/neurobe/ins-course-artifacts?course_id=${selected.id}&code=${selected.course_code || selected.code}`
-            );
-          }
-        }}
-        toogle="instructor"
-        activeView={state.activeTab}
-        onBack={() => {
-          if (router?.query?.from === "my-courses") {
-            router.push("/neurobe/my-assigned-courses");
-          } else {
-            router.back();
-          }
-        }}
-        onViewChange={(view) => {
-          setState({ activeTab: view });
-          if (view === "coordinator") {
-            router.push(
-              `/neurobe/course-artifacts?course_id=${state.courseData?.id || router?.query?.course_id || ""}&code=${activeCourseCode}`
-            );
-          }
-        }}
-      />
-
-      {/* ── Course Instructor View Banner ── */}
-      <div className="mx-6 mt-4 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 p-4 shadow-xs dark:border-indigo-800/60 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-indigo-950/40">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow">
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Course Instructor View
-              </h3>
-              <span className="rounded-full border border-indigo-300 bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                Active Approved Versions Only
+              <History className="h-4 w-4 text-indigo-500" />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Version History ({versionsList.length})
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Read-only view of the coordinator-approved curriculum and active academic artifacts for this course.
-            </p>
+            {selectedVer && (
+              <button
+                type="button"
+                onClick={() => setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }))}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+              >
+                ← Reset to Active Version
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin">
+            {versionsList.map((ver: any, idx: number) => {
+              const itemId = ver[idKey];
+              const isItemActive = Boolean(ver.is_active);
+              const isItemApproved = Boolean(ver.is_approved);
+              const isSelected = selectedVer ? (selectedVer[idKey] === itemId) : isItemActive;
+              const isBusy = ver.current_state === "redis_queued" || ver.current_state === "processing";
+
+              return (
+                <div
+                  key={itemId || idx}
+                  className={`min-w-[210px] shrink-0 rounded-xl border p-3 transition ${
+                    isSelected
+                      ? "border-indigo-500 bg-indigo-50/40 shadow-xs dark:border-indigo-600 dark:bg-indigo-950/40"
+                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-850/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      v{ver.version_number || (idx + 1)}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {isItemActive && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                          Active
+                        </span>
+                      )}
+                      {isItemApproved ? (
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                          Approved
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                          Draft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {ver.created_at ? new Date(ver.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                  </p>
+
+                  {isBusy && (
+                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
+                      <Sparkles className="h-3 w-3 animate-spin" />
+                      <span>{ver.current_state}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                    {isSelected ? (
+                      <span className="rounded-md bg-indigo-600/10 px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                        {isItemActive && !selectedVer ? "Active Current" : "Currently Viewing"}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectVersionCard(tabType, ver, idKey)}
+                        disabled={loadingVersionDetail}
+                        className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      >
+                        View
+                      </button>
+                    )}
+
+                    {!isItemApproved && approveFn && (
+                      <button
+                        type="button"
+                        onClick={() => approveFn?.(itemId)}
+                        disabled={actionLoading === `${approveLoadingPrefix}${itemId}`}
+                        className="rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {actionLoading === `${approveLoadingPrefix}${itemId}` ? "..." : "Approve"}
+                      </button>
+                    )}
+
+                    {isItemApproved && !isItemActive && activateFn && (
+                      <button
+                        type="button"
+                        onClick={() => activateFn?.(itemId)}
+                        disabled={actionLoading === `${activateLoadingPrefix}${itemId}`}
+                        className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {actionLoading === `${activateLoadingPrefix}${itemId}` ? "..." : "Activate"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (router?.query?.from === "my-courses") {
-              router.push("/neurobe/my-assigned-courses");
-            } else {
-              router.back();
-            }
-          }}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-4 py-2 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 active:scale-95 dark:border-indigo-700 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
-        >
-          ← Back
-        </button>
+
+        {selectedVer && (
+          <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>
+                Viewing historical version <strong>v{selectedVer.version_number || ""}</strong> ({selectedVer.is_approved ? "Approved" : "Draft"}). Artifact is in read-only mode.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }))}
+              className="rounded-lg bg-amber-600 px-2.5 py-1 font-semibold text-white transition hover:bg-amber-700"
+            >
+              Return to Active Version
+            </button>
+          </div>
+        )}
       </div>
+    );
+  };
 
-      <PageHeader
-        title="Course Artifacts"
-        records={
-          activeCourseCode && activeCourseTitle
-            ? `${activeCourseCode} — ${activeCourseTitle}`
-            : activeCourseCode || "Course Artifacts"
+  // ── COPO Matrix Delta Save ────────────────────────────────────────────────
+  const saveCopoDeltaChanges = async () => {
+    if (!currentCopo?.copo_id) return;
+    try {
+      setSavingCopoDelta(true);
+      for (const [cellIdStr, delta] of Object.entries(copoDirtyCells)) {
+        await Models.copo.update_matrix_cell(currentCopo.copo_id, cellIdStr, delta);
+      }
+      Success("CO-PO matrix delta changes saved successfully!");
+      setCopoDirtyCells({});
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save CO-PO matrix changes"));
+    } finally {
+      setSavingCopoDelta(false);
+    }
+  };
+
+  // ── Pedagogy Per-Topic Edit & Save (3 Pedagogies) ──────────────────────────
+  const startEditPedagogyTopic = (sug: any) => {
+    setEditingPedagogyTopicId(sug.id);
+    setPedagogyDraft({
+      bloom_level_1: sug.bloom_level_1 || "K2 - Understand",
+      pedagogy_suggested_1: sug.pedagogy_suggested_1 || "",
+      description_1: sug.description_1 || "",
+      methodology_1: sug.methodology_1 || "",
+      bloom_level_2: sug.bloom_level_2 || "K3 - Apply",
+      pedagogy_suggested_2: sug.pedagogy_suggested_2 || "",
+      description_2: sug.description_2 || "",
+      methodology_2: sug.methodology_2 || "",
+      bloom_level_3: sug.bloom_level_3 || "K4 - Analyze",
+      pedagogy_suggested_3: sug.pedagogy_suggested_3 || "",
+      description_3: sug.description_3 || "",
+      methodology_3: sug.methodology_3 || "",
+    });
+  };
+
+  const savePedagogyTopic = async (sugId: number) => {
+    if (!currentPedagogy?.pedagogy_id) return;
+    try {
+      setSavingPedagogyTopic(true);
+      await Models.pedagogy.update_topic_suggestion(currentPedagogy.pedagogy_id, sugId, {
+        bloom_level_1: pedagogyDraft.bloom_level_1,
+        pedagogy_suggested_1: pedagogyDraft.pedagogy_suggested_1?.trim(),
+        description_1: pedagogyDraft.description_1?.trim() || undefined,
+        methodology_1: pedagogyDraft.methodology_1?.trim() || undefined,
+        bloom_level_2: pedagogyDraft.bloom_level_2,
+        pedagogy_suggested_2: pedagogyDraft.pedagogy_suggested_2?.trim(),
+        description_2: pedagogyDraft.description_2?.trim() || undefined,
+        methodology_2: pedagogyDraft.methodology_2?.trim() || undefined,
+        bloom_level_3: pedagogyDraft.bloom_level_3,
+        pedagogy_suggested_3: pedagogyDraft.pedagogy_suggested_3?.trim(),
+        description_3: pedagogyDraft.description_3?.trim() || undefined,
+        methodology_3: pedagogyDraft.methodology_3?.trim() || undefined,
+      });
+      Success("Topic pedagogy strategies updated successfully!");
+      setEditingPedagogyTopicId(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update pedagogy topic"));
+    } finally {
+      setSavingPedagogyTopic(false);
+    }
+  };
+
+  // ── Lesson Plan Per-Slot Edit & Save ───────────────────────────────────────
+  const startEditLpSlot = (slot: any) => {
+    setEditingLpSlotId(slot.id);
+    setLpSlotDraft({
+      time_allocated: Number(slot.time_allocated) || 1,
+      bloom_level: slot.bloom_level || "Understand",
+      suggested_activity: slot.suggested_activity || "",
+    });
+  };
+
+  const saveLpSlot = async (slotId: number) => {
+    if (!currentLessonPlan?.lesson_plan_id) return;
+    try {
+      setSavingLpSlot(true);
+      await Models.lession_plan.update_topic_slot(currentLessonPlan.lesson_plan_id, slotId, {
+        time_allocated: Number(lpSlotDraft.time_allocated) || 1,
+        bloom_level: lpSlotDraft.bloom_level,
+        suggested_activity: lpSlotDraft.suggested_activity?.trim() || undefined,
+      });
+      Success("Topic slot schedule updated successfully!");
+      setEditingLpSlotId(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update lesson plan slot"));
+    } finally {
+      setSavingLpSlot(false);
+    }
+  };
+
+  const startEditLpSubtopicSlot = (subSlot: any) => {
+    setEditingLpSubtopicSlotId(subSlot.id);
+    setLpSubtopicSlotDraft({
+      time_allocated: Number(subSlot.time_allocated) || 0.5,
+      bloom_level: subSlot.bloom_level || "Understand",
+      suggested_activity: subSlot.suggested_activity || "",
+    });
+  };
+
+  const saveLpSubtopicSlot = async (subSlotId: number) => {
+    if (!currentLessonPlan?.lesson_plan_id) return;
+    try {
+      setSavingLpSubtopicSlot(true);
+      await Models.lession_plan.update_subtopic_slot(currentLessonPlan.lesson_plan_id, subSlotId, {
+        time_allocated: Number(lpSubtopicSlotDraft.time_allocated) || 0.5,
+        bloom_level: lpSubtopicSlotDraft.bloom_level,
+        suggested_activity: lpSubtopicSlotDraft.suggested_activity?.trim() || undefined,
+      });
+      Success("Subtopic slot schedule updated successfully!");
+      setEditingLpSubtopicSlotId(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update subtopic slot"));
+    } finally {
+      setSavingLpSubtopicSlot(false);
+    }
+  };
+
+  // Units list from current extraction
+  const units = currentExt?.units || [];
+  const selectedUnit = units[selectedUnitIndex] || units[0];
+
+  // ── Coordinator CRUD & Section Edit State ─────────────────────────────────
+  const canEdit = Boolean(isCoord && currentExt && !selectedVersionData.syllabus);
+
+  const KNOWLEDGE_LEVELS = [
+    "K1 - Remember",
+    "K2 - Understand",
+    "K3 - Apply",
+    "K4 - Analyze",
+    "K5 - Evaluate",
+    "K6 - Create",
+  ];
+
+  // Section edit modes: null | "hours" | "objectives" | "outcomes" | "textbooks" | "reference_books"
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [savingSection, setSavingSection] = useState<boolean>(false);
+
+  // Draft states
+  const [hoursDraft, setHoursDraft] = useState({
+    credits: 0,
+    lecture_hours: 0,
+    tutorial_hours: 0,
+    practical_hours: 0,
+    total_theory_hours: 0,
+    total_lab_hours: 0,
+  });
+  const [objectivesDraft, setObjectivesDraft] = useState<any[]>([]);
+  const [outcomesDraft, setOutcomesDraft] = useState<any[]>([]);
+  const [textbooksDraft, setTextbooksDraft] = useState<any[]>([]);
+  const [referenceBooksDraft, setReferenceBooksDraft] = useState<any[]>([]);
+
+  // Hierarchy CRUD modal state (Unit / Topic / Subtopic)
+  const [hierarchyModal, setHierarchyModal] = useState<{
+    type: "unit" | "topic" | "subtopic";
+    mode: "add" | "edit";
+    data?: any;
+    unitId?: number;
+    topicId?: number;
+    subtopicId?: number;
+  } | null>(null);
+  const [modalForm, setModalForm] = useState<any>({});
+  const [submittingModal, setSubmittingModal] = useState<boolean>(false);
+
+  // ── Section 1: Hours & Credits Handlers ────────────────────────────────────
+  const startEditHours = () => {
+    const ext = currentExt || activeExt;
+    setHoursDraft({
+      credits: ext?.credits ?? course.credits ?? 0,
+      lecture_hours: ext?.lecture_hours ?? 0,
+      tutorial_hours: ext?.tutorial_hours ?? 0,
+      practical_hours: ext?.practical_hours ?? 0,
+      total_theory_hours: ext?.total_theory_hours ?? course.total_theory_hours ?? 0,
+      total_lab_hours: ext?.total_lab_hours ?? course.total_lab_hours ?? 0,
+    });
+    setEditingSection("hours");
+  };
+
+  const saveHours = async () => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    try {
+      setSavingSection(true);
+      await Models.syllabus.update_hours(extId, {
+        credits: Number(hoursDraft.credits),
+        lecture_hours: Number(hoursDraft.lecture_hours),
+        tutorial_hours: Number(hoursDraft.tutorial_hours),
+        practical_hours: Number(hoursDraft.practical_hours),
+        total_theory_hours: Number(hoursDraft.total_theory_hours),
+        total_lab_hours: Number(hoursDraft.total_lab_hours),
+      });
+      Success("Curriculum hours and credits updated successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update hours"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 2: Objectives Handlers ─────────────────────────────────────────
+  const startEditObjectives = () => {
+    const ext = currentExt || activeExt;
+    setObjectivesDraft((ext?.objectives || []).map((o: any) => ({ ...o })));
+    setEditingSection("objectives");
+  };
+
+  const handleAddObjectiveRow = () => {
+    setObjectivesDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        objective_number: prev.length + 1,
+        description: "",
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteObjectiveRow = (id: any) => {
+    setObjectivesDraft((prev) => prev.filter((o) => o.id !== id));
+  };
+
+  const saveObjectives = async () => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    try {
+      setSavingSection(true);
+      const ext = currentExt || activeExt;
+      const original = ext?.objectives || [];
+      const currentIds = new Set(objectivesDraft.filter((o) => !o.isNew).map((o) => o.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteObjective(extId, orig.id);
         }
-        subtitle={`Access active approved academic references prepared for this course.`}
-        icon={<Users className="h-5 w-5 text-color2" />}
-        record2="Instructor View"
-        record3="Active Version Only"
-      />
+      }
 
-      {/* Main Grid Layout: Left Course References Navigation + Right Artifact Details */}
-      <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Course References List */}
-        <div className="lg:col-span-4 xl:col-span-3">
-          <CourseReferencesCard
-            title="COURSE REFERENCES"
-            availableCountText="8 Available References"
-            items={referenceItems}
-            assessmentItems={assessmentItems}
-            onItemClick={(item) => {
-              const defaultSubTab =
-                item.id === "syllabus"
-                  ? "course-info"
-                  : item.id === "copo"
-                    ? "course-outcomes"
-                    : item.id === "topics"
-                      ? "all-units"
-                      : state.activeSubTab;
-              setState({ selectedReferenceId: item.id, activeSubTab: defaultSubTab });
-            }}
-          />
+      for (const obj of objectivesDraft) {
+        if (obj.isNew) {
+          if (obj.description?.trim()) {
+            await Models.syllabus.addObjective(extId, {
+              objective_number: Number(obj.objective_number) || 1,
+              description: obj.description.trim(),
+            });
+          }
+        } else {
+          await Models.syllabus.updateObjective(extId, obj.id, {
+            objective_number: Number(obj.objective_number) || 1,
+            description: obj.description?.trim() || "",
+          });
+        }
+      }
+
+      Success("Course objectives saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save objectives"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 3: Course Outcomes Handlers ────────────────────────────────────
+  const startEditOutcomes = () => {
+    const ext = currentExt || activeExt;
+    setOutcomesDraft(
+      (ext?.outcomes || []).map((co: any) => ({
+        ...co,
+        knowledge_level: co.knowledge_level || (co.bloom_level ? `K2 - ${co.bloom_level}` : "K2 - Understand"),
+      }))
+    );
+    setEditingSection("outcomes");
+  };
+
+  const handleAddOutcomeRow = () => {
+    setOutcomesDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        co_code: `CO${prev.length + 1}`,
+        description: "",
+        knowledge_level: "K2 - Understand",
+        bloom_level: "Understand",
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteOutcomeRow = (id: any) => {
+    setOutcomesDraft((prev) => prev.filter((co) => co.id !== id));
+  };
+
+  const saveOutcomes = async () => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    try {
+      setSavingSection(true);
+      const ext = currentExt || activeExt;
+      const original = ext?.outcomes || [];
+      const currentIds = new Set(outcomesDraft.filter((co) => !co.isNew).map((co) => co.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteOutcome(extId, orig.id);
+        }
+      }
+
+      for (const co of outcomesDraft) {
+        const kLevel = co.knowledge_level || "K2 - Understand";
+        const bloomPart = kLevel.includes("-") ? kLevel.split("-")[1].trim() : kLevel;
+
+        if (co.isNew) {
+          if (co.description?.trim()) {
+            await Models.syllabus.addOutcome(extId, {
+              co_code: co.co_code?.trim() || "CO1",
+              description: co.description.trim(),
+              knowledge_level: kLevel,
+              bloom_level: bloomPart,
+            });
+          }
+        } else {
+          await Models.syllabus.updateOutcome(extId, co.id, {
+            co_code: co.co_code?.trim() || "CO1",
+            description: co.description?.trim() || "",
+            knowledge_level: kLevel,
+            bloom_level: bloomPart,
+          });
+        }
+      }
+
+      Success("Course outcomes saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save outcomes"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 4: Textbooks Handlers ──────────────────────────────────────────
+  const startEditTextbooks = () => {
+    const ext = currentExt || activeExt;
+    setTextbooksDraft(
+      (ext?.textbooks || []).map((t: any) => ({
+        ...t,
+        authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors || ""),
+      }))
+    );
+    setEditingSection("textbooks");
+  };
+
+  const handleAddTextbookRow = () => {
+    setTextbooksDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        title: "",
+        authorsStr: "",
+        publisher: "",
+        edition: "",
+        publication_year: new Date().getFullYear(),
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteTextbookRow = (id: any) => {
+    setTextbooksDraft((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const saveTextbooks = async () => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    try {
+      setSavingSection(true);
+      const ext = currentExt || activeExt;
+      const original = ext?.textbooks || [];
+      const currentIds = new Set(textbooksDraft.filter((t) => !t.isNew).map((t) => t.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteTextbook(extId, orig.id);
+        }
+      }
+
+      for (const t of textbooksDraft) {
+        const authorsArr = (t.authorsStr || "")
+          .split(",")
+          .map((a: string) => a.trim())
+          .filter(Boolean);
+
+        if (t.isNew) {
+          if (t.title?.trim()) {
+            await Models.syllabus.addTextbook(extId, {
+              title: t.title.trim(),
+              authors: authorsArr,
+              publisher: t.publisher?.trim() || undefined,
+              edition: t.edition?.trim() || undefined,
+              publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+            });
+          }
+        } else {
+          await Models.syllabus.updateTextbook(extId, t.id, {
+            title: t.title?.trim() || "",
+            authors: authorsArr,
+            publisher: t.publisher?.trim() || undefined,
+            edition: t.edition?.trim() || undefined,
+            publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+          });
+        }
+      }
+
+      Success("Textbooks saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save textbooks"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 4b: Reference Books Handlers ────────────────────────────────────
+  const startEditReferenceBooks = () => {
+    const ext = currentExt || activeExt;
+    setReferenceBooksDraft(
+      (ext?.reference_books || []).map((t: any) => ({
+        ...t,
+        authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors || ""),
+      }))
+    );
+    setEditingSection("reference_books");
+  };
+
+  const handleAddReferenceBookRow = () => {
+    setReferenceBooksDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        title: "",
+        authorsStr: "",
+        publisher: "",
+        edition: "",
+        publication_year: new Date().getFullYear(),
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteReferenceBookRow = (id: any) => {
+    setReferenceBooksDraft((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const saveReferenceBooks = async () => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    try {
+      setSavingSection(true);
+      const ext = currentExt || activeExt;
+      const original = ext?.reference_books || [];
+      const currentIds = new Set(referenceBooksDraft.filter((t) => !t.isNew).map((t) => t.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteReferenceBook(extId, orig.id);
+        }
+      }
+
+      for (const t of referenceBooksDraft) {
+        const authorsArr = (t.authorsStr || "")
+          .split(",")
+          .map((a: string) => a.trim())
+          .filter(Boolean);
+
+        if (t.isNew) {
+          if (t.title?.trim()) {
+            await Models.syllabus.addReferenceBook(extId, {
+              title: t.title.trim(),
+              authors: authorsArr,
+              publisher: t.publisher?.trim() || undefined,
+              edition: t.edition?.trim() || undefined,
+              publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+            });
+          }
+        } else {
+          await Models.syllabus.updateReferenceBook(extId, t.id, {
+            title: t.title?.trim() || "",
+            authors: authorsArr,
+            publisher: t.publisher?.trim() || undefined,
+            edition: t.edition?.trim() || undefined,
+            publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+          });
+        }
+      }
+
+      Success("Reference books saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save reference books"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  // ── Section 5: Curriculum Hierarchy Modal & CRUD (Unit / Topic / Subtopic) ──
+  const openUnitModal = (mode: "add" | "edit", unit?: any) => {
+    setHierarchyModal({
+      type: "unit",
+      mode,
+      unitId: unit?.id,
+      data: unit,
+    });
+    setModalForm(
+      mode === "edit"
+        ? {
+            unit_number: unit.unit_number || 1,
+            unit_title: unit.unit_title || "",
+            unit_overview: unit.unit_overview || "",
+            theory_hours: unit.theory_hours || 0,
+            lab_hours: unit.lab_hours || 0,
+            tutorial_hours: unit.tutorial_hours || 0,
+          }
+        : {
+            unit_number: units.length + 1,
+            unit_title: "",
+            unit_overview: "",
+            theory_hours: 0,
+            lab_hours: 0,
+            tutorial_hours: 0,
+          }
+    );
+  };
+
+  const openTopicModal = (mode: "add" | "edit", unitId: number, topic?: any) => {
+    setHierarchyModal({
+      type: "topic",
+      mode,
+      unitId,
+      topicId: topic?.id,
+      data: topic,
+    });
+    setModalForm(
+      mode === "edit"
+        ? {
+            topic_code: topic.topic_code || "",
+            topic_name: topic.topic_name || "",
+            topic_description: topic.topic_description || "",
+            knowledge_level: topic.knowledge_level || "K2 - Understand",
+            learning_sequence: topic.learning_sequence || 1,
+          }
+        : {
+            topic_code: "",
+            topic_name: "",
+            topic_description: "",
+            knowledge_level: "K2 - Understand",
+            learning_sequence: 1,
+          }
+    );
+  };
+
+  const openSubtopicModal = (mode: "add" | "edit", topicId: number, subtopic?: any) => {
+    setHierarchyModal({
+      type: "subtopic",
+      mode,
+      topicId,
+      subtopicId: subtopic?.id,
+      data: subtopic,
+    });
+    setModalForm(
+      mode === "edit"
+        ? {
+            subtopic_code: subtopic.subtopic_code || "",
+            subtopic_name: subtopic.subtopic_name || "",
+            subtopic_description: subtopic.subtopic_description || "",
+          }
+        : {
+            subtopic_code: "",
+            subtopic_name: "",
+            subtopic_description: "",
+          }
+    );
+  };
+
+  const handleHierarchySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!hierarchyModal || !extId) return;
+    try {
+      setSubmittingModal(true);
+      const { type, mode, unitId, topicId, subtopicId } = hierarchyModal;
+
+      if (type === "unit") {
+        if (mode === "add") {
+          await Models.syllabus.addUnit(extId, {
+            unit_number: Number(modalForm.unit_number) || 1,
+            unit_title: modalForm.unit_title.trim(),
+            unit_overview: modalForm.unit_overview?.trim() || undefined,
+            theory_hours: Number(modalForm.theory_hours) || 0,
+            lab_hours: Number(modalForm.lab_hours) || 0,
+            tutorial_hours: Number(modalForm.tutorial_hours) || 0,
+          });
+          Success("Unit created successfully!");
+        } else {
+          await Models.syllabus.updateUnit(extId, unitId!, {
+            unit_number: Number(modalForm.unit_number) || undefined,
+            unit_title: modalForm.unit_title?.trim() || undefined,
+            unit_overview: modalForm.unit_overview?.trim() || undefined,
+            theory_hours: Number(modalForm.theory_hours) ?? undefined,
+            lab_hours: Number(modalForm.lab_hours) ?? undefined,
+            tutorial_hours: Number(modalForm.tutorial_hours) ?? undefined,
+          });
+          Success("Unit updated successfully!");
+        }
+      } else if (type === "topic") {
+        if (mode === "add") {
+          await Models.syllabus.addTopic(extId, unitId!, {
+            topic_code: modalForm.topic_code?.trim() || "",
+            topic_name: modalForm.topic_name.trim(),
+            topic_description: modalForm.topic_description?.trim() || undefined,
+            knowledge_level: modalForm.knowledge_level || undefined,
+            learning_sequence: Number(modalForm.learning_sequence) || 1,
+          });
+          Success("Topic created successfully!");
+        } else {
+          await Models.syllabus.updateTopic(extId, topicId!, {
+            topic_code: modalForm.topic_code?.trim() || undefined,
+            topic_name: modalForm.topic_name?.trim() || undefined,
+            topic_description: modalForm.topic_description?.trim() || undefined,
+            knowledge_level: modalForm.knowledge_level || undefined,
+            learning_sequence: Number(modalForm.learning_sequence) || undefined,
+          });
+          Success("Topic updated successfully!");
+        }
+      } else if (type === "subtopic") {
+        if (mode === "add") {
+          await Models.syllabus.addSubtopic(extId, topicId!, {
+            subtopic_code: modalForm.subtopic_code?.trim() || "",
+            subtopic_name: modalForm.subtopic_name.trim(),
+            subtopic_description: modalForm.subtopic_description?.trim() || undefined,
+          });
+          Success("Subtopic created successfully!");
+        } else {
+          await Models.syllabus.updateSubtopic(extId, subtopicId!, {
+            subtopic_code: modalForm.subtopic_code?.trim() || undefined,
+            subtopic_name: modalForm.subtopic_name?.trim() || undefined,
+            subtopic_description: modalForm.subtopic_description?.trim() || undefined,
+          });
+          Success("Subtopic updated successfully!");
+        }
+      }
+
+      setHierarchyModal(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save changes"));
+    } finally {
+      setSubmittingModal(false);
+    }
+  };
+
+  const handleDeleteUnit = async (unitId: number) => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    if (!confirm("Are you sure you want to delete this Unit and all its topics and subtopics?")) return;
+    try {
+      await Models.syllabus.deleteUnit(extId, unitId);
+      Success("Unit deleted successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to delete unit"));
+    }
+  };
+
+  const handleDeleteTopic = async (topicId: number) => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    if (!confirm("Are you sure you want to delete this Topic and its subtopics?")) return;
+    try {
+      await Models.syllabus.deleteTopic(extId, topicId);
+      Success("Topic deleted successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to delete topic"));
+    }
+  };
+
+  const handleDeleteSubtopic = async (subtopicId: number) => {
+    const extId = currentExt?.extractions_id || activeExt?.extractions_id;
+    if (!extId) return;
+    if (!confirm("Are you sure you want to delete this Subtopic?")) return;
+    try {
+      await Models.syllabus.deleteSubtopic(extId, subtopicId);
+      Success("Subtopic deleted successfully!");
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to delete subtopic"));
+    }
+  };
+
+  return (
+    <div className="min-h-screen space-y-6 pb-16">
+      {/* ── Top Header & Course Identity ── */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => router.push("/neurobe/my-assigned-courses")}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700 dark:text-indigo-400"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back to My Assigned Courses</span>
+            </button>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-mono text-xs font-bold text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                {course.course_code || "Course"}
+              </span>
+
+              {isCoord ? (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Course Coordinator
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Course Instructor
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white md:text-2xl">
+              {course.course_title || "Course Artifacts"}
+            </h1>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fetchPortfolio(true)}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-indigo-500" : ""}`} />
+              <span>Refresh</span>
+            </button>
+
+            {activeSyllabus && (
+              <button
+                type="button"
+                onClick={() => setSplitScreenView(!splitScreenView)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-xs transition ${
+                  splitScreenView
+                    ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/70 dark:text-indigo-300"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                }`}
+                title={splitScreenView ? "Close split screen view" : "View original document in split screen"}
+              >
+                <Columns className="h-3.5 w-3.5 text-indigo-500" />
+                <span>{splitScreenView ? "Exit Split View" : "Split View (Document)"}</span>
+              </button>
+            )}
+
+            {/* Coordinator-only Upload */}
+            {isCoord && (
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span>Upload Syllabus</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Right Column: Syllabus Details */}
-        <div className="lg:col-span-8 xl:col-span-9 space-y-4">
-          {(() => {
-            const currentHeaderData =
-              REFERENCE_HEADER_DATA_MAP[state.selectedReferenceId] ||
-              REFERENCE_HEADER_DATA_MAP["syllabus"];
+        {/* Academic Details Strip */}
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 dark:border-slate-800 sm:grid-cols-4">
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <GraduationCap className="h-4 w-4 text-slate-400" />
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">{course.programme_name || "General"}</p>
+              <p className="text-[10px] text-slate-400">Programme</p>
+            </div>
+          </div>
 
-            const activeTabs =
-              state.selectedReferenceId === "syllabus"
-                ? SYLLABUS_HEADER_DATA.tabs
-                : state.selectedReferenceId === "copo"
-                  ? COPO_HEADER_TABS
-                  : state.selectedReferenceId === "topics"
-                    ? TOPICS_HEADER_TABS
-                    : null;
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <Layers className="h-4 w-4 text-slate-400" />
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">{course.semester ? `Semester ${course.semester}` : "All Terms"}</p>
+              <p className="text-[10px] text-slate-400">Term</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <Clock className="h-4 w-4 text-slate-400" />
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">{course.credits || 0} Credits</p>
+              <p className="text-[10px] text-slate-400">{course.total_theory_hours || 0} Theory / {course.total_lab_hours || 0} Lab Hrs</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <BookOpen className="h-4 w-4 text-slate-400" />
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">{course.department_name || "General"}</p>
+              <p className="text-[10px] text-slate-400">Department</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Background Job Notice Banner ── */}
+      {jobNotice && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 text-xs text-indigo-900 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+          <div className="flex items-start gap-2.5">
+            <Sparkles className="h-4 w-4 shrink-0 text-indigo-500 mt-0.5" />
+            <div>
+              <p className="font-semibold">Background Job In Progress</p>
+              <p className="mt-0.5">{jobNotice}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setJobNotice(null)}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ── Error Banner ── */}
+      {error && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* ── Tabs Navigation ── */}
+      <div className="border-b border-slate-200 dark:border-slate-800">
+        <nav className="flex space-x-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab("syllabus")}
+            className={`border-b-2 pb-3 text-sm font-semibold transition ${
+              activeTab === "syllabus"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            1. Syllabus & Curriculum
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("copo")}
+            className={`border-b-2 pb-3 text-sm font-semibold transition ${
+              activeTab === "copo"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            2. CO-PO Mapping
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("pedagogy")}
+            className={`border-b-2 pb-3 text-sm font-semibold transition ${
+              activeTab === "pedagogy"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            3. Pedagogy & Strategies
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("lesson_plan")}
+            className={`border-b-2 pb-3 text-sm font-semibold transition ${
+              activeTab === "lesson_plan"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            4. Lesson Plan & Timeline
+          </button>
+        </nav>
+      </div>
+
+      {/* ── Tabs Content (Full Width or Split Screen) ── */}
+      {(() => {
+        const tabContent = (
+          <>
+            {/* ── TAB 1: SYLLABUS & CURRICULUM ── */}
+            {activeTab === "syllabus" && (
+        <div className="space-y-6">
+          {renderVersionCards("syllabus")}
+
+          {/* Active Version Snapshot Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  {selectedVersionData.syllabus ? "Viewing Syllabus Version" : "Active Syllabus File"}
+                </p>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {activeSyllabus?.original_filename || "No syllabus uploaded"}
+                </h4>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {currentExt?.is_approved ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Extraction Approved
+                </span>
+              ) : currentExt ? (
+                <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                  Draft Extraction (v{currentExt.version_number || currentExt.extraction_version_id})
+                </span>
+              ) : null}
+
+              {/* Coordinator Approval & Activation Controls */}
+              {isCoord && currentExt && !currentExt.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApproveExtraction(currentExt.extractions_id)}
+                  disabled={actionLoading === `approve_syllabus_${currentExt.extractions_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_syllabus_${currentExt.extractions_id}` ? "Approving..." : "Approve Extraction"}
+                </button>
+              )}
+
+              {isCoord && currentExt && currentExt.is_approved && !currentExt.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivateExtraction(currentExt.extractions_id)}
+                  disabled={actionLoading === `activate_syllabus_${currentExt.extractions_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_syllabus_${currentExt.extractions_id}` ? "Activating..." : "Set as Active"}
+                </button>
+              )}
+
+              {activeSyllabus && (
+                <button
+                  type="button"
+                  onClick={() => setSplitScreenView(!splitScreenView)}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-xs transition ${
+                    splitScreenView
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  <Columns className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>{splitScreenView ? "Close Split View" : "Split View (Source Document)"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* If No Extraction */}
+          {!currentExt && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <FileText className="h-10 w-10 text-slate-400" />
+              <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
+                No Syllabus Extracted Yet
+              </h3>
+              <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                {isCoord
+                  ? "Upload a PDF or DOCX syllabus document above to initiate AI extraction of objectives, outcomes, and curriculum hierarchy."
+                  : "The course coordinator has not yet uploaded and extracted the syllabus for this course."}
+              </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(true)}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Upload Syllabus Document</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {currentExt && (
+            <div className="space-y-6">
+              {/* ── Section 1: Curriculum Hours & Credits ── */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-indigo-500" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Curriculum Hours & Credits
+                    </h3>
+                  </div>
+
+                  {canEdit && editingSection !== "hours" && (
+                    <button
+                      type="button"
+                      onClick={startEditHours}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      <Edit2 className="h-3 w-3 text-indigo-500" />
+                      <span>Edit Hours</span>
+                    </button>
+                  )}
+                </div>
+
+                {editingSection === "hours" ? (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Credits</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.credits}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, credits: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Theory Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.total_theory_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, total_theory_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Lab Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.total_lab_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, total_lab_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Lecture Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.lecture_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, lecture_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tutorial Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.tutorial_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, tutorial_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Practical Hrs</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={hoursDraft.practical_hours}
+                          onChange={(e) => setHoursDraft({ ...hoursDraft, practical_hours: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSection(null)}
+                        disabled={savingSection}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveHours}
+                        disabled={savingSection}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Save className="h-3 w-3" />
+                        <span>{savingSection ? "Saving..." : "Save Hours"}</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">{currentExt?.credits ?? course.credits ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Credits</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{currentExt?.total_theory_hours ?? course.total_theory_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Theory Hours</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{currentExt?.total_lab_hours ?? course.total_lab_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Lab Hours</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{currentExt?.lecture_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Lecture (L)</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{currentExt?.tutorial_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Tutorial (T)</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{currentExt?.practical_hours ?? 0}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Practical (P)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Two Columns: Objectives/Outcomes/Textbooks (Left) & Units Hierarchy (Right) ── */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Left Column: Objectives & Outcomes & Textbooks */}
+                <div className="space-y-6 lg:col-span-1">
+                  {/* ── Course Objectives Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Award className="h-4 w-4 text-indigo-500" />
+                        <span>Course Objectives</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "objectives" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddObjectiveRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Objective"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveObjectives}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditObjectives}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {editingSection === "objectives" ? (
+                      <div className="mt-3 space-y-3">
+                        {objectivesDraft.map((obj, idx) => (
+                          <div key={obj.id} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 dark:border-slate-700 dark:bg-slate-800/40">
+                            <input
+                              type="number"
+                              min={1}
+                              value={obj.objective_number}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setObjectivesDraft(objectivesDraft.map((o) => o.id === obj.id ? { ...o, objective_number: val } : o));
+                              }}
+                              className="w-12 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                              placeholder="#"
+                            />
+                            <textarea
+                              rows={2}
+                              value={obj.description}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setObjectivesDraft(objectivesDraft.map((o) => o.id === obj.id ? { ...o, description: val } : o));
+                              }}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              placeholder="Objective description..."
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteObjectiveRow(obj.id)}
+                              className="mt-1 rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                              title="Delete Objective"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {objectivesDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No objectives. Click &apos;Add&apos; to create one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <ul className="mt-3 space-y-2.5">
+                        {(currentExt?.objectives || []).map((obj: any, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                              {obj.objective_number || idx + 1}
+                            </span>
+                            <span className="leading-relaxed">{obj.description}</span>
+                          </li>
+                        ))}
+                        {(!currentExt?.objectives || currentExt.objectives.length === 0) && (
+                          <li className="text-xs text-slate-400 italic">No specific objectives defined.</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* ── Course Outcomes Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span>Course Outcomes (COs)</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "outcomes" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddOutcomeRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Course Outcome"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveOutcomes}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditOutcomes}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {editingSection === "outcomes" ? (
+                      <div className="mt-3 space-y-3">
+                        {outcomesDraft.map((co, idx) => (
+                          <div key={co.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                value={co.co_code}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setOutcomesDraft(outcomesDraft.map((item) => item.id === co.id ? { ...item, co_code: val } : item));
+                                }}
+                                className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                                placeholder="CO#"
+                              />
+                              <select
+                                value={co.knowledge_level || "K2 - Understand"}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setOutcomesDraft(outcomesDraft.map((item) => item.id === co.id ? { ...item, knowledge_level: val } : item));
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              >
+                                {KNOWLEDGE_LEVELS.map((lvl) => (
+                                  <option key={lvl} value={lvl}>{lvl}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteOutcomeRow(co.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                title="Delete Outcome"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={co.description}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOutcomesDraft(outcomesDraft.map((item) => item.id === co.id ? { ...item, description: val } : item));
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              placeholder="Course outcome description..."
+                            />
+                          </div>
+                        ))}
+                        {outcomesDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No course outcomes. Click &apos;Add&apos; to create one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {(currentExt.outcomes || []).map((co: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                {co.co_code}
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {co.knowledge_level && (
+                                  <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                    {co.knowledge_level}
+                                  </span>
+                                )}
+                                {co.bloom_level && (
+                                  <span className="rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/80 dark:text-purple-300">
+                                    {co.bloom_level}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed">
+                              {co.description}
+                            </p>
+                            {co.reason_for_inferred_level && (
+                              <div className="mt-1.5 rounded-lg bg-indigo-50/50 px-2 py-1 text-[11px] text-indigo-700 italic dark:bg-indigo-950/30 dark:text-indigo-300">
+                                💡 Inferred Level Rationale: {co.reason_for_inferred_level}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {(!currentExt.outcomes || currentExt.outcomes.length === 0) && (
+                          <p className="text-xs text-slate-400 italic">No course outcomes extracted.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Prescribed Textbooks Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-purple-500" />
+                        <span>Prescribed Textbooks</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "textbooks" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddTextbookRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Textbook"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveTextbooks}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditTextbooks}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {editingSection === "textbooks" ? (
+                      <div className="mt-3 space-y-3">
+                        {textbooksDraft.map((t, idx) => (
+                          <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                value={t.title}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, title: val } : item));
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                placeholder="Book Title"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTextbookRow(t.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                title="Delete Textbook"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={t.authorsStr}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, authorsStr: val } : item));
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                              placeholder="Authors (comma-separated)"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={t.publisher || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, publisher: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Publisher"
+                              />
+                              <input
+                                type="number"
+                                value={t.publication_year || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTextbooksDraft(textbooksDraft.map((item) => item.id === t.id ? { ...item, publication_year: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Year"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {textbooksDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No textbooks. Click &apos;Add&apos; to record one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2.5">
+                        {(currentExt?.textbooks || []).map((b: any, idx: number) => (
+                          <div key={idx} className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+                            <p className="font-semibold text-slate-900 dark:text-white">{b.title}</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors} {b.publisher ? `— ${b.publisher}` : ""} {b.publication_year ? `(${b.publication_year})` : ""}
+                            </p>
+                          </div>
+                        ))}
+                        {(!currentExt?.textbooks || currentExt.textbooks.length === 0) && (
+                          <p className="text-xs text-slate-400 italic">No textbooks recorded.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Prescribed Reference Books Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-teal-500" />
+                        <span>Reference Books</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "reference_books" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddReferenceBookRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Reference Book"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveReferenceBooks}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditReferenceBooks}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {editingSection === "reference_books" ? (
+                      <div className="mt-3 space-y-3">
+                        {referenceBooksDraft.map((t) => (
+                          <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                value={t.title}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, title: val } : item));
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                placeholder="Reference Book Title"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReferenceBookRow(t.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                title="Delete Reference Book"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={t.authorsStr}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, authorsStr: val } : item));
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                              placeholder="Authors (comma-separated)"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={t.publisher || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, publisher: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Publisher"
+                              />
+                              <input
+                                type="number"
+                                value={t.publication_year || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, publication_year: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Year"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {referenceBooksDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No reference books. Click &apos;Add&apos; to record one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2.5">
+                        {(currentExt?.reference_books || []).map((b: any, idx: number) => (
+                          <div key={idx} className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+                            <p className="font-semibold text-slate-900 dark:text-white">{b.title}</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors} {b.publisher ? `— ${b.publisher}` : ""} {b.publication_year ? `(${b.publication_year})` : ""}
+                            </p>
+                          </div>
+                        ))}
+                        {(!currentExt?.reference_books || currentExt.reference_books.length === 0) && (
+                          <p className="text-xs text-slate-400 italic">No reference books recorded.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Right Column: Curriculum Hierarchy (Units, Topics & Subtopics) ── */}
+                <div className="space-y-4 lg:col-span-2">
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          Curriculum Hierarchy (Units, Topics & Subtopics)
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {units.length} Units • Structured hierarchical teaching units
+                        </p>
+                      </div>
+
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => openUnitModal("add")}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Add Unit</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-5 space-y-6">
+                      {units.map((u: any, uIdx: number) => (
+                        <div
+                          key={u.id || uIdx}
+                          className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
+                        >
+                          {/* Unit Header Bar */}
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-md bg-indigo-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white shadow-2xs dark:bg-indigo-500">
+                                  Unit {u.unit_number}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                  {u.unit_title}
+                                </h4>
+                              </div>
+                              {u.unit_overview && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                                  {u.unit_overview}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-lg bg-slate-200/70 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                {u.theory_hours || 0} Theory Hrs • {u.lab_hours || 0} Lab Hrs
+                              </span>
+
+                              {canEdit && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openTopicModal("add", u.id)}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                    title="Add Topic to this Unit"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    <span>Add Topic</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUnitModal("edit", u)}
+                                    className="rounded-lg border border-slate-200 bg-white p-1 text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    title="Edit Unit"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteUnit(u.id)}
+                                    className="rounded-lg border border-rose-200 bg-rose-50 p-1 text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                    title="Delete Unit"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Topics List (Hierarchical children of Unit) */}
+                          <div className="mt-4 space-y-3">
+                            {(u.topics || []).map((t: any, tIdx: number) => (
+                              <div
+                                key={t.id || tIdx}
+                                className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800"
+                              >
+                                {/* Topic Title & Controls */}
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-xs text-slate-900 dark:text-white">
+                                      {t.topic_code ? `${t.topic_code} : ` : ""}{t.topic_name}
+                                    </span>
+                                    {t.knowledge_level && (
+                                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                        {t.knowledge_level}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {canEdit && (
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => openSubtopicModal("add", t.id)}
+                                        className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-400"
+                                        title="Add Subtopic under this Topic"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                        <span>Add Subtopic</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openTopicModal("edit", u.id, t)}
+                                        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                                        title="Edit Topic"
+                                      >
+                                        <Edit2 className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteTopic(t.id)}
+                                        className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                        title="Delete Topic"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {t.topic_description && (
+                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {t.topic_description}
+                                  </p>
+                                )}
+
+                                {/* Subtopics: Rendered Hierarchically Under Parent Topic */}
+                                <div className="mt-3 ml-3 border-l-2 border-indigo-200 pl-3.5 space-y-2 dark:border-indigo-900/60">
+                                  {(t.subtopics || []).map((st: any, stIdx: number) => (
+                                    <div
+                                      key={st.id || stIdx}
+                                      className="group flex items-center justify-between gap-2 rounded-lg bg-slate-50/70 px-2.5 py-1.5 text-xs transition hover:bg-slate-100 dark:bg-slate-850/60 dark:hover:bg-slate-850"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                                        <span className="font-medium text-slate-700 dark:text-slate-200">
+                                          {st.subtopic_code ? `${st.subtopic_code} : ` : ""}{st.subtopic_name}
+                                        </span>
+                                        {st.subtopic_description && (
+                                          <span className="text-[11px] text-slate-400">
+                                            — {st.subtopic_description}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {canEdit && (
+                                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                          <button
+                                            type="button"
+                                            onClick={() => openSubtopicModal("edit", t.id, st)}
+                                            className="rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                            title="Edit Subtopic"
+                                          >
+                                            <Edit2 className="h-2.5 w-2.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteSubtopic(st.id)}
+                                            className="rounded p-0.5 text-slate-400 hover:text-rose-600"
+                                            title="Delete Subtopic"
+                                          >
+                                            <Trash2 className="h-2.5 w-2.5" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                  {(!t.subtopics || t.subtopics.length === 0) && (
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-400 italic">
+                                      <span>No subtopics nested.</span>
+                                      {canEdit && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openSubtopicModal("add", t.id)}
+                                          className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400 not-italic"
+                                        >
+                                          + Add Subtopic
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+
+                            {(!u.topics || u.topics.length === 0) && (
+                              <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
+                                <span>No topics in this unit yet.</span>
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openTopicModal("add", u.id)}
+                                    className="ml-2 font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                                  >
+                                    Add Topic
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {units.length === 0 && (
+                        <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center dark:border-slate-800">
+                          <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                            No curriculum units recorded
+                          </p>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => openUnitModal("add")}
+                              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Create First Unit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 2: CO-PO MAPPING ── */}
+      {activeTab === "copo" && (
+        <div className="space-y-6">
+          {renderVersionCards("copo")}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Course Outcome to Program Outcome (CO-PO) Correlation Matrix
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Accreditation correlation matrix (1 = Low, 2 = Medium, 3 = High, 0 = None)
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {currentCopo?.is_approved ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  CO-PO Matrix Approved
+                </span>
+              ) : currentCopo ? (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                  Draft Version v{currentCopo.version_number || currentCopo.version_id}
+                </span>
+              ) : null}
+
+              {/* Coordinator Controls */}
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGenerateCopoModal}
+                  disabled={isCopoBusy || actionLoading === "generate_copo"}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isCopoBusy ? "Generating CO-PO..." : "Generate CO-PO Mapping"}
+                </button>
+              )}
+
+              {isCoord && currentCopo && !currentCopo.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApproveCopo(currentCopo.copo_id)}
+                  disabled={actionLoading === `approve_copo_${currentCopo.copo_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_copo_${currentCopo.copo_id}` ? "Approving..." : "Approve CO-PO"}
+                </button>
+              )}
+
+              {isCoord && currentCopo && currentCopo.is_approved && !currentCopo.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivateCopo(currentCopo.copo_id)}
+                  disabled={actionLoading === `activate_copo_${currentCopo.copo_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_copo_${currentCopo.copo_id}` ? "Activating..." : "Set as Active"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Delta Changes Notice Banner */}
+          {Object.keys(copoDirtyCells).length > 0 && (
+            <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/50 dark:text-indigo-200">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <span>You have <strong>{Object.keys(copoDirtyCells).length}</strong> unsaved matrix cell change(s).</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCopoDirtyCells({})}
+                  className="rounded-lg border border-slate-300 px-3 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={saveCopoDeltaChanges}
+                  disabled={savingCopoDelta}
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <Save className="h-3 w-3" />
+                  <span>{savingCopoDelta ? "Saving..." : "Save Changes"}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!currentCopo ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <Layers className="h-10 w-10 text-slate-400" />
+              <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
+                No CO-PO Mapping Generated
+              </h3>
+              <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                {isCoord
+                  ? "Click 'Generate CO-PO Mapping' to trigger AI matrix generation based on an approved curriculum extraction."
+                  : "The course coordinator has not generated a CO-PO mapping version for this course yet."}
+              </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGenerateCopoModal}
+                  disabled={isCopoBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate CO-PO Mapping</span>
+                </button>
+              )}
+            </div>
+          ) : (() => {
+            // Compute unique POs and COs for n x m grid
+            const entries = currentCopo.matrix_entries || [];
+            const posMap = new Map<number, { po_id: number; po_code: string }>();
+            const cosMap = new Map<number, { course_outcome_id: number; co_code: string; description?: string }>();
+            const cellMap = new Map<string, any>();
+            const extOutcomesMap = new Map<number, any>();
+            (currentExt?.outcomes || []).forEach((o: any) => extOutcomesMap.set(o.id, o));
+
+            entries.forEach((e: any) => {
+              if (!posMap.has(e.po_id)) {
+                posMap.set(e.po_id, { po_id: e.po_id, po_code: e.po_code || `PO${e.po_id}` });
+              }
+              if (!cosMap.has(e.course_outcome_id)) {
+                const extCo = extOutcomesMap.get(e.course_outcome_id);
+                cosMap.set(e.course_outcome_id, {
+                  course_outcome_id: e.course_outcome_id,
+                  co_code: e.co_code || extCo?.co_code || `CO${e.course_outcome_id}`,
+                  description: extCo?.description,
+                });
+              }
+              cellMap.set(`${e.course_outcome_id}_${e.po_id}`, e);
+            });
+
+            const posList = Array.from(posMap.values()).sort((a, b) => {
+              const numA = parseInt(a.po_code.replace(/\D/g, "")) || a.po_id;
+              const numB = parseInt(b.po_code.replace(/\D/g, "")) || b.po_id;
+              return numA - numB;
+            });
+
+            const cosList = Array.from(cosMap.values()).sort((a, b) => {
+              const numA = parseInt(a.co_code.replace(/\D/g, "")) || a.course_outcome_id;
+              const numB = parseInt(b.co_code.replace(/\D/g, "")) || b.course_outcome_id;
+              return numA - numB;
+            });
+
+            const canEditMatrix = Boolean(isCoord && currentCopo && !selectedVersionData.copo);
 
             return (
-              <>
-                {state.selectedReferenceId !== "cia-papers" && (
-                  <SyllabusHeaderCard
-                    title={currentHeaderData.title}
-                    icon={currentHeaderData.icon}
-                    subtitle={currentHeaderData.subtitle}
-                    approvedBy={activeApprovedBy}
-                    approvedDate={activeApprovedDate}
-                    unitsCountText={`${dynamicUnits.length} Units`}
-                    versionBadgeText={activeVersionBadgeText}
-                    bannerProgramme={activeProgramme}
-                    bannerBatch={activeBatch}
-                    bannerSemester={activeSemester}
-                    courseCode={activeCourseCode}
-                    courseTitle={activeCourseTitle}
-                  />
-                )}
-
-                {state.selectedReferenceId === "cia-papers" && (
-                  <div id="cia-papers-section" className="space-y-4 scroll-mt-36">
-                    <CIAQuestionPapersCard
-                      title="CIA QUESTION PAPERS"
-                      subtitle="Continuous Internal Assessment examination papers approved for this course."
-                      courseCode={activeCourseCode}
-                      courseTitle={activeCourseTitle}
-                      programme={activeProgramme}
-                      batch={activeBatch}
-                      semester={activeSemester}
-                    />
-                    <CIAPaperHeaderCard onPrint={() => window.print()} />
-                    <div id="printable-question-paper">
-                      <CIAQuestionPaperViewCard />
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Correlation Matrix ({cosList.length} COs × {posList.length} POs)
+                      </span>
+                      {canEditMatrix && (
+                        <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                          Click any cell to edit score & justification
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 3 = High</span>
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 2 = Medium</span>
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 1 = Low</span>
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> 0 = None</span>
                     </div>
                   </div>
-                )}
-                {(state.selectedReferenceId === "syllabus" || state.selectedReferenceId === "copo") && (
-                  <div className="sticky top-20 z-20 backdrop-blur-md dark:bg-gray-900/95 overflow-x-auto pt-2.5 pb-0 -mb-1">
-                    <GenericTabs
-                      tabs={activeTabs}
-                      activeKey={state.activeSubTab}
-                      noWrap={true}
-                      onChange={(tabKey: any) => {
-                        setState({ activeSubTab: tabKey });
-                        const el = document.getElementById(tabKey);
-                        if (el) {
-                          const y =
-                            el.getBoundingClientRect().top +
-                            window.pageYOffset -
-                            140;
-                          window.scrollTo({ top: y, behavior: "smooth" });
-                        }
-                      }}
-                    />
+
+                  <table className="mt-4 w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                        <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-24">CO</th>
+                        <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 min-w-[200px]">Outcome Description</th>
+                        {posList.map((po) => (
+                          <th key={po.po_id} className="py-2.5 px-2 text-center font-bold text-slate-700 dark:text-slate-300 w-16">
+                            {po.po_code}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {cosList.map((co) => (
+                        <tr key={co.course_outcome_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                          <td className="py-2.5 px-3 font-bold text-indigo-600 dark:text-indigo-400">
+                            {co.co_code}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
+                            {co.description || "—"}
+                          </td>
+                          {posList.map((po) => {
+                            const entry = cellMap.get(`${co.course_outcome_id}_${po.po_id}`);
+                            if (!entry) {
+                              return <td key={po.po_id} className="py-2.5 px-2 text-center text-slate-300">—</td>;
+                            }
+                            const dirty = copoDirtyCells[entry.id];
+                            const currentVal = dirty !== undefined ? dirty.matrix_value : (entry.matrix_value ?? 0);
+                            const currentJust = dirty?.justification !== undefined ? dirty.justification : (entry.justification || "");
+                            const isDirty = dirty !== undefined;
+
+                            let colorClass = "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500";
+                            if (currentVal === 3) colorClass = "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-bold";
+                            else if (currentVal === 2) colorClass = "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 font-bold";
+                            else if (currentVal === 1) colorClass = "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-semibold";
+
+                            return (
+                              <td key={po.po_id} className="py-2 px-1 text-center">
+                                <button
+                                  type="button"
+                                  disabled={!canEditMatrix}
+                                  onClick={() => setCopoEditingCell({
+                                    id: entry.id,
+                                    co_code: co.co_code,
+                                    po_code: po.po_code,
+                                    matrix_value: currentVal,
+                                    justification: currentJust,
+                                  })}
+                                  title={currentJust ? `${co.co_code} → ${po.po_code}: ${currentJust}` : `${co.co_code} → ${po.po_code} (${currentVal})`}
+                                  className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition ${colorClass} ${
+                                    canEditMatrix ? "cursor-pointer hover:scale-110 hover:shadow-xs" : "cursor-default"
+                                  } ${isDirty ? "ring-2 ring-indigo-500" : ""}`}
+                                >
+                                  {currentVal}
+                                </button>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Justification Details Reference */}
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    Matrix Correlation Justifications ({entries.filter((e: any) => e.justification || copoDirtyCells[e.id]?.justification).length})
+                  </h4>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                    {entries
+                      .filter((e: any) => (copoDirtyCells[e.id]?.justification ?? e.justification))
+                      .map((e: any) => {
+                        const val = copoDirtyCells[e.id]?.matrix_value ?? e.matrix_value;
+                        const just = copoDirtyCells[e.id]?.justification ?? e.justification;
+                        return (
+                          <div key={e.id} className="rounded-lg bg-slate-50 p-2.5 text-xs dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
+                              <span>{e.co_code || `CO${e.course_outcome_id}`} → {e.po_code || `PO${e.po_id}`}</span>
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                Level {val}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                              {just}
+                            </p>
+                          </div>
+                        );
+                      })}
                   </div>
-                )}
-
-                {state.selectedReferenceId === "syllabus" && (
-                  <>
-                    <div id="course-info" className="scroll-mt-36">
-                      <CourseInformationCard
-                        courseCode={activeCourseCode}
-                        courseTitle={activeCourseTitle}
-                      />
-                    </div>
-
-                    <div id="course-outcomes" className="scroll-mt-36">
-                      <CourseOutcomesCard
-                        title="COURSE OUTCOMES"
-                        approvedCountText={`${dynamicOutcomes.length} Approved Statements`}
-                        outcomes={dynamicOutcomes}
-                        coverageUnitsText={`${dynamicUnits.length} Units`}
-                        coverageTheoryHoursText={`${dynamicTheoryHours} Theory Hours`}
-                        coverageLabHoursText={`${dynamicLabHours} Lab Hours`}
-                        coverageTopicsText={`${dynamicUnits.reduce((acc: number, u: any) => acc + (u.topics?.length || 0), 0)} Syllabus Topics`}
-                      />
-                    </div>
-
-                    <div id="unit-syllabus" className="scroll-mt-36">
-                      <UnitWiseSyllabusCard
-                        title="UNIT-WISE SYLLABUS"
-                        headerStatsText={`${dynamicUnits.length} Units`}
-                        units={dynamicUnits}
-                        onHierarchyClick={(unitNum) =>
-                          console.log("Hierarchy clicked for unit:", unitNum)
-                        }
-                      />
-                    </div>
-
-                    <div id="theory-lab" className="scroll-mt-36">
-                      <TheoryAndLabCard
-                        title="THEORY & LABORATORY"
-                        headerSubtitle="Curriculum Allocation"
-                        theoryHours={dynamicTheoryHours}
-                        labHours={dynamicLabHours}
-                        experiments={dynamicLaboratoryExperiments}
-                      />
-                    </div>
-
-                    <div id="textbooks" className="scroll-mt-36">
-                      <TextbooksCard
-                        title="TEXTBOOKS"
-                        headerSubtitle="Approved Prescribed Literature"
-                        textbooks={dynamicTextbooks}
-                      />
-                    </div>
-
-                    <div id="reference-books" className="scroll-mt-36">
-                      <ReferenceBooksCard
-                        title="REFERENCE BOOKS"
-                        headerSubtitle="Supplementary Academic References"
-                        references={dynamicReferences}
-                      />
-                    </div>
-                  </>
-                )}
-                {state.selectedReferenceId === "copo" && (
-                  <>
-                    <div id="course-outcomes" className="scroll-mt-36">
-                      <CourseOutcomesCard
-                        title="COURSE OUTCOMES"
-                        approvedCountText={`${dynamicOutcomes.length} Approved Statements`}
-                        outcomes={dynamicOutcomes}
-                        isCopoView={true}
-                      />
-                    </div>
-
-                    <div id="copo-matrix" className="scroll-mt-36">
-                      <CopoMappingMatrixCard
-                        title="CO–PO MAPPING MATRIX"
-                        subtitle="Shows how each Course Outcome is mapped to the Program Outcomes."
-                        headerStatsText={`${dynamicOutcomes.length} × ${dynamicPoHeaders.length} Matrix`}
-                        poHeaders={dynamicPoHeaders}
-                        rows={dynamicCopoRows}
-                      />
-                    </div>
-
-                    <div id="mapping-rationale" className="scroll-mt-36">
-                      <MappingRationaleCard
-                        title="MAPPING RATIONALE"
-                        subtitle="Detailed justification for each mapped Course Outcome."
-                        headerStatsText={`${dynamicRationaleItems.length} Outcomes`}
-                        items={dynamicRationaleItems}
-                      />
-                    </div>
-
-                    <div id="program-outcomes" className="scroll-mt-36">
-                      <MappingRationaleCard
-                        title="PROGRAM OUTCOMES"
-                        subtitle="View the Program Outcomes used for this course mapping."
-                        headerStatsText={`${dynamicPoHeaders.length} Program Outcomes`}
-                        items={(state.copoData?.program_outcomes || []).map((po: any) => ({
-                          id: po.code || po.po_code,
-                          poCode: po.code || po.po_code,
-                          poTitle: po.title || po.name || po.code,
-                          description: po.description || po.statement || "",
-                        }))}
-                      />
-                    </div>
-                  </>
-                )}
-                {state.selectedReferenceId === "topics" && (
-                  <div id="topics-section" className="scroll-mt-36">
-                    <CourseTopicsCard units={dynamicTopicUnits} />
-                  </div>
-                )}
-
-                {state.selectedReferenceId === "pedagogy" && (
-                  <div id="pedagogy-section" className="scroll-mt-36">
-                    <PedagogyTopicsCard
-                      title="TEACHING APPROACHES OF TOPICS"
-                      subtitle="Approved teaching methods for each topic in the course."
-                      headerStatsText={`${dynamicPedagogyUnits.length} Units`}
-                      units={dynamicPedagogyUnits}
-                    />
-                  </div>
-                )}
-
-                {state.selectedReferenceId === "lesson-plan" && (
-                  <div id="lesson-plan-section" className="scroll-mt-36">
-                    <LessonPlanTopicsCard
-                      title="LESSON PLAN OF TOPICS"
-                      subtitle="Prescribed teaching methods, textbooks and reference books for each topic."
-                      headerStatsText={`${dynamicLessonUnits.length} Units`}
-                      units={dynamicLessonUnits}
-                    />
-                  </div>
-                )}
-
-                {state.selectedReferenceId === "learning-materials" && (
-                  <div id="learning-materials-section" className="scroll-mt-36">
-                    <LearningMaterialsCard
-                      title="LEARNING MATERIALS OF TOPICS"
-                      subtitle="Coordinator-approved study materials, lecture notes, and learning content."
-                      headerStatsText={`${dynamicLearningMaterialUnits.length} Units`}
-                      units={dynamicLearningMaterialUnits}
-                    />
-                  </div>
-                )}
-
-                {state.selectedReferenceId === "question-bank" && (
-                  <div id="question-bank-section" className="scroll-mt-36">
-                    <QuestionBankTopicsCard
-                      title="QUESTION BANK OF TOPICS"
-                      subtitle="Approved question sets and MCQ repositories aligned with syllabus units and outcomes."
-                      headerStatsText={`${dynamicQuestionBankUnits.reduce((acc, u) => acc + (u.questions?.length || 0), 0)} Questions`}
-                      units={dynamicQuestionBankUnits}
-                    />
-                  </div>
-                )}
-
-
-              </>
+                </div>
+              </div>
             );
           })()}
         </div>
+      )}
+
+      {/* ── TAB 3: PEDAGOGY & DELIVERY ── */}
+      {activeTab === "pedagogy" && (
+        <div className="space-y-6">
+          {renderVersionCards("pedagogy")}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Instructional Strategies & Topic Delivery Methods
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Suggested pedagogical approaches, activity models, and learning modes
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {currentPedagogy?.is_approved ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Pedagogy Approved
+                </span>
+              ) : currentPedagogy ? (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                  Draft Version v{currentPedagogy.version_number || currentPedagogy.version_id}
+                </span>
+              ) : null}
+
+              {/* Coordinator Controls */}
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGeneratePedagogyModal}
+                  disabled={isPedagogyBusy || actionLoading === "generate_pedagogy"}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isPedagogyBusy ? "Generating Pedagogy..." : "Generate Pedagogy"}
+                </button>
+              )}
+
+              {isCoord && currentPedagogy && !currentPedagogy.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApprovePedagogy(currentPedagogy.pedagogy_id)}
+                  disabled={actionLoading === `approve_pedagogy_${currentPedagogy.pedagogy_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_pedagogy_${currentPedagogy.pedagogy_id}` ? "Approving..." : "Approve Pedagogy"}
+                </button>
+              )}
+
+              {isCoord && currentPedagogy && currentPedagogy.is_approved && !currentPedagogy.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivatePedagogy(currentPedagogy.pedagogy_id)}
+                  disabled={actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}` ? "Activating..." : "Set as Active"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!currentPedagogy ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <Presentation className="h-10 w-10 text-slate-400" />
+              <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
+                No Pedagogy Generated
+              </h3>
+              <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                {isCoord
+                  ? "Click 'Generate Pedagogy' to automatically synthesize topic-level teaching delivery methods based on an approved curriculum extraction."
+                  : "The course coordinator has not generated pedagogy strategies for this course yet."}
+              </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGeneratePedagogyModal}
+                  disabled={isPedagogyBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate Pedagogy</span>
+                </button>
+              )}
+            </div>
+          ) : (() => {
+            const unitsList = currentExt?.units || activeExt?.units || [];
+            const topicSuggestions = currentPedagogy.topic_suggestions || [];
+            const sugByTopicId = new Map<number, any>();
+            topicSuggestions.forEach((s: any) => sugByTopicId.set(s.topic_id, s));
+
+            const canEditPedagogy = Boolean(isCoord && currentPedagogy && !selectedVersionData.pedagogy);
+            const renderedSugIds = new Set<number>();
+            const hasUnits = unitsList.length > 0;
+
+            const renderStrategyCards = (sug: any) => (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Pedagogy 1: Primary Strategy */}
+                <div className="rounded-xl border border-emerald-200/80 bg-white p-3.5 shadow-2xs dark:border-emerald-900/60 dark:bg-slate-900 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        1. Primary Strategy
+                      </span>
+                      {sug.bloom_level_1 && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {sug.bloom_level_1}
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                      {sug.pedagogy_suggested_1 || "Direct Instruction & Discussion"}
+                    </h5>
+                    {sug.methodology_1 && (
+                      <p className="mt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        {sug.methodology_1}
+                      </p>
+                    )}
+                    {sug.description_1 && (
+                      <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {sug.description_1}
+                      </p>
+                    )}
+                  </div>
+                  {Array.isArray(sug.advantages_1) && sug.advantages_1.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
+                      {sug.advantages_1.map((adv: string, aIdx: number) => (
+                        <span key={aIdx} className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300">
+                          ✓ {adv}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pedagogy 2: Alternative 1 */}
+                <div className="rounded-xl border border-sky-200/80 bg-white p-3.5 shadow-2xs dark:border-sky-900/60 dark:bg-slate-900 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                        2. Alternative Strategy 1
+                      </span>
+                      {sug.bloom_level_2 && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {sug.bloom_level_2}
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                      {sug.pedagogy_suggested_2 || "Collaborative Problem Solving"}
+                    </h5>
+                    {sug.methodology_2 && (
+                      <p className="mt-1 text-[11px] font-medium text-sky-600 dark:text-sky-400">
+                        {sug.methodology_2}
+                      </p>
+                    )}
+                    {sug.description_2 && (
+                      <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {sug.description_2}
+                      </p>
+                    )}
+                  </div>
+                  {Array.isArray(sug.advantages_2) && sug.advantages_2.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
+                      {sug.advantages_2.map((adv: string, aIdx: number) => (
+                        <span key={aIdx} className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700 dark:bg-sky-950/70 dark:text-sky-300">
+                          ✓ {adv}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pedagogy 3: Alternative 2 */}
+                <div className="rounded-xl border border-violet-200/80 bg-white p-3.5 shadow-2xs dark:border-violet-900/60 dark:bg-slate-900 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                        3. Alternative Strategy 2
+                      </span>
+                      {sug.bloom_level_3 && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {sug.bloom_level_3}
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                      {sug.pedagogy_suggested_3 || "Flipped Classroom / Project Work"}
+                    </h5>
+                    {sug.methodology_3 && (
+                      <p className="mt-1 text-[11px] font-medium text-violet-600 dark:text-violet-400">
+                        {sug.methodology_3}
+                      </p>
+                    )}
+                    {sug.description_3 && (
+                      <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {sug.description_3}
+                      </p>
+                    )}
+                  </div>
+                  {Array.isArray(sug.advantages_3) && sug.advantages_3.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
+                      {sug.advantages_3.map((adv: string, aIdx: number) => (
+                        <span key={aIdx} className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-950/70 dark:text-violet-300">
+                          ✓ {adv}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+
+            const renderEditForm = (sug: any, topicName: string) => (
+              <div className="space-y-4 rounded-xl border border-indigo-200 bg-white p-4 dark:border-indigo-900 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
+                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    Edit 3 Pedagogical Delivery Strategies: {topicName}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingPedagogyTopicId(null)}
+                      className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => savePedagogyTopic(sug.id)}
+                      disabled={savingPedagogyTopic}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>{savingPedagogyTopic ? "Saving..." : "Save Strategies"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Strategy 1 Form */}
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/20 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/20 space-y-2.5">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">1. Primary Strategy</span>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Name</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.pedagogy_suggested_1 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_1: e.target.value })}
+                        placeholder="e.g. Flipped Classroom"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                      <select
+                        value={pedagogyDraft.bloom_level_1 || "K2 - Understand"}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_1: e.target.value })}
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Methodology</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.methodology_1 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_1: e.target.value })}
+                        placeholder="e.g. Direct Instruction & Guided Problem Solving"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Description</label>
+                      <textarea
+                        rows={2}
+                        value={pedagogyDraft.description_1 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_1: e.target.value })}
+                        placeholder="Brief instructional description..."
+                        className="mt-1 w-full rounded border border-slate-200 bg-white p-2 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Strategy 2 Form */}
+                  <div className="rounded-lg border border-sky-200 bg-sky-50/20 p-3.5 dark:border-sky-900/60 dark:bg-sky-950/20 space-y-2.5">
+                    <span className="text-xs font-bold text-sky-700 dark:text-sky-400">2. Alternative Strategy 1</span>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Name</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.pedagogy_suggested_2 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_2: e.target.value })}
+                        placeholder="e.g. Collaborative Problem Solving"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                      <select
+                        value={pedagogyDraft.bloom_level_2 || "K3 - Apply"}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_2: e.target.value })}
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Methodology</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.methodology_2 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_2: e.target.value })}
+                        placeholder="e.g. Small group case discussions"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Description</label>
+                      <textarea
+                        rows={2}
+                        value={pedagogyDraft.description_2 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_2: e.target.value })}
+                        placeholder="Brief instructional description..."
+                        className="mt-1 w-full rounded border border-slate-200 bg-white p-2 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Strategy 3 Form */}
+                  <div className="rounded-lg border border-violet-200 bg-violet-50/20 p-3.5 dark:border-violet-900/60 dark:bg-violet-950/20 space-y-2.5">
+                    <span className="text-xs font-bold text-violet-700 dark:text-violet-400">3. Alternative Strategy 2</span>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Name</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.pedagogy_suggested_3 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_3: e.target.value })}
+                        placeholder="e.g. Think-Pair-Share"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                      <select
+                        value={pedagogyDraft.bloom_level_3 || "K4 - Analyze"}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_3: e.target.value })}
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Methodology</label>
+                      <input
+                        type="text"
+                        value={pedagogyDraft.methodology_3 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_3: e.target.value })}
+                        placeholder="e.g. Self-paced guided inquiry"
+                        className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Description</label>
+                      <textarea
+                        rows={2}
+                        value={pedagogyDraft.description_3 || ""}
+                        onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_3: e.target.value })}
+                        placeholder="Brief instructional description..."
+                        className="mt-1 w-full rounded border border-slate-200 bg-white p-2 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+
+            return (
+              <div className="space-y-6">
+                {hasUnits ? (
+                  unitsList.map((unit: any, uIdx: number) => {
+                    const uTopics = unit.topics || [];
+                    if (uTopics.length === 0) return null;
+
+                    return (
+                      <div
+                        key={unit.id || uIdx}
+                        className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4"
+                      >
+                        {/* Unit Card Header */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                          <div className="flex items-center gap-2.5">
+                            <span className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                              Unit {unit.unit_number}
+                            </span>
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                {unit.unit_title}
+                              </h4>
+                              {unit.unit_overview && (
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+                                  {unit.unit_overview}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            {uTopics.length} Topics
+                          </span>
+                        </div>
+
+                        {/* Topics List with 3 Pedagogies Card Views */}
+                        <div className="space-y-4">
+                          {uTopics.map((topic: any, tIdx: number) => {
+                            const sug = sugByTopicId.get(topic.id);
+                            if (sug) renderedSugIds.add(sug.id);
+                            const isEditingThisTopic = sug && editingPedagogyTopicId === sug.id;
+
+                            return (
+                              <div
+                                key={topic.id || tIdx}
+                                className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-3"
+                              >
+                                {/* Topic Card Header */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-750">
+                                  <div className="flex items-center gap-2">
+                                    <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                      Topic {unit.unit_number}.{topic.topic_number || tIdx + 1}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                      {topic.topic_name}
+                                    </span>
+                                  </div>
+
+                                  {canEditPedagogy && sug && !isEditingThisTopic && (
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditPedagogyTopic(sug)}
+                                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                    >
+                                      <Edit2 className="h-3 w-3 text-indigo-500" />
+                                      <span>Edit Pedagogies</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Body: 3 Pedagogies Cards or Edit Form */}
+                                {isEditingThisTopic ? (
+                                  renderEditForm(sug, topic.topic_name)
+                                ) : sug ? (
+                                  renderStrategyCards(sug)
+                                ) : (
+                                  <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
+                                    No pedagogy strategies recorded for this topic.
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : null}
+
+                {/* Fallback for unmapped suggestions (or if units list is empty) */}
+                {(() => {
+                  const unmapped = topicSuggestions.filter((s: any) => !renderedSugIds.has(s.id));
+                  if (unmapped.length === 0) return null;
+
+                  return (
+                    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 pb-2 dark:border-slate-800">
+                        {hasUnits ? "Additional Topic Pedagogies" : "Curriculum Topics Pedagogies"}
+                      </h4>
+                      <div className="space-y-4">
+                        {unmapped.map((sug: any, idx: number) => {
+                          const isEditingThisTopic = editingPedagogyTopicId === sug.id;
+                          const tName = sug.topic_name || `Topic #${sug.topic_id}`;
+
+                          return (
+                            <div
+                              key={sug.id || idx}
+                              className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-750">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                  {tName}
+                                </span>
+                                {canEditPedagogy && !isEditingThisTopic && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditPedagogyTopic(sug)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                                  >
+                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <span>Edit Pedagogies</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {isEditingThisTopic ? renderEditForm(sug, tName) : renderStrategyCards(sug)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {topicSuggestions.length === 0 && (
+                  <div className="py-8 text-center text-xs text-slate-400 italic">
+                    No topic suggestions recorded in this pedagogy version.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── TAB 4: LESSON PLAN & TIMELINE ── */}
+      {activeTab === "lesson_plan" && (
+        <div className="space-y-6">
+          {renderVersionCards("lesson_plan")}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Lecture Plan, Hourly Allocation & Delivery Schedule
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Target hours: {currentLessonPlan?.target_total_hours || 45} Hrs • Total Theory: {currentLessonPlan?.total_theory_hours || 0} Hrs • Total Lab: {currentLessonPlan?.total_lab_hours || 0} Hrs
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {currentLessonPlan?.is_approved ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Lesson Plan Approved
+                </span>
+              ) : currentLessonPlan ? (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                  Draft Version v{currentLessonPlan.version_number || currentLessonPlan.version_id}
+                </span>
+              ) : null}
+
+              {/* Coordinator Controls */}
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGenerateLessonPlanModal}
+                  disabled={isLessonPlanBusy || actionLoading === "generate_lp"}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isLessonPlanBusy ? "Generating Lesson Plan..." : "Generate Lesson Plan"}
+                </button>
+              )}
+
+              {isCoord && currentLessonPlan && !currentLessonPlan.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApproveLessonPlan(currentLessonPlan.lesson_plan_id)}
+                  disabled={actionLoading === `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}` ? "Approving..." : "Approve Lesson Plan"}
+                </button>
+              )}
+
+              {isCoord && currentLessonPlan && currentLessonPlan.is_approved && !currentLessonPlan.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivateLessonPlan(currentLessonPlan.lesson_plan_id)}
+                  disabled={actionLoading === `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}` ? "Activating..." : "Set as Active"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!currentLessonPlan ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <Calendar className="h-10 w-10 text-slate-400" />
+              <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
+                No Lesson Plan Generated
+              </h3>
+              <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                {isCoord
+                  ? "Click 'Generate Lesson Plan' to allocate hours across topics and subtopics based on syllabus requirements."
+                  : "The course coordinator has not generated a lesson plan for this course yet."}
+              </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGenerateLessonPlanModal}
+                  disabled={isLessonPlanBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate Lesson Plan</span>
+                </button>
+              )}
+            </div>
+          ) : (() => {
+            const slots = currentLessonPlan.topic_slots || [];
+            const groupsMap = new Map<string, { unitTitle: string; slots: any[]; totalHours: number }>();
+
+            slots.forEach((slot: any) => {
+              const uKey = slot.unit_title || (slot.unit_id ? `Unit ${slot.unit_id}` : "Curriculum Topics");
+              if (!groupsMap.has(uKey)) {
+                groupsMap.set(uKey, { unitTitle: uKey, slots: [], totalHours: 0 });
+              }
+              const g = groupsMap.get(uKey)!;
+              g.slots.push(slot);
+              g.totalHours += Number(slot.time_allocated) || 0;
+            });
+
+            const groupsList = Array.from(groupsMap.values());
+            const canEditLp = Boolean(isCoord && currentLessonPlan && !selectedVersionData.lesson_plan);
+
+            return (
+              <div className="space-y-6">
+                {groupsList.map((group, gIdx) => (
+                  <div
+                    key={gIdx}
+                    className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4"
+                  >
+                    {/* Unit Card Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                          Unit
+                        </span>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                          {group.unitTitle}
+                        </h4>
+                      </div>
+                      <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                        {group.totalHours} Total Allocated Hours
+                      </span>
+                    </div>
+
+                    {/* Topic Slots as Hierarchical Cards */}
+                    <div className="space-y-3.5">
+                      {group.slots.map((slot: any, sIdx: number) => {
+                        const isEditingThisSlot = editingLpSlotId === slot.id;
+                        const subSlots = slot.subtopic_slots || [];
+
+                        return (
+                          <div
+                            key={slot.id || sIdx}
+                            className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40 space-y-3"
+                          >
+                            {/* Topic Slot Header */}
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                                    Slot #{sIdx + 1}
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                    {slot.topic_name || `Topic #${slot.topic_id}`}
+                                  </span>
+                                </div>
+                                {slot.subtopic_name && (
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    ↳ Subtopic: {slot.subtopic_name}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-lg bg-indigo-100/70 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                                  {slot.time_allocated || 1} Hr(s)
+                                </span>
+                                {slot.bloom_level && (
+                                  <span className="rounded bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    {slot.bloom_level}
+                                  </span>
+                                )}
+                                {canEditLp && !isEditingThisSlot && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditLpSlot(slot)}
+                                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  >
+                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <span>Edit Slot</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Editing Topic Slot Form */}
+                            {isEditingThisSlot ? (
+                              <div className="rounded-lg border border-indigo-200 bg-white p-3 dark:border-indigo-900 dark:bg-slate-900 space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Allocated Hours</label>
+                                    <input
+                                      type="number"
+                                      min={0.5}
+                                      step={0.5}
+                                      value={lpSlotDraft.time_allocated}
+                                      onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, time_allocated: Number(e.target.value) })}
+                                      className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                                    <input
+                                      type="text"
+                                      value={lpSlotDraft.bloom_level}
+                                      onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, bloom_level: e.target.value })}
+                                      placeholder="e.g. Understand"
+                                      className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Suggested Activity</label>
+                                    <input
+                                      type="text"
+                                      value={lpSlotDraft.suggested_activity}
+                                      onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, suggested_activity: e.target.value })}
+                                      placeholder="e.g. Interactive discussion & code walk"
+                                      className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-end gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveLpSlot(slot.id)}
+                                    disabled={savingLpSlot}
+                                    className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                    <span>{savingLpSlot ? "Saving..." : "Save"}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingLpSlotId(null)}
+                                    className="rounded border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">Activity: </span>
+                                <span>{slot.suggested_activity || "Interactive lecture with hands-on practice & discussion"}</span>
+                              </div>
+                            )}
+
+                            {/* Hierarchical Subtopic Slots (if any) */}
+                            {subSlots.length > 0 && (
+                              <div className="border-t border-slate-200/60 pt-2.5 dark:border-slate-750 space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  Subtopic Delivery Schedule ({subSlots.length})
+                                </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {subSlots.map((sub: any) => {
+                                    const isEditingSub = editingLpSubtopicSlotId === sub.id;
+
+                                    if (isEditingSub) {
+                                      return (
+                                        <div
+                                          key={sub.id}
+                                          className="rounded-lg border border-indigo-200 bg-white p-3 text-xs dark:border-indigo-900 dark:bg-slate-900 space-y-2"
+                                        >
+                                          <span className="font-bold text-slate-900 dark:text-white">
+                                            {sub.subtopic_name || `Subtopic #${sub.subtopic_id}`}
+                                          </span>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                              <label className="text-[10px] font-semibold text-slate-500">Hours</label>
+                                              <input
+                                                type="number"
+                                                min={0.25}
+                                                step={0.25}
+                                                value={lpSubtopicSlotDraft.time_allocated}
+                                                onChange={(e) => setLpSubtopicSlotDraft({ ...lpSubtopicSlotDraft, time_allocated: Number(e.target.value) })}
+                                                className="w-full rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="text-[10px] font-semibold text-slate-500">Activity</label>
+                                              <input
+                                                type="text"
+                                                value={lpSubtopicSlotDraft.suggested_activity}
+                                                onChange={(e) => setLpSubtopicSlotDraft({ ...lpSubtopicSlotDraft, suggested_activity: e.target.value })}
+                                                className="w-full rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center justify-end gap-1.5 pt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => saveLpSubtopicSlot(sub.id)}
+                                              disabled={savingLpSubtopicSlot}
+                                              className="rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+                                            >
+                                              {savingLpSubtopicSlot ? "..." : "Save"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingLpSubtopicSlotId(null)}
+                                              className="rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div
+                                        key={sub.id}
+                                        className="rounded-lg border border-slate-200/70 bg-white p-2.5 text-xs dark:border-slate-700/60 dark:bg-slate-900 flex items-start justify-between gap-2"
+                                      >
+                                        <div className="space-y-0.5">
+                                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                            {sub.subtopic_name || `Subtopic #${sub.subtopic_id}`}
+                                          </span>
+                                          {sub.suggested_activity && (
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                              {sub.suggested_activity}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <span className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                                            {sub.time_allocated}h
+                                          </span>
+                                          {canEditLp && (
+                                            <button
+                                              type="button"
+                                              onClick={() => startEditLpSubtopicSlot(sub)}
+                                              className="rounded p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                              title="Edit Subtopic Slot"
+                                            >
+                                              <Edit2 className="h-3 w-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {groupsList.length === 0 && (
+                  <div className="py-8 text-center text-xs text-slate-400 italic">
+                    No topic slots defined in this lesson plan version.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </>
+  );
+
+  if (splitScreenView) {
+    return (
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column: 6 Cols - Sticky Document Viewer */}
+        <div className="lg:col-span-6 h-[calc(100vh-210px)] min-h-[680px] sticky top-6 rounded-2xl border border-slate-200/80 bg-slate-900 shadow-sm overflow-hidden dark:border-slate-800 flex flex-col">
+          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-slate-300">
+            <div className="flex items-center gap-2 truncate">
+              <FileText className="h-4 w-4 text-indigo-400 shrink-0" />
+              <span className="font-semibold truncate">
+                {activeSyllabus?.original_filename || "Syllabus Document"}
+              </span>
+              {activeSyllabus?.version_id && (
+                <span className="text-[10px] text-slate-400 font-mono">v{activeSyllabus.version_id}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSplitScreenView(false)}
+              className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded-lg hover:bg-slate-800 transition"
+            >
+              Close Split View ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {loadingDoc ? (
+              <div className="flex h-full items-center justify-center text-slate-400 text-xs">
+                <RefreshCw className="h-5 w-5 animate-spin mr-2 text-indigo-400" />
+                Loading document preview...
+              </div>
+            ) : (
+              <PDFViewer
+                file={documentBlobUrl}
+                fileName={activeSyllabus?.original_filename || "Syllabus_Document.pdf"}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: 6 Cols - Tab content with independent scroll */}
+        <div className="lg:col-span-6 h-[calc(100vh-210px)] min-h-[680px] overflow-y-auto pr-1 space-y-6">
+          {tabContent}
+        </div>
       </div>
+    );
+  }
+
+  return <div className="mt-6 space-y-6">{tabContent}</div>;
+})()}
+
+      {/* ── Hierarchy CRUD Modal (Unit / Topic / Subtopic) ── */}
+      {hierarchyModal && canEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {hierarchyModal.type === "unit"
+                  ? hierarchyModal.mode === "add" ? "Add Curriculum Unit" : `Edit Unit ${modalForm.unit_number}`
+                  : hierarchyModal.type === "topic"
+                  ? hierarchyModal.mode === "add" ? "Add Topic to Unit" : "Edit Topic"
+                  : hierarchyModal.mode === "add" ? "Add Subtopic to Topic" : "Edit Subtopic"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setHierarchyModal(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleHierarchySubmit} className="mt-4 space-y-4">
+              {/* Unit Form */}
+              {hierarchyModal.type === "unit" && (
+                <>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="col-span-1">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Unit #</label>
+                      <input
+                        type="number"
+                        min={1}
+                        required
+                        value={modalForm.unit_number}
+                        onChange={(e) => setModalForm({ ...modalForm, unit_number: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Unit Title</label>
+                      <input
+                        type="text"
+                        required
+                        value={modalForm.unit_title}
+                        onChange={(e) => setModalForm({ ...modalForm, unit_title: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        placeholder="e.g., Introduction to Neural Networks"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Unit Overview</label>
+                    <textarea
+                      rows={3}
+                      value={modalForm.unit_overview}
+                      onChange={(e) => setModalForm({ ...modalForm, unit_overview: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="Brief overview or learning outcome of this unit..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Theory Hours</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={modalForm.theory_hours}
+                        onChange={(e) => setModalForm({ ...modalForm, theory_hours: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Lab Hours</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={modalForm.lab_hours}
+                        onChange={(e) => setModalForm({ ...modalForm, lab_hours: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tutorial Hours</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={modalForm.tutorial_hours}
+                        onChange={(e) => setModalForm({ ...modalForm, tutorial_hours: Number(e.target.value) })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Topic Form */}
+              {hierarchyModal.type === "topic" && (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Topic Code</label>
+                      <input
+                        type="text"
+                        value={modalForm.topic_code}
+                        onChange={(e) => setModalForm({ ...modalForm, topic_code: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        placeholder="e.g. 1.1"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Knowledge Level</label>
+                      <select
+                        value={modalForm.knowledge_level || "K2 - Understand"}
+                        onChange={(e) => setModalForm({ ...modalForm, knowledge_level: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        {KNOWLEDGE_LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Topic Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={modalForm.topic_name}
+                      onChange={(e) => setModalForm({ ...modalForm, topic_name: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="e.g., Perceptrons and Multi-layer Networks"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Topic Description</label>
+                    <textarea
+                      rows={3}
+                      value={modalForm.topic_description}
+                      onChange={(e) => setModalForm({ ...modalForm, topic_description: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="Summary of topics covered..."
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Subtopic Form */}
+              {hierarchyModal.type === "subtopic" && (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subtopic Code</label>
+                    <input
+                      type="text"
+                      value={modalForm.subtopic_code}
+                      onChange={(e) => setModalForm({ ...modalForm, subtopic_code: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="e.g. 1.1.1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subtopic Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={modalForm.subtopic_name}
+                      onChange={(e) => setModalForm({ ...modalForm, subtopic_name: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="e.g., Activation Functions & Sigmoid"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Subtopic Description</label>
+                    <textarea
+                      rows={3}
+                      value={modalForm.subtopic_description}
+                      onChange={(e) => setModalForm({ ...modalForm, subtopic_description: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      placeholder="Specific scope of this subtopic..."
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setHierarchyModal(null)}
+                  disabled={submittingModal}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingModal}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{submittingModal ? "Saving..." : "Save Changes"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Upload Syllabus Modal (Coordinator Only) ── */}
+      {showUploadModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              Upload Course Syllabus
+            </h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Select a PDF or DOCX syllabus document. The AI worker will extract course objectives, outcomes, and topics.
+            </p>
+
+            <form onSubmit={handleUploadSyllabus} className="mt-5 space-y-4">
+              <div className="rounded-xl border-2 border-dashed border-slate-300 p-6 text-center hover:border-indigo-500 dark:border-slate-700">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="syllabus-upload-input"
+                />
+                <label
+                  htmlFor="syllabus-upload-input"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <Upload className="h-8 w-8 text-slate-400" />
+                  <span className="mt-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                    {uploadFile ? uploadFile.name : "Click to browse file"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1">PDF or DOCX up to 25MB</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  disabled={uploading}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!uploadFile || uploading}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {uploading ? "Uploading & Queuing..." : "Upload & Extract"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate CO-PO Mapping Modal ── */}
+      {showGenerateCopoModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-500" />
+                <span>Generate CO-PO Mapping</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGenerateCopoModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              The AI worker will synthesize correlation scores (1–3) and justification text between each course outcome and program outcome based on the selected curriculum extraction.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Extraction Version
+                </label>
+                <select
+                  value={selectedExtractionForCopo || ""}
+                  onChange={(e) => setSelectedExtractionForCopo(Number(e.target.value))}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {(portfolio?.versions?.extractions || [])
+                    .filter((e: any) => e.is_approved)
+                    .map((e: any) => (
+                      <option key={e.extractions_id} value={e.extractions_id}>
+                        Version v{e.version_number} (ID: {e.extractions_id}) — {e.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowGenerateCopoModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGenerateCopo}
+                disabled={actionLoading === "generate_copo" || !selectedExtractionForCopo}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{actionLoading === "generate_copo" ? "Queuing..." : "Queue Generation"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate Pedagogy Modal ── */}
+      {showGeneratePedagogyModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Presentation className="h-4 w-4 text-indigo-500" />
+                <span>Generate Pedagogy Strategies</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGeneratePedagogyModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              The AI worker will analyze the topics and Bloom taxonomy levels to recommend primary & alternative instructional strategies and active learning methodologies.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Extraction Version
+                </label>
+                <select
+                  value={selectedExtractionForPedagogy || ""}
+                  onChange={(e) => setSelectedExtractionForPedagogy(Number(e.target.value))}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {(portfolio?.versions?.extractions || [])
+                    .filter((e: any) => e.is_approved)
+                    .map((e: any) => (
+                      <option key={e.extractions_id} value={e.extractions_id}>
+                        Version v{e.version_number} (ID: {e.extractions_id}) — {e.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowGeneratePedagogyModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGeneratePedagogy}
+                disabled={actionLoading === "generate_pedagogy" || !selectedExtractionForPedagogy}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{actionLoading === "generate_pedagogy" ? "Queuing..." : "Queue Generation"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate Lesson Plan Modal ── */}
+      {showGenerateLessonPlanModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-indigo-500" />
+                <span>Generate Lesson Plan Schedule</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGenerateLessonPlanModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              Generate an hourly schedule distributing syllabus topics across the semester timeline. You can optionally link an approved pedagogy version to carry over suggested delivery activities.
+            </p>
+
+            <div className="mt-4 space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Extraction Version <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedExtractionForLp || ""}
+                  onChange={(e) => setSelectedExtractionForLp(Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {(portfolio?.versions?.extractions || [])
+                    .filter((e: any) => e.is_approved)
+                    .map((e: any) => (
+                      <option key={e.extractions_id} value={e.extractions_id}>
+                        Extraction v{e.version_number} — {e.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Pedagogy Version (Optional)
+                </label>
+                <select
+                  value={selectedPedagogyForLp || ""}
+                  onChange={(e) => setSelectedPedagogyForLp(e.target.value ? Number(e.target.value) : null)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="">None (Use standard classroom delivery activities)</option>
+                  {(portfolio?.versions?.pedagogies || [])
+                    .filter((p: any) => p.is_approved)
+                    .map((p: any) => (
+                      <option key={p.pedagogy_id} value={p.pedagogy_id}>
+                        Pedagogy v{p.version_number || p.version_id} — {p.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Target Total Hours
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={lpTargetHours}
+                  onChange={(e) => setLpTargetHours(Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  placeholder="e.g. 45"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowGenerateLessonPlanModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGenerateLessonPlan}
+                disabled={actionLoading === "generate_lp" || !selectedExtractionForLp}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{actionLoading === "generate_lp" ? "Queuing..." : "Queue Generation"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CO-PO Cell Correlation Edit Modal ── */}
+      {copoEditingCell && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit2 className="h-4 w-4 text-indigo-500" />
+                <span>Edit Cell: {copoEditingCell.co_code} → {copoEditingCell.po_code}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCopoEditingCell(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Correlation Level
+                </label>
+                <div className="mt-2 grid grid-cols-4 gap-2">
+                  {[
+                    { val: 0, label: "0 - None", color: "hover:border-slate-400 bg-slate-50 dark:bg-slate-800" },
+                    { val: 1, label: "1 - Low", color: "hover:border-amber-400 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+                    { val: 2, label: "2 - Medium", color: "hover:border-sky-400 bg-sky-50/70 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300" },
+                    { val: 3, label: "3 - High", color: "hover:border-emerald-400 bg-emerald-50/70 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setCopoEditingCell({ ...copoEditingCell, matrix_value: opt.val })}
+                      className={`rounded-xl border py-2.5 text-center text-xs font-bold transition ${opt.color} ${
+                        copoEditingCell.matrix_value === opt.val
+                          ? "border-indigo-600 ring-2 ring-indigo-500/30"
+                          : "border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Accreditation Justification
+                </label>
+                <textarea
+                  rows={3}
+                  value={copoEditingCell.justification || ""}
+                  onChange={(e) => setCopoEditingCell({ ...copoEditingCell, justification: e.target.value })}
+                  placeholder="Explain why this CO supports this Program Outcome..."
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setCopoEditingCell(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCopoDirtyCells((prev) => ({
+                    ...prev,
+                    [copoEditingCell.id]: {
+                      matrix_value: Number(copoEditingCell.matrix_value) || 0,
+                      justification: copoEditingCell.justification?.trim() || "",
+                    },
+                  }));
+                  setCopoEditingCell(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-95"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>Apply to Cell</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default PrivateRouter(QuestionBank);
+export default PrivateRouter(InsCourseArtifacts);

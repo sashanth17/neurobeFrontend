@@ -18,6 +18,7 @@ import {
   PenTool,
 } from "lucide-react";
 import { AiGenerationJobPayload, SyllabusTopicItem } from "@/types/cia-test.types";
+import { isLimitExhaustion } from "@/utils/function.utils";
 
 interface AiGeneratorDrawerProps {
   isOpen: boolean;
@@ -250,11 +251,28 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
 
           {/* Error Banner */}
           {generationError && !isGenerating && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
-              <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-600 mt-0.5" />
+            <div
+              className={`mb-5 flex items-start gap-2.5 rounded-xl border p-3.5 text-xs ${
+                isLimitExhaustion(generationError)
+                  ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                  : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+              }`}
+            >
+              <AlertCircle
+                className={`h-4 w-4 flex-shrink-0 mt-0.5 ${
+                  isLimitExhaustion(generationError) ? "text-amber-600 dark:text-amber-400" : "text-red-600"
+                }`}
+              />
               <div>
-                <strong className="font-bold">Generation Failed: </strong>
+                <strong className="font-bold">
+                  {isLimitExhaustion(generationError) ? "Generation Limit Exhausted: " : "Generation Failed: "}
+                </strong>
                 <span>{generationError}</span>
+                {isLimitExhaustion(generationError) && (
+                  <p className="mt-1 text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                    Solution: Ask your admin to request for more generations.
+                  </p>
+                )}
               </div>
             </div>
           )}

@@ -56,23 +56,6 @@ const SCORE_CONFIG: Record<
   0: { label: "No Mapping", bg: "bg-gray-300", desc: "No Mapping" },
 };
 
-const AI_RATIONALE: Record<string, string> = {
-  PO1: "Applies foundational engineering and mathematical principles to layered network architectures, framing protocols, error detection (CRC), and transmission mediums.",
-  PO2: "Requires systematic analysis of network topologies, protocol behaviors, and failure scenarios to derive substantiated engineering conclusions.",
-  PO3: "Involves designing network components, subnetting schemes, and protocol stacks to address complex connectivity requirements.",
-  PO4: "Demands experimental investigation of network performance metrics, packet loss, and latency under varying conditions.",
-  PO5: "Utilizes simulation tools, network analyzers, and modern protocol frameworks to model and evaluate network behavior.",
-  PO6: "Considers societal implications of network design decisions including privacy, accessibility, and regulatory compliance.",
-  PO7: "Evaluates environmental impact of network infrastructure deployment and promotes sustainable networking practices.",
-  PO8: "Addresses ethical responsibilities in network security, data privacy, and responsible use of communication systems.",
-  PO9: "Collaborative network design projects require effective teamwork, role distribution, and leadership in technical environments.",
-  PO10: "Communicates network design specifications, performance reports, and technical documentation to diverse stakeholders.",
-  PO11: "Applies project management principles to plan, budget, and execute network infrastructure deployment projects.",
-  PO12: "Encourages continuous learning to keep pace with evolving networking standards, protocols, and technologies.",
-  PSO1: "Directly applies core computing and networking concepts to design robust and efficient communication systems.",
-  PSO2: "Leverages modern networking tools, simulators, and frameworks to solve real-world connectivity and performance challenges.",
-};
-
 interface COPOMappingModalProps {
   open: boolean;
   onClose: () => void;
@@ -134,9 +117,7 @@ const COPOMappingModal = ({
 
   useEffect(() => {
     setEditableScore(score);
-    setEditableJustification(
-      justification || AI_RATIONALE[poKey] || "Empirical packet capture analysis and latency profiling using Wireshark lab simulations."
-    );
+    setEditableJustification(justification || "");
   }, [score, justification, poKey]);
 
   useEffect(() => {
@@ -147,8 +128,8 @@ const COPOMappingModal = ({
 
   const scoreConf = SCORE_CONFIG[editableScore] ?? SCORE_CONFIG[0];
   const poDesc = poDescription || PO_DESCRIPTIONS[poKey] || "";
-  const poHeading = poTitle || (poKey.startsWith("PSO") ? "Program Specific Outcome" : "Engineering Knowledge");
-  const rationale = editableJustification || justification || AI_RATIONALE[poKey] || "AI rationale not available for this mapping.";
+  const poHeading = poTitle || (poKey.startsWith("PSO") ? "Program Specific Outcome" : "Program Outcome");
+  const rationale = editableJustification || justification || "No academic justification entered yet.";
   const displayStrengthLabel = isEditing ? scoreConf.label : (strengthLabel || scoreConf.label);
   const isAccepted = status?.toLowerCase() === "accepted";
 

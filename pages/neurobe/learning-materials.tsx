@@ -10,7 +10,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { Dropdown, Success, useSetState } from "@/utils/function.utils";
+import { Dropdown, Failure, Success, useSetState, getErrorMessage } from "@/utils/function.utils";
 import TableComponent from "@/components/common-components/TableComponent";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
@@ -81,7 +81,7 @@ const RAW_UNIT_DATA: Record<
         textbook: "Computer Networks — Chapter 2",
         reference: "Data Communications and Networking — Chapter 3",
         pedagogy: "Guided Discussion",
-        status: "Approved",
+        status: "Not Generated",
       },
       {
         id: "1.3",
@@ -404,18 +404,7 @@ const LearningMeterials = () => {
   const [generateModal, setGenerateModal] = useState(false);
 
   // ── Per-unit reviewed topic tracking ──────────────────────────────────────
-  // Pre-seed with topics that already have status "Reviewed" in RAW_UNIT_DATA
-  const [reviewedMap, setReviewedMap] = useState<Record<string, Set<string>>>(
-    () =>
-      Object.fromEntries(
-        Object.entries(RAW_UNIT_DATA).map(([unitKey, unit]) => [
-          unitKey,
-          new Set(
-            unit.topics.filter((t) => t.status === "Approved").map((t) => t.id)
-          ),
-        ])
-      )
-  );
+  const [reviewedMap, setReviewedMap] = useState<Record<string, Set<string>>>({});
 
 
 
@@ -662,9 +651,7 @@ const LearningMeterials = () => {
       }
 
     } catch (error: any) {
-      // console.error('✌️Generate error --->', error);
-      const errorMsg = error?.message || "Failed to generate learning material";
-      // Error toast would be shown here
+      Failure(getErrorMessage(error, "Failed to generate learning material"), error);
     } finally {
       setState({ generateLoading: false });
     }
