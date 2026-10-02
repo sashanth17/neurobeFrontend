@@ -2,9 +2,23 @@ import { commonInstance } from '@/utils/axios.utils';
 
 const syllabus = {
 
+    upload: (formData: any) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/syllabi/upload`;
+            commonInstance()
+                .post(url, formData, {
+                    headers: { "Content-Type": "multipart/form-data" },
+                })
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
     create: (data: any) => {
         let promise = new Promise((resolve, reject) => {
-            let url = `course/syllabi/extract-document`;
+            let url = `course/syllabi/upload`;
             commonInstance()
                 .post(url, data, {
                     headers: { "Content-Type": "multipart/form-data" },
@@ -14,13 +28,68 @@ const syllabus = {
                 })
                 .catch((error) => {
                     if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
+                        reject(error.response.data?.detail || error.response.data?.message || error.response.data);
                     } else {
                         reject(error);
                     }
                 });
         });
         return promise;
+    },
+
+    approve: (syllabusId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/syllabi/${syllabusId}/approve`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    activate: (syllabusId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/syllabi/${syllabusId}/activate`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    extraction_approve: (extractionsId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/extractions/${extractionsId}/approve`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    extraction_activate: (extractionsId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/extractions/${extractionsId}/activate`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    update_hours: (extractionsId: number | string, data: any) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .patch(`course/extractions/${extractionsId}/hours`, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
     },
 
     detail: (id: string | number) => {

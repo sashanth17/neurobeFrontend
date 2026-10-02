@@ -1,4 +1,4 @@
-import instance from '@/utils/axios.utils';
+import instance, { commonInstance } from '@/utils/axios.utils';
 import { getOrganizationId } from '@/utils/function.utils';
 
 const course = {
@@ -253,10 +253,32 @@ const course = {
         return promise;
     },
 
+    my_assigned_courses: (params?: { faculty_id?: number }) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/dashboard/my-courses`;
+            if (params?.faculty_id) {
+                url += `?faculty_id=${params.faculty_id}`;
+            }
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
 
-
-
-
+    course_portfolio: (courseId: number | string) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/dashboard/courses/${courseId}/portfolio`;
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
 
 };
 
