@@ -1041,6 +1041,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               No students match the selected filter.
             </div>
           ) : (
+            paginatedStudents.map(student => {
               const isSelected = selectedStudent?.student_marks_id === student.student_marks_id;
               const isVerified = student.is_locked || student.verification_status === 'VERIFIED';
               const isNeedsReview = !isVerified && (student.mapping_status === 'NEEDS_REVIEW' || student.verification_status === 'NEEDS_REVIEW' || student.total_mismatch_flag);
