@@ -81,6 +81,17 @@ const syllabus = {
         });
     },
 
+    get_extraction: (extractionsId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/extractions/${extractionsId}`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
     getFileBlob: (courseSyllabusId: number | string) => {
         return new Promise((resolve, reject) => {
             commonInstance()

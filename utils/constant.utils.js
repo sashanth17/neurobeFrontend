@@ -170,12 +170,6 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "Course Artifacts",
-      href: "/neurobe/course-artifacts",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
       label: "Instance Management",
       href: "/neurobe/course-offering",
     },

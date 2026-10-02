@@ -1,7 +1,7 @@
 import { commonInstance } from '@/utils/axios.utils';
 
 const lession_plan = {
-  generate: (payload: { extractions_id: number; target_total_hours?: number }) => {
+  generate: (payload: { extractions_id: number; pedagogy_id?: number; target_total_hours?: number }) => {
     return new Promise((resolve, reject) => {
       commonInstance()
         .post(`course/lesson-plans/generate`, payload)

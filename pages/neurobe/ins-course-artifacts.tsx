@@ -128,6 +128,79 @@ const InsCourseArtifacts = () => {
   const activePedagogy = portfolio?.active_pedagogy;
   const activeLessonPlan = portfolio?.active_lesson_plan;
 
+  // ── Selected Historical Version State (for Coordinator preview) ────────────
+  const [selectedVersionData, setSelectedVersionData] = useState<{
+    syllabus?: any;
+    copo?: any;
+    pedagogy?: any;
+    lesson_plan?: any;
+  }>({});
+  const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
+
+  // Active / Selected item aliases
+  const currentExt = selectedVersionData.syllabus || activeExt;
+  const currentCopo = selectedVersionData.copo || activeCopo;
+  const currentPedagogy = selectedVersionData.pedagogy || activePedagogy;
+  const currentLessonPlan = selectedVersionData.lesson_plan || activeLessonPlan;
+
+  // In-progress generation check (One generation at a time per tab)
+  const isExtractionBusy = Boolean(
+    (portfolio?.versions?.extractions || []).some(
+      (e: any) => e.current_state === "redis_queued" || e.current_state === "processing"
+    )
+  );
+  const isCopoBusy = Boolean(
+    (portfolio?.versions?.copo || []).some(
+      (c: any) => c.current_state === "redis_queued" || c.current_state === "processing"
+    )
+  );
+  const isPedagogyBusy = Boolean(
+    (portfolio?.versions?.pedagogies || []).some(
+      (p: any) => p.current_state === "redis_queued" || p.current_state === "processing"
+    )
+  );
+  const isLessonPlanBusy = Boolean(
+    (portfolio?.versions?.lesson_plans || []).some(
+      (l: any) => l.current_state === "redis_queued" || l.current_state === "processing"
+    )
+  );
+
+  // ── Generation Modals State ────────────────────────────────────────────────
+  const [showGenerateCopoModal, setShowGenerateCopoModal] = useState<boolean>(false);
+  const [selectedExtractionForCopo, setSelectedExtractionForCopo] = useState<number | null>(null);
+
+  const [showGeneratePedagogyModal, setShowGeneratePedagogyModal] = useState<boolean>(false);
+  const [selectedExtractionForPedagogy, setSelectedExtractionForPedagogy] = useState<number | null>(null);
+
+  const [showGenerateLessonPlanModal, setShowGenerateLessonPlanModal] = useState<boolean>(false);
+  const [selectedExtractionForLp, setSelectedExtractionForLp] = useState<number | null>(null);
+  const [selectedPedagogyForLp, setSelectedPedagogyForLp] = useState<number | null>(null);
+  const [lpTargetHours, setLpTargetHours] = useState<number>(45);
+
+  // ── COPO Matrix Grid & Delta Save State ────────────────────────────────────
+  const [copoEditingCell, setCopoEditingCell] = useState<any | null>(null);
+  const [copoDirtyCells, setCopoDirtyCells] = useState<Record<number, { matrix_value: number; justification?: string }>>({});
+  const [savingCopoDelta, setSavingCopoDelta] = useState<boolean>(false);
+
+  // ── Pedagogy Per-Topic Edit State ──────────────────────────────────────────
+  const [editingPedagogyTopicId, setEditingPedagogyTopicId] = useState<number | null>(null);
+  const [pedagogyDraft, setPedagogyDraft] = useState<{
+    bloom_level_1?: string;
+    pedagogy_suggested_1?: string;
+    description_1?: string;
+    methodology_1?: string;
+  }>({});
+  const [savingPedagogyTopic, setSavingPedagogyTopic] = useState<boolean>(false);
+
+  // ── Lesson Plan Per-Slot Edit State ────────────────────────────────────────
+  const [editingLpSlotId, setEditingLpSlotId] = useState<number | null>(null);
+  const [lpSlotDraft, setLpSlotDraft] = useState<{
+    time_allocated?: number;
+    bloom_level?: string;
+    suggested_activity?: string;
+  }>({});
+  const [savingLpSlot, setSavingLpSlot] = useState<boolean>(false);
+
   // ── Split-Screen Document Viewer State ─────────────────────────────────────
   const [splitScreenView, setSplitScreenView] = useState<boolean>(false);
   const [documentBlobUrl, setDocumentBlobUrl] = useState<string | null>(null);
@@ -201,11 +274,12 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleApproveExtraction = async () => {
-    if (!activeExt?.extractions_id) return;
+  const handleApproveExtraction = async (specificId?: any) => {
+    const targetId = specificId || currentExt?.extractions_id;
+    if (!targetId) return;
     try {
-      setActionLoading("approve_extraction");
-      await Models.syllabus.extraction_approve(activeExt.extractions_id);
+      setActionLoading(`approve_syllabus_${targetId}`);
+      await Models.syllabus.extraction_approve(targetId);
       Success("Curriculum extraction approved successfully!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -215,12 +289,14 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleActivateExtraction = async () => {
-    if (!activeExt?.extractions_id) return;
+  const handleActivateExtraction = async (specificId?: any) => {
+    const targetId = specificId || currentExt?.extractions_id;
+    if (!targetId) return;
     try {
-      setActionLoading("activate_extraction");
-      await Models.syllabus.extraction_activate(activeExt.extractions_id);
+      setActionLoading(`activate_syllabus_${targetId}`);
+      await Models.syllabus.extraction_activate(targetId);
       Success("Extraction activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, syllabus: undefined }));
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate extraction"));
@@ -229,15 +305,31 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleGenerateCopo = async () => {
-    if (!activeExt?.extractions_id) return;
+  const openGenerateCopoModal = () => {
+    if (isCopoBusy) {
+      Failure("A CO-PO generation job is already in progress for this course.");
+      return;
+    }
+    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    if (approvedExts.length === 0) {
+      Failure("No approved extraction found. Please approve an extraction version first.");
+      return;
+    }
+    setSelectedExtractionForCopo(approvedExts[0].extractions_id);
+    setShowGenerateCopoModal(true);
+  };
+
+  const handleConfirmGenerateCopo = async () => {
+    if (!selectedExtractionForCopo) return;
     try {
       setActionLoading("generate_copo");
-      await Models.copo.generate({ extractions_id: activeExt.extractions_id });
+      await Models.copo.generate({ extractions_id: selectedExtractionForCopo });
       Success("CO-PO mapping generation queued!");
+      setShowGenerateCopoModal(false);
       setJobNotice(
         "CO-PO mapping generation is queued. When completed, click the Refresh button to load the generated matrix."
       );
+      fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to trigger CO-PO generation"));
     } finally {
@@ -245,11 +337,12 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleApproveCopo = async () => {
-    if (!activeCopo?.copo_id) return;
+  const handleApproveCopo = async (specificId?: any) => {
+    const targetId = specificId || currentCopo?.copo_id;
+    if (!targetId) return;
     try {
-      setActionLoading("approve_copo");
-      await Models.copo.approve(activeCopo.copo_id);
+      setActionLoading(`approve_copo_${targetId}`);
+      await Models.copo.approve(targetId);
       Success("CO-PO mapping approved!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -259,12 +352,14 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleActivateCopo = async () => {
-    if (!activeCopo?.copo_id) return;
+  const handleActivateCopo = async (specificId?: any) => {
+    const targetId = specificId || currentCopo?.copo_id;
+    if (!targetId) return;
     try {
-      setActionLoading("activate_copo");
-      await Models.copo.activate(activeCopo.copo_id);
+      setActionLoading(`activate_copo_${targetId}`);
+      await Models.copo.activate(targetId);
       Success("CO-PO mapping activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, copo: undefined }));
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate CO-PO mapping"));
@@ -273,15 +368,31 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleGeneratePedagogy = async () => {
-    if (!activeExt?.extractions_id) return;
+  const openGeneratePedagogyModal = () => {
+    if (isPedagogyBusy) {
+      Failure("A pedagogy suggestion generation job is already in progress for this course.");
+      return;
+    }
+    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    if (approvedExts.length === 0) {
+      Failure("No approved extraction found. Please approve an extraction version first.");
+      return;
+    }
+    setSelectedExtractionForPedagogy(approvedExts[0].extractions_id);
+    setShowGeneratePedagogyModal(true);
+  };
+
+  const handleConfirmGeneratePedagogy = async () => {
+    if (!selectedExtractionForPedagogy) return;
     try {
       setActionLoading("generate_pedagogy");
-      await Models.pedagogy.generate({ extractions_id: activeExt.extractions_id });
+      await Models.pedagogy.generate({ extractions_id: selectedExtractionForPedagogy });
       Success("Pedagogy suggestions generation queued!");
+      setShowGeneratePedagogyModal(false);
       setJobNotice(
         "Pedagogy generation is queued. When completed, click the Refresh button to load the new teaching strategies."
       );
+      fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to trigger pedagogy generation"));
     } finally {
@@ -289,11 +400,12 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleApprovePedagogy = async () => {
-    if (!activePedagogy?.pedagogy_id) return;
+  const handleApprovePedagogy = async (specificId?: any) => {
+    const targetId = specificId || currentPedagogy?.pedagogy_id;
+    if (!targetId) return;
     try {
-      setActionLoading("approve_pedagogy");
-      await Models.pedagogy.approve(activePedagogy.pedagogy_id);
+      setActionLoading(`approve_pedagogy_${targetId}`);
+      await Models.pedagogy.approve(targetId);
       Success("Pedagogy suggestions approved!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -303,12 +415,14 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleActivatePedagogy = async () => {
-    if (!activePedagogy?.pedagogy_id) return;
+  const handleActivatePedagogy = async (specificId?: any) => {
+    const targetId = specificId || currentPedagogy?.pedagogy_id;
+    if (!targetId) return;
     try {
-      setActionLoading("activate_pedagogy");
-      await Models.pedagogy.activate(activePedagogy.pedagogy_id);
+      setActionLoading(`activate_pedagogy_${targetId}`);
+      await Models.pedagogy.activate(targetId);
       Success("Pedagogy suggestions activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, pedagogy: undefined }));
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate pedagogy"));
@@ -317,18 +431,38 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleGenerateLessonPlan = async () => {
-    if (!activeExt?.extractions_id) return;
+  const openGenerateLessonPlanModal = () => {
+    if (isLessonPlanBusy) {
+      Failure("A lesson plan generation job is already in progress for this course.");
+      return;
+    }
+    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    if (approvedExts.length === 0) {
+      Failure("No approved extraction found. Please approve an extraction version first.");
+      return;
+    }
+    setSelectedExtractionForLp(approvedExts[0].extractions_id);
+    const approvedPeds = (portfolio?.versions?.pedagogies || []).filter((p: any) => p.is_approved);
+    setSelectedPedagogyForLp(approvedPeds.length > 0 ? approvedPeds[0].pedagogy_id : null);
+    setLpTargetHours(currentExt?.total_theory_hours || 45);
+    setShowGenerateLessonPlanModal(true);
+  };
+
+  const handleConfirmGenerateLessonPlan = async () => {
+    if (!selectedExtractionForLp) return;
     try {
       setActionLoading("generate_lp");
       await Models.lession_plan.generate({
-        extractions_id: activeExt.extractions_id,
-        target_total_hours: 45,
+        extractions_id: selectedExtractionForLp,
+        pedagogy_id: selectedPedagogyForLp || undefined,
+        target_total_hours: Number(lpTargetHours) || 45,
       });
       Success("Lesson plan generation queued!");
+      setShowGenerateLessonPlanModal(false);
       setJobNotice(
         "Lesson plan schedule generation is queued. When completed, click the Refresh button to load the hourly timeline."
       );
+      fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to trigger lesson plan generation"));
     } finally {
@@ -336,11 +470,12 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleApproveLessonPlan = async () => {
-    if (!activeLessonPlan?.lesson_plan_id) return;
+  const handleApproveLessonPlan = async (specificId?: any) => {
+    const targetId = specificId || currentLessonPlan?.lesson_plan_id;
+    if (!targetId) return;
     try {
-      setActionLoading("approve_lp");
-      await Models.lession_plan.approve(activeLessonPlan.lesson_plan_id);
+      setActionLoading(`approve_lesson_plan_${targetId}`);
+      await Models.lession_plan.approve(targetId);
       Success("Lesson plan approved!");
       fetchPortfolio(true);
     } catch (err: any) {
@@ -350,12 +485,14 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  const handleActivateLessonPlan = async () => {
-    if (!activeLessonPlan?.lesson_plan_id) return;
+  const handleActivateLessonPlan = async (specificId?: any) => {
+    const targetId = specificId || currentLessonPlan?.lesson_plan_id;
+    if (!targetId) return;
     try {
-      setActionLoading("activate_lp");
-      await Models.lession_plan.activate(activeLessonPlan.lesson_plan_id);
+      setActionLoading(`activate_lesson_plan_${targetId}`);
+      await Models.lession_plan.activate(targetId);
       Success("Lesson plan activated as current version!");
+      setSelectedVersionData((prev) => ({ ...prev, lesson_plan: undefined }));
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate lesson plan"));
@@ -364,12 +501,304 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  // Units list from active extraction
-  const units = activeExt?.units || [];
+  // ── Version Card Selection Handler ─────────────────────────────────────────
+  const handleSelectVersionCard = async (
+    tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
+    versionItem: any,
+    idKey: string
+  ) => {
+    const itemId = versionItem[idKey];
+    if (versionItem.is_active) {
+      setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+      return;
+    }
+    try {
+      setLoadingVersionDetail(true);
+      if (tabType === "syllabus") {
+        const full = await Models.syllabus.get_extraction(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
+      } else if (tabType === "copo") {
+        const full = await Models.copo.get(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, copo: full }));
+      } else if (tabType === "pedagogy") {
+        const full = await Models.pedagogy.get(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
+      } else if (tabType === "lesson_plan") {
+        const full = await Models.lession_plan.get(itemId);
+        setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
+      }
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to load version details"));
+    } finally {
+      setLoadingVersionDetail(false);
+    }
+  };
+
+  // ── Version Cards Carousel / Panel ─────────────────────────────────────────
+  const renderVersionCards = (tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan") => {
+    if (!isCoord) return null;
+
+    let versionsList: any[] = [];
+    let idKey = "";
+    let approveFn: ((id: any) => Promise<void>) | null = null;
+    let activateFn: ((id: any) => Promise<void>) | null = null;
+    let approveLoadingPrefix = "";
+    let activateLoadingPrefix = "";
+
+    if (tabType === "syllabus") {
+      versionsList = portfolio?.versions?.extractions || [];
+      idKey = "extractions_id";
+      approveFn = handleApproveExtraction;
+      activateFn = handleActivateExtraction;
+      approveLoadingPrefix = "approve_syllabus_";
+      activateLoadingPrefix = "activate_syllabus_";
+    } else if (tabType === "copo") {
+      versionsList = portfolio?.versions?.copo || [];
+      idKey = "copo_id";
+      approveFn = handleApproveCopo;
+      activateFn = handleActivateCopo;
+      approveLoadingPrefix = "approve_copo_";
+      activateLoadingPrefix = "activate_copo_";
+    } else if (tabType === "pedagogy") {
+      versionsList = portfolio?.versions?.pedagogies || [];
+      idKey = "pedagogy_id";
+      approveFn = handleApprovePedagogy;
+      activateFn = handleActivatePedagogy;
+      approveLoadingPrefix = "approve_pedagogy_";
+      activateLoadingPrefix = "activate_pedagogy_";
+    } else if (tabType === "lesson_plan") {
+      versionsList = portfolio?.versions?.lesson_plans || [];
+      idKey = "lesson_plan_id";
+      approveFn = handleApproveLessonPlan;
+      activateFn = handleActivateLessonPlan;
+      approveLoadingPrefix = "approve_lesson_plan_";
+      activateLoadingPrefix = "activate_lesson_plan_";
+    }
+
+    if (versionsList.length === 0) return null;
+
+    const selectedVer = selectedVersionData[tabType];
+
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-indigo-500" />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Version History ({versionsList.length})
+              </span>
+            </div>
+            {selectedVer && (
+              <button
+                type="button"
+                onClick={() => setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }))}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+              >
+                ← Reset to Active Version
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin">
+            {versionsList.map((ver: any, idx: number) => {
+              const itemId = ver[idKey];
+              const isItemActive = Boolean(ver.is_active);
+              const isItemApproved = Boolean(ver.is_approved);
+              const isSelected = selectedVer ? (selectedVer[idKey] === itemId) : isItemActive;
+              const isBusy = ver.current_state === "redis_queued" || ver.current_state === "processing";
+
+              return (
+                <div
+                  key={itemId || idx}
+                  className={`min-w-[210px] shrink-0 rounded-xl border p-3 transition ${
+                    isSelected
+                      ? "border-indigo-500 bg-indigo-50/40 shadow-xs dark:border-indigo-600 dark:bg-indigo-950/40"
+                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-850/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      v{ver.version_number || (idx + 1)}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {isItemActive && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                          Active
+                        </span>
+                      )}
+                      {isItemApproved ? (
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                          Approved
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                          Draft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {ver.created_at ? new Date(ver.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                  </p>
+
+                  {isBusy && (
+                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
+                      <Sparkles className="h-3 w-3 animate-spin" />
+                      <span>{ver.current_state}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                    {isSelected ? (
+                      <span className="rounded-md bg-indigo-600/10 px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                        {isItemActive && !selectedVer ? "Active Current" : "Currently Viewing"}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectVersionCard(tabType, ver, idKey)}
+                        disabled={loadingVersionDetail}
+                        className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      >
+                        View
+                      </button>
+                    )}
+
+                    {!isItemApproved && approveFn && (
+                      <button
+                        type="button"
+                        onClick={() => approveFn?.(itemId)}
+                        disabled={actionLoading === `${approveLoadingPrefix}${itemId}`}
+                        className="rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {actionLoading === `${approveLoadingPrefix}${itemId}` ? "..." : "Approve"}
+                      </button>
+                    )}
+
+                    {isItemApproved && !isItemActive && activateFn && (
+                      <button
+                        type="button"
+                        onClick={() => activateFn?.(itemId)}
+                        disabled={actionLoading === `${activateLoadingPrefix}${itemId}`}
+                        className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {actionLoading === `${activateLoadingPrefix}${itemId}` ? "..." : "Activate"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {selectedVer && (
+          <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>
+                Viewing historical version <strong>v{selectedVer.version_number || ""}</strong> ({selectedVer.is_approved ? "Approved" : "Draft"}). Artifact is in read-only mode.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }))}
+              className="rounded-lg bg-amber-600 px-2.5 py-1 font-semibold text-white transition hover:bg-amber-700"
+            >
+              Return to Active Version
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── COPO Matrix Delta Save ────────────────────────────────────────────────
+  const saveCopoDeltaChanges = async () => {
+    if (!currentCopo?.copo_id) return;
+    try {
+      setSavingCopoDelta(true);
+      for (const [cellIdStr, delta] of Object.entries(copoDirtyCells)) {
+        await Models.copo.update_matrix_cell(currentCopo.copo_id, cellIdStr, delta);
+      }
+      Success("CO-PO matrix delta changes saved successfully!");
+      setCopoDirtyCells({});
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save CO-PO matrix changes"));
+    } finally {
+      setSavingCopoDelta(false);
+    }
+  };
+
+  // ── Pedagogy Per-Topic Edit & Save ─────────────────────────────────────────
+  const startEditPedagogyTopic = (sug: any) => {
+    setEditingPedagogyTopicId(sug.id);
+    setPedagogyDraft({
+      bloom_level_1: sug.bloom_level_1 || "K2 - Understand",
+      pedagogy_suggested_1: sug.pedagogy_suggested_1 || "",
+      description_1: sug.description_1 || "",
+      methodology_1: sug.methodology_1 || "",
+    });
+  };
+
+  const savePedagogyTopic = async (sugId: number) => {
+    if (!currentPedagogy?.pedagogy_id) return;
+    try {
+      setSavingPedagogyTopic(true);
+      await Models.pedagogy.update_topic_suggestion(currentPedagogy.pedagogy_id, sugId, {
+        bloom_level_1: pedagogyDraft.bloom_level_1,
+        pedagogy_suggested_1: pedagogyDraft.pedagogy_suggested_1?.trim(),
+        description_1: pedagogyDraft.description_1?.trim() || undefined,
+        methodology_1: pedagogyDraft.methodology_1?.trim() || undefined,
+      });
+      Success("Topic pedagogy strategy updated successfully!");
+      setEditingPedagogyTopicId(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update pedagogy topic"));
+    } finally {
+      setSavingPedagogyTopic(false);
+    }
+  };
+
+  // ── Lesson Plan Per-Slot Edit & Save ───────────────────────────────────────
+  const startEditLpSlot = (slot: any) => {
+    setEditingLpSlotId(slot.id);
+    setLpSlotDraft({
+      time_allocated: Number(slot.time_allocated) || 1,
+      bloom_level: slot.bloom_level || "Understand",
+      suggested_activity: slot.suggested_activity || "",
+    });
+  };
+
+  const saveLpSlot = async (slotId: number) => {
+    if (!currentLessonPlan?.lesson_plan_id) return;
+    try {
+      setSavingLpSlot(true);
+      await Models.lession_plan.update_topic_slot(currentLessonPlan.lesson_plan_id, slotId, {
+        time_allocated: Number(lpSlotDraft.time_allocated) || 1,
+        bloom_level: lpSlotDraft.bloom_level,
+        suggested_activity: lpSlotDraft.suggested_activity?.trim() || undefined,
+      });
+      Success("Topic slot schedule updated successfully!");
+      setEditingLpSlotId(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to update lesson plan slot"));
+    } finally {
+      setSavingLpSlot(false);
+    }
+  };
+
+  // Units list from current extraction
+  const units = currentExt?.units || [];
   const selectedUnit = units[selectedUnitIndex] || units[0];
 
   // ── Coordinator CRUD & Section Edit State ─────────────────────────────────
-  const canEdit = Boolean(isCoord && activeExt && !activeExt.is_approved);
+  const canEdit = Boolean(isCoord && currentExt && !currentExt.is_approved && !selectedVersionData.syllabus);
 
   const KNOWLEDGE_LEVELS = [
     "K1 - Remember",
@@ -396,6 +825,7 @@ const InsCourseArtifacts = () => {
   const [objectivesDraft, setObjectivesDraft] = useState<any[]>([]);
   const [outcomesDraft, setOutcomesDraft] = useState<any[]>([]);
   const [textbooksDraft, setTextbooksDraft] = useState<any[]>([]);
+  const [referenceBooksDraft, setReferenceBooksDraft] = useState<any[]>([]);
 
   // Hierarchy CRUD modal state (Unit / Topic / Subtopic)
   const [hierarchyModal, setHierarchyModal] = useState<{
@@ -660,6 +1090,86 @@ const InsCourseArtifacts = () => {
     }
   };
 
+  // ── Section 4b: Reference Books Handlers ────────────────────────────────────
+  const startEditReferenceBooks = () => {
+    setReferenceBooksDraft(
+      (currentExt?.reference_books || []).map((t: any) => ({
+        ...t,
+        authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors || ""),
+      }))
+    );
+    setEditingSection("reference_books");
+  };
+
+  const handleAddReferenceBookRow = () => {
+    setReferenceBooksDraft((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        title: "",
+        authorsStr: "",
+        publisher: "",
+        edition: "",
+        publication_year: new Date().getFullYear(),
+        isNew: true,
+      },
+    ]);
+  };
+
+  const handleDeleteReferenceBookRow = (id: any) => {
+    setReferenceBooksDraft((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const saveReferenceBooks = async () => {
+    if (!currentExt?.extractions_id) return;
+    try {
+      setSavingSection(true);
+      const original = currentExt.reference_books || [];
+      const currentIds = new Set(referenceBooksDraft.filter((t) => !t.isNew).map((t) => t.id));
+
+      for (const orig of original) {
+        if (!currentIds.has(orig.id)) {
+          await Models.syllabus.deleteReferenceBook(currentExt.extractions_id, orig.id);
+        }
+      }
+
+      for (const t of referenceBooksDraft) {
+        const authorsArr = (t.authorsStr || "")
+          .split(",")
+          .map((a: string) => a.trim())
+          .filter(Boolean);
+
+        if (t.isNew) {
+          if (t.title?.trim()) {
+            await Models.syllabus.addReferenceBook(currentExt.extractions_id, {
+              title: t.title.trim(),
+              authors: authorsArr,
+              publisher: t.publisher?.trim() || undefined,
+              edition: t.edition?.trim() || undefined,
+              publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+            });
+          }
+        } else {
+          await Models.syllabus.updateReferenceBook(currentExt.extractions_id, t.id, {
+            title: t.title?.trim() || "",
+            authors: authorsArr,
+            publisher: t.publisher?.trim() || undefined,
+            edition: t.edition?.trim() || undefined,
+            publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+          });
+        }
+      }
+
+      Success("Reference books saved successfully!");
+      setEditingSection(null);
+      fetchPortfolio(true);
+    } catch (err: any) {
+      Failure(getErrorMessage(err, "Failed to save reference books"));
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
   // ── Section 5: Curriculum Hierarchy Modal & CRUD (Unit / Topic / Subtopic) ──
   const openUnitModal = (mode: "add" | "edit", unit?: any) => {
     setHierarchyModal({
@@ -913,27 +1423,16 @@ const InsCourseArtifacts = () => {
               </button>
             )}
 
-            {/* Coordinator-only Upload & Version History */}
+            {/* Coordinator-only Upload */}
             {isCoord && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/neurobe/course-version-history?course_id=${courseIdParam}`)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                >
-                  <History className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Version History</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowUploadModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>Upload Syllabus</span>
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span>Upload Syllabus</span>
+              </button>
             )}
           </div>
         </div>
@@ -1062,6 +1561,8 @@ const InsCourseArtifacts = () => {
             {/* ── TAB 1: SYLLABUS & CURRICULUM ── */}
             {activeTab === "syllabus" && (
         <div className="space-y-6">
+          {renderVersionCards("syllabus")}
+
           {/* Active Version Snapshot Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-3">
@@ -1070,7 +1571,7 @@ const InsCourseArtifacts = () => {
               </div>
               <div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Active Syllabus File
+                  {selectedVersionData.syllabus ? "Viewing Syllabus Version" : "Active Syllabus File"}
                 </p>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                   {activeSyllabus?.original_filename || "No syllabus uploaded"}
@@ -1079,37 +1580,37 @@ const InsCourseArtifacts = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {activeExt?.is_approved ? (
+              {currentExt?.is_approved ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Extraction Approved
                 </span>
-              ) : activeExt ? (
+              ) : currentExt ? (
                 <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-                  Draft Extraction (v{activeExt.extraction_version_id})
+                  Draft Extraction (v{currentExt.version_number || currentExt.extraction_version_id})
                 </span>
               ) : null}
 
               {/* Coordinator Approval & Activation Controls */}
-              {isCoord && activeExt && !activeExt.is_approved && (
+              {isCoord && currentExt && !currentExt.is_approved && (
                 <button
                   type="button"
-                  onClick={handleApproveExtraction}
-                  disabled={actionLoading === "approve_extraction"}
+                  onClick={() => handleApproveExtraction(currentExt.extractions_id)}
+                  disabled={actionLoading === `approve_syllabus_${currentExt.extractions_id}`}
                   className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
                 >
-                  {actionLoading === "approve_extraction" ? "Approving..." : "Approve Extraction"}
+                  {actionLoading === `approve_syllabus_${currentExt.extractions_id}` ? "Approving..." : "Approve Extraction"}
                 </button>
               )}
 
-              {isCoord && activeExt && activeExt.is_approved && !activeExt.is_active && (
+              {isCoord && currentExt && currentExt.is_approved && !currentExt.is_active && (
                 <button
                   type="button"
-                  onClick={handleActivateExtraction}
-                  disabled={actionLoading === "activate_extraction"}
+                  onClick={() => handleActivateExtraction(currentExt.extractions_id)}
+                  disabled={actionLoading === `activate_syllabus_${currentExt.extractions_id}`}
                   className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
                 >
-                  {actionLoading === "activate_extraction" ? "Activating..." : "Set as Active"}
+                  {actionLoading === `activate_syllabus_${currentExt.extractions_id}` ? "Activating..." : "Set as Active"}
                 </button>
               )}
 
@@ -1131,7 +1632,7 @@ const InsCourseArtifacts = () => {
           </div>
 
           {/* If No Extraction */}
-          {!activeExt && (
+          {!currentExt && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <FileText className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -1155,7 +1656,7 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {activeExt && (
+          {currentExt && (
             <div className="space-y-6">
               {/* ── Section 1: Curriculum Hours & Credits ── */}
               <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -1267,27 +1768,27 @@ const InsCourseArtifacts = () => {
                 ) : (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                     <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
-                      <p className="text-lg font-bold text-slate-900 dark:text-white">{activeExt.credits ?? course.credits ?? 0}</p>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">{currentExt?.credits ?? course.credits ?? 0}</p>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Credits</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
-                      <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{activeExt.total_theory_hours ?? course.total_theory_hours ?? 0}</p>
+                      <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{currentExt?.total_theory_hours ?? course.total_theory_hours ?? 0}</p>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Theory Hours</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
-                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{activeExt.total_lab_hours ?? course.total_lab_hours ?? 0}</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{currentExt?.total_lab_hours ?? course.total_lab_hours ?? 0}</p>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Lab Hours</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
-                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{activeExt.lecture_hours ?? 0}</p>
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{currentExt?.lecture_hours ?? 0}</p>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Lecture (L)</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
-                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{activeExt.tutorial_hours ?? 0}</p>
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{currentExt?.tutorial_hours ?? 0}</p>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Tutorial (T)</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/40">
-                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{activeExt.practical_hours ?? 0}</p>
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{currentExt?.practical_hours ?? 0}</p>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Practical (P)</p>
                     </div>
                   </div>
@@ -1393,7 +1894,7 @@ const InsCourseArtifacts = () => {
                       </div>
                     ) : (
                       <ul className="mt-3 space-y-2.5">
-                        {(activeExt.objectives || []).map((obj: any, idx: number) => (
+                        {(currentExt?.objectives || []).map((obj: any, idx: number) => (
                           <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300">
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
                               {obj.objective_number || idx + 1}
@@ -1401,7 +1902,7 @@ const InsCourseArtifacts = () => {
                             <span className="leading-relaxed">{obj.description}</span>
                           </li>
                         ))}
-                        {(!activeExt.objectives || activeExt.objectives.length === 0) && (
+                        {(!currentExt?.objectives || currentExt.objectives.length === 0) && (
                           <li className="text-xs text-slate-400 italic">No specific objectives defined.</li>
                         )}
                       </ul>
@@ -1516,7 +2017,7 @@ const InsCourseArtifacts = () => {
                       </div>
                     ) : (
                       <div className="mt-3 space-y-3">
-                        {(activeExt.outcomes || []).map((co: any, idx: number) => (
+                        {(currentExt.outcomes || []).map((co: any, idx: number) => (
                           <div
                             key={idx}
                             className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
@@ -1525,18 +2026,30 @@ const InsCourseArtifacts = () => {
                               <span className="font-bold text-indigo-600 dark:text-indigo-400">
                                 {co.co_code}
                               </span>
-                              {(co.knowledge_level || co.bloom_level) && (
-                                <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
-                                  {co.knowledge_level || co.bloom_level}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {co.knowledge_level && (
+                                  <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                    {co.knowledge_level}
+                                  </span>
+                                )}
+                                {co.bloom_level && (
+                                  <span className="rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/80 dark:text-purple-300">
+                                    {co.bloom_level}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed">
                               {co.description}
                             </p>
+                            {co.reason_for_inferred_level && (
+                              <div className="mt-1.5 rounded-lg bg-indigo-50/50 px-2 py-1 text-[11px] text-indigo-700 italic dark:bg-indigo-950/30 dark:text-indigo-300">
+                                💡 Inferred Level Rationale: {co.reason_for_inferred_level}
+                              </div>
+                            )}
                           </div>
                         ))}
-                        {(!activeExt.outcomes || activeExt.outcomes.length === 0) && (
+                        {(!currentExt.outcomes || currentExt.outcomes.length === 0) && (
                           <p className="text-xs text-slate-400 italic">No course outcomes extracted.</p>
                         )}
                       </div>
@@ -1661,7 +2174,7 @@ const InsCourseArtifacts = () => {
                       </div>
                     ) : (
                       <div className="mt-3 space-y-2.5">
-                        {(activeExt.textbooks || []).map((b: any, idx: number) => (
+                        {(currentExt?.textbooks || []).map((b: any, idx: number) => (
                           <div key={idx} className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
                             <p className="font-semibold text-slate-900 dark:text-white">{b.title}</p>
                             <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
@@ -1669,8 +2182,141 @@ const InsCourseArtifacts = () => {
                             </p>
                           </div>
                         ))}
-                        {(!activeExt.textbooks || activeExt.textbooks.length === 0) && (
+                        {(!currentExt?.textbooks || currentExt.textbooks.length === 0) && (
                           <p className="text-xs text-slate-400 italic">No textbooks recorded.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Prescribed Reference Books Card ── */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-teal-500" />
+                        <span>Reference Books</span>
+                      </h3>
+
+                      {canEdit && (
+                        <div>
+                          {editingSection === "reference_books" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={handleAddReferenceBookRow}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                title="Add Reference Book"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Add</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveReferenceBooks}
+                                disabled={savingSection}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSection(null)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startEditReferenceBooks}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              <Edit2 className="h-3 w-3 text-indigo-500" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {editingSection === "reference_books" ? (
+                      <div className="mt-3 space-y-3">
+                        {referenceBooksDraft.map((t) => (
+                          <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                value={t.title}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, title: val } : item));
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                placeholder="Reference Book Title"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReferenceBookRow(t.id)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                title="Delete Reference Book"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={t.authorsStr}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, authorsStr: val } : item));
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                              placeholder="Authors (comma-separated)"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={t.publisher || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, publisher: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Publisher"
+                              />
+                              <input
+                                type="number"
+                                value={t.publication_year || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReferenceBooksDraft(referenceBooksDraft.map((item) => item.id === t.id ? { ...item, publication_year: val } : item));
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                placeholder="Year"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {referenceBooksDraft.length === 0 && (
+                          <p className="text-center text-xs text-slate-400 py-3 italic">
+                            No reference books. Click &apos;Add&apos; to record one.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2.5">
+                        {(currentExt?.reference_books || []).map((b: any, idx: number) => (
+                          <div key={idx} className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+                            <p className="font-semibold text-slate-900 dark:text-white">{b.title}</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors} {b.publisher ? `— ${b.publisher}` : ""} {b.publication_year ? `(${b.publication_year})` : ""}
+                            </p>
+                          </div>
+                        ))}
+                        {(!currentExt?.reference_books || currentExt.reference_books.length === 0) && (
+                          <p className="text-xs text-slate-400 italic">No reference books recorded.</p>
                         )}
                       </div>
                     )}
@@ -1927,65 +2573,95 @@ const InsCourseArtifacts = () => {
       {/* ── TAB 2: CO-PO MAPPING ── */}
       {activeTab === "copo" && (
         <div className="space-y-6">
+          {renderVersionCards("copo")}
+
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Course Outcome to Program Outcome (CO-PO) Correlation Matrix
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Accreditation mapping (1 = Low, 2 = Medium, 3 = High correlation)
+                Accreditation correlation matrix (1 = Low, 2 = Medium, 3 = High, 0 = None)
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {activeCopo?.is_approved ? (
+              {currentCopo?.is_approved ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   CO-PO Matrix Approved
                 </span>
-              ) : activeCopo ? (
+              ) : currentCopo ? (
                 <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-                  Draft Version {activeCopo.version_id}
+                  Draft Version v{currentCopo.version_number || currentCopo.version_id}
                 </span>
               ) : null}
 
               {/* Coordinator Controls */}
-              {isCoord && !activeCopo && activeExt?.is_approved && (
+              {isCoord && (
                 <button
                   type="button"
-                  onClick={handleGenerateCopo}
-                  disabled={actionLoading === "generate_copo"}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {actionLoading === "generate_copo" ? "Queuing..." : "Generate CO-PO Mapping"}
-                </button>
-              )}
-
-              {isCoord && activeCopo && !activeCopo.is_approved && (
-                <button
-                  type="button"
-                  onClick={handleApproveCopo}
-                  disabled={actionLoading === "approve_copo"}
-                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {actionLoading === "approve_copo" ? "Approving..." : "Approve CO-PO"}
-                </button>
-              )}
-
-              {isCoord && activeCopo && activeCopo.is_approved && !activeCopo.is_active && (
-                <button
-                  type="button"
-                  onClick={handleActivateCopo}
-                  disabled={actionLoading === "activate_copo"}
+                  onClick={openGenerateCopoModal}
+                  disabled={isCopoBusy || actionLoading === "generate_copo"}
                   className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {actionLoading === "activate_copo" ? "Activating..." : "Set as Active"}
+                  {isCopoBusy ? "Generating CO-PO..." : "Generate CO-PO Mapping"}
+                </button>
+              )}
+
+              {isCoord && currentCopo && !currentCopo.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApproveCopo(currentCopo.copo_id)}
+                  disabled={actionLoading === `approve_copo_${currentCopo.copo_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_copo_${currentCopo.copo_id}` ? "Approving..." : "Approve CO-PO"}
+                </button>
+              )}
+
+              {isCoord && currentCopo && currentCopo.is_approved && !currentCopo.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivateCopo(currentCopo.copo_id)}
+                  disabled={actionLoading === `activate_copo_${currentCopo.copo_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_copo_${currentCopo.copo_id}` ? "Activating..." : "Set as Active"}
                 </button>
               )}
             </div>
           </div>
 
-          {!activeCopo ? (
+          {/* Delta Changes Notice Banner */}
+          {Object.keys(copoDirtyCells).length > 0 && (
+            <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/50 dark:text-indigo-200">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <span>You have <strong>{Object.keys(copoDirtyCells).length}</strong> unsaved matrix cell change(s).</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCopoDirtyCells({})}
+                  className="rounded-lg border border-slate-300 px-3 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={saveCopoDeltaChanges}
+                  disabled={savingCopoDelta}
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <Save className="h-3 w-3" />
+                  <span>{savingCopoDelta ? "Saving..." : "Save Changes"}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!currentCopo ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Layers className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -1993,65 +2669,176 @@ const InsCourseArtifacts = () => {
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? activeExt?.is_approved
-                    ? "Click 'Generate CO-PO Mapping' to trigger AI matrix generation based on the approved extraction."
-                    : "The extraction must be approved first before generating the CO-PO correlation matrix."
+                  ? "Click 'Generate CO-PO Mapping' to trigger AI matrix generation based on an approved curriculum extraction."
                   : "The course coordinator has not generated a CO-PO mapping version for this course yet."}
               </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGenerateCopoModal}
+                  disabled={isCopoBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate CO-PO Mapping</span>
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">CO Code</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Target PO</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Correlation Level</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Justification</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {(activeCopo.matrix_entries || []).map((cell: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition">
-                      <td className="py-3 px-4 font-bold text-indigo-600 dark:text-indigo-400">{cell.co_code || `CO${cell.course_outcome_id}`}</td>
-                      <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">{cell.po_code || `PO${cell.po_id}`}</td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                            cell.matrix_value === 3
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              : cell.matrix_value === 2
-                              ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
-                              : cell.matrix_value === 1
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                          }`}
-                        >
-                          {cell.matrix_value || 0}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400 leading-relaxed max-w-md">
-                        {cell.justification || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                  {(activeCopo.matrix_entries || []).length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-400 italic">
-                        No matrix cell entries recorded in this mapping version.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          ) : (() => {
+            // Compute unique POs and COs for n x m grid
+            const entries = currentCopo.matrix_entries || [];
+            const posMap = new Map<number, { po_id: number; po_code: string }>();
+            const cosMap = new Map<number, { course_outcome_id: number; co_code: string; description?: string }>();
+            const cellMap = new Map<string, any>();
+            const extOutcomesMap = new Map<number, any>();
+            (currentExt?.outcomes || []).forEach((o: any) => extOutcomesMap.set(o.id, o));
+
+            entries.forEach((e: any) => {
+              if (!posMap.has(e.po_id)) {
+                posMap.set(e.po_id, { po_id: e.po_id, po_code: e.po_code || `PO${e.po_id}` });
+              }
+              if (!cosMap.has(e.course_outcome_id)) {
+                const extCo = extOutcomesMap.get(e.course_outcome_id);
+                cosMap.set(e.course_outcome_id, {
+                  course_outcome_id: e.course_outcome_id,
+                  co_code: e.co_code || extCo?.co_code || `CO${e.course_outcome_id}`,
+                  description: extCo?.description,
+                });
+              }
+              cellMap.set(`${e.course_outcome_id}_${e.po_id}`, e);
+            });
+
+            const posList = Array.from(posMap.values()).sort((a, b) => {
+              const numA = parseInt(a.po_code.replace(/\D/g, "")) || a.po_id;
+              const numB = parseInt(b.po_code.replace(/\D/g, "")) || b.po_id;
+              return numA - numB;
+            });
+
+            const cosList = Array.from(cosMap.values()).sort((a, b) => {
+              const numA = parseInt(a.co_code.replace(/\D/g, "")) || a.course_outcome_id;
+              const numB = parseInt(b.co_code.replace(/\D/g, "")) || b.course_outcome_id;
+              return numA - numB;
+            });
+
+            const canEditMatrix = Boolean(isCoord && !currentCopo.is_approved && !selectedVersionData.copo);
+
+            return (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Correlation Matrix ({cosList.length} COs × {posList.length} POs)
+                    </span>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 3 = High</span>
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 2 = Medium</span>
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 1 = Low</span>
+                      <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> 0 = None</span>
+                    </div>
+                  </div>
+
+                  <table className="mt-4 w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                        <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-24">CO</th>
+                        <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 min-w-[200px]">Outcome Description</th>
+                        {posList.map((po) => (
+                          <th key={po.po_id} className="py-2.5 px-2 text-center font-bold text-slate-700 dark:text-slate-300 w-16">
+                            {po.po_code}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {cosList.map((co) => (
+                        <tr key={co.course_outcome_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                          <td className="py-2.5 px-3 font-bold text-indigo-600 dark:text-indigo-400">
+                            {co.co_code}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
+                            {co.description || "—"}
+                          </td>
+                          {posList.map((po) => {
+                            const entry = cellMap.get(`${co.course_outcome_id}_${po.po_id}`);
+                            if (!entry) {
+                              return <td key={po.po_id} className="py-2.5 px-2 text-center text-slate-300">—</td>;
+                            }
+                            const dirty = copoDirtyCells[entry.id];
+                            const currentVal = dirty !== undefined ? dirty.matrix_value : (entry.matrix_value ?? 0);
+                            const currentJust = dirty?.justification !== undefined ? dirty.justification : (entry.justification || "");
+                            const isDirty = dirty !== undefined;
+
+                            let colorClass = "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500";
+                            if (currentVal === 3) colorClass = "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-bold";
+                            else if (currentVal === 2) colorClass = "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 font-bold";
+                            else if (currentVal === 1) colorClass = "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-semibold";
+
+                            return (
+                              <td key={po.po_id} className="py-2 px-1 text-center">
+                                <button
+                                  type="button"
+                                  disabled={!canEditMatrix}
+                                  onClick={() => setCopoEditingCell({
+                                    id: entry.id,
+                                    co_code: co.co_code,
+                                    po_code: po.po_code,
+                                    matrix_value: currentVal,
+                                    justification: currentJust,
+                                  })}
+                                  title={currentJust ? `${co.co_code} → ${po.po_code}: ${currentJust}` : `${co.co_code} → ${po.po_code} (${currentVal})`}
+                                  className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition ${colorClass} ${
+                                    canEditMatrix ? "cursor-pointer hover:scale-110 hover:shadow-xs" : "cursor-default"
+                                  } ${isDirty ? "ring-2 ring-indigo-500" : ""}`}
+                                >
+                                  {currentVal}
+                                </button>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Justification Details Reference */}
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    Matrix Correlation Justifications ({entries.filter((e: any) => e.justification || copoDirtyCells[e.id]?.justification).length})
+                  </h4>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                    {entries
+                      .filter((e: any) => (copoDirtyCells[e.id]?.justification ?? e.justification))
+                      .map((e: any) => {
+                        const val = copoDirtyCells[e.id]?.matrix_value ?? e.matrix_value;
+                        const just = copoDirtyCells[e.id]?.justification ?? e.justification;
+                        return (
+                          <div key={e.id} className="rounded-lg bg-slate-50 p-2.5 text-xs dark:bg-slate-800/40">
+                            <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
+                              <span>{e.co_code || `CO${e.course_outcome_id}`} → {e.po_code || `PO${e.po_id}`}</span>
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                Level {val}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                              {just}
+                            </p>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
       {/* ── TAB 3: PEDAGOGY & DELIVERY ── */}
       {activeTab === "pedagogy" && (
         <div className="space-y-6">
+          {renderVersionCards("pedagogy")}
+
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -2063,54 +2850,54 @@ const InsCourseArtifacts = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {activePedagogy?.is_approved ? (
+              {currentPedagogy?.is_approved ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Pedagogy Approved
                 </span>
-              ) : activePedagogy ? (
+              ) : currentPedagogy ? (
                 <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-                  Draft Version {activePedagogy.version_id}
+                  Draft Version v{currentPedagogy.version_number || currentPedagogy.version_id}
                 </span>
               ) : null}
 
               {/* Coordinator Controls */}
-              {isCoord && !activePedagogy && activeExt?.is_approved && (
+              {isCoord && (
                 <button
                   type="button"
-                  onClick={handleGeneratePedagogy}
-                  disabled={actionLoading === "generate_pedagogy"}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {actionLoading === "generate_pedagogy" ? "Queuing..." : "Generate Pedagogy"}
-                </button>
-              )}
-
-              {isCoord && activePedagogy && !activePedagogy.is_approved && (
-                <button
-                  type="button"
-                  onClick={handleApprovePedagogy}
-                  disabled={actionLoading === "approve_pedagogy"}
-                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {actionLoading === "approve_pedagogy" ? "Approving..." : "Approve Pedagogy"}
-                </button>
-              )}
-
-              {isCoord && activePedagogy && activePedagogy.is_approved && !activePedagogy.is_active && (
-                <button
-                  type="button"
-                  onClick={handleActivatePedagogy}
-                  disabled={actionLoading === "activate_pedagogy"}
+                  onClick={openGeneratePedagogyModal}
+                  disabled={isPedagogyBusy || actionLoading === "generate_pedagogy"}
                   className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {actionLoading === "activate_pedagogy" ? "Activating..." : "Set as Active"}
+                  {isPedagogyBusy ? "Generating Pedagogy..." : "Generate Pedagogy"}
+                </button>
+              )}
+
+              {isCoord && currentPedagogy && !currentPedagogy.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApprovePedagogy(currentPedagogy.pedagogy_id)}
+                  disabled={actionLoading === `approve_pedagogy_${currentPedagogy.pedagogy_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_pedagogy_${currentPedagogy.pedagogy_id}` ? "Approving..." : "Approve Pedagogy"}
+                </button>
+              )}
+
+              {isCoord && currentPedagogy && currentPedagogy.is_approved && !currentPedagogy.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivatePedagogy(currentPedagogy.pedagogy_id)}
+                  disabled={actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}` ? "Activating..." : "Set as Active"}
                 </button>
               )}
             </div>
           </div>
 
-          {!activePedagogy ? (
+          {!currentPedagogy ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Presentation className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -2118,51 +2905,152 @@ const InsCourseArtifacts = () => {
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? activeExt?.is_approved
-                    ? "Click 'Generate Pedagogy' to automatically synthesize topic-level teaching delivery methods."
-                    : "The extraction must be approved first before generating pedagogy strategies."
+                  ? "Click 'Generate Pedagogy' to automatically synthesize topic-level teaching delivery methods based on an approved curriculum extraction."
                   : "The course coordinator has not generated pedagogy strategies for this course yet."}
               </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGeneratePedagogyModal}
+                  disabled={isPedagogyBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate Pedagogy</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {(activePedagogy.topic_suggestions || []).map((sug: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white">
-                      Topic #{sug.topic_id}
-                    </span>
-                    {sug.bloom_level_1 && (
-                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                        {sug.bloom_level_1}
-                      </span>
-                    )}
-                  </div>
+              {(currentPedagogy.topic_suggestions || []).map((sug: any, idx: number) => {
+                const isEditingThisTopic = editingPedagogyTopicId === sug.id;
+                const canEditThis = Boolean(isCoord && !currentPedagogy.is_approved && !selectedVersionData.pedagogy);
 
-                  <div className="mt-3 space-y-2 text-xs">
-                    <div>
-                      <p className="font-semibold text-indigo-600 dark:text-indigo-400">
-                        Primary Strategy: {sug.pedagogy_suggested_1}
-                      </p>
-                      {sug.description_1 && (
-                        <p className="mt-1 text-slate-600 dark:text-slate-400 leading-relaxed">
-                          {sug.description_1}
-                        </p>
-                      )}
+                return (
+                  <div
+                    key={sug.id || idx}
+                    className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white">
+                        {sug.topic_name || `Topic #${sug.topic_id}`}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {sug.bloom_level_1 && (
+                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                            {sug.bloom_level_1}
+                          </span>
+                        )}
+                        {canEditThis && !isEditingThisTopic && (
+                          <button
+                            type="button"
+                            onClick={() => startEditPedagogyTopic(sug)}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                          >
+                            <Edit2 className="h-3 w-3 text-indigo-500" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {sug.pedagogy_suggested_2 && (
-                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
-                        <span className="font-semibold">Alternative Strategy:</span> {sug.pedagogy_suggested_2}
+                    {isEditingThisTopic ? (
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Bloom Taxonomy Level</label>
+                          <select
+                            value={pedagogyDraft.bloom_level_1 || "K2 - Understand"}
+                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_1: e.target.value })}
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400"
+                          >
+                            {KNOWLEDGE_LEVELS.map((lvl) => (
+                              <option key={lvl} value={lvl}>{lvl}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Primary Strategy</label>
+                          <input
+                            type="text"
+                            value={pedagogyDraft.pedagogy_suggested_1 || ""}
+                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_1: e.target.value })}
+                            placeholder="e.g. Flipped Classroom / Problem-Based Learning"
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Strategy Description</label>
+                          <textarea
+                            rows={2}
+                            value={pedagogyDraft.description_1 || ""}
+                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_1: e.target.value })}
+                            placeholder="Brief description of instructional flow..."
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Suggested Methodology</label>
+                          <input
+                            type="text"
+                            value={pedagogyDraft.methodology_1 || ""}
+                            onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_1: e.target.value })}
+                            placeholder="e.g. Small group brainstorming & case study presentation"
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setEditingPedagogyTopicId(null)}
+                            className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => savePedagogyTopic(sug.id)}
+                            disabled={savingPedagogyTopic}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            <Save className="h-3 w-3" />
+                            <span>{savingPedagogyTopic ? "Saving..." : "Save Strategy"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2 text-xs">
+                        <div>
+                          <p className="font-semibold text-indigo-600 dark:text-indigo-400">
+                            Primary Strategy: {sug.pedagogy_suggested_1}
+                          </p>
+                          {sug.description_1 && (
+                            <p className="mt-1 text-slate-600 dark:text-slate-400 leading-relaxed">
+                              {sug.description_1}
+                            </p>
+                          )}
+                        </div>
+
+                        {sug.methodology_1 && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                            Methodology: {sug.methodology_1}
+                          </p>
+                        )}
+
+                        {sug.pedagogy_suggested_2 && (
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
+                            <span className="font-semibold">Alternative Strategy:</span> {sug.pedagogy_suggested_2}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
-              {(activePedagogy.topic_suggestions || []).length === 0 && (
+                );
+              })}
+              {(currentPedagogy.topic_suggestions || []).length === 0 && (
                 <div className="col-span-2 py-8 text-center text-xs text-slate-400 italic">
                   No topic suggestions recorded in this pedagogy version.
                 </div>
@@ -2175,65 +3063,67 @@ const InsCourseArtifacts = () => {
       {/* ── TAB 4: LESSON PLAN & TIMELINE ── */}
       {activeTab === "lesson_plan" && (
         <div className="space-y-6">
+          {renderVersionCards("lesson_plan")}
+
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Lecture Plan, Hourly Allocation & Delivery Schedule
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Target hours: {activeLessonPlan?.target_total_hours || 45} Hrs • Total Theory: {activeLessonPlan?.total_theory_hours || 0} Hrs • Total Lab: {activeLessonPlan?.total_lab_hours || 0} Hrs
+                Target hours: {currentLessonPlan?.target_total_hours || 45} Hrs • Total Theory: {currentLessonPlan?.total_theory_hours || 0} Hrs • Total Lab: {currentLessonPlan?.total_lab_hours || 0} Hrs
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {activeLessonPlan?.is_approved ? (
+              {currentLessonPlan?.is_approved ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Lesson Plan Approved
                 </span>
-              ) : activeLessonPlan ? (
+              ) : currentLessonPlan ? (
                 <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-                  Draft Version {activeLessonPlan.version_id}
+                  Draft Version v{currentLessonPlan.version_number || currentLessonPlan.version_id}
                 </span>
               ) : null}
 
               {/* Coordinator Controls */}
-              {isCoord && !activeLessonPlan && activeExt?.is_approved && (
+              {isCoord && (
                 <button
                   type="button"
-                  onClick={handleGenerateLessonPlan}
-                  disabled={actionLoading === "generate_lp"}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {actionLoading === "generate_lp" ? "Queuing..." : "Generate Lesson Plan"}
-                </button>
-              )}
-
-              {isCoord && activeLessonPlan && !activeLessonPlan.is_approved && (
-                <button
-                  type="button"
-                  onClick={handleApproveLessonPlan}
-                  disabled={actionLoading === "approve_lp"}
-                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {actionLoading === "approve_lp" ? "Approving..." : "Approve Lesson Plan"}
-                </button>
-              )}
-
-              {isCoord && activeLessonPlan && activeLessonPlan.is_approved && !activeLessonPlan.is_active && (
-                <button
-                  type="button"
-                  onClick={handleActivateLessonPlan}
-                  disabled={actionLoading === "activate_lp"}
+                  onClick={openGenerateLessonPlanModal}
+                  disabled={isLessonPlanBusy || actionLoading === "generate_lp"}
                   className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {actionLoading === "activate_lp" ? "Activating..." : "Set as Active"}
+                  {isLessonPlanBusy ? "Generating Lesson Plan..." : "Generate Lesson Plan"}
+                </button>
+              )}
+
+              {isCoord && currentLessonPlan && !currentLessonPlan.is_approved && (
+                <button
+                  type="button"
+                  onClick={() => handleApproveLessonPlan(currentLessonPlan.lesson_plan_id)}
+                  disabled={actionLoading === `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`}
+                  className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading === `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}` ? "Approving..." : "Approve Lesson Plan"}
+                </button>
+              )}
+
+              {isCoord && currentLessonPlan && currentLessonPlan.is_approved && !currentLessonPlan.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleActivateLessonPlan(currentLessonPlan.lesson_plan_id)}
+                  disabled={actionLoading === `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`}
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {actionLoading === `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}` ? "Activating..." : "Set as Active"}
                 </button>
               )}
             </div>
           </div>
 
-          {!activeLessonPlan ? (
+          {!currentLessonPlan ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Calendar className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -2241,55 +3131,174 @@ const InsCourseArtifacts = () => {
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? activeExt?.is_approved
-                    ? "Click 'Generate Lesson Plan' to allocate hours across topics and subtopics based on syllabus requirements."
-                    : "The extraction must be approved first before generating a lesson plan."
+                  ? "Click 'Generate Lesson Plan' to allocate hours across topics and subtopics based on syllabus requirements."
                   : "The course coordinator has not generated a lesson plan for this course yet."}
               </p>
+              {isCoord && (
+                <button
+                  type="button"
+                  onClick={openGenerateLessonPlanModal}
+                  disabled={isLessonPlanBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate Lesson Plan</span>
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Slot #</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Topic / Subtopic</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Time Allocated</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Bloom Level</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">Suggested Activity</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {(activeLessonPlan.topic_slots || []).map((slot: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition">
-                      <td className="py-3 px-4 font-bold text-slate-500">{idx + 1}</td>
-                      <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
-                        Topic ID: {slot.topic_id}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-indigo-600 dark:text-indigo-400">
-                        {slot.time_allocated || 1} Hr(s)
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {slot.bloom_level || "Understand"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
-                        {slot.suggested_activity || "Interactive Lecture & Discussion"}
-                      </td>
-                    </tr>
-                  ))}
-                  {(activeLessonPlan.topic_slots || []).length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 italic">
-                        No topic slots defined in this lesson plan version.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          ) : (() => {
+            const slots = currentLessonPlan.topic_slots || [];
+            const groupsMap = new Map<string, { unitTitle: string; slots: any[]; totalHours: number }>();
+
+            slots.forEach((slot: any) => {
+              const uKey = slot.unit_title || (slot.unit_id ? `Unit ${slot.unit_id}` : "Curriculum Topics");
+              if (!groupsMap.has(uKey)) {
+                groupsMap.set(uKey, { unitTitle: uKey, slots: [], totalHours: 0 });
+              }
+              const g = groupsMap.get(uKey)!;
+              g.slots.push(slot);
+              g.totalHours += Number(slot.time_allocated) || 0;
+            });
+
+            const groupsList = Array.from(groupsMap.values());
+            const canEditLp = Boolean(isCoord && !currentLessonPlan.is_approved && !selectedVersionData.lesson_plan);
+
+            return (
+              <div className="space-y-6">
+                {groupsList.map((group, gIdx) => (
+                  <div key={gIdx} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                        <span>{group.unitTitle}</span>
+                      </h4>
+                      <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                        {group.totalHours} Allocated Hours
+                      </span>
+                    </div>
+
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-16">Slot #</th>
+                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 min-w-[220px]">Topic / Subtopic</th>
+                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-28">Allocated</th>
+                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-32">Bloom Level</th>
+                            <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300">Suggested Activity</th>
+                            {canEditLp && <th className="py-2.5 px-3 text-right font-bold text-slate-700 dark:text-slate-300 w-20">Actions</th>}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {group.slots.map((slot: any, sIdx: number) => {
+                            const isEditingThisSlot = editingLpSlotId === slot.id;
+
+                            if (isEditingThisSlot) {
+                              return (
+                                <tr key={slot.id || sIdx} className="bg-indigo-50/40 dark:bg-indigo-950/30">
+                                  <td className="py-2.5 px-3 font-bold text-indigo-600">{sIdx + 1}</td>
+                                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                                    <div>{slot.topic_name || `Topic #${slot.topic_id}`}</div>
+                                    {slot.subtopic_name && <div className="text-[11px] text-slate-400">↳ {slot.subtopic_name}</div>}
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <input
+                                      type="number"
+                                      min={0.5}
+                                      step={0.5}
+                                      value={lpSlotDraft.time_allocated}
+                                      onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, time_allocated: Number(e.target.value) })}
+                                      className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <input
+                                      type="text"
+                                      value={lpSlotDraft.bloom_level}
+                                      onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, bloom_level: e.target.value })}
+                                      placeholder="e.g. Understand"
+                                      className="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <input
+                                      type="text"
+                                      value={lpSlotDraft.suggested_activity}
+                                      onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, suggested_activity: e.target.value })}
+                                      placeholder="e.g. Interactive discussion & problem solving"
+                                      className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => saveLpSlot(slot.id)}
+                                        disabled={savingLpSlot}
+                                        className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                      >
+                                        <Check className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingLpSlotId(null)}
+                                        className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return (
+                              <tr key={slot.id || sIdx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition">
+                                <td className="py-2.5 px-3 font-bold text-slate-400">{sIdx + 1}</td>
+                                <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                                  <div>{slot.topic_name || `Topic #${slot.topic_id}`}</div>
+                                  {slot.subtopic_name && <div className="text-[11px] text-slate-400">↳ {slot.subtopic_name}</div>}
+                                </td>
+                                <td className="py-2.5 px-3 font-bold text-indigo-600 dark:text-indigo-400">
+                                  {slot.time_allocated || 1} Hr(s)
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    {slot.bloom_level || "Understand"}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                                  {slot.suggested_activity || "Interactive Lecture & Discussion"}
+                                </td>
+                                {canEditLp && (
+                                  <td className="py-2.5 px-3 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditLpSlot(slot)}
+                                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    >
+                                      <Edit2 className="h-3 w-3 text-indigo-500" />
+                                      <span>Edit</span>
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+
+                {groupsList.length === 0 && (
+                  <div className="py-8 text-center text-xs text-slate-400 italic">
+                    No topic slots defined in this lesson plan version.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </>
@@ -2605,6 +3614,325 @@ const InsCourseArtifacts = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate CO-PO Mapping Modal ── */}
+      {showGenerateCopoModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-500" />
+                <span>Generate CO-PO Mapping</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGenerateCopoModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              The AI worker will synthesize correlation scores (1–3) and justification text between each course outcome and program outcome based on the selected curriculum extraction.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Extraction Version
+                </label>
+                <select
+                  value={selectedExtractionForCopo || ""}
+                  onChange={(e) => setSelectedExtractionForCopo(Number(e.target.value))}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {(portfolio?.versions?.extractions || [])
+                    .filter((e: any) => e.is_approved)
+                    .map((e: any) => (
+                      <option key={e.extractions_id} value={e.extractions_id}>
+                        Version v{e.version_number} (ID: {e.extractions_id}) — {e.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowGenerateCopoModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGenerateCopo}
+                disabled={actionLoading === "generate_copo" || !selectedExtractionForCopo}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{actionLoading === "generate_copo" ? "Queuing..." : "Queue Generation"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate Pedagogy Modal ── */}
+      {showGeneratePedagogyModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Presentation className="h-4 w-4 text-indigo-500" />
+                <span>Generate Pedagogy Strategies</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGeneratePedagogyModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              The AI worker will analyze the topics and Bloom taxonomy levels to recommend primary & alternative instructional strategies and active learning methodologies.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Extraction Version
+                </label>
+                <select
+                  value={selectedExtractionForPedagogy || ""}
+                  onChange={(e) => setSelectedExtractionForPedagogy(Number(e.target.value))}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {(portfolio?.versions?.extractions || [])
+                    .filter((e: any) => e.is_approved)
+                    .map((e: any) => (
+                      <option key={e.extractions_id} value={e.extractions_id}>
+                        Version v{e.version_number} (ID: {e.extractions_id}) — {e.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowGeneratePedagogyModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGeneratePedagogy}
+                disabled={actionLoading === "generate_pedagogy" || !selectedExtractionForPedagogy}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{actionLoading === "generate_pedagogy" ? "Queuing..." : "Queue Generation"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate Lesson Plan Modal ── */}
+      {showGenerateLessonPlanModal && isCoord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-indigo-500" />
+                <span>Generate Lesson Plan Schedule</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGenerateLessonPlanModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              Generate an hourly schedule distributing syllabus topics across the semester timeline. You can optionally link an approved pedagogy version to carry over suggested delivery activities.
+            </p>
+
+            <div className="mt-4 space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Extraction Version <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedExtractionForLp || ""}
+                  onChange={(e) => setSelectedExtractionForLp(Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {(portfolio?.versions?.extractions || [])
+                    .filter((e: any) => e.is_approved)
+                    .map((e: any) => (
+                      <option key={e.extractions_id} value={e.extractions_id}>
+                        Extraction v{e.version_number} — {e.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Select Approved Pedagogy Version (Optional)
+                </label>
+                <select
+                  value={selectedPedagogyForLp || ""}
+                  onChange={(e) => setSelectedPedagogyForLp(e.target.value ? Number(e.target.value) : null)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="">None (Use standard classroom delivery activities)</option>
+                  {(portfolio?.versions?.pedagogies || [])
+                    .filter((p: any) => p.is_approved)
+                    .map((p: any) => (
+                      <option key={p.pedagogy_id} value={p.pedagogy_id}>
+                        Pedagogy v{p.version_number || p.version_id} — {p.is_active ? "Active" : "Approved"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Target Total Hours
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={lpTargetHours}
+                  onChange={(e) => setLpTargetHours(Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  placeholder="e.g. 45"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowGenerateLessonPlanModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGenerateLessonPlan}
+                disabled={actionLoading === "generate_lp" || !selectedExtractionForLp}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{actionLoading === "generate_lp" ? "Queuing..." : "Queue Generation"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CO-PO Cell Correlation Edit Modal ── */}
+      {copoEditingCell && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit2 className="h-4 w-4 text-indigo-500" />
+                <span>Edit Cell: {copoEditingCell.co_code} → {copoEditingCell.po_code}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCopoEditingCell(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Correlation Level
+                </label>
+                <div className="mt-2 grid grid-cols-4 gap-2">
+                  {[
+                    { val: 0, label: "0 - None", color: "hover:border-slate-400 bg-slate-50 dark:bg-slate-800" },
+                    { val: 1, label: "1 - Low", color: "hover:border-amber-400 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+                    { val: 2, label: "2 - Medium", color: "hover:border-sky-400 bg-sky-50/70 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300" },
+                    { val: 3, label: "3 - High", color: "hover:border-emerald-400 bg-emerald-50/70 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setCopoEditingCell({ ...copoEditingCell, matrix_value: opt.val })}
+                      className={`rounded-xl border py-2.5 text-center text-xs font-bold transition ${opt.color} ${
+                        copoEditingCell.matrix_value === opt.val
+                          ? "border-indigo-600 ring-2 ring-indigo-500/30"
+                          : "border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Accreditation Justification
+                </label>
+                <textarea
+                  rows={3}
+                  value={copoEditingCell.justification || ""}
+                  onChange={(e) => setCopoEditingCell({ ...copoEditingCell, justification: e.target.value })}
+                  placeholder="Explain why this CO supports this Program Outcome..."
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setCopoEditingCell(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCopoDirtyCells((prev) => ({
+                    ...prev,
+                    [copoEditingCell.id]: {
+                      matrix_value: Number(copoEditingCell.matrix_value) || 0,
+                      justification: copoEditingCell.justification?.trim() || "",
+                    },
+                  }));
+                  setCopoEditingCell(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-95"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>Apply to Cell</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
