@@ -35,6 +35,7 @@ import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import Models from "@/imports/models.import";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
+import { BACKEND_URL } from "@/utils/constant.utils";
 
 const InsCourseArtifacts = () => {
   const dispatch = useDispatch();
@@ -235,7 +236,7 @@ const InsCourseArtifacts = () => {
 
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-    const directFileUrl = `http://localhost:8080/course/syllabi/${sylId}/file${tokenParam}`;
+    const directFileUrl = `${BACKEND_URL}course/syllabi/${sylId}/file${tokenParam}`;
 
     Models.syllabus
       .getFileBlob(sylId)
