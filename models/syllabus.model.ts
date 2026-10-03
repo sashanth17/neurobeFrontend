@@ -59,6 +59,33 @@ const syllabus = {
         });
     },
 
+    list_syllabi: (params?: { course_id?: number | string }) => {
+        return new Promise((resolve, reject) => {
+            const q = new URLSearchParams();
+            if (params?.course_id) q.append("course_id", String(params.course_id));
+            commonInstance()
+                .get(`course/syllabi?${q.toString()}`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    list_extractions: (params?: { course_id?: number | string; course_syllabus_id?: number | string }) => {
+        return new Promise((resolve, reject) => {
+            const q = new URLSearchParams();
+            if (params?.course_id) q.append("course_id", String(params.course_id));
+            if (params?.course_syllabus_id) q.append("course_syllabus_id", String(params.course_syllabus_id));
+            commonInstance()
+                .get(`course/extractions?${q.toString()}`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
     extraction_approve: (extractionsId: number | string) => {
         return new Promise((resolve, reject) => {
             commonInstance()
@@ -74,6 +101,17 @@ const syllabus = {
         return new Promise((resolve, reject) => {
             commonInstance()
                 .patch(`course/extractions/${extractionsId}/activate`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+    get_active_extraction: (courseId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/extractions/courses/${courseId}/active`)
                 .then((res) => resolve(res.data))
                 .catch((error) => {
                     reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);

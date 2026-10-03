@@ -12,6 +12,17 @@ const pedagogy = {
     });
   },
 
+  get_active: (courseId: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .get(`course/pedagogies/courses/${courseId}/active`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
+        });
+    });
+  },
+
   get: (pedagogy_id: number | string) => {
     return new Promise((resolve, reject) => {
       commonInstance()

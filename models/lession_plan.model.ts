@@ -12,6 +12,17 @@ const lession_plan = {
     });
   },
 
+  get_active: (courseId: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .get(`course/lesson-plans/courses/${courseId}/active`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
+        });
+    });
+  },
+
   get: (lesson_plan_id: number | string) => {
     return new Promise((resolve, reject) => {
       commonInstance()
