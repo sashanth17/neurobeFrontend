@@ -35,6 +35,7 @@ import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import Models from "@/imports/models.import";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
+import { BACKEND_URL } from "@/utils/constant.utils";
 
 const InsCourseArtifacts = () => {
   const dispatch = useDispatch();
@@ -66,6 +67,31 @@ const InsCourseArtifacts = () => {
   // Active Tab
   const [activeTab, setActiveTab] = useState<"syllabus" | "copo" | "pedagogy" | "lesson_plan">("syllabus");
 
+  // Per-section loaded version data
+  const [sectionData, setSectionData] = useState<{
+    syllabus?: any;
+    copo?: any;
+    pedagogy?: any;
+    lesson_plan?: any;
+  }>({});
+
+  // Dynamic versions list per section
+  const [sectionVersions, setSectionVersions] = useState<{
+    syllabi?: any[];
+    extractions?: any[];
+    copo?: any[];
+    pedagogies?: any[];
+    lesson_plans?: any[];
+  }>({});
+
+  // Per-section loading indicator
+  const [sectionLoading, setSectionLoading] = useState<{
+    syllabus?: boolean;
+    copo?: boolean;
+    pedagogy?: boolean;
+    lesson_plan?: boolean;
+  }>({});
+
   // Filter unit selection for Pedagogy & Lesson Plan
   const [selectedUnitIndex, setSelectedUnitIndex] = useState<number>(0);
 
@@ -84,31 +110,6 @@ const InsCourseArtifacts = () => {
     dispatch(setPageTitle("Course Artifacts Portfolio"));
   }, [dispatch]);
 
-  // Single Atomic Fetch (Load once on mount / explicit refresh only)
-  const fetchPortfolio = async (isManualRefresh = false) => {
-    if (!courseIdParam) return;
-    try {
-      if (isManualRefresh) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
-
-      const res: any = await Models.course.course_portfolio(courseIdParam);
-      setPortfolio(res);
-    } catch (err: any) {
-      console.error("Failed to load course portfolio:", err);
-      setError(getErrorMessage(err, "Failed to load course portfolio"));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (courseIdParam) {
-      fetchPortfolio(false);
-    }
-  }, [courseIdParam]);
-
   const course = portfolio?.course || {};
   const perms = portfolio?.permissions || {
     is_coordinator: false,
@@ -122,12 +123,6 @@ const InsCourseArtifacts = () => {
   };
   const isCoord = Boolean(perms.is_coordinator);
 
-  const activeSyllabus = portfolio?.active_syllabus;
-  const activeExt = portfolio?.active_extraction;
-  const activeCopo = portfolio?.active_copo;
-  const activePedagogy = portfolio?.active_pedagogy;
-  const activeLessonPlan = portfolio?.active_lesson_plan;
-
   // ── Selected Historical Version State (for Coordinator preview) ────────────
   const [selectedVersionData, setSelectedVersionData] = useState<{
     syllabus?: any;
@@ -137,30 +132,163 @@ const InsCourseArtifacts = () => {
   }>({});
   const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
 
+  // Load section-specific versions and current active version data on tab switch
+  const loadSectionData = async (
+    tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
+    forceRefresh = false,
+    coordOverride?: boolean
+  ) => {
+    if (!courseIdParam) return;
+    const userIsCoord = coordOverride !== undefined ? coordOverride : isCoord;
+    setSectionLoading((prev) => ({ ...prev, [tab]: true }));
+    try {
+      if (userIsCoord) {
+        // Coordinator: Fetch version lists for version card population
+        if (tab === "syllabus") {
+          const [extractionsRes, syllabiRes]: [any, any] = await Promise.all([
+            Models.syllabus.list_extractions({ course_id: courseIdParam }),
+            Models.syllabus.list_syllabi({ course_id: courseIdParam }),
+          ]);
+          setSectionVersions((prev) => ({
+            ...prev,
+            extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
+            syllabi: Array.isArray(syllabiRes) ? syllabiRes : [],
+          }));
+        } else if (tab === "copo") {
+          const copoRes: any = await Models.copo.list({ course_id: courseIdParam });
+          setSectionVersions((prev) => ({
+            ...prev,
+            copo: Array.isArray(copoRes) ? copoRes : [],
+          }));
+        } else if (tab === "pedagogy") {
+          const [pedRes, extractionsRes]: [any, any] = await Promise.all([
+            Models.pedagogy.list({ course_id: courseIdParam }),
+            sectionVersions.extractions?.length
+              ? Promise.resolve(sectionVersions.extractions)
+              : Models.syllabus.list_extractions({ course_id: courseIdParam }),
+          ]);
+          setSectionVersions((prev) => ({
+            ...prev,
+            pedagogies: Array.isArray(pedRes) ? pedRes : [],
+            extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
+          }));
+        } else if (tab === "lesson_plan") {
+          const [lpRes, extractionsRes, pedRes]: [any, any, any] = await Promise.all([
+            Models.lession_plan.list({ course_id: courseIdParam }),
+            sectionVersions.extractions?.length
+              ? Promise.resolve(sectionVersions.extractions)
+              : Models.syllabus.list_extractions({ course_id: courseIdParam }),
+            sectionVersions.pedagogies?.length
+              ? Promise.resolve(sectionVersions.pedagogies)
+              : Models.pedagogy.list({ course_id: courseIdParam }),
+          ]);
+          setSectionVersions((prev) => ({
+            ...prev,
+            lesson_plans: Array.isArray(lpRes) ? lpRes : [],
+            extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
+            pedagogies: Array.isArray(pedRes) ? pedRes : [],
+          }));
+        }
+        // NOTE: For coordinator, no automatic get call for version data is made here.
+        // The get call is only made when the coordinator clicks the "View" button on a version card.
+      } else {
+        // Instructor: Load confirmed active version for display
+        if (tab === "syllabus") {
+          const activeExt = await Models.syllabus.get_active_extraction(courseIdParam);
+          setSectionData((prev) => ({ ...prev, syllabus: activeExt || null }));
+        } else if (tab === "copo") {
+          const activeCopo = await Models.copo.get_active(courseIdParam);
+          setSectionData((prev) => ({ ...prev, copo: activeCopo || null }));
+        } else if (tab === "pedagogy") {
+          const activePed = await Models.pedagogy.get_active(courseIdParam);
+          setSectionData((prev) => ({ ...prev, pedagogy: activePed || null }));
+        } else if (tab === "lesson_plan") {
+          const activeLp = await Models.lession_plan.get_active(courseIdParam);
+          setSectionData((prev) => ({ ...prev, lesson_plan: activeLp || null }));
+        }
+      }
+    } catch (err: any) {
+      console.error(`Failed to load section data for ${tab}:`, err);
+    } finally {
+      setSectionLoading((prev) => ({ ...prev, [tab]: false }));
+    }
+  };
+
+  const fetchPortfolio = async (isManualRefresh = false) => {
+    if (!courseIdParam) return;
+    try {
+      if (isManualRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+
+      const res: any = await Models.course.course_portfolio(courseIdParam);
+      setPortfolio(res);
+      const userIsCoord = Boolean(res?.permissions?.is_coordinator);
+      loadSectionData(activeTab, true, userIsCoord);
+    } catch (err: any) {
+      console.error("Failed to load course portfolio:", err);
+      setError(getErrorMessage(err, "Failed to load course portfolio"));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, [courseIdParam]);
+
+  useEffect(() => {
+    if (courseIdParam && portfolio) {
+      loadSectionData(activeTab);
+    }
+  }, [activeTab]);
+
+  // Section version lists
+  const versionsExtractions = sectionVersions.extractions || portfolio?.versions?.extractions || [];
+  const versionsCopo = sectionVersions.copo || portfolio?.versions?.copo || [];
+  const versionsPedagogies = sectionVersions.pedagogies || portfolio?.versions?.pedagogies || [];
+  const versionsLessonPlans = sectionVersions.lesson_plans || portfolio?.versions?.lesson_plans || [];
+  const versionsSyllabi = sectionVersions.syllabi || portfolio?.versions?.syllabi || [];
+
+  const activeExt = sectionData.syllabus || portfolio?.active_extraction;
+  const activeCopo = sectionData.copo || portfolio?.active_copo;
+  const activePedagogy = sectionData.pedagogy || portfolio?.active_pedagogy;
+  const activeLessonPlan = sectionData.lesson_plan || portfolio?.active_lesson_plan;
+
   // Active / Selected item aliases
-  const currentExt = selectedVersionData.syllabus || activeExt;
-  const currentCopo = selectedVersionData.copo || activeCopo;
-  const currentPedagogy = selectedVersionData.pedagogy || activePedagogy;
-  const currentLessonPlan = selectedVersionData.lesson_plan || activeLessonPlan;
+  // For coordinator: ONLY what coordinator explicitly viewed via View button in selectedVersionData
+  // For instructor: only the active version in sectionData
+  const currentExt = isCoord ? selectedVersionData.syllabus : activeExt;
+  const currentCopo = isCoord ? selectedVersionData.copo : activeCopo;
+  const currentPedagogy = isCoord ? selectedVersionData.pedagogy : activePedagogy;
+  const currentLessonPlan = isCoord ? selectedVersionData.lesson_plan : activeLessonPlan;
+
+  const activeSyllabus =
+    versionsSyllabi.find((s: any) => s.is_active) ||
+    versionsSyllabi.find((s: any) => s.course_syllabus_id === currentExt?.course_syllabus_id) ||
+    (currentExt?.course_syllabus_id ? { course_syllabus_id: currentExt.course_syllabus_id, original_filename: currentExt?.original_filename || "Syllabus.pdf" } : null) ||
+    (isCoord ? (portfolio?.active_syllabus || versionsSyllabi[0]) : null) ||
+    null;
 
   // In-progress generation check (One generation at a time per tab)
   const isExtractionBusy = Boolean(
-    (portfolio?.versions?.extractions || []).some(
+    versionsExtractions.some(
       (e: any) => e.current_state === "redis_queued" || e.current_state === "processing"
     )
   );
   const isCopoBusy = Boolean(
-    (portfolio?.versions?.copo || []).some(
+    versionsCopo.some(
       (c: any) => c.current_state === "redis_queued" || c.current_state === "processing"
     )
   );
   const isPedagogyBusy = Boolean(
-    (portfolio?.versions?.pedagogies || []).some(
+    versionsPedagogies.some(
       (p: any) => p.current_state === "redis_queued" || p.current_state === "processing"
     )
   );
   const isLessonPlanBusy = Boolean(
-    (portfolio?.versions?.lesson_plans || []).some(
+    versionsLessonPlans.some(
       (l: any) => l.current_state === "redis_queued" || l.current_state === "processing"
     )
   );
@@ -235,7 +363,7 @@ const InsCourseArtifacts = () => {
 
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-    const directFileUrl = `http://localhost:8080/course/syllabi/${sylId}/file${tokenParam}`;
+    const directFileUrl = `${BACKEND_URL}course/syllabi/${sylId}/file${tokenParam}`;
 
     Models.syllabus
       .getFileBlob(sylId)
@@ -283,6 +411,8 @@ const InsCourseArtifacts = () => {
       setJobNotice(
         "A syllabus extraction job has been queued. When processing completes, please click the Refresh button above to load the extracted curriculum."
       );
+      fetchPortfolio(true);
+      loadSectionData("syllabus", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to upload syllabus document"));
     } finally {
@@ -298,6 +428,7 @@ const InsCourseArtifacts = () => {
       await Models.syllabus.extraction_approve(targetId);
       Success("Curriculum extraction approved successfully!");
       fetchPortfolio(true);
+      loadSectionData("syllabus", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to approve extraction"));
     } finally {
@@ -314,6 +445,7 @@ const InsCourseArtifacts = () => {
       Success("Extraction activated as current version!");
       setSelectedVersionData((prev) => ({ ...prev, syllabus: undefined }));
       fetchPortfolio(true);
+      loadSectionData("syllabus", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate extraction"));
     } finally {
@@ -326,7 +458,7 @@ const InsCourseArtifacts = () => {
       Failure("A CO-PO generation job is already in progress for this course.");
       return;
     }
-    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    const approvedExts = versionsExtractions.filter((e: any) => e.is_approved);
     if (approvedExts.length === 0) {
       Failure("No approved extraction found. Please approve an extraction version first.");
       return;
@@ -346,6 +478,7 @@ const InsCourseArtifacts = () => {
         "CO-PO mapping generation is queued. When completed, click the Refresh button to load the generated matrix."
       );
       fetchPortfolio(true);
+      loadSectionData("copo", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to trigger CO-PO generation"));
     } finally {
@@ -361,6 +494,7 @@ const InsCourseArtifacts = () => {
       await Models.copo.approve(targetId);
       Success("CO-PO mapping approved!");
       fetchPortfolio(true);
+      loadSectionData("copo", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to approve CO-PO mapping"));
     } finally {
@@ -377,6 +511,7 @@ const InsCourseArtifacts = () => {
       Success("CO-PO mapping activated as current version!");
       setSelectedVersionData((prev) => ({ ...prev, copo: undefined }));
       fetchPortfolio(true);
+      loadSectionData("copo", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate CO-PO mapping"));
     } finally {
@@ -389,7 +524,7 @@ const InsCourseArtifacts = () => {
       Failure("A pedagogy suggestion generation job is already in progress for this course.");
       return;
     }
-    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    const approvedExts = versionsExtractions.filter((e: any) => e.is_approved);
     if (approvedExts.length === 0) {
       Failure("No approved extraction found. Please approve an extraction version first.");
       return;
@@ -409,6 +544,7 @@ const InsCourseArtifacts = () => {
         "Pedagogy generation is queued. When completed, click the Refresh button to load the new teaching strategies."
       );
       fetchPortfolio(true);
+      loadSectionData("pedagogy", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to trigger pedagogy generation"));
     } finally {
@@ -424,6 +560,7 @@ const InsCourseArtifacts = () => {
       await Models.pedagogy.approve(targetId);
       Success("Pedagogy suggestions approved!");
       fetchPortfolio(true);
+      loadSectionData("pedagogy", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to approve pedagogy"));
     } finally {
@@ -440,6 +577,7 @@ const InsCourseArtifacts = () => {
       Success("Pedagogy suggestions activated as current version!");
       setSelectedVersionData((prev) => ({ ...prev, pedagogy: undefined }));
       fetchPortfolio(true);
+      loadSectionData("pedagogy", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate pedagogy"));
     } finally {
@@ -452,13 +590,13 @@ const InsCourseArtifacts = () => {
       Failure("A lesson plan generation job is already in progress for this course.");
       return;
     }
-    const approvedExts = (portfolio?.versions?.extractions || []).filter((e: any) => e.is_approved);
+    const approvedExts = versionsExtractions.filter((e: any) => e.is_approved);
     if (approvedExts.length === 0) {
       Failure("No approved extraction found. Please approve an extraction version first.");
       return;
     }
     setSelectedExtractionForLp(approvedExts[0].extractions_id);
-    const approvedPeds = (portfolio?.versions?.pedagogies || []).filter((p: any) => p.is_approved);
+    const approvedPeds = versionsPedagogies.filter((p: any) => p.is_approved);
     setSelectedPedagogyForLp(approvedPeds.length > 0 ? approvedPeds[0].pedagogy_id : null);
     setLpTargetHours(currentExt?.total_theory_hours || 45);
     setShowGenerateLessonPlanModal(true);
@@ -479,6 +617,7 @@ const InsCourseArtifacts = () => {
         "Lesson plan schedule generation is queued. When completed, click the Refresh button to load the hourly timeline."
       );
       fetchPortfolio(true);
+      loadSectionData("lesson_plan", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to trigger lesson plan generation"));
     } finally {
@@ -494,6 +633,7 @@ const InsCourseArtifacts = () => {
       await Models.lession_plan.approve(targetId);
       Success("Lesson plan approved!");
       fetchPortfolio(true);
+      loadSectionData("lesson_plan", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to approve lesson plan"));
     } finally {
@@ -510,6 +650,7 @@ const InsCourseArtifacts = () => {
       Success("Lesson plan activated as current version!");
       setSelectedVersionData((prev) => ({ ...prev, lesson_plan: undefined }));
       fetchPortfolio(true);
+      loadSectionData("lesson_plan", true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to activate lesson plan"));
     } finally {
@@ -517,17 +658,14 @@ const InsCourseArtifacts = () => {
     }
   };
 
-  // ── Version Card Selection Handler ─────────────────────────────────────────
+  // ── Version Card Selection Handler (Course Coordinator only) ───────────────
   const handleSelectVersionCard = async (
     tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
     versionItem: any,
     idKey: string
   ) => {
     const itemId = versionItem[idKey];
-    if (versionItem.is_active) {
-      setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
-      return;
-    }
+    if (!itemId) return;
     try {
       setLoadingVersionDetail(true);
       if (tabType === "syllabus") {
@@ -562,28 +700,28 @@ const InsCourseArtifacts = () => {
     let activateLoadingPrefix = "";
 
     if (tabType === "syllabus") {
-      versionsList = portfolio?.versions?.extractions || [];
+      versionsList = versionsExtractions;
       idKey = "extractions_id";
       approveFn = handleApproveExtraction;
       activateFn = handleActivateExtraction;
       approveLoadingPrefix = "approve_syllabus_";
       activateLoadingPrefix = "activate_syllabus_";
     } else if (tabType === "copo") {
-      versionsList = portfolio?.versions?.copo || [];
+      versionsList = versionsCopo;
       idKey = "copo_id";
       approveFn = handleApproveCopo;
       activateFn = handleActivateCopo;
       approveLoadingPrefix = "approve_copo_";
       activateLoadingPrefix = "activate_copo_";
     } else if (tabType === "pedagogy") {
-      versionsList = portfolio?.versions?.pedagogies || [];
+      versionsList = versionsPedagogies;
       idKey = "pedagogy_id";
       approveFn = handleApprovePedagogy;
       activateFn = handleActivatePedagogy;
       approveLoadingPrefix = "approve_pedagogy_";
       activateLoadingPrefix = "activate_pedagogy_";
     } else if (tabType === "lesson_plan") {
-      versionsList = portfolio?.versions?.lesson_plans || [];
+      versionsList = versionsLessonPlans;
       idKey = "lesson_plan_id";
       approveFn = handleApproveLessonPlan;
       activateFn = handleActivateLessonPlan;
@@ -608,10 +746,12 @@ const InsCourseArtifacts = () => {
             {selectedVer && (
               <button
                 type="button"
-                onClick={() => setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }))}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                onClick={() => {
+                  setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+                }}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
-                ← Reset to Active Version
+                ✕ Close View
               </button>
             )}
           </div>
@@ -621,7 +761,7 @@ const InsCourseArtifacts = () => {
               const itemId = ver[idKey];
               const isItemActive = Boolean(ver.is_active);
               const isItemApproved = Boolean(ver.is_approved);
-              const isSelected = selectedVer ? (selectedVer[idKey] === itemId) : isItemActive;
+              const isSelected = Boolean(selectedVer && selectedVer[idKey] === itemId);
               const isBusy = ver.current_state === "redis_queued" || ver.current_state === "processing";
 
               return (
@@ -669,14 +809,14 @@ const InsCourseArtifacts = () => {
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
                     {isSelected ? (
                       <span className="rounded-md bg-indigo-600/10 px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
-                        {isItemActive && !selectedVer ? "Active Current" : "Currently Viewing"}
+                        Currently Viewing
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => handleSelectVersionCard(tabType, ver, idKey)}
                         disabled={loadingVersionDetail}
-                        className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-2xs hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                       >
                         View
                       </button>
@@ -720,7 +860,10 @@ const InsCourseArtifacts = () => {
             </div>
             <button
               type="button"
-              onClick={() => setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }))}
+              onClick={() => {
+                setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+                loadSectionData(tabType, true);
+              }}
               className="rounded-lg bg-amber-600 px-2.5 py-1 font-semibold text-white transition hover:bg-amber-700"
             >
               Return to Active Version
@@ -1712,17 +1855,30 @@ const InsCourseArtifacts = () => {
             </div>
           </div>
 
+          {/* If Loading Syllabus */}
+          {(sectionLoading.syllabus || loadingVersionDetail) && !currentExt && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <RefreshCw className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Loading syllabus data...</p>
+              <p className="text-xs text-slate-400">Fetching latest extraction details</p>
+            </div>
+          )}
+
           {/* If No Extraction */}
-          {!currentExt && (
+          {!sectionLoading.syllabus && !loadingVersionDetail && !currentExt && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <FileText className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
-                No Syllabus Extracted Yet
+                {isCoord
+                  ? (versionsExtractions.length > 0 ? "Select a Version to View" : "No Syllabus Extracted Yet")
+                  : "No Active Curriculum Available"}
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? "Upload a PDF or DOCX syllabus document above to initiate AI extraction of objectives, outcomes, and curriculum hierarchy."
-                  : "The course coordinator has not yet uploaded and extracted the syllabus for this course."}
+                  ? (versionsExtractions.length > 0
+                      ? "Click 'View' on any version card above to load and inspect curriculum details."
+                      : "Upload a PDF or DOCX syllabus document above to initiate AI extraction of objectives, outcomes, and curriculum hierarchy.")
+                  : "The course coordinator has not yet activated a syllabus extraction for this course."}
               </p>
               {isCoord && (
                 <button
@@ -2742,18 +2898,31 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {!currentCopo ? (
+          {/* If Loading COPO */}
+          {(sectionLoading.copo || loadingVersionDetail) && !currentCopo && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <RefreshCw className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Loading CO-PO matrix data...</p>
+              <p className="text-xs text-slate-400">Fetching latest correlation matrix</p>
+            </div>
+          )}
+
+          {!sectionLoading.copo && !loadingVersionDetail && !currentCopo && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Layers className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
-                No CO-PO Mapping Generated
+                {isCoord
+                  ? (versionsCopo.length > 0 ? "Select a Version to View" : "No CO-PO Mapping Generated")
+                  : "No Active CO-PO Mapping Available"}
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? "Click 'Generate CO-PO Mapping' to trigger AI matrix generation based on an approved curriculum extraction."
-                  : "The course coordinator has not generated a CO-PO mapping version for this course yet."}
+                  ? (versionsCopo.length > 0
+                      ? "Click 'View' on any version card above to load and inspect its correlation matrix."
+                      : "Click 'Generate CO-PO Mapping' to trigger AI matrix generation based on an approved curriculum extraction.")
+                  : "There is no approved active CO-PO mapping version for this course yet."}
               </p>
-              {isCoord && (
+              {isCoord && versionsCopo.length === 0 && (
                 <button
                   type="button"
                   onClick={openGenerateCopoModal}
@@ -2765,7 +2934,9 @@ const InsCourseArtifacts = () => {
                 </button>
               )}
             </div>
-          ) : (() => {
+          )}
+
+          {currentCopo && (() => {
             // Compute unique POs and COs for n x m grid
             const entries = currentCopo.matrix_entries || [];
             const posMap = new Map<number, { po_id: number; po_code: string }>();
@@ -2783,7 +2954,7 @@ const InsCourseArtifacts = () => {
                 cosMap.set(e.course_outcome_id, {
                   course_outcome_id: e.course_outcome_id,
                   co_code: e.co_code || extCo?.co_code || `CO${e.course_outcome_id}`,
-                  description: extCo?.description,
+                  description: e.co_description || extCo?.description,
                 });
               }
               cellMap.set(`${e.course_outcome_id}_${e.po_id}`, e);
@@ -2985,18 +3156,31 @@ const InsCourseArtifacts = () => {
             </div>
           </div>
 
-          {!currentPedagogy ? (
+          {/* If Loading Pedagogy */}
+          {(sectionLoading.pedagogy || loadingVersionDetail) && !currentPedagogy && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <RefreshCw className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Loading pedagogy suggestions...</p>
+              <p className="text-xs text-slate-400">Fetching latest instructional strategies</p>
+            </div>
+          )}
+
+          {!sectionLoading.pedagogy && !loadingVersionDetail && !currentPedagogy && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Presentation className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
-                No Pedagogy Generated
+                {isCoord
+                  ? (versionsPedagogies.length > 0 ? "Select a Version to View" : "No Pedagogy Generated")
+                  : "No Active Pedagogy Available"}
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? "Click 'Generate Pedagogy' to automatically synthesize topic-level teaching delivery methods based on an approved curriculum extraction."
-                  : "The course coordinator has not generated pedagogy strategies for this course yet."}
+                  ? (versionsPedagogies.length > 0
+                      ? "Click 'View' on any version card above to load and inspect topic-level teaching delivery methods."
+                      : "Click 'Generate Pedagogy' to automatically synthesize topic-level teaching delivery methods based on an approved curriculum extraction.")
+                  : "There is no approved active pedagogy strategy version for this course yet."}
               </p>
-              {isCoord && (
+              {isCoord && versionsPedagogies.length === 0 && (
                 <button
                   type="button"
                   onClick={openGeneratePedagogyModal}
@@ -3008,7 +3192,9 @@ const InsCourseArtifacts = () => {
                 </button>
               )}
             </div>
-          ) : (() => {
+          )}
+
+          {currentPedagogy && (() => {
             const unitsList = currentExt?.units || activeExt?.units || [];
             const topicSuggestions = currentPedagogy.topic_suggestions || [];
             const sugByTopicId = new Map<number, any>();
@@ -3514,18 +3700,31 @@ const InsCourseArtifacts = () => {
             </div>
           </div>
 
-          {!currentLessonPlan ? (
+          {/* If Loading Lesson Plan */}
+          {(sectionLoading.lesson_plan || loadingVersionDetail) && !currentLessonPlan && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+              <RefreshCw className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Loading lesson plan schedule...</p>
+              <p className="text-xs text-slate-400">Fetching hourly allocation and topics</p>
+            </div>
+          )}
+
+          {!sectionLoading.lesson_plan && !loadingVersionDetail && !currentLessonPlan && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Calendar className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
-                No Lesson Plan Generated
+                {isCoord
+                  ? (versionsLessonPlans.length > 0 ? "Select a Version to View" : "No Lesson Plan Generated")
+                  : "No Active Lesson Plan Available"}
               </h3>
               <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
                 {isCoord
-                  ? "Click 'Generate Lesson Plan' to allocate hours across topics and subtopics based on syllabus requirements."
-                  : "The course coordinator has not generated a lesson plan for this course yet."}
+                  ? (versionsLessonPlans.length > 0
+                      ? "Click 'View' on any version card above to load and inspect its hourly timeline schedule."
+                      : "Click 'Generate Lesson Plan' to allocate hours across topics and subtopics based on syllabus requirements.")
+                  : "There is no approved active lesson plan for this course yet."}
               </p>
-              {isCoord && (
+              {isCoord && versionsLessonPlans.length === 0 && (
                 <button
                   type="button"
                   onClick={openGenerateLessonPlanModal}
@@ -3537,7 +3736,9 @@ const InsCourseArtifacts = () => {
                 </button>
               )}
             </div>
-          ) : (() => {
+          )}
+
+          {currentLessonPlan && (() => {
             const slots = currentLessonPlan.topic_slots || [];
             const groupsMap = new Map<string, { unitTitle: string; slots: any[]; totalHours: number }>();
 

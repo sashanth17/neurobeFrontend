@@ -21,6 +21,17 @@ const COPOMap = {
     });
   },
 
+  get_active: (courseId: number | string) => {
+    return new Promise((resolve, reject) => {
+      commonInstance()
+        .get(`course/copo/courses/${courseId}/active`)
+        .then((res) => resolve(res.data))
+        .catch((error) => {
+          reject(error.response?.data?.detail || error.response?.data?.message || error.message || error);
+        });
+    });
+  },
+
   get: (copo_id: number | string) => {
     return new Promise((resolve, reject) => {
       commonInstance()
