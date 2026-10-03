@@ -96,6 +96,9 @@ export interface TemplateQuestion {
   id?: number;
   question_number: number;
   max_marks: number;
+  question_type?: 'direct' | 'either_or' | string;
+  target_co?: string | null;
+  sub_question_structure?: any;
   actual_question_id?: number | null;
 }
 
@@ -104,6 +107,7 @@ export interface TemplateSection {
   section_order: number;
   section_name: string;
   section_title: string;
+  section_type?: 'direct' | 'either_or' | string;
   allocated_marks: number;
   questions: TemplateQuestion[];
 }
@@ -116,6 +120,7 @@ export interface QuestionPaperTemplate {
   total_maximum_marks: number;
   status: 'drafted' | 'build' | 'underreview' | 'verified' | string;
   description?: string;
+  co_distribution?: Record<string, number>;
   is_editable?: boolean;
   is_deletable?: boolean;
   assigned_tests_count?: number;
@@ -129,14 +134,19 @@ export interface CreateTemplatePayload {
   total_maximum_marks: number;
   status: string;
   description?: string;
+  co_distribution?: Record<string, number>;
   sections: {
     section_order: number;
     section_name: string;
     section_title: string;
+    section_type?: string;
     allocated_marks: number;
     questions: {
       question_number: number;
       max_marks: number;
+      question_type?: string;
+      target_co?: string | null;
+      sub_question_structure?: any;
       actual_question_id?: number | null;
     }[];
   }[];
@@ -147,14 +157,19 @@ export interface UpdateTemplatePayload {
   total_maximum_marks?: number;
   status?: string;
   description?: string;
-    sections?: {
+  co_distribution?: Record<string, number>;
+  sections?: {
     section_order: number;
     section_name: string;
     section_title: string;
+    section_type?: string;
     allocated_marks: number;
     questions: {
       question_number: number;
       max_marks: number;
+      question_type?: string;
+      target_co?: string | null;
+      sub_question_structure?: any;
       actual_question_id?: number | null;
     }[];
   }[];
@@ -231,6 +246,7 @@ export interface CandidateQuestion {
   } | null;
   topics?: string[];
   topic_names?: string[];
+  primary_topic_name?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -316,10 +332,35 @@ export interface BlueprintSlot {
   section_name: string;
   section_title: string;
   section_order?: number;
+  section_type?: 'direct' | 'either_or' | string;
   question_number: number;
   max_marks: number;
+  question_type?: 'direct' | 'either_or' | 'sub_questions' | string;
+  target_co?: string | null;
+  sub_question_structure?: any;
   actual_question_id?: number | null;
   assigned_question?: SlotAssignedQuestion | null;
+}
+
+export interface COSummaryItem {
+  co_code: string;
+  allocated_marks: number;
+  assigned_marks: number;
+  remaining_marks: number;
+  is_fulfilled: boolean;
+}
+
+export interface COSummaryResponse {
+  template_id: number;
+  total_marks: number;
+  co_summary: COSummaryItem[];
+  is_co_fully_balanced: boolean;
+}
+
+export interface SlotStructureUpdateRequest {
+  question_type: string;
+  target_co?: string | null;
+  sub_question_structure?: any;
 }
 
 export interface SyllabusTopicItem {

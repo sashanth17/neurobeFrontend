@@ -223,9 +223,18 @@ export const ciaAssessmentService = {
       });
       const items = sylRes.data?.items || sylRes.data || [];
       if (!items.length) return [];
-      const syllabusId = items[0].id;
-      const fullRes = await commonInstance().get(`course/syllabi/${syllabusId}`);
-      const units = fullRes.data?.units || [];
+      const syllabusId = items[0].course_syllabus_id || items[0].id;
+      if (!syllabusId) return [];
+
+      let units = [];
+      try {
+        const unitsRes = await commonInstance().get(`course/syllabi/${syllabusId}/units`);
+        units = Array.isArray(unitsRes.data) ? unitsRes.data : unitsRes.data?.units || [];
+      } catch {
+        const fullRes = await commonInstance().get(`course/syllabi/${syllabusId}`);
+        units = fullRes.data?.units || [];
+      }
+
       const topics = [];
       units.forEach((u) => {
         (u.topics || []).forEach((t) => {
@@ -460,24 +469,41 @@ export const ciaAssessmentService = {
   },
 
   /**
-   * Assign a question from the candidate pool into a blueprint slot (strict marks matching)
+   * Assign a question from the candidate pool into a blueprint slot or sub-slot (strict marks matching)
    * POST /question-paper-templates/{templateId}/slots/{slotId}/assign
    */
-  async assignQuestionToSlot(templateId, slotId, generatedQuestionId) {
+  async assignQuestionToSlot(templateId, slotId, generatedQuestionId, subId = null) {
+    const payload = { generated_question_id: generatedQuestionId };
+    if (subId) payload.sub_id = subId;
     const res = await instance().post(
       `question-paper-templates/${templateId}/slots/${slotId}/assign`,
-      { generated_question_id: generatedQuestionId }
+      payload
     );
     return res.data;
   },
 
   /**
-   * Unassign a slot and unlock the question
+   * Unassign a slot or specific sub-slot and unlock the question
    * POST /question-paper-templates/{templateId}/slots/{slotId}/unassign
    */
-  async unassignSlot(templateId, slotId) {
+  async unassignSlot(templateId, slotId, subId = null) {
+    const params = subId ? { sub_id: subId } : {};
     const res = await instance().post(
-      `question-paper-templates/${templateId}/slots/${slotId}/unassign`
+      `question-paper-templates/${templateId}/slots/${slotId}/unassign`,
+      {},
+      { params }
+    );
+    return res.data;
+  },
+
+  /**
+   * Configure slot question_type, target_co, and modular sub_question_structure
+   * PUT /question-paper-templates/{templateId}/slots/{slotId}/structure
+   */
+  async updateSlotStructure(templateId, slotId, payload) {
+    const res = await instance().put(
+      `question-paper-templates/${templateId}/slots/${slotId}/structure`,
+      payload
     );
     return res.data;
   },

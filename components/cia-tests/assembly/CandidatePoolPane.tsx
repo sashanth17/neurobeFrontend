@@ -29,8 +29,6 @@ import {
 import { CandidateQuestion, BlueprintSlot, QuestionGroupItem } from "@/types/cia-test.types";
 import { CandidateFilters } from "@/hook/useQuestionAssembly";
 import FormattedMathText from "@/components/common-components/FormattedMathText";
-import DiagramStudioModal from "@/components/cia-tests/assembly/DiagramStudioModal";
-import QuestionDiagramPreview from "@/components/cia-tests/assembly/QuestionDiagramPreview";
 import QuestionPaperStudioService from "@/services/questionPaperStudioService";
 import { toast } from "react-toastify";
 
@@ -78,11 +76,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   onDeleteQuestion,
   onRefreshCandidates,
 }) => {
-  // Modal & Studio States
-  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [openSlotMenuId, setOpenSlotMenuId] = useState<number | null>(null);
-  const [isDiagramStudioOpen, setIsDiagramStudioOpen] = useState(false);
-  const [activeQuestionForDiagram, setActiveQuestionForDiagram] = useState<CandidateQuestion | null>(null);
   const [draggedQuestionId, setDraggedQuestionId] = useState<number | null>(null);
 
   // Grouping Mode
@@ -98,6 +92,31 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   // Single Question Tag Editor Inline Popover
   const [editingTagQuestionId, setEditingTagQuestionId] = useState<number | null>(null);
   const [singleTagInput, setSingleTagInput] = useState("");
+
+  // Interactive CO updating & Topic filter states
+  const [coUpdatingId, setCoUpdatingId] = useState<number | null>(null);
+  const [selectedTopicFilter, setSelectedTopicFilter] = useState<string>("");
+
+  const handleCoChange = async (questionId: number, newCO: string) => {
+    if (!courseId || !templateId) {
+      toast.error("Course or template ID missing");
+      return;
+    }
+    const coValue = newCO === "" ? null : newCO;
+    setCoUpdatingId(questionId);
+    try {
+      await QuestionPaperStudioService.updateQuestionCO(courseId, templateId, questionId, coValue);
+      toast.success(`Question updated to ${newCO ? newCO : "Unassigned CO"}`);
+      if (onRefreshCandidates) {
+        onRefreshCandidates();
+      }
+    } catch (err: any) {
+      console.error("Failed to update CO:", err);
+      toast.error(err?.response?.data?.detail || "Failed to update question Course Outcome");
+    } finally {
+      setCoUpdatingId(null);
+    }
+  };
 
   // Pending Deletion & 5-Second Undo State (Only for non-assigned questions)
   const [pendingDelete, setPendingDelete] = useState<{
@@ -213,10 +232,26 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
     }
   };
 
-  // Filter out pending deleted questions
+  // Extract distinct topics for filtering
+  const distinctTopics = useMemo(() => {
+    const set = new Set<string>();
+    candidates.forEach((c) => {
+      const top = c.primary_topic_name || (c.topic_names && c.topic_names[0]) || (c.topics && c.topics[0]);
+      if (top && top.trim()) set.add(top.trim());
+    });
+    return Array.from(set).sort();
+  }, [candidates]);
+
+  // Filter out pending deleted questions and apply topic filter
   const displayedCandidates = useMemo(() => {
-    return filteredCandidates.filter((q) => !hiddenQuestionIds.includes(q.id));
-  }, [filteredCandidates, hiddenQuestionIds]);
+    return filteredCandidates
+      .filter((q) => !hiddenQuestionIds.includes(q.id))
+      .filter((q) => {
+        if (!selectedTopicFilter) return true;
+        const top = q.primary_topic_name || (q.topic_names && q.topic_names[0]) || (q.topics && q.topics[0]);
+        return top === selectedTopicFilter;
+      });
+  }, [filteredCandidates, hiddenQuestionIds, selectedTopicFilter]);
 
   // Available unique tags for quick selection
   const availableGroupTags = useMemo(() => {
@@ -339,29 +374,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
     }
   };
 
-  // Open Diagram Studio for a question
-  const handleOpenDiagramStudio = (question: CandidateQuestion) => {
-    setActiveQuestionForDiagram(question);
-    setIsDiagramStudioOpen(true);
-  };
-
-  // Save Diagram Spec back to question
-  const handleSaveDiagramSpec = async (spec: Record<string, any>, renderedUrl: string) => {
-    if (!activeQuestionForDiagram) return;
-    try {
-      // If parent has onEditQuestion or service, update diagram_spec and diagram_url
-      const updated = {
-        ...activeQuestionForDiagram,
-        diagram_spec: spec,
-        diagram_url: renderedUrl,
-      };
-      onEditQuestion(updated);
-      toast.success("Vector diagram attached to question!");
-      if (onRefreshCandidates) onRefreshCandidates();
-    } catch (e) {
-      toast.error("Failed to attach diagram to question");
-    }
-  };
 
   const coOptions = ["", "CO1", "CO2", "CO3", "CO4", "CO5"];
   const bloomOptions = [
@@ -394,18 +406,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Open Vector Diagram Studio */}
-          <button
-            type="button"
-            onClick={() => {
-              setActiveQuestionForDiagram(null);
-              setIsDiagramStudioOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 shadow-sm transition-all hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
-          >
-            <Compass className="h-4 w-4" />
-            <span>Diagram Studio</span>
-          </button>
 
           {/* AI Generator */}
           <button
@@ -487,6 +487,36 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
               <option value="none">Flat List (No Groups)</option>
             </select>
           </div>
+
+          {/* Topic Filter */}
+          <select
+            value={selectedTopicFilter}
+            onChange={(e) => setSelectedTopicFilter(e.target.value)}
+            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 max-w-[180px]"
+          >
+            <option value="">All Topics</option>
+            {distinctTopics.map((top) => (
+              <option key={top} value={top}>
+                {top}
+              </option>
+            ))}
+          </select>
+
+          {/* Course Outcome Filter */}
+          <select
+            value={filters.course_outcome}
+            onChange={(e) => onFilterChange({ ...filters, course_outcome: e.target.value })}
+            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+          >
+            <option value="">All COs</option>
+            <option value="CO1">CO1</option>
+            <option value="CO2">CO2</option>
+            <option value="CO3">CO3</option>
+            <option value="CO4">CO4</option>
+            <option value="CO5">CO5</option>
+            <option value="CO6">CO6</option>
+            <option value="CO7">CO7</option>
+          </select>
 
           {/* Marks Filter */}
           <select
@@ -695,27 +725,49 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                 </span>
                               )}
 
-                              {/* CO Badge */}
-                              {/* {(q.course_outcome || q.co_level) && (
-                                <span className="rounded-lg bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">
-                                  {q.course_outcome || q.co_level}
-                                </span>
-                              )} */}
-
-                              {/* Topic Badge */}
-                              {(q.topic_names?.length || q.topic_tags?.length) ? (
-                                <span
-                                  title={(q.topic_names || q.topic_tags || []).join(", ")}
-                                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 flex items-center gap-1 max-w-[200px]"
+                              {/* Interactive CO Dropdown */}
+                              <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                <span className="text-[10px] text-indigo-500 mr-1 font-extrabold">CO:</span>
+                                <select
+                                  value={q.co_level || q.course_outcome || ""}
+                                  disabled={coUpdatingId === q.id || isAssigned}
+                                  onChange={(e) => handleCoChange(q.id, e.target.value)}
+                                  className="bg-transparent font-bold text-indigo-800 dark:text-indigo-200 focus:outline-none cursor-pointer disabled:opacity-60"
+                                  title={isAssigned ? "Assigned question CO is locked" : "Change Course Outcome"}
                                 >
-                                  <span className="truncate">{(q.topic_names || q.topic_tags || [])[0]}</span>
-                                  {(q.topic_names?.length || q.topic_tags?.length || 0) > 1 && (
-                                    <span className="text-[10px] bg-blue-200/50 dark:bg-blue-800/50 px-1 rounded-sm shrink-0">
-                                      +{(q.topic_names?.length || q.topic_tags?.length || 0) - 1}
-                                    </span>
-                                  )}
-                                </span>
-                              ) : null}
+                                  <option value="" className="text-gray-600 dark:bg-gray-800">None</option>
+                                  <option value="CO1" className="text-gray-800 dark:bg-gray-800">CO1</option>
+                                  <option value="CO2" className="text-gray-800 dark:bg-gray-800">CO2</option>
+                                  <option value="CO3" className="text-gray-800 dark:bg-gray-800">CO3</option>
+                                  <option value="CO4" className="text-gray-800 dark:bg-gray-800">CO4</option>
+                                  <option value="CO5" className="text-gray-800 dark:bg-gray-800">CO5</option>
+                                  <option value="CO6" className="text-gray-800 dark:bg-gray-800">CO6</option>
+                                  <option value="CO7" className="text-gray-800 dark:bg-gray-800">CO7</option>
+                                </select>
+                                {coUpdatingId === q.id && (
+                                  <span className="ml-1 text-[10px] animate-pulse text-indigo-600">...</span>
+                                )}
+                              </div>
+
+                              {/* Prominent Emerald Topic Badge */}
+                              {(() => {
+                                const topicName = q.primary_topic_name || (q.topic_names && q.topic_names[0]) || (q.topics && q.topics[0]);
+                                if (!topicName) return null;
+                                return (
+                                  <span
+                                    title={`Topic: ${topicName}`}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 max-w-[220px]"
+                                  >
+                                    <Bookmark className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    <span className="truncate">Topic: {topicName}</span>
+                                    {((q.topic_names?.length || q.topics?.length || 0) > 1) && (
+                                      <span className="text-[10px] bg-emerald-200/60 dark:bg-emerald-800/60 px-1 rounded-sm shrink-0">
+                                        +{Math.max(q.topic_names?.length || 0, q.topics?.length || 0) - 1}
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })()}
 
                               {/* Group Tag Badge / Inline Tag Editor */}
                               {q.group_tag ? (
@@ -918,18 +970,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                             />
                           </div>
 
-                          {/* Vector Diagram Spec or MinIO Image Preview */}
-                          {(q.diagram_url || q.diagram_spec) && (
-                            <div className="mt-2.5">
-                              <QuestionDiagramPreview
-                                diagramUrl={q.diagram_url}
-                                diagramSpec={q.diagram_spec}
-                                thumbnail={true}
-                                onOpenStudio={() => handleOpenDiagramStudio(q)}
-                                onZoom={(url) => setZoomImageUrl(url)}
-                              />
-                            </div>
-                          )}
 
                           {/* Sub Questions List with Math Formatting */}
                           {q.sub_questions && q.sub_questions.length > 0 && (
@@ -995,17 +1035,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                             </div>
 
                             <div className="flex items-center gap-1.5">
-                              {/* Attach or edit vector diagram */}
-                              {!q.diagram_url && !q.diagram_spec && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenDiagramStudio(q)}
-                                  className="inline-flex items-center gap-1 rounded-lg p-1.5 text-xs text-gray-500 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/40"
-                                  title="Create or attach vector diagram"
-                                >
-                                  <Compass className="h-3.5 w-3.5" />
-                                </button>
-                              )}
 
                               {/* Edit Question */}
                               <button
@@ -1197,41 +1226,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
         </div>
       )}
 
-      {/* ── 8. Diagram Studio Modal Integration ──────────────────────────────── */}
-      <DiagramStudioModal
-        isOpen={isDiagramStudioOpen}
-        onClose={() => {
-          setIsDiagramStudioOpen(false);
-          setActiveQuestionForDiagram(null);
-        }}
-        initialSpec={activeQuestionForDiagram?.diagram_spec || null}
-        courseCode={courseCode}
-        courseId={courseId}
-        questionId={activeQuestionForDiagram?.id || null}
-        onSaveSpec={handleSaveDiagramSpec}
-      />
-
-      {/* ── 9. Diagram Zoom Lightbox Modal ───────────────────────────────────── */}
-      {zoomImageUrl && (
-        <div
-          onClick={() => setZoomImageUrl(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-        >
-          <div className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-3xl bg-white p-2 shadow-2xl dark:bg-gray-800">
-            <button
-              onClick={() => setZoomImageUrl(null)}
-              className="absolute right-3 top-3 rounded-full bg-black/60 p-1.5 text-white hover:bg-black"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <img
-              src={zoomImageUrl}
-              alt="Diagram enlarged preview"
-              className="max-h-[80vh] w-auto rounded-2xl object-contain"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

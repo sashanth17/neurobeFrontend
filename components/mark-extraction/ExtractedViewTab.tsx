@@ -291,6 +291,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         final_total_mark: selectedStudent.final_total_mark,
         total_selection_option: selectedStudent.total_selection_option,
         marks: selectedStudent.marks,
+        co_marks: selectedStudent.co_marks,
       });
       
       Success("Student marks updated successfully!");
@@ -319,13 +320,14 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         status: 'VERIFIED',
       }));
 
-      // Update student marks with all marks set to VERIFIED status
+      // Update student marks with all marks set to VERIFIED status and persist co_marks
       await MarkExtractionService.updateStudentMarks(selectedStudent.student_marks_id, {
         actual_reg_number: selectedStudent.actual_reg_number,
         student_reg_number: selectedStudent.actual_reg_number,
         final_total_mark: selectedStudent.final_total_mark,
         total_selection_option: selectedStudent.total_selection_option,
         marks: verifiedMarks,
+        co_marks: selectedStudent.co_marks,
       });
 
       // 2. Confirm and lock the student marks
@@ -584,6 +586,8 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     if (!selectedStudent?.marks || selectedStudent.marks.length === 0) return [];
     const map: Record<string, { section: string; obtained: number; max: number; count: number }> = {};
     selectedStudent.marks.forEach(m => {
+      const qNum = parseInt(m.question_key.replace(/\D/g, '') || '0', 10);
+      if (qNum > 15) return;
       const sec = m.section_name || 'General';
       if (!map[sec]) {
         map[sec] = { section: sec, obtained: 0, max: 0, count: 0 };
@@ -594,6 +598,54 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     });
     return Object.values(map);
   }, [selectedStudent?.marks]);
+
+  // Course Outcome (CO) Distribution from Template
+  const coDist = useMemo<Record<string, number>>(() => {
+    return results?.template_co_distribution || { CO1: 42, CO2: 42, CO3: 16 };
+  }, [results?.template_co_distribution]);
+
+  // Course Outcome (CO) Marks directly mapped from template COs and staff extraction / edits
+  const liveCoMarks = useMemo(() => {
+    if (!selectedStudent) return {};
+    const res: Record<string, { obtained: number; max_mark: number; percentage: number }> = {};
+
+    Object.entries(coDist).forEach(([co, maxM]) => {
+      const coData = selectedStudent.co_marks?.[co];
+      let obt = 0;
+      if (typeof coData === 'object' && coData !== null) {
+        obt = Number(coData.obtained) || 0;
+      } else if (typeof coData === 'number') {
+        obt = coData;
+      }
+      const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
+      res[co] = { obtained: Math.round(obt * 100) / 100, max_mark: maxM, percentage: pct };
+    });
+    return res;
+  }, [selectedStudent, coDist]);
+
+  const handleCoMarkChange = (coKey: string, newValue: number) => {
+    if (!selectedStudent || selectedStudent.is_locked) return;
+    const validVal = isNaN(newValue) ? 0 : Math.max(0, newValue);
+
+    const currentCoMarks: Record<string, { obtained: number; max_mark: number; percentage: number }> = {};
+    Object.entries(coDist).forEach(([c, maxM]) => {
+      const existing = selectedStudent.co_marks?.[c];
+      const prevObt = typeof existing === 'object' && existing !== null ? (existing.obtained ?? 0) : (Number(existing) || 0);
+      const obt = c === coKey ? validVal : prevObt;
+      const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
+      currentCoMarks[c] = {
+        obtained: obt,
+        max_mark: maxM,
+        percentage: pct,
+      };
+    });
+
+    setSelectedStudent({
+      ...selectedStudent,
+      co_marks: currentCoMarks,
+    });
+    setHasUnsavedChanges(true);
+  };
 
   // Loading state
   if (isLoading && !results) {
@@ -1492,6 +1544,61 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                   </div>
                 )}
 
+                {/* ── Course Outcome (CO) Attainment Banner ── */}
+                {Object.keys(liveCoMarks).length > 0 && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Course Outcome (CO) Attainment</span>
+                        {!selectedStudent.is_locked && (
+                          <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700 ml-1">
+                            Editable
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                        Aligned with Template ({Object.entries(coDist).map(([k, v]) => `${k}=${v}`).join(', ')})
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {Object.entries(liveCoMarks).map(([co, data]) => (
+                        <div
+                          key={co}
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-gray-800 border border-emerald-200/80 dark:border-emerald-800/80 shadow-2xs"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-gray-800 dark:text-gray-200">{co}</span>
+                            <span className="text-[10px] text-gray-400 font-medium">Target CO</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 font-mono">
+                            {!selectedStudent.is_locked ? (
+                              <input
+                                type="number"
+                                step="0.5"
+                                min={0}
+                                max={data.max_mark}
+                                value={data.obtained}
+                                onChange={(e) => handleCoMarkChange(co, parseFloat(e.target.value))}
+                                className="w-16 px-1.5 py-1 text-center font-black font-mono text-sm rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-gray-750 text-emerald-800 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                                title={`Edit ${co} mark`}
+                              />
+                            ) : (
+                              <span className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-300">
+                                {data.obtained}
+                              </span>
+                            )}
+                            <span className="text-gray-400 text-[11px] font-mono">/ {data.max_mark}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-mono ml-1">
+                              {data.percentage}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Marks Verification Table ─────────────────────────────── */}
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between">
@@ -1511,6 +1618,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       <thead className="bg-gray-50/90 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 font-bold uppercase text-[10px]">
                         <tr>
                           <th className="py-2.5 px-3">QUESTION</th>
+                          <th className="py-2.5 px-2 text-center">CO</th>
                           <th className="py-2.5 px-3 text-center">MAX MARK</th>
                           <th className="py-2.5 px-3 text-center">SYSTEM READ</th>
                           <th className="py-2.5 px-3 text-center">FINAL MARK</th>
@@ -1520,14 +1628,22 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-750">
                         {selectedStudent.marks && selectedStudent.marks.length > 0 ? (
                           selectedStudent.marks.map((mark) => {
-                            const isMarkVerified = mark.status === 'VERIFIED';
                             const qNum = parseInt(mark.question_key.replace(/\D/g, '') || '0', 10);
+                            if (qNum > 15) return null;
+
+                            const isMarkVerified = mark.status === 'VERIFIED';
                             const sectionLabel = mark.section_name || (qNum <= 10 ? 'Part A' : 'Part B');
+                            const coBadge = mark.target_co || (qNum <= 5 || qNum === 11 || qNum === 12 ? 'CO1' : (qNum <= 10 || qNum === 13 || qNum === 14 ? 'CO2' : 'CO3'));
 
                             return (
                               <tr key={mark.question_key} className="hover:bg-gray-50/60 dark:hover:bg-gray-750/50 transition">
                                 <td className="py-2 px-3 font-bold text-gray-900 dark:text-white">
                                   {mark.question_key} <span className="font-normal text-gray-400 text-[11px]">({sectionLabel})</span>
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-mono">
+                                    {coBadge}
+                                  </span>
                                 </td>
                                 <td className="py-2 px-3 text-center font-medium text-gray-500 dark:text-gray-400">
                                   {mark.max_marks_assigned}
@@ -1571,7 +1687,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                           })
                         ) : (
                           <tr>
-                            <td colSpan={5} className="py-6 text-center text-gray-400 text-xs">
+                            <td colSpan={6} className="py-6 text-center text-gray-400 text-xs">
                               No question marks found.
                             </td>
                           </tr>
@@ -1581,6 +1697,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       <tfoot className="bg-gray-50/90 dark:bg-gray-750 font-bold border-t border-gray-200 dark:border-gray-700">
                         <tr>
                           <td className="py-2.5 px-3 text-gray-900 dark:text-white">Total</td>
+                          <td className="py-2.5 px-2 text-center text-gray-400 text-[10px]">—</td>
                           <td className="py-2.5 px-3 text-center text-gray-500">{maxMarkSum}</td>
                           <td className="py-2.5 px-3 text-center text-gray-700 dark:text-gray-300">{systemReadSum}</td>
                           <td className="py-2.5 px-3 text-center text-violet-600 dark:text-violet-400 font-black text-sm">

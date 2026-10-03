@@ -12,8 +12,6 @@ import {
   Compass,
 } from "lucide-react";
 import { CandidateQuestion, SubQuestionItem } from "@/types/cia-test.types";
-import DiagramStudioModal from "@/components/cia-tests/assembly/DiagramStudioModal";
-import QuestionDiagramPreview from "@/components/cia-tests/assembly/QuestionDiagramPreview";
 
 interface ManualQuestionModalProps {
   isOpen: boolean;
@@ -21,7 +19,6 @@ interface ManualQuestionModalProps {
   defaultMarks?: number | null;
   onClose: () => void;
   onSave: (payload: any) => Promise<boolean>;
-  onUploadDiagram: (file: File) => Promise<{ diagram_url: string; filename?: string }>;
 }
 
 export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
@@ -30,12 +27,12 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   defaultMarks,
   onClose,
   onSave,
-  onUploadDiagram,
 }) => {
   const [questionType, setQuestionType] = useState<"DIRECT" | "SUB_QUESTIONS" | "EITHER_OR">("DIRECT");
   const [totalMarks, setTotalMarks] = useState<number>(defaultMarks || 10);
   const [courseOutcome, setCourseOutcome] = useState<string>("CO1");
   const [bloomLevel, setBloomLevel] = useState<string>("K3");
+  const [topicName, setTopicName] = useState<string>("");
   const [questionText, setQuestionText] = useState<string>("");
 
   // Sub questions
@@ -48,11 +45,6 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   const [optionAText, setOptionAText] = useState<string>("");
   const [optionBText, setOptionBText] = useState<string>("");
 
-  // Diagram
-  const [diagramUrl, setDiagramUrl] = useState<string | null>(null);
-  const [diagramSpec, setDiagramSpec] = useState<Record<string, any> | null>(null);
-  const [isDiagramStudioOpen, setIsDiagramStudioOpen] = useState<boolean>(false);
-  const [uploadingDiagram, setUploadingDiagram] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
@@ -61,10 +53,13 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
     if (questionToEdit) {
       setQuestionText(questionToEdit.question_text || "");
       setTotalMarks(questionToEdit.max_marks || 10);
-      setCourseOutcome(questionToEdit.course_outcome || "CO1");
-      setBloomLevel(questionToEdit.bloom_level || "K3");
-      setDiagramUrl(questionToEdit.diagram_url || null);
-      setDiagramSpec(questionToEdit.diagram_spec || null);
+      setCourseOutcome(questionToEdit.co_level || questionToEdit.course_outcome || "CO1");
+      setBloomLevel(questionToEdit.knowledge_level || questionToEdit.bloom_level || "K3");
+      setTopicName(
+        (questionToEdit as any).primary_topic_name ||
+        questionToEdit.topic_names?.[0] ||
+        ""
+      );
 
       if (questionToEdit.option_a && questionToEdit.option_b) {
         setQuestionType("EITHER_OR");
@@ -81,8 +76,6 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
       setTotalMarks(defaultMarks || 10);
       setCourseOutcome("CO1");
       setBloomLevel("K3");
-      setDiagramUrl(null);
-      setDiagramSpec(null);
       setQuestionType("DIRECT");
       setSubQuestions([
         { sub_label: "a", text: "", marks: 5 },
@@ -138,21 +131,6 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
     return true;
   };
 
-  const handleDiagramUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingDiagram(true);
-    try {
-      const res = await onUploadDiagram(file);
-      setDiagramUrl(res.diagram_url);
-    } catch (err) {
-      // Handled
-    } finally {
-      setUploadingDiagram(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -166,10 +144,12 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
             : questionText,
         max_marks: Number(totalMarks),
         course_outcome: courseOutcome,
+        co_level: courseOutcome,
         bloom_level: bloomLevel,
-        question_type: questionType,
-        diagram_url: diagramUrl,
-        diagram_spec: diagramSpec,
+        knowledge_level: bloomLevel,
+        primary_topic_name: topicName.trim() || undefined,
+        topic_names: topicName.trim() ? [topicName.trim()] : [],
+        question_type: questionType.toLowerCase(),
       };
 
       if (questionType === "SUB_QUESTIONS") {
@@ -212,7 +192,7 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
               {questionToEdit ? "Edit Candidate Question" : "Author New Question"}
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Formulate a structured exam question with sub-parts, choice, and MinIO diagrams.
+              Formulate a structured exam question with sub-parts and either/or choices.
             </p>
           </div>
           <button
@@ -274,6 +254,20 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
             </div>
           </div>
 
+          {/* Syllabus Topic Input */}
+          <div>
+            <label className="block font-bold text-gray-700 dark:text-gray-300 mb-1">
+              Syllabus Topic
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Relational Algebra, Finite Automata, Tree Traversal"
+              value={topicName}
+              onChange={(e) => setTopicName(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-2.5 font-medium text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+            />
+          </div>
+
           {/* Marks, CO, and Bloom's Row */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -304,6 +298,8 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
                 <option value="CO3">CO3</option>
                 <option value="CO4">CO4</option>
                 <option value="CO5">CO5</option>
+                <option value="CO6">CO6</option>
+                <option value="CO7">CO7</option>
               </select>
             </div>
 
@@ -461,75 +457,6 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
             </div>
           )}
 
-          {/* Diagram Upload Section */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 dark:border-gray-700 dark:bg-gray-900">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                <ImageIcon className="h-4 w-4 text-purple-600" />
-                Attach Diagram or Circuit Image (MinIO Object Storage)
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDiagramStudioOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 transition-colors"
-                >
-                  <Compass className="h-3.5 w-3.5" />
-                  <span>Vector Diagram Studio</span>
-                </button>
-                {diagramUrl && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDiagramUrl(null);
-                      setDiagramSpec(null);
-                    }}
-                    className="text-xs font-semibold text-red-600 hover:underline"
-                  >
-                    Remove Image
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {diagramUrl || diagramSpec ? (
-              <div className="flex items-center gap-3">
-                <QuestionDiagramPreview
-                  diagramUrl={diagramUrl}
-                  diagramSpec={diagramSpec}
-                  thumbnail={true}
-                  onOpenStudio={() => setIsDiagramStudioOpen(true)}
-                />
-                <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" /> Vector diagram attached & ready
-                </span>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 py-4 cursor-pointer hover:border-purple-500 dark:border-gray-600">
-                {uploadingDiagram ? (
-                  <div className="flex items-center gap-2 text-purple-600 font-semibold">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Uploading image to MinIO...</span>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="h-5 w-5 text-gray-400 mb-1" />
-                    <span className="font-semibold text-gray-600 dark:text-gray-300">
-                      Click to upload diagram image (PNG, JPG, SVG)
-                    </span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleDiagramUpload}
-                  disabled={uploadingDiagram}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-
           {/* Form Actions */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-gray-700">
             <button
@@ -542,7 +469,7 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
 
             <button
               type="submit"
-              disabled={submitting || uploadingDiagram}
+              disabled={submitting}
               className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2 font-bold text-white shadow hover:bg-purple-700 disabled:opacity-50"
             >
               {submitting ? (
@@ -557,16 +484,6 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
           </div>
         </form>
       </div>
-
-      <DiagramStudioModal
-        isOpen={isDiagramStudioOpen}
-        onClose={() => setIsDiagramStudioOpen(false)}
-        initialSpec={diagramSpec}
-        onSaveSpec={(spec, renderedUrl) => {
-          setDiagramSpec(spec);
-          setDiagramUrl(renderedUrl);
-        }}
-      />
     </div>
   );
 };

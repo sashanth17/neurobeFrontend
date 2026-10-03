@@ -177,11 +177,105 @@ export const QuestionPaperStudioService = {
         message: data.state.message,
         total_generated: data.state.total_generated,
         question_ids: data.state.question_ids,
-        result: data.state.result,
-        error: data.state.error,
       };
     }
     return data;
+  },
+
+  /**
+   * Update question Course Outcome (CO1 to CO7 or null)
+   * PATCH /courses/{courseId}/templates/{templateId}/questions/{questionId}/co
+   */
+  async updateQuestionCO(
+    courseId: string | number,
+    templateId: string | number,
+    questionId: number,
+    coLevel: string | null
+  ): Promise<CandidateQuestion> {
+    const res = await instance().patch<CandidateQuestion>(
+      `courses/${courseId}/templates/${templateId}/questions/${questionId}/co`,
+      { co_level: coLevel }
+    );
+    return res.data;
+  },
+
+  /**
+   * Fetch Real-time CO Attainment and Budget Summary
+   * GET /courses/{courseId}/templates/{templateId}/co-summary
+   */
+  async getTemplateCOSummary(
+    courseId: string | number,
+    templateId: string | number
+  ): Promise<{
+    template_id: number;
+    total_marks: number;
+    co_summary: Array<{
+      co_code: string;
+      allocated_marks: number;
+      assigned_marks: number;
+      remaining_marks: number;
+      is_fulfilled: boolean;
+    }>;
+    is_co_fully_balanced: boolean;
+  }> {
+    const res = await instance().get(
+      `courses/${courseId}/templates/${templateId}/co-summary`
+    );
+    return res.data;
+  },
+
+  /**
+   * Configure slot question_type, target_co, and modular sub_question_structure
+   * PUT /courses/{courseId}/templates/{templateId}/slots/{slotId}/structure
+   */
+  async updateSlotStructure(
+    courseId: string | number,
+    templateId: string | number,
+    slotId: number,
+    payload: { question_type: string; target_co?: string | null; sub_question_structure?: any }
+  ): Promise<any> {
+    const res = await instance().put(
+      `courses/${courseId}/templates/${templateId}/slots/${slotId}/structure`,
+      payload
+    );
+    return res.data;
+  },
+
+  /**
+   * Assign candidate question into slot or sub-slot
+   * POST /question-paper-templates/{templateId}/slots/{slotId}/assign
+   */
+  async assignQuestionToSlot(
+    templateId: string | number,
+    slotId: number,
+    generatedQuestionId: number,
+    subId?: string | null
+  ): Promise<any> {
+    const payload: any = { generated_question_id: generatedQuestionId };
+    if (subId) payload.sub_id = subId;
+    const res = await instance().post(
+      `question-paper-templates/${templateId}/slots/${slotId}/assign`,
+      payload
+    );
+    return res.data;
+  },
+
+  /**
+   * Unassign question from slot or sub-slot
+   * POST /question-paper-templates/{templateId}/slots/{slotId}/unassign
+   */
+  async unassignSlot(
+    templateId: string | number,
+    slotId: number,
+    subId?: string | null
+  ): Promise<any> {
+    const params = subId ? { sub_id: subId } : {};
+    const res = await instance().post(
+      `question-paper-templates/${templateId}/slots/${slotId}/unassign`,
+      {},
+      { params }
+    );
+    return res.data;
   },
 };
 

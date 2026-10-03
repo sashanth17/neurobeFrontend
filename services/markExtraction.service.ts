@@ -50,6 +50,7 @@ export interface QuestionMark {
   final_mark:          number;
   confidence?:         number;
   status:              'VERIFIED' | 'NEEDS_REVIEW' | 'NEEDS_CORRECTION' | 'CORRECTED' | string;
+  target_co?:          string;
 }
 
 export interface StudentMarks {
@@ -70,6 +71,7 @@ export interface StudentMarks {
   is_locked?:                   boolean;
   source_pages:                 number[];
   marks:                        QuestionMark[];
+  co_marks?:                    Record<string, { obtained: number; max_mark: number; percentage: number }>;
 }
 
 export interface ExtractionVerificationSummary {
@@ -85,6 +87,7 @@ export interface VerifiedMarkQuestion {
   mark: number;
   section?: string;
   max_mark?: number;
+  target_co?: string;
 }
 
 export interface VerifiedMarkStudent {
@@ -100,6 +103,8 @@ export interface VerifiedMarkStudent {
   source_pages?: number[];
   image_base_url?: string;
   section_totals?: Record<string, number>;
+  percentage?: number;
+  co_marks?: Record<string, { obtained: number; max_mark: number; percentage: number }>;
 }
 
 export interface VerifiedMarksResponse {
@@ -108,6 +113,8 @@ export interface VerifiedMarksResponse {
   total_verified: number;
   image_base_url?: string;
   verified_students: VerifiedMarkStudent[];
+  template_co_distribution?: Record<string, number>;
+  expected_questions?: string[];
 }
 
 export interface CIATestJobItem {
@@ -139,6 +146,8 @@ export interface LatestExtractionResults {
   template_questions?:  any[];
   unmapped?:            any[];
   duplicates?:          any[][];
+  template_co_distribution?: Record<string, number>;
+  expected_questions?: string[];
 }
 
 export const MarkExtractionService = {
@@ -395,7 +404,7 @@ export const MarkExtractionService = {
   updateConfirmedMarks: async (
     ciaTestId: number,
     regNo: string,
-    payload: { marks: any[]; final_total_mark?: number }
+    payload: { marks: any[]; final_total_mark?: number; co_marks?: Record<string, { obtained: number; max_mark: number; percentage: number }> }
   ) => {
     const res = await commonInstance().post(
       `${COURSE_API_BASE}/cia-tests/${ciaTestId}/students/${encodeURIComponent(regNo)}/update-confirmed-marks`,

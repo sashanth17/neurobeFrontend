@@ -66,6 +66,7 @@ const QuestionAssemblyStudioPage = () => {
     // Slot Actions
     handleAssignSlot,
     handleUnassignSlot,
+    handleUpdateSlotStructure,
     // Candidate Actions
     handleCreateManualQuestion,
     handleUpdateCandidateQuestion,
@@ -211,6 +212,8 @@ const QuestionAssemblyStudioPage = () => {
         {/* LEFT PANE: Blueprint Slots (5 Columns on Desktop) */}
         <div className="lg:col-span-5">
           <BlueprintSlotsPane
+            courseId={validCourseId}
+            templateId={validTemplateId}
             template={template}
             candidates={candidates}
             activeSlotId={activeSlotId}
@@ -219,6 +222,7 @@ const QuestionAssemblyStudioPage = () => {
             onUnassignSlot={handleUnassignSlot}
             onAssignSlot={handleAssignSlot}
             onEditQuestion={handleOpenEditModal}
+            onUpdateSlotStructure={handleUpdateSlotStructure}
           />
         </div>
 
@@ -265,7 +269,7 @@ const QuestionAssemblyStudioPage = () => {
         cancellingJob={cancellingJob}
       />
 
-      {/* Manual Author / Edit Modal with Diagram Upload */}
+      {/* Manual Author / Edit Modal */}
       <ManualQuestionModal
         isOpen={isManualModalOpen}
         questionToEdit={questionToEdit}
@@ -275,7 +279,6 @@ const QuestionAssemblyStudioPage = () => {
           setQuestionToEdit(null);
         }}
         onSave={handleSaveManualQuestion}
-        onUploadDiagram={handleUploadDiagram}
       />
 
       {/* Live University Exam Paper Preview Modal */}

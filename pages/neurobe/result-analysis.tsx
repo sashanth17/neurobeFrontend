@@ -63,7 +63,10 @@ const ResultsAnalysis = () => {
 
         {state.mode === "mcq" && <KnowledgeLevelAnalysisCard />}
 
-        <StudentResultsTableCard mode={state.mode as "mcq" | "cia"} />
+        <StudentResultsTableCard 
+          mode={state.mode as "mcq" | "cia"} 
+          ciaTestId={parseInt((state.selectedCia || '').replace(/\D/g, '') || "1", 10)}
+        />
       </div>
     </div>
   );

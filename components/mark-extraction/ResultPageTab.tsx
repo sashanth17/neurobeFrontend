@@ -48,6 +48,7 @@ export default function ResultPageTab({
   // ── In-place Editing State inside Result Modal ───────────────────────────────
   const [isEditingStudent, setIsEditingStudent] = useState<boolean>(false);
   const [editedMarks, setEditedMarks] = useState<Record<string, number>>({});
+  const [editedCoMarks, setEditedCoMarks] = useState<Record<string, number>>({});
   const [isSavingMarks, setIsSavingMarks] = useState<boolean>(false);
 
   // ── Unlock Confirmation Dialog State ────────────────────────────────────────
@@ -93,8 +94,14 @@ export default function ResultPageTab({
   const totalVerified = verifiedStudents.length;
   const pctVerified = totalEnrolled > 0 ? Math.min(100, Math.round((totalVerified / totalEnrolled) * 100)) : (totalVerified > 0 ? 100 : 0);
 
-  // Extract dynamic question keys for the table header (parent questions only, naturally sorted)
+  // Extract dynamic question keys for the table header (parent questions only, capped to template 15)
   const questionKeys = useMemo(() => {
+    if (results?.expected_questions && results.expected_questions.length > 0) {
+      return results.expected_questions.filter(k => {
+        const num = parseInt(k.replace(/\D/g, ''), 10);
+        return !isNaN(num) && num <= 15;
+      });
+    }
     if (verifiedStudents.length === 0) return [];
     const keysSet = new Set<string>();
     verifiedStudents.forEach(st => {
@@ -102,17 +109,42 @@ export default function ResultPageTab({
         if (!qm.q_no) return;
         const match = qm.q_no.match(/^(Q\d+)/i);
         const parentKey = match ? match[1].toUpperCase() : qm.q_no.toUpperCase();
-        keysSet.add(parentKey);
+        const num = parseInt(parentKey.replace(/\D/g, ''), 10);
+        if (!isNaN(num) && num <= 15) {
+          keysSet.add(parentKey);
+        }
       });
     });
-    // Sort question keys naturally (e.g. Q1, Q2, ..., Q9, Q10, Q11, etc.)
+    // Sort question keys naturally (e.g. Q1, Q2, ..., Q9, Q10, Q11, ..., Q15)
     return Array.from(keysSet).sort((a, b) => {
       const numA = parseInt(a.replace(/\D/g, ''), 10);
       const numB = parseInt(b.replace(/\D/g, ''), 10);
       if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
       return a.localeCompare(b);
     });
-  }, [verifiedStudents]);
+  }, [results?.expected_questions, verifiedStudents]);
+
+  // Course Outcome (CO) keys & distribution from template
+  const coDist = useMemo<Record<string, number>>(() => {
+    return results?.template_co_distribution || { CO1: 42, CO2: 42, CO3: 16 };
+  }, [results?.template_co_distribution]);
+
+  const coKeys = useMemo(() => {
+    return Object.keys(coDist).sort();
+  }, [coDist]);
+
+  // Template question-to-CO mapping (Section A: Q1-Q5 CO1, Q6-Q10 CO2; Section B: Q11-Q12 CO1, Q13-Q14 CO2, Q15 CO3)
+  const questionCoMap = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (let i = 1; i <= 5; i++) map[`Q${i}`] = 'CO1';
+    for (let i = 6; i <= 10; i++) map[`Q${i}`] = 'CO2';
+    map['Q11'] = 'CO1';
+    map['Q12'] = 'CO1';
+    map['Q13'] = 'CO2';
+    map['Q14'] = 'CO2';
+    map['Q15'] = 'CO3';
+    return map;
+  }, []);
 
   // Filter students based on search query
   const filteredStudents = useMemo(() => {
@@ -170,6 +202,19 @@ export default function ResultPageTab({
       }
     });
     setEditedMarks(initialMarks);
+
+    const initialCoMarks: Record<string, number> = {};
+    Object.entries(coDist).forEach(([co, maxM]) => {
+      const coData = student.co_marks?.[co];
+      let obt = 0;
+      if (typeof coData === 'object' && coData !== null) {
+        obt = Number(coData.obtained) || 0;
+      } else if (typeof coData === 'number') {
+        obt = coData;
+      }
+      initialCoMarks[co] = obt;
+    });
+    setEditedCoMarks(initialCoMarks);
   };
 
   const handleCloseSheetViewer = () => {
@@ -191,9 +236,22 @@ export default function ResultPageTab({
       const newTotal = Object.values(editedMarks).reduce((acc, v) => acc + (Number(v) || 0), 0);
       const roundedTotal = Math.round(newTotal * 100) / 100;
 
+      // Build CO marks payload from editedCoMarks
+      const finalCoPayload: Record<string, { obtained: number; max_mark: number; percentage: number }> = {};
+      Object.entries(coDist).forEach(([co, maxM]) => {
+        const obt = editedCoMarks[co] !== undefined ? editedCoMarks[co] : (modalCoMarks[co]?.obtained || 0);
+        const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
+        finalCoPayload[co] = {
+          obtained: Math.round(obt * 100) / 100,
+          max_mark: maxM,
+          percentage: pct,
+        };
+      });
+
       await MarkExtractionService.updateConfirmedMarks(ciaTestId, viewingStudent.register_number, {
         marks: marksPayload,
         final_total_mark: roundedTotal,
+        co_marks: finalCoPayload,
       });
 
       const updatedQuestions = canonicalViewingQuestions.map(qm => ({
@@ -204,6 +262,7 @@ export default function ResultPageTab({
         ...viewingStudent,
         question_marks: updatedQuestions,
         total_mark: roundedTotal,
+        co_marks: finalCoPayload,
       };
 
       setViewingStudent(updatedStudent);
@@ -218,7 +277,7 @@ export default function ResultPageTab({
       });
 
       setIsEditingStudent(false);
-      Success(`Marks updated & re-locked for ${viewingStudent.student_name || viewingStudent.register_number}`);
+      Success(`Marks and COs updated & re-locked for ${viewingStudent.student_name || viewingStudent.register_number}`);
     } catch (err: any) {
       console.error("Failed to save edited marks", err);
       Failure(err?.response?.data?.detail || "Failed to update marks");
@@ -292,6 +351,18 @@ export default function ResultPageTab({
         });
       }
 
+      // Course Outcome (CO) Attainment
+      coKeys.forEach((co) => {
+        const coData = student.co_marks?.[co];
+        const maxM = coData?.max_mark ?? coDist[co] ?? 0;
+        const obt = typeof coData === 'object' && coData !== null 
+          ? (coData.obtained ?? 0) 
+          : (typeof coData === 'number' ? coData : 0);
+        rowData[`${co} Marks`] = obt;
+        rowData[`${co} Max`] = maxM;
+        rowData[`${co} Attainment (%)`] = coData?.percentage ?? (maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0);
+      });
+
       // Total and Max mark
       rowData["Total Marks"] = student.total_mark;
       rowData["Max Marks"] = student.max_mark || maxMark;
@@ -354,9 +425,9 @@ export default function ResultPageTab({
   }, [viewingStudent?.question_marks]);
 
   // Canonicalize & naturally sort viewing questions: merge subquestions (Q11B -> Q11)
-  const canonicalViewingQuestions = useMemo(() => {
+  const canonicalViewingQuestions = useMemo<{ q_no: string; mark: number; max_mark: number; section: string; target_co?: string }[]>(() => {
     if (!viewingStudent?.question_marks) return [];
-    const map = new Map<string, { q_no: string; mark: number; max_mark: number; section: string }>();
+    const map = new Map<string, { q_no: string; mark: number; max_mark: number; section: string; target_co?: string }>();
     viewingStudent.question_marks.forEach(qm => {
       if (!qm.q_no) return;
       const match = qm.q_no.match(/^(Q\d+)/i);
@@ -368,6 +439,7 @@ export default function ResultPageTab({
           mark: Number(qm.mark) || 0,
           max_mark: Number(qm.max_mark) || 0,
           section: qm.section || '',
+          target_co: qm.target_co || '',
         });
       } else {
         const bestMark = (Number(qm.mark) || 0) > existing.mark ? Number(qm.mark) : existing.mark;
@@ -377,18 +449,47 @@ export default function ResultPageTab({
           mark: bestMark,
           max_mark: bestMax,
           section: existing.section || qm.section || '',
+          target_co: existing.target_co || qm.target_co || '',
         });
       }
     });
 
-    // Natural numerical sort: Q1, Q2, ..., Q9, Q10, Q11, ...
-    return Array.from(map.values()).sort((a, b) => {
-      const numA = parseInt(a.q_no.replace(/\D/g, ''), 10);
-      const numB = parseInt(b.q_no.replace(/\D/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      return a.q_no.localeCompare(b.q_no);
-    });
+    // Natural numerical sort: Q1, Q2, ..., Q9, Q10, Q11, ..., Q15 (strictly capped to template 15)
+    return Array.from(map.values())
+      .filter(item => {
+        const num = parseInt(item.q_no.replace(/\D/g, ''), 10);
+        return !isNaN(num) && num <= 15;
+      })
+      .sort((a, b) => {
+        const numA = parseInt(a.q_no.replace(/\D/g, ''), 10);
+        const numB = parseInt(b.q_no.replace(/\D/g, ''), 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.q_no.localeCompare(b.q_no);
+      });
   }, [viewingStudent?.question_marks]);
+
+  // Course Outcome (CO) Marks directly mapped from template COs and staff extraction / edits
+  const modalCoMarks = useMemo(() => {
+    if (!viewingStudent) return {};
+    const res: Record<string, { obtained: number; max_mark: number; percentage: number }> = {};
+
+    Object.entries(coDist).forEach(([co, maxM]) => {
+      let obt = 0;
+      if (isEditingStudent) {
+        obt = editedCoMarks[co] !== undefined ? editedCoMarks[co] : 0;
+      } else {
+        const coData = viewingStudent.co_marks?.[co];
+        if (typeof coData === 'object' && coData !== null) {
+          obt = Number(coData.obtained) || 0;
+        } else if (typeof coData === 'number') {
+          obt = coData;
+        }
+      }
+      const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
+      res[co] = { obtained: Math.round(obt * 100) / 100, max_mark: maxM, percentage: pct };
+    });
+    return res;
+  }, [viewingStudent, isEditingStudent, editedCoMarks, coDist]);
 
   const editedGrandTotal = useMemo(() => {
     if (!isEditingStudent) {
@@ -613,6 +714,12 @@ export default function ResultPageTab({
                         {key}
                       </th>
                     ))}
+                    {/* Course Outcome (CO) Columns */}
+                    {coKeys.map((co) => (
+                      <th key={co} className="py-3 px-3 text-center bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-extrabold whitespace-nowrap">
+                        {co} <span className="text-[9px] font-normal text-emerald-600 dark:text-emerald-400">({coDist[co] || 42})</span>
+                      </th>
+                    ))}
                     <th className="py-3 px-4 text-center">Total Marks</th>
                     <th className="py-3 px-3 text-center">Status</th>
                     {/* Action Column in the right corner */}
@@ -622,7 +729,7 @@ export default function ResultPageTab({
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-750 bg-white dark:bg-gray-800">
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={6 + questionKeys.length} className="py-12 text-center text-xs text-gray-400">
+                      <td colSpan={6 + questionKeys.length + coKeys.length} className="py-12 text-center text-xs text-gray-400">
                         No verified students match &ldquo;{searchQuery}&rdquo;.
                       </td>
                     </tr>
@@ -662,6 +769,27 @@ export default function ResultPageTab({
                               {markMap.has(qKey) ? markMap.get(qKey) : '—'}
                             </td>
                           ))}
+                          {/* Course Outcome (CO) Marks */}
+                          {coKeys.map((co) => {
+                            const coData = st.co_marks?.[co];
+                            const maxM = coData?.max_mark ?? coDist[co] ?? 0;
+                            const obt = typeof coData === 'object' && coData !== null 
+                              ? (coData.obtained ?? 0) 
+                              : (typeof coData === 'number' ? coData : 0);
+                            const roundedObt = Math.round(obt * 100) / 100;
+                            const coPct = coData?.percentage ?? (maxM > 0 ? Math.round((roundedObt / maxM) * 1000) / 10 : 0);
+                            return (
+                              <td key={co} className="py-3 px-3 text-center font-mono text-xs whitespace-nowrap bg-emerald-50/30 dark:bg-emerald-950/10">
+                                <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                                  {roundedObt}
+                                </span>
+                                <span className="text-gray-400 text-[10px] ml-0.5">/{maxM}</span>
+                                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 ml-1">
+                                  ({coPct}%)
+                                </span>
+                              </td>
+                            );
+                          })}
                           {/* Total Marks */}
                           <td className="py-3 px-4 text-center whitespace-nowrap">
                             <span className="font-mono font-black text-sm text-gray-900 dark:text-white">
@@ -1046,12 +1174,78 @@ export default function ResultPageTab({
                     </div>
                   )}
 
+                  {/* Course Outcome (CO) Attainment Banner */}
+                  {Object.keys(modalCoMarks).length > 0 && (
+                    <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/80 dark:border-emerald-800/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                            Course Outcome (CO) Attainment
+                          </span>
+                          {isEditingStudent && (
+                            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
+                              Editable
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          Aligned with Template Blueprint
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {Object.entries(modalCoMarks).map(([co, data]) => (
+                          <div 
+                            key={co} 
+                            className="bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/60 flex flex-col justify-between shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-gray-800 dark:text-gray-200">
+                                {co}
+                              </span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-mono">
+                                {data.percentage}%
+                              </span>
+                            </div>
+                            <div className="mt-1.5 flex items-center justify-between font-mono">
+                              {isEditingStudent ? (
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  min={0}
+                                  max={data.max_mark}
+                                  value={editedCoMarks[co] ?? data.obtained}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    setEditedCoMarks(prev => ({
+                                      ...prev,
+                                      [co]: isNaN(val) ? 0 : Math.max(0, val)
+                                    }));
+                                  }}
+                                  className="w-16 px-1.5 py-1 text-center font-black font-mono text-sm rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-gray-750 text-emerald-800 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                                  title={`Edit ${co} mark`}
+                                />
+                              ) : (
+                                <span className="font-black text-sm text-emerald-700 dark:text-emerald-300">
+                                  {data.obtained}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-gray-400 ml-1">
+                                / {data.max_mark}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Individual Question Marks Table */}
                   <div className="border border-gray-200 dark:border-gray-750 rounded-xl overflow-hidden shadow-2xs">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-750 text-gray-500 dark:text-gray-400 font-bold uppercase text-[10px]">
                         <tr>
                           <th className="py-2.5 px-3">Q.No</th>
+                          <th className="py-2.5 px-2">CO</th>
                           {hasDistinctSections && <th className="py-2.5 px-2">Section</th>}
                           <th className="py-2.5 px-3 text-right">Awarded Mark</th>
                         </tr>
@@ -1061,6 +1255,11 @@ export default function ResultPageTab({
                           <tr key={qm.q_no || i} className="hover:bg-gray-50/50 dark:hover:bg-gray-750/30">
                             <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-white">
                               {qm.q_no}
+                            </td>
+                            <td className="py-2.5 px-2">
+                              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-mono">
+                                {qm.target_co || questionCoMap[qm.q_no] || 'CO1'}
+                              </span>
                             </td>
                             {hasDistinctSections && (
                               <td className="py-2.5 px-2 text-gray-500 dark:text-gray-400 text-[11px]">

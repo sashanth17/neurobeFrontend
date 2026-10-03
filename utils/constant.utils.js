@@ -1,27 +1,11 @@
 export const CLIENT_ID =
   "625052261407-4p8ihs05c67d778mr5d91lqjvnvpkd8k.apps.googleusercontent.com";
 
-// export const BACKEND_URL = "http://31.97.206.165/api/";
+const rawBackend = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim();
 
-// export const BACKEND_URL = "http://88.222.213.249/api/";
-/**
- * Reads backend origin from environment. Set NEXT_PUBLIC_API_BASE_URL in .env
- * for each environment (dev / staging / production). Falls back to localhost
- * only when the var is absent (local docker-compose dev setup).
- */
-const rawBackend = (
-  (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) ||
-  "http://127.0.0.1:80/"
-).trim();
-
-// On Windows, localhost:80 connects to WSL relay [::1]:80 which hangs. Enforce 127.0.0.1 for local Docker Kong
-const normalizedBackend = (rawBackend || "http://127.0.0.1:80/")
-  .replace("://localhost:", "://127.0.0.1:")
-  .replace("://localhost/", "://127.0.0.1/");
-
-export const BACKEND_URL = normalizedBackend.endsWith("/")
-  ? normalizedBackend
-  : `${normalizedBackend}/`;
+export const BACKEND_URL = rawBackend
+  ? (rawBackend.endsWith("/") ? rawBackend : `${rawBackend}/`)
+  : "";
 
 export const FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";

@@ -62,8 +62,6 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
   const [subQuestionMarks, setSubQuestionMarks] = useState<number[]>([4, 6]);
 
   const [isEitherOr, setIsEitherOr] = useState<boolean>(false);
-  const [includeDiagram, setIncludeDiagram] = useState<boolean>(false);
-  const [diagramType, setDiagramType] = useState<string>("auto");
 
   // Auto-select first topics when syllabusTopics loads
   useEffect(() => {
@@ -153,8 +151,6 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
       num_sub_questions: hasSubQuestions ? numSubQuestions : null,
       sub_question_marks: hasSubQuestions ? subQuestionMarks : null,
       custom_instructions: customInstructions.trim() || null,
-      include_diagram: includeDiagram,
-      diagram_type: includeDiagram ? diagramType : undefined,
       bloom_level: knowledgeLevel,
       additional_instructions: customInstructions.trim() || undefined,
     };
@@ -509,69 +505,6 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
                   <p className="mt-2 text-[10px] text-purple-600 dark:text-purple-400 font-semibold border-t border-gray-100 pt-1.5 dark:border-gray-700">
                     ⚡ Option A and Option B will both inherit the [{subQuestionMarks.join("m + ")}m] sub-question structure.
                   </p>
-                )}
-              </div>
-
-              {/* Visualization Diagram Toggle & Domain Presets */}
-              <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <label className="flex cursor-pointer items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400">
-                      <ImageIcon className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-800 dark:text-gray-200">
-                          Include Visualization Diagram
-                        </span>
-                        <span className="text-[10px] bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 font-bold px-1.5 py-0.5 rounded">
-                          SVG Engine
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-400">
-                        AI will synthesize engineering diagram specifications and auto-compile them into crisp vector SVGs.
-                      </p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={includeDiagram}
-                    onChange={(e) => setIncludeDiagram(e.target.checked)}
-                    disabled={isGenerating}
-                    className="h-4 w-4 rounded text-teal-600 focus:ring-teal-500 mt-1"
-                  />
-                </label>
-
-                {includeDiagram && (
-                  <div className="mt-3.5 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
-                    <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Select Engineering / Science Domain:
-                    </span>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: "auto", label: "Auto Detect" },
-                        { id: "beam", label: "Civil Beam" },
-                        { id: "truss", label: "Structural Truss" },
-                        { id: "logic_circuit", label: "Digital Logic" },
-                        { id: "flowchart", label: "Process Flow" },
-                        { id: "geometry", label: "2D Geometry" },
-                      ].map((type) => (
-                        <button
-                          key={type.id}
-                          type="button"
-                          disabled={isGenerating}
-                          onClick={() => setDiagramType(type.id)}
-                          className={`px-2 py-1.5 rounded-lg text-xs font-semibold text-center border transition-all ${
-                            diagramType === type.id
-                              ? "bg-teal-500 text-white border-teal-600 shadow-sm"
-                              : "bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
-                          }`}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 )}
               </div>
             </div>

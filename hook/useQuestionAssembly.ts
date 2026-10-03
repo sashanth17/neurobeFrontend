@@ -265,7 +265,7 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
   const filteredCandidates = useMemo(() => {
     return candidates.filter((item) => {
       if (filters.marks !== null && item.max_marks !== filters.marks) return false;
-      if (filters.course_outcome && item.course_outcome !== filters.course_outcome) return false;
+      if (filters.course_outcome && (item.course_outcome || item.co_level) !== filters.course_outcome) return false;
       if (filters.bloom_level && item.bloom_level !== filters.bloom_level) return false;
       if (filters.unassigned_only && item.is_assigned) return false;
       if (filters.search) {
@@ -333,11 +333,11 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
   // SLOT ASSIGNMENT & UNASSIGNMENT
   // =========================================================================
 
-  const handleAssignSlot = async (slotId: number, questionId: number) => {
-    setActionLoadingId(`slot-assign-${slotId}`);
+  const handleAssignSlot = async (slotId: number, questionId: number, subId?: string | null) => {
+    setActionLoadingId(`slot-assign-${slotId}${subId ? `-${subId}` : ""}`);
     try {
-      await ciaAssessmentService.assignQuestionToSlot(validTemplateId, slotId, questionId);
-      toast.success("Question assigned to slot!");
+      await ciaAssessmentService.assignQuestionToSlot(validTemplateId, slotId, questionId, subId);
+      toast.success(subId ? `Question assigned to sub-part ${subId}!` : "Question assigned to slot!");
       // Refresh both template slots and candidates
       await Promise.all([fetchTemplate(), fetchCandidates()]);
       setActiveSlotId(null);
@@ -349,15 +349,31 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
     }
   };
 
-  const handleUnassignSlot = async (slotId: number) => {
-    setActionLoadingId(`slot-unassign-${slotId}`);
+  const handleUnassignSlot = async (slotId: number, subId?: string | null) => {
+    setActionLoadingId(`slot-unassign-${slotId}${subId ? `-${subId}` : ""}`);
     try {
-      await ciaAssessmentService.unassignSlot(validTemplateId, slotId);
-      toast.info("Question unassigned from slot");
+      await ciaAssessmentService.unassignSlot(validTemplateId, slotId, subId);
+      toast.info(subId ? `Question unassigned from sub-part ${subId}` : "Question unassigned from slot");
       await Promise.all([fetchTemplate(), fetchCandidates()]);
     } catch (err: any) {
       console.error("Failed to unassign slot:", err);
       toast.error(err.response?.data?.detail || "Failed to unassign slot");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleUpdateSlotStructure = async (slotId: number, payload: any) => {
+    setActionLoadingId(`slot-structure-${slotId}`);
+    try {
+      await ciaAssessmentService.updateSlotStructure(validTemplateId, slotId, payload);
+      toast.success("Sub-question structure updated!");
+      await fetchTemplate();
+      return true;
+    } catch (err: any) {
+      console.error("Failed to update slot structure:", err);
+      toast.error(err.response?.data?.detail || "Failed to update slot structure");
+      return false;
     } finally {
       setActionLoadingId(null);
     }
@@ -503,6 +519,7 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
     // Slot Actions
     handleAssignSlot,
     handleUnassignSlot,
+    handleUpdateSlotStructure,
     // Candidate Actions
     handleCreateManualQuestion,
     handleUpdateCandidateQuestion,

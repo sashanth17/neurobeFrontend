@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { ExamPaperPreviewData, QuestionPaperTemplate } from "@/types/cia-test.types";
 import FormattedMathText from "@/components/common-components/FormattedMathText";
-import QuestionDiagramPreview from "./QuestionDiagramPreview";
 
 interface ExamPaperPreviewModalProps {
   isOpen: boolean;
@@ -175,9 +174,9 @@ export const ExamPaperPreviewModal: React.FC<ExamPaperPreviewModalProps> = ({
                                 const qNumber = q.question_number ?? qIdx + 1;
                                 const slotKey = q.slot_id ?? q.id ?? `${secIdx}-${qIdx}`;
                                 const slotMarks = q.allocated_marks ?? qData?.max_marks ?? "-";
-                                const co = qData?.co_level || qData?.course_outcome || "-";
+                                const subStructure = q.sub_question_structure || qData?.sub_question_structure;
+                                const co = q.target_co || subStructure?.target_co || qData?.co_level || qData?.course_outcome || "-";
                                 const rbt = qData?.knowledge_level || qData?.bloom_level || "-";
-
                                 const subQuestions = qData?.sub_questions || [];
                                 const eitherOr =
                                   qData?.either_or_content ||
@@ -190,22 +189,87 @@ export const ExamPaperPreviewModal: React.FC<ExamPaperPreviewModalProps> = ({
                                     <td className="py-2.5 font-bold">{qNumber}.</td>
 
                                     <td className="py-2.5 pr-3">
-                                      {isAssigned && qData?.question_text ? (
+                                      {subStructure ? (
+                                        subStructure.type === "either_or" ? (
+                                          <div className="space-y-2">
+                                            {/* Option A Sub-parts */}
+                                            <div className="space-y-1.5">
+                                              {(subStructure.option_a?.sub_questions || []).map((sub: any, sIdx: number) => {
+                                                const qText = sub.assigned_question?.question_text || sub.assigned_question_text;
+                                                return (
+                                                  <div key={sIdx} className="flex items-start justify-between text-xs">
+                                                    <span>
+                                                      <strong>({sub.label || `a.${sIdx + 1}`})</strong>{" "}
+                                                      {qText ? (
+                                                        <FormattedMathText text={qText} />
+                                                      ) : (
+                                                        <span className="italic text-gray-400">[Option A sub-part unassigned]</span>
+                                                      )}
+                                                    </span>
+                                                    <span className="font-semibold text-gray-700 ml-2">
+                                                      [{sub.marks}]
+                                                    </span>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+
+                                            {/* Real-World Centered OR */}
+                                            <div className="text-center font-bold text-[11px] tracking-widest text-gray-800 my-1">
+                                              (OR)
+                                            </div>
+
+                                            {/* Option B Sub-parts */}
+                                            <div className="space-y-1.5">
+                                              {(subStructure.option_b?.sub_questions || []).map((sub: any, sIdx: number) => {
+                                                const qText = sub.assigned_question?.question_text || sub.assigned_question_text;
+                                                return (
+                                                  <div key={sIdx} className="flex items-start justify-between text-xs">
+                                                    <span>
+                                                      <strong>({sub.label || `b.${sIdx + 1}`})</strong>{" "}
+                                                      {qText ? (
+                                                        <FormattedMathText text={qText} />
+                                                      ) : (
+                                                        <span className="italic text-gray-400">[Option B sub-part unassigned]</span>
+                                                      )}
+                                                    </span>
+                                                    <span className="font-semibold text-gray-700 ml-2">
+                                                      [{sub.marks}]
+                                                    </span>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          /* Direct Sub-parts */
+                                          <div className="space-y-1.5">
+                                            {(subStructure.sub_questions || []).map((sub: any, sIdx: number) => {
+                                              const qText = sub.assigned_question?.question_text || sub.assigned_question_text;
+                                              return (
+                                                <div key={sIdx} className="flex items-start justify-between text-xs">
+                                                  <span>
+                                                    <strong>({sub.label || String.fromCharCode(97 + sIdx)})</strong>{" "}
+                                                    {qText ? (
+                                                      <FormattedMathText text={qText} />
+                                                    ) : (
+                                                      <span className="italic text-gray-400">[Sub-part unassigned]</span>
+                                                    )}
+                                                  </span>
+                                                  <span className="font-semibold text-gray-700 ml-2">
+                                                    [{sub.marks}]
+                                                  </span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )
+                                      ) : isAssigned && qData?.question_text ? (
                                         <div>
                                           <FormattedMathText
                                             text={qData.question_text}
                                             className="leading-relaxed whitespace-pre-wrap block"
                                           />
-
-                                          {/* Vector or MinIO Diagram inline rendering */}
-                                          {(qData.diagram_url || qData.diagram_spec) && (
-                                            <QuestionDiagramPreview
-                                              diagramUrl={qData.diagram_url}
-                                              diagramSpec={qData.diagram_spec}
-                                              questionNumber={qNumber}
-                                              className="my-2"
-                                            />
-                                          )}
 
                                           {/* Sub questions */}
                                           {subQuestions.length > 0 && (

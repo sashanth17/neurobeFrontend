@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { Users, Search, CheckCircle2, BookOpen } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Users, Search, CheckCircle2 } from "lucide-react";
 import TableComponent from "@/components/common-components/TableComponent";
+import { MarkExtractionService } from "@/services/markExtraction.service";
 
 export interface StudentResultRecord {
   seq: number;
@@ -8,12 +9,19 @@ export interface StudentResultRecord {
   name: string;
   score: string;
   percentage: string;
+  coMarks?: {
+    CO1?: { obtained: number; max_mark: number; percentage: number };
+    CO2?: { obtained: number; max_mark: number; percentage: number };
+    CO3?: { obtained: number; max_mark: number; percentage: number };
+    [key: string]: { obtained: number; max_mark: number; percentage: number } | undefined;
+  };
 }
 
 export interface StudentResultsTableCardProps {
   title?: string;
   subtitle?: string;
   mode?: "mcq" | "cia";
+  ciaTestId?: number;
   records?: StudentResultRecord[];
 }
 
@@ -31,33 +39,176 @@ const DEFAULT_MCQ_RECORDS: StudentResultRecord[] = [
 ];
 
 const DEFAULT_CIA_RECORDS: StudentResultRecord[] = [
-  { seq: 1, regNo: "24CS1001", name: "Aarav Swaminathan", score: "43/50", percentage: "(86%)" },
-  { seq: 2, regNo: "24CS1002", name: "Abinaya Sundaram", score: "40/50", percentage: "(80%)" },
-  { seq: 3, regNo: "24CS1003", name: "Aditya Narayanan", score: "49/50", percentage: "(98%)" },
-  { seq: 4, regNo: "24CS1004", name: "Ananya Ramesh", score: "44/50", percentage: "(88%)" },
-  { seq: 5, regNo: "24CS1005", name: "Bala Chandran", score: "36/50", percentage: "(72%)" },
-  { seq: 6, regNo: "24CS1006", name: "Deepa Muthukumar", score: "42/50", percentage: "(84%)" },
-  { seq: 7, regNo: "24CS1007", name: "Dharun Karthik", score: "38/50", percentage: "(76%)" },
-  { seq: 8, regNo: "24CS1008", name: "Divya Bharathi", score: "48/50", percentage: "(96%)" },
-  { seq: 9, regNo: "24CS1009", name: "Gokul Prasanth", score: "39/50", percentage: "(78%)" },
-  { seq: 10, regNo: "24CS1010", name: "Harini Venkatesh", score: "45/50", percentage: "(90%)" },
+  {
+    seq: 1,
+    regNo: "721225C5DB04",
+    name: "Arun Kumar M",
+    score: "78/100",
+    percentage: "(78%)",
+    coMarks: {
+      CO1: { obtained: 34, max_mark: 42, percentage: 81.0 },
+      CO2: { obtained: 32, max_mark: 42, percentage: 76.2 },
+      CO3: { obtained: 12, max_mark: 16, percentage: 75.0 },
+    },
+  },
+  {
+    seq: 2,
+    regNo: "721225C5DB05",
+    name: "Bhavana S",
+    score: "85/100",
+    percentage: "(85%)",
+    coMarks: {
+      CO1: { obtained: 37, max_mark: 42, percentage: 88.1 },
+      CO2: { obtained: 35, max_mark: 42, percentage: 83.3 },
+      CO3: { obtained: 13, max_mark: 16, percentage: 81.3 },
+    },
+  },
+  {
+    seq: 3,
+    regNo: "721225C5DB06",
+    name: "Chandru K",
+    score: "92/100",
+    percentage: "(92%)",
+    coMarks: {
+      CO1: { obtained: 39, max_mark: 42, percentage: 92.9 },
+      CO2: { obtained: 38, max_mark: 42, percentage: 90.5 },
+      CO3: { obtained: 15, max_mark: 16, percentage: 93.8 },
+    },
+  },
+  {
+    seq: 4,
+    regNo: "721225C5DB07",
+    name: "Divya Bharathi R",
+    score: "74/100",
+    percentage: "(74%)",
+    coMarks: {
+      CO1: { obtained: 31, max_mark: 42, percentage: 73.8 },
+      CO2: { obtained: 31, max_mark: 42, percentage: 73.8 },
+      CO3: { obtained: 12, max_mark: 16, percentage: 75.0 },
+    },
+  },
+  {
+    seq: 5,
+    regNo: "721225C5DB08",
+    name: "Ezhil Vendhan P",
+    score: "68/100",
+    percentage: "(68%)",
+    coMarks: {
+      CO1: { obtained: 28, max_mark: 42, percentage: 66.7 },
+      CO2: { obtained: 29, max_mark: 42, percentage: 69.0 },
+      CO3: { obtained: 11, max_mark: 16, percentage: 68.8 },
+    },
+  },
+  {
+    seq: 6,
+    regNo: "721225C5DB09",
+    name: "Gowtham Raj S",
+    score: "88/100",
+    percentage: "(88%)",
+    coMarks: {
+      CO1: { obtained: 38, max_mark: 42, percentage: 90.5 },
+      CO2: { obtained: 36, max_mark: 42, percentage: 85.7 },
+      CO3: { obtained: 14, max_mark: 16, percentage: 87.5 },
+    },
+  },
+  {
+    seq: 7,
+    regNo: "721225C5DB10",
+    name: "Harini Priya V",
+    score: "80/100",
+    percentage: "(80%)",
+    coMarks: {
+      CO1: { obtained: 34, max_mark: 42, percentage: 81.0 },
+      CO2: { obtained: 33, max_mark: 42, percentage: 78.6 },
+      CO3: { obtained: 13, max_mark: 16, percentage: 81.3 },
+    },
+  },
+  {
+    seq: 8,
+    regNo: "721225C5DB11",
+    name: "Janani Shree M",
+    score: "95/100",
+    percentage: "(95%)",
+    coMarks: {
+      CO1: { obtained: 41, max_mark: 42, percentage: 97.6 },
+      CO2: { obtained: 40, max_mark: 42, percentage: 95.2 },
+      CO3: { obtained: 14, max_mark: 16, percentage: 87.5 },
+    },
+  },
+  {
+    seq: 9,
+    regNo: "721225C5DB12",
+    name: "Karthik Raja T",
+    score: "72/100",
+    percentage: "(72%)",
+    coMarks: {
+      CO1: { obtained: 30, max_mark: 42, percentage: 71.4 },
+      CO2: { obtained: 30, max_mark: 42, percentage: 71.4 },
+      CO3: { obtained: 12, max_mark: 16, percentage: 75.0 },
+    },
+  },
+  {
+    seq: 10,
+    regNo: "721225C5DB13",
+    name: "Lavanya Devi R",
+    score: "89/100",
+    percentage: "(89%)",
+    coMarks: {
+      CO1: { obtained: 38, max_mark: 42, percentage: 90.5 },
+      CO2: { obtained: 37, max_mark: 42, percentage: 88.1 },
+      CO3: { obtained: 14, max_mark: 16, percentage: 87.5 },
+    },
+  },
 ];
 
 export const StudentResultsTableCard: React.FC<StudentResultsTableCardProps> = ({
   title = "Student Results",
   subtitle,
   mode = "mcq",
+  ciaTestId,
   records,
 }) => {
   const [search, setSearch] = useState("");
+  const [liveCiaRecords, setLiveCiaRecords] = useState<StudentResultRecord[] | null>(null);
+
+  useEffect(() => {
+    if (mode === "cia" && !records) {
+      let isMounted = true;
+      const testId = ciaTestId || 1;
+      MarkExtractionService.getVerifiedMarks(testId)
+        .then((resp) => {
+          if (!isMounted || !resp?.verified_students || resp.verified_students.length === 0) return;
+          const mapped: StudentResultRecord[] = resp.verified_students.map((st, idx) => {
+            const total = st.total_mark ?? 0;
+            const max = st.max_mark || 100;
+            const pct = (st as any).percentage ?? (max > 0 ? Math.round((total / max) * 1000) / 10 : 0);
+            return {
+              seq: idx + 1,
+              regNo: st.register_number,
+              name: st.student_name || st.register_number,
+              score: `${total}/${max}`,
+              percentage: `(${pct}%)`,
+              coMarks: st.co_marks,
+            };
+          });
+          setLiveCiaRecords(mapped);
+        })
+        .catch((err) => {
+          console.warn("Could not fetch live verified marks for CIA, using template defaults", err);
+        });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [mode, records, ciaTestId]);
 
   const rawRecords =
-    records || (mode === "cia" ? DEFAULT_CIA_RECORDS : DEFAULT_MCQ_RECORDS);
+    records || (mode === "cia" ? (liveCiaRecords || DEFAULT_CIA_RECORDS) : DEFAULT_MCQ_RECORDS);
 
   const displaySubtitle =
     subtitle ||
     (mode === "cia"
-      ? "Verified Continuous Internal Assessment marks for CS309 — Computer Networks (40 Enrolled Students)"
+      ? "Verified Continuous Internal Assessment marks for CS309 — Computer Networks (Course Outcome & Blueprint Aligned)"
       : "Individual test submissions for CS309 — Computer Networks (40 Enrolled Students)");
 
   const filteredRecords = rawRecords.filter((row) => {
@@ -80,7 +231,7 @@ export const StudentResultsTableCard: React.FC<StudentResultsTableCardProps> = (
       accessor: "regNo",
       title: "REGISTER NUMBER",
       render: ({ regNo }: StudentResultRecord) => (
-        <span className="text-xs font-bold text-[#000] dark:text-white">
+        <span className="text-xs font-bold text-[#000] dark:text-white font-mono">
           {regNo}
         </span>
       ),
@@ -94,16 +245,80 @@ export const StudentResultsTableCard: React.FC<StudentResultsTableCardProps> = (
         </span>
       ),
     },
+    ...(mode === "cia"
+      ? [
+          {
+            accessor: "co1",
+            title: "CO1 (MAX 42)",
+            textAlignment: "center" as const,
+            render: (rec: StudentResultRecord) => {
+              const co = rec.coMarks?.CO1;
+              if (!co) return <span className="text-xs text-gray-400 font-mono">—</span>;
+              return (
+                <div className="flex items-center justify-center gap-1.5 font-mono">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    {co.obtained}
+                  </span>
+                  <span className="text-[10px] text-gray-400">/{co.max_mark || 42}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    {co.percentage}%
+                  </span>
+                </div>
+              );
+            },
+          },
+          {
+            accessor: "co2",
+            title: "CO2 (MAX 42)",
+            textAlignment: "center" as const,
+            render: (rec: StudentResultRecord) => {
+              const co = rec.coMarks?.CO2;
+              if (!co) return <span className="text-xs text-gray-400 font-mono">—</span>;
+              return (
+                <div className="flex items-center justify-center gap-1.5 font-mono">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    {co.obtained}
+                  </span>
+                  <span className="text-[10px] text-gray-400">/{co.max_mark || 42}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    {co.percentage}%
+                  </span>
+                </div>
+              );
+            },
+          },
+          {
+            accessor: "co3",
+            title: "CO3 (MAX 16)",
+            textAlignment: "center" as const,
+            render: (rec: StudentResultRecord) => {
+              const co = rec.coMarks?.CO3;
+              if (!co) return <span className="text-xs text-gray-400 font-mono">—</span>;
+              return (
+                <div className="flex items-center justify-center gap-1.5 font-mono">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    {co.obtained}
+                  </span>
+                  <span className="text-[10px] text-gray-400">/{co.max_mark || 16}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    {co.percentage}%
+                  </span>
+                </div>
+              );
+            },
+          },
+        ]
+      : []),
     {
       accessor: "score",
-      title: "SCORE",
-      textAlignment: "right",
+      title: mode === "cia" ? "TOTAL SCORE (100)" : "SCORE",
+      textAlignment: "right" as const,
       render: ({ score, percentage }: StudentResultRecord) => (
-        <div className="text-right">
-          <span className="text-xs font-bold text-[#000] dark:text-white">
+        <div className="text-right font-mono">
+          <span className="text-xs font-black text-[#000] dark:text-white">
             {score}
           </span>
-          <span className="ml-1 text-xs font-medium text-pri">
+          <span className="ml-1 text-xs font-bold text-pri">
             {percentage}
           </span>
         </div>
@@ -124,8 +339,8 @@ export const StudentResultsTableCard: React.FC<StudentResultsTableCardProps> = (
 
             {/* Show Green Chip ONLY when mode is CIA */}
             {mode === "cia" && (
-              <span className="inline-flex border border-[#10B981] items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-600 border border-emerald-100/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#047857] font-bold  dark:text-emerald-400" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-600 border border-[#10B981] dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#047857] font-bold dark:text-emerald-400" />
                 <span className="text-[#047857] font-bold">Verified Marks from Evaluated Answer Sheets</span>
               </span>
             )}
