@@ -9,8 +9,19 @@ export const CLIENT_ID =
  * for each environment (dev / staging / production). Falls back to localhost
  * only when the var is absent (local docker-compose dev setup).
  */
-export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://neurobebk.irepute.co.in/";
+const rawBackend = (
+  (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) ||
+  "http://127.0.0.1:80/"
+).trim();
+
+// On Windows, localhost:80 connects to WSL relay [::1]:80 which hangs. Enforce 127.0.0.1 for local Docker Kong
+const normalizedBackend = (rawBackend || "http://127.0.0.1:80/")
+  .replace("://localhost:", "://127.0.0.1:")
+  .replace("://localhost/", "://127.0.0.1/");
+
+export const BACKEND_URL = normalizedBackend.endsWith("/")
+  ? normalizedBackend
+  : `${normalizedBackend}/`;
 
 export const FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
@@ -182,14 +193,20 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuNotes",
-      label: "Results & Analysis",
-      href: "/neurobe/result-analysis",
+      label: "MCQ Test Execution",
+      href: "/neurobe/mcq-test-execution",
+    },
+    {
+      type: "link",
+      icon: "IconMenuCharts",
+      label: "Live Test Monitor",
+      href: "/neurobe/ins-mcq-live-monitor",
     },
     {
       type: "link",
       icon: "IconMenuNotes",
       label: "Marks Extraction & Verification",
-      href: "/neurobe/marks-extraction",
+      href: "/neurobe/mark-extraction",
     },
     // {
     //   type: "submenu",
@@ -241,16 +258,23 @@ export const OwnmenuConfig = {
     },
     {
       type: "link",
-      icon: "IconMenuNotes",
-      label: "Results & Analysis",
-      href: "/neurobe/ins-result-analysis",
+      icon: "IconMenuTables",
+      label: "MCQ Test Execution",
+      href: "/neurobe/ins-mcq-test-execution",
+      notifyKey: "new_application_count",
+    },
+    {
+      type: "link",
+      icon: "IconMenuCharts",
+      label: "Live Test Monitor",
+      href: "/neurobe/ins-mcq-live-monitor",
     },
 
     {
       type: "link",
       icon: "IconMenuNotes",
       label: "Marks Extraction & Verification",
-      href: "/neurobe/ins-marks-extraction",
+      href: "/neurobe/mark-extraction",
     },
   ],
 };
@@ -289,14 +313,20 @@ OwnmenuConfig.FACULTY = [
   {
     type: "link",
     icon: "IconMenuNotes",
-    label: "Results & Analysis",
-    href: "/neurobe/ins-result-analysis",
+    label: "MCQ Test Execution",
+    href: "/neurobe/ins-mcq-test-execution",
+  },
+  {
+    type: "link",
+    icon: "IconMenuCharts",
+    label: "Live Test Monitor",
+    href: "/neurobe/ins-mcq-live-monitor",
   },
   {
     type: "link",
     icon: "IconMenuNotes",
     label: "Marks Extraction & Verification",
-    href: "/neurobe/ins-marks-extraction",
+    href: "/neurobe/mark-extraction",
   },
 ];
 

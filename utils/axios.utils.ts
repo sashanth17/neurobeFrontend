@@ -40,19 +40,25 @@ const isTokenExpired = (responseData: any): boolean => {
   // or flat:           { detail: "Access token has expired" }
   const detail = responseData?.detail;
   if (typeof detail === "object" && detail !== null) {
-    return detail?.code === "TOKEN_EXPIRED" ||
-           detail?.detail === "Access token has expired";
+    return (
+      detail?.code === "TOKEN_EXPIRED" ||
+      detail?.detail === "Access token has expired"
+    );
   }
   if (typeof detail === "string") {
-    return detail === "Access token has expired" ||
-           detail.toLowerCase().includes("token") &&
-           detail.toLowerCase().includes("expired");
+    return (
+      detail === "Access token has expired" ||
+      (detail.toLowerCase().includes("token") &&
+        detail.toLowerCase().includes("expired"))
+    );
   }
   // Legacy error field (old format)
   const err = responseData?.error;
   if (typeof err === "string") {
-    return err === "invalid or expired token" ||
-           err.toLowerCase().includes("expired");
+    return (
+      err === "invalid or expired token" ||
+      err.toLowerCase().includes("expired")
+    );
   }
   return false;
 };
@@ -101,26 +107,33 @@ if (typeof window !== "undefined") {
 
 // ─── Main instance → /org/api/v1/ ────────────────────────────────────────────
 export const instance = (): AxiosInstance => {
-  if (api) return api;
-
-  api = axios.create({
-    baseURL: `${BACKEND_URL}org/api/v1/`,
-  });
-
-  attachInterceptors(api);
+  const targetBaseUrl = `${BACKEND_URL}org/api/v1/`;
+  if (!api) {
+    api = axios.create({
+      baseURL: targetBaseUrl,
+      timeout: 30000,
+    });
+    attachInterceptors(api);
+  } else if (api.defaults.baseURL !== targetBaseUrl) {
+    api.defaults.baseURL = targetBaseUrl;
+  }
   return api;
 };
 
 // ─── Course instance → base BACKEND_URL ──────────────────────────────────────
 export const commonInstance = (): AxiosInstance => {
-  if (courseApi) return courseApi;
-
-  courseApi = axios.create({
-    baseURL: `${BACKEND_URL}`,
-  });
-
-  attachInterceptors(courseApi);
+  const targetBaseUrl = `${BACKEND_URL}`;
+  if (!courseApi) {
+    courseApi = axios.create({
+      baseURL: targetBaseUrl,
+      timeout: 30000,
+    });
+    attachInterceptors(courseApi);
+  } else if (courseApi.defaults.baseURL !== targetBaseUrl) {
+    courseApi.defaults.baseURL = targetBaseUrl;
+  }
   return courseApi;
 };
 
 export default instance;
+
