@@ -392,25 +392,20 @@ const InsCourseArtifacts = () => {
     null;
 
   // In-progress generation check (One generation at a time per tab)
+  const isBusyState = (state?: string) =>
+    state === "redis_queued" || state === "sent_to_llm" || state === "processing";
+
   const isExtractionBusy = Boolean(
-    versionsExtractions.some(
-      (e: any) => e.current_state === "redis_queued" || e.current_state === "processing"
-    )
+    versionsExtractions.some((e: any) => isBusyState(e.current_state))
   );
   const isCopoBusy = Boolean(
-    versionsCopo.some(
-      (c: any) => c.current_state === "redis_queued" || c.current_state === "processing"
-    )
+    versionsCopo.some((c: any) => isBusyState(c.current_state))
   );
   const isPedagogyBusy = Boolean(
-    versionsPedagogies.some(
-      (p: any) => p.current_state === "redis_queued" || p.current_state === "processing"
-    )
+    versionsPedagogies.some((p: any) => isBusyState(p.current_state))
   );
   const isLessonPlanBusy = Boolean(
-    versionsLessonPlans.some(
-      (l: any) => l.current_state === "redis_queued" || l.current_state === "processing"
-    )
+    versionsLessonPlans.some((l: any) => isBusyState(l.current_state))
   );
 
   // ── Generation Modals State ────────────────────────────────────────────────
@@ -517,6 +512,10 @@ const InsCourseArtifacts = () => {
 
   const handleUploadSyllabus = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isExtractionBusy) {
+      Failure("An extraction job is already in progress for this course. Please wait for it to complete.");
+      return;
+    }
     if (!uploadFile || !courseIdParam) return;
     try {
       setUploading(true);
@@ -524,13 +523,16 @@ const InsCourseArtifacts = () => {
       formData.append("course_id", String(courseIdParam));
       formData.append("file", uploadFile);
 
-      await Models.syllabus.upload(formData);
+      const res: any = await Models.syllabus.upload(formData);
       Success("Syllabus document uploaded! AI Extraction has been queued.");
       setShowUploadModal(false);
       setUploadFile(null);
       setJobNotice(
         "A syllabus extraction job has been queued. When processing completes, please click the Refresh button above to load the extracted curriculum."
       );
+      if (res?.extractions_id) {
+        setSelectedVersionData((prev) => ({ ...prev, syllabus: res }));
+      }
       fetchPortfolio(true);
       loadSectionData("syllabus", true);
     } catch (err: any) {
@@ -588,15 +590,22 @@ const InsCourseArtifacts = () => {
   };
 
   const handleConfirmGenerateCopo = async () => {
+    if (isCopoBusy) {
+      Failure("A CO-PO generation job is already in progress for this course.");
+      return;
+    }
     if (!selectedExtractionForCopo) return;
     try {
       setActionLoading("generate_copo");
-      await Models.copo.generate({ extractions_id: selectedExtractionForCopo });
+      const res: any = await Models.copo.generate({ extractions_id: selectedExtractionForCopo });
       Success("CO-PO mapping generation queued!");
       setShowGenerateCopoModal(false);
       setJobNotice(
         "CO-PO mapping generation is queued. When completed, click the Refresh button to load the generated matrix."
       );
+      if (res?.copo_id) {
+        setSelectedVersionData((prev) => ({ ...prev, copo: res }));
+      }
       fetchPortfolio(true);
       loadSectionData("copo", true);
     } catch (err: any) {
@@ -654,15 +663,22 @@ const InsCourseArtifacts = () => {
   };
 
   const handleConfirmGeneratePedagogy = async () => {
+    if (isPedagogyBusy) {
+      Failure("A pedagogy suggestion generation job is already in progress for this course.");
+      return;
+    }
     if (!selectedExtractionForPedagogy) return;
     try {
       setActionLoading("generate_pedagogy");
-      await Models.pedagogy.generate({ extractions_id: selectedExtractionForPedagogy });
+      const res: any = await Models.pedagogy.generate({ extractions_id: selectedExtractionForPedagogy });
       Success("Pedagogy suggestions generation queued!");
       setShowGeneratePedagogyModal(false);
       setJobNotice(
         "Pedagogy generation is queued. When completed, click the Refresh button to load the new teaching strategies."
       );
+      if (res?.pedagogy_id) {
+        setSelectedVersionData((prev) => ({ ...prev, pedagogy: res }));
+      }
       fetchPortfolio(true);
       loadSectionData("pedagogy", true);
     } catch (err: any) {
@@ -723,10 +739,14 @@ const InsCourseArtifacts = () => {
   };
 
   const handleConfirmGenerateLessonPlan = async () => {
+    if (isLessonPlanBusy) {
+      Failure("A lesson plan generation job is already in progress for this course.");
+      return;
+    }
     if (!selectedExtractionForLp) return;
     try {
       setActionLoading("generate_lp");
-      await Models.lession_plan.generate({
+      const res: any = await Models.lession_plan.generate({
         extractions_id: selectedExtractionForLp,
         pedagogy_id: selectedPedagogyForLp || undefined,
         target_total_hours: Number(lpTargetHours) || 45,
@@ -736,6 +756,9 @@ const InsCourseArtifacts = () => {
       setJobNotice(
         "Lesson plan schedule generation is queued. When completed, click the Refresh button to load the hourly timeline."
       );
+      if (res?.lesson_plan_id) {
+        setSelectedVersionData((prev) => ({ ...prev, lesson_plan: res }));
+      }
       fetchPortfolio(true);
       loadSectionData("lesson_plan", true);
     } catch (err: any) {
@@ -806,6 +829,89 @@ const InsCourseArtifacts = () => {
     } finally {
       setLoadingVersionDetail(false);
     }
+  };
+
+  // ── Generation Loading Screen for In-Progress Versions (sent_to_llm / redis_queued) ─
+  const renderGenerationLoadingScreen = (
+    stageName: string,
+    state: string,
+    versionNumber?: number | string
+  ) => {
+    const isProcessing = state === "sent_to_llm" || state === "processing";
+
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-indigo-200/80 bg-gradient-to-b from-indigo-50/70 via-white to-indigo-50/30 p-10 text-center shadow-sm dark:border-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-indigo-950/20 my-4">
+        {/* Animated Radial Icon */}
+        <div className="relative mb-5 flex h-16 w-16 items-center justify-center">
+          <div className="absolute inset-0 animate-ping rounded-full bg-indigo-400/20 dark:bg-indigo-500/20" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 dark:bg-indigo-500">
+            {isProcessing ? (
+              <Sparkles className="h-7 w-7 animate-pulse text-amber-300" />
+            ) : (
+              <Clock className="h-7 w-7 text-white" />
+            )}
+          </div>
+        </div>
+
+        {/* Status Badge */}
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3.5 py-1 text-xs font-semibold shadow-2xs dark:border-slate-800 dark:bg-slate-800">
+          {isProcessing ? (
+            <span className="inline-flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-purple-500"></span>
+              </span>
+              <span className="text-[11px] font-bold tracking-wide uppercase">Processing (Sent to LLM)</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
+              <span className="text-[11px] font-bold tracking-wide uppercase">Queued</span>
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-base font-bold text-slate-900 dark:text-white sm:text-lg">
+          {stageName} {versionNumber ? `(v${versionNumber})` : ""} Generation in Progress
+        </h3>
+
+        {/* Message Callout */}
+        <div className="mt-3 max-w-md space-y-2.5">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            {isProcessing
+              ? "The AI worker has picked up this job and is actively querying the LLM to synthesize curriculum data."
+              : "This generation job is currently waiting in the processing queue."}
+          </p>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200 text-left sm:text-center">
+            <p className="font-bold flex items-center justify-center gap-1.5 text-amber-900 dark:text-amber-200">
+              <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>Please come back in ~2 minutes</span>
+            </p>
+            <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+              Background polling is not active. Once the generation completes, click the <strong>Refresh to Load Data</strong> button below or the top Refresh button to load the newly generated version.
+            </p>
+          </div>
+        </div>
+
+        {/* Refresh Button */}
+        <div className="mt-6 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              fetchPortfolio(true);
+              loadSectionData(activeTab, true);
+            }}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            <span>{refreshing ? "Checking..." : "Refresh to Load Data"}</span>
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // ── Version Cards Carousel / Panel ─────────────────────────────────────────
@@ -882,7 +988,7 @@ const InsCourseArtifacts = () => {
               const isItemActive = Boolean(ver.is_active);
               const isItemApproved = Boolean(ver.is_approved);
               const isSelected = Boolean(selectedVer && selectedVer[idKey] === itemId);
-              const isBusy = ver.current_state === "redis_queued" || ver.current_state === "processing";
+              const isBusy = isBusyState(ver.current_state);
 
               return (
                 <div
@@ -920,9 +1026,22 @@ const InsCourseArtifacts = () => {
                   </p>
 
                   {isBusy && (
-                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
-                      <Sparkles className="h-3 w-3 animate-spin" />
-                      <span>{ver.current_state}</span>
+                    <div className={`mt-1.5 flex items-center gap-1 text-[10px] font-semibold ${
+                      ver.current_state === "sent_to_llm" || ver.current_state === "processing"
+                        ? "text-purple-600 dark:text-purple-400"
+                        : "text-amber-600 dark:text-amber-400"
+                    }`}>
+                      {ver.current_state === "sent_to_llm" || ver.current_state === "processing" ? (
+                        <>
+                          <Sparkles className="h-3 w-3 animate-spin" />
+                          <span>Processing</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-3 w-3" />
+                          <span>Queued</span>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -946,7 +1065,7 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={() => approveFn?.(itemId)}
-                        disabled={actionLoading === `${approveLoadingPrefix}${itemId}`}
+                        disabled={isBusy || actionLoading === `${approveLoadingPrefix}${itemId}`}
                         className="rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         {actionLoading === `${approveLoadingPrefix}${itemId}` ? "..." : "Approve"}
@@ -957,7 +1076,7 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={() => activateFn?.(itemId)}
-                        disabled={actionLoading === `${activateLoadingPrefix}${itemId}`}
+                        disabled={isBusy || actionLoading === `${activateLoadingPrefix}${itemId}`}
                         className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         {actionLoading === `${activateLoadingPrefix}${itemId}` ? "..." : "Activate"}
@@ -983,7 +1102,7 @@ const InsCourseArtifacts = () => {
                 <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
               )}
               <span>
-                Viewing version <strong>v{selectedVer.version_number || ""}</strong> ({selectedVer.is_approved ? (selectedVer.is_active ? "Active" : "Approved") : "Draft"}).
+                Viewing version <strong>v{selectedVer.version_number || ""}</strong> ({selectedVer.is_approved ? (selectedVer.is_active ? "Active" : "Approved") : (isBusyState(selectedVer.current_state) ? (selectedVer.current_state === "sent_to_llm" || selectedVer.current_state === "processing" ? "Processing" : "Queued") : "Draft")}).
                 {isCoord || perms.can_edit ? " Edit permissions enabled for coordinator." : " Artifact is in read-only mode."}
               </span>
             </div>
@@ -1795,11 +1914,28 @@ const InsCourseArtifacts = () => {
             {isCoord && (
               <button
                 type="button"
-                onClick={() => setShowUploadModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                onClick={() => {
+                  if (isExtractionBusy) {
+                    Failure("An extraction job is already in progress for this course. Please wait for it to complete.");
+                    return;
+                  }
+                  setShowUploadModal(true);
+                }}
+                disabled={isExtractionBusy}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                title={isExtractionBusy ? "Extraction in progress. Please wait for it to complete." : "Upload Syllabus"}
               >
-                <Upload className="h-3.5 w-3.5" />
-                <span>Upload Syllabus</span>
+                {isExtractionBusy ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Extracting Syllabus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Upload Syllabus</span>
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -2008,8 +2144,33 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
+          {/* In-Progress Generation Screen for Syllabus */}
+          {!sectionLoading.syllabus && !loadingVersionDetail && (() => {
+            const isCurrentBusy = isBusyState(currentExt?.current_state);
+            const inProgressExt = versionsExtractions.find((e: any) => isBusyState(e.current_state));
+
+            if (isCurrentBusy) {
+              return renderGenerationLoadingScreen(
+                "Syllabus Curriculum",
+                currentExt.current_state,
+                currentExt.version_number || currentExt.extraction_version_id
+              );
+            }
+            if (!currentExt && inProgressExt) {
+              return renderGenerationLoadingScreen(
+                "Syllabus Curriculum",
+                inProgressExt.current_state,
+                inProgressExt.version_number || inProgressExt.extraction_version_id
+              );
+            }
+            return null;
+          })()}
+
           {/* If No Extraction */}
-          {!sectionLoading.syllabus && !loadingVersionDetail && !currentExt && (
+          {!sectionLoading.syllabus &&
+            !loadingVersionDetail &&
+            !currentExt &&
+            !versionsExtractions.some((e: any) => isBusyState(e.current_state)) && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <FileText className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -2027,8 +2188,15 @@ const InsCourseArtifacts = () => {
               {isCoord && (
                 <button
                   type="button"
-                  onClick={() => setShowUploadModal(true)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                  onClick={() => {
+                    if (isExtractionBusy) {
+                      Failure("An extraction job is already in progress for this course. Please wait for it to complete.");
+                      return;
+                    }
+                    setShowUploadModal(true);
+                  }}
+                  disabled={isExtractionBusy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                 >
                   <Upload className="h-4 w-4" />
                   <span>Upload Syllabus Document</span>
@@ -2037,7 +2205,7 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {currentExt && (
+          {currentExt && !isBusyState(currentExt.current_state) && (
             <div className="space-y-6">
               {/* ── Section 1: Curriculum Hours & Credits ── */}
               <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -3051,7 +3219,32 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {!sectionLoading.copo && !loadingVersionDetail && !currentCopo && (
+          {/* In-Progress Generation Screen for CO-PO */}
+          {!sectionLoading.copo && !loadingVersionDetail && (() => {
+            const isCurrentBusy = isBusyState(currentCopo?.current_state);
+            const inProgressCopo = versionsCopo.find((c: any) => isBusyState(c.current_state));
+
+            if (isCurrentBusy) {
+              return renderGenerationLoadingScreen(
+                "CO-PO Correlation Matrix",
+                currentCopo.current_state,
+                currentCopo.version_number || currentCopo.version_id
+              );
+            }
+            if (!currentCopo && inProgressCopo) {
+              return renderGenerationLoadingScreen(
+                "CO-PO Correlation Matrix",
+                inProgressCopo.current_state,
+                inProgressCopo.version_number || inProgressCopo.version_id
+              );
+            }
+            return null;
+          })()}
+
+          {!sectionLoading.copo &&
+            !loadingVersionDetail &&
+            !currentCopo &&
+            !versionsCopo.some((c: any) => isBusyState(c.current_state)) && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Layers className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -3080,7 +3273,7 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {currentCopo && (() => {
+          {currentCopo && !isBusyState(currentCopo.current_state) && (() => {
             // Compute unique POs and COs for n x m grid
             const entries = currentCopo.matrix_entries || [];
             const posMap = new Map<number, { po_id: number; po_code: string }>();
@@ -3309,7 +3502,32 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {!sectionLoading.pedagogy && !loadingVersionDetail && !currentPedagogy && (
+          {/* In-Progress Generation Screen for Pedagogy */}
+          {!sectionLoading.pedagogy && !loadingVersionDetail && (() => {
+            const isCurrentBusy = isBusyState(currentPedagogy?.current_state);
+            const inProgressPedagogy = versionsPedagogies.find((p: any) => isBusyState(p.current_state));
+
+            if (isCurrentBusy) {
+              return renderGenerationLoadingScreen(
+                "Instructional Pedagogy",
+                currentPedagogy.current_state,
+                currentPedagogy.version_number || currentPedagogy.version_id
+              );
+            }
+            if (!currentPedagogy && inProgressPedagogy) {
+              return renderGenerationLoadingScreen(
+                "Instructional Pedagogy",
+                inProgressPedagogy.current_state,
+                inProgressPedagogy.version_number || inProgressPedagogy.version_id
+              );
+            }
+            return null;
+          })()}
+
+          {!sectionLoading.pedagogy &&
+            !loadingVersionDetail &&
+            !currentPedagogy &&
+            !versionsPedagogies.some((p: any) => isBusyState(p.current_state)) && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Presentation className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -3338,7 +3556,7 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {currentPedagogy && (() => {
+          {currentPedagogy && !isBusyState(currentPedagogy.current_state) && (() => {
             const unitsList = currentExt?.units || activeExt?.units || [];
             const topicSuggestions = currentPedagogy.topic_suggestions || [];
             const sugByTopicId = new Map<number, any>();
@@ -3853,7 +4071,32 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {!sectionLoading.lesson_plan && !loadingVersionDetail && !currentLessonPlan && (
+          {/* In-Progress Generation Screen for Lesson Plan */}
+          {!sectionLoading.lesson_plan && !loadingVersionDetail && (() => {
+            const isCurrentBusy = isBusyState(currentLessonPlan?.current_state);
+            const inProgressLessonPlan = versionsLessonPlans.find((l: any) => isBusyState(l.current_state));
+
+            if (isCurrentBusy) {
+              return renderGenerationLoadingScreen(
+                "Lesson Plan Timeline",
+                currentLessonPlan.current_state,
+                currentLessonPlan.version_number || currentLessonPlan.version_id
+              );
+            }
+            if (!currentLessonPlan && inProgressLessonPlan) {
+              return renderGenerationLoadingScreen(
+                "Lesson Plan Timeline",
+                inProgressLessonPlan.current_state,
+                inProgressLessonPlan.version_number || inProgressLessonPlan.version_id
+              );
+            }
+            return null;
+          })()}
+
+          {!sectionLoading.lesson_plan &&
+            !loadingVersionDetail &&
+            !currentLessonPlan &&
+            !versionsLessonPlans.some((l: any) => isBusyState(l.current_state)) && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center dark:border-slate-800 dark:bg-slate-900">
               <Calendar className="h-10 w-10 text-slate-400" />
               <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
@@ -3882,7 +4125,7 @@ const InsCourseArtifacts = () => {
             </div>
           )}
 
-          {currentLessonPlan && (() => {
+          {currentLessonPlan && !isBusyState(currentLessonPlan.current_state) && (() => {
             const slots = currentLessonPlan.topic_slots || [];
             const groupsMap = new Map<string, { unitTitle: string; slots: any[]; totalHours: number }>();
 
@@ -4455,10 +4698,14 @@ const InsCourseArtifacts = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={!uploadFile || uploading}
+                  disabled={!uploadFile || uploading || isExtractionBusy}
                   className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {uploading ? "Uploading & Queuing..." : "Upload & Extract"}
+                  {uploading
+                    ? "Uploading & Queuing..."
+                    : isExtractionBusy
+                    ? "Extraction in Progress..."
+                    : "Upload & Extract"}
                 </button>
               </div>
             </form>
@@ -4520,11 +4767,11 @@ const InsCourseArtifacts = () => {
               <button
                 type="button"
                 onClick={handleConfirmGenerateCopo}
-                disabled={actionLoading === "generate_copo" || !selectedExtractionForCopo}
+                disabled={actionLoading === "generate_copo" || !selectedExtractionForCopo || isCopoBusy}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>{actionLoading === "generate_copo" ? "Queuing..." : "Queue Generation"}</span>
+                <span>{actionLoading === "generate_copo" ? "Queuing..." : isCopoBusy ? "Generating CO-PO..." : "Queue Generation"}</span>
               </button>
             </div>
           </div>
@@ -4585,11 +4832,11 @@ const InsCourseArtifacts = () => {
               <button
                 type="button"
                 onClick={handleConfirmGeneratePedagogy}
-                disabled={actionLoading === "generate_pedagogy" || !selectedExtractionForPedagogy}
+                disabled={actionLoading === "generate_pedagogy" || !selectedExtractionForPedagogy || isPedagogyBusy}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>{actionLoading === "generate_pedagogy" ? "Queuing..." : "Queue Generation"}</span>
+                <span>{actionLoading === "generate_pedagogy" ? "Queuing..." : isPedagogyBusy ? "Generating Pedagogy..." : "Queue Generation"}</span>
               </button>
             </div>
           </div>
@@ -4684,11 +4931,11 @@ const InsCourseArtifacts = () => {
               <button
                 type="button"
                 onClick={handleConfirmGenerateLessonPlan}
-                disabled={actionLoading === "generate_lp" || !selectedExtractionForLp}
+                disabled={actionLoading === "generate_lp" || !selectedExtractionForLp || isLessonPlanBusy}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>{actionLoading === "generate_lp" ? "Queuing..." : "Queue Generation"}</span>
+                <span>{actionLoading === "generate_lp" ? "Queuing..." : isLessonPlanBusy ? "Generating Lesson Plan..." : "Queue Generation"}</span>
               </button>
             </div>
           </div>

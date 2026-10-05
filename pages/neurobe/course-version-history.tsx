@@ -13,6 +13,7 @@ import {
   Presentation,
   Calendar,
   Sparkles,
+  Clock,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
@@ -120,6 +121,47 @@ const CourseVersionHistory = () => {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const isBusyState = (state?: string) =>
+    state === "redis_queued" || state === "sent_to_llm" || state === "processing";
+
+  const renderStateBadge = (state?: string) => {
+    if (state === "sent_to_llm" || state === "processing") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+          <Sparkles className="h-3 w-3 animate-spin" />
+          Processing
+        </span>
+      );
+    }
+    if (state === "redis_queued") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+          <Clock className="h-3 w-3" />
+          Queued
+        </span>
+      );
+    }
+    if (state === "completed") {
+      return (
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 uppercase">
+          Completed
+        </span>
+      );
+    }
+    if (state === "failed") {
+      return (
+        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300 uppercase">
+          Failed
+        </span>
+      );
+    }
+    return (
+      <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase">
+        {state || "—"}
+      </span>
+    );
   };
 
   return (
@@ -266,9 +308,7 @@ const CourseVersionHistory = () => {
                     {s.original_filename}
                   </td>
                   <td className="py-3 px-4">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase">
-                      {s.current_state}
-                    </span>
+                    {renderStateBadge(s.current_state)}
                   </td>
                   <td className="py-3 px-4 space-x-1.5">
                     {s.is_active && (
@@ -288,7 +328,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleApprove("syllabus", s.course_syllabus_id)}
-                        disabled={actionLoading === `approve_syllabus_${s.course_syllabus_id}`}
+                        disabled={isBusyState(s.current_state) || actionLoading === `approve_syllabus_${s.course_syllabus_id}`}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Approve
@@ -298,7 +338,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleActivate("syllabus", s.course_syllabus_id)}
-                        disabled={actionLoading === `activate_syllabus_${s.course_syllabus_id}`}
+                        disabled={isBusyState(s.current_state) || actionLoading === `activate_syllabus_${s.course_syllabus_id}`}
                         className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         Set Active
@@ -319,9 +359,7 @@ const CourseVersionHistory = () => {
                     {e.credits || 0} Credits • {e.total_theory_hours || 0} Theory Hrs / {e.total_lab_hours || 0} Lab Hrs
                   </td>
                   <td className="py-3 px-4">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase">
-                      {e.current_state}
-                    </span>
+                    {renderStateBadge(e.current_state)}
                   </td>
                   <td className="py-3 px-4 space-x-1.5">
                     {e.is_active && (
@@ -341,7 +379,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleApprove("extraction", e.extractions_id)}
-                        disabled={actionLoading === `approve_extraction_${e.extractions_id}`}
+                        disabled={isBusyState(e.current_state) || actionLoading === `approve_extraction_${e.extractions_id}`}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Approve
@@ -351,7 +389,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleActivate("extraction", e.extractions_id)}
-                        disabled={actionLoading === `activate_extraction_${e.extractions_id}`}
+                        disabled={isBusyState(e.current_state) || actionLoading === `activate_extraction_${e.extractions_id}`}
                         className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         Set Active
@@ -372,9 +410,7 @@ const CourseVersionHistory = () => {
                     Bound to Extraction v{c.extractions_id}
                   </td>
                   <td className="py-3 px-4">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase">
-                      {c.current_state}
-                    </span>
+                    {renderStateBadge(c.current_state)}
                   </td>
                   <td className="py-3 px-4 space-x-1.5">
                     {c.is_active && (
@@ -394,7 +430,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleApprove("copo", c.copo_id)}
-                        disabled={actionLoading === `approve_copo_${c.copo_id}`}
+                        disabled={isBusyState(c.current_state) || actionLoading === `approve_copo_${c.copo_id}`}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Approve
@@ -404,7 +440,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleActivate("copo", c.copo_id)}
-                        disabled={actionLoading === `activate_copo_${c.copo_id}`}
+                        disabled={isBusyState(c.current_state) || actionLoading === `activate_copo_${c.copo_id}`}
                         className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         Set Active
@@ -425,9 +461,7 @@ const CourseVersionHistory = () => {
                     Bound to Extraction v{p.extractions_id}
                   </td>
                   <td className="py-3 px-4">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase">
-                      {p.current_state}
-                    </span>
+                    {renderStateBadge(p.current_state)}
                   </td>
                   <td className="py-3 px-4 space-x-1.5">
                     {p.is_active && (
@@ -447,7 +481,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleApprove("pedagogy", p.pedagogy_id)}
-                        disabled={actionLoading === `approve_pedagogy_${p.pedagogy_id}`}
+                        disabled={isBusyState(p.current_state) || actionLoading === `approve_pedagogy_${p.pedagogy_id}`}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Approve
@@ -457,7 +491,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleActivate("pedagogy", p.pedagogy_id)}
-                        disabled={actionLoading === `activate_pedagogy_${p.pedagogy_id}`}
+                        disabled={isBusyState(p.current_state) || actionLoading === `activate_pedagogy_${p.pedagogy_id}`}
                         className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         Set Active
@@ -478,9 +512,7 @@ const CourseVersionHistory = () => {
                     {l.target_total_hours} Target Hrs • {l.total_theory_hours} Theory / {l.total_lab_hours} Lab Hrs
                   </td>
                   <td className="py-3 px-4">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase">
-                      {l.current_state}
-                    </span>
+                    {renderStateBadge(l.current_state)}
                   </td>
                   <td className="py-3 px-4 space-x-1.5">
                     {l.is_active && (
@@ -500,7 +532,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleApprove("lesson_plan", l.lesson_plan_id)}
-                        disabled={actionLoading === `approve_lp_${l.lesson_plan_id}`}
+                        disabled={isBusyState(l.current_state) || actionLoading === `approve_lp_${l.lesson_plan_id}`}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Approve
@@ -510,7 +542,7 @@ const CourseVersionHistory = () => {
                       <button
                         type="button"
                         onClick={() => handleActivate("lesson_plan", l.lesson_plan_id)}
-                        disabled={actionLoading === `activate_lp_${l.lesson_plan_id}`}
+                        disabled={isBusyState(l.current_state) || actionLoading === `activate_lp_${l.lesson_plan_id}`}
                         className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         Set Active
