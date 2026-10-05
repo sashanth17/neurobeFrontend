@@ -121,7 +121,40 @@ const InsCourseArtifacts = () => {
     can_generate_pedagogy: false,
     can_generate_lesson_plan: false,
   };
-  const isCoord = Boolean(perms.is_coordinator);
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    try {
+      const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      if (userStr) {
+        setCurrentUser(JSON.parse(userStr));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const userRole = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const role =
+        currentUser?.role ||
+        localStorage.getItem("role") ||
+        localStorage.getItem("group") ||
+        "";
+      return role.toLowerCase();
+    }
+    return "";
+  }, [currentUser]);
+
+  const isCoord = Boolean(
+    perms.is_coordinator ||
+    perms.can_edit ||
+    userRole.includes("coordinator") ||
+    userRole === "admin" ||
+    userRole === "super_admin" ||
+    (currentUser?.id && course && (course.coordinator_id === currentUser.id || course.course_coordinator_id === currentUser.id))
+  );
 
   // ── Selected Historical Version State (for Coordinator preview) ────────────
   const [selectedVersionData, setSelectedVersionData] = useState<{
@@ -131,6 +164,51 @@ const InsCourseArtifacts = () => {
     lesson_plan?: any;
   }>({});
   const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
+
+  // Helper to re-fetch and update currently viewed or active version data in state
+  const refreshCurrentVersion = async (tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan", id?: any) => {
+    try {
+      if (tab === "syllabus") {
+        const extId = id || selectedVersionData.syllabus?.extractions_id || currentExt?.extractions_id || activeExt?.extractions_id;
+        if (extId) {
+          const full = await Models.syllabus.get_extraction(extId);
+          if (selectedVersionData.syllabus || isCoord) {
+            setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
+          }
+          setSectionData((prev) => ({ ...prev, syllabus: full }));
+        }
+      } else if (tab === "copo") {
+        const copoId = id || selectedVersionData.copo?.copo_id || currentCopo?.copo_id || activeCopo?.copo_id;
+        if (copoId) {
+          const full = await Models.copo.get(copoId);
+          if (selectedVersionData.copo || isCoord) {
+            setSelectedVersionData((prev) => ({ ...prev, copo: full }));
+          }
+          setSectionData((prev) => ({ ...prev, copo: full }));
+        }
+      } else if (tab === "pedagogy") {
+        const pedId = id || selectedVersionData.pedagogy?.pedagogy_id || currentPedagogy?.pedagogy_id || activePedagogy?.pedagogy_id;
+        if (pedId) {
+          const full = await Models.pedagogy.get(pedId);
+          if (selectedVersionData.pedagogy || isCoord) {
+            setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
+          }
+          setSectionData((prev) => ({ ...prev, pedagogy: full }));
+        }
+      } else if (tab === "lesson_plan") {
+        const lpId = id || selectedVersionData.lesson_plan?.lesson_plan_id || currentLessonPlan?.lesson_plan_id || activeLessonPlan?.lesson_plan_id;
+        if (lpId) {
+          const full = await Models.lession_plan.get(lpId);
+          if (selectedVersionData.lesson_plan || isCoord) {
+            setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
+          }
+          setSectionData((prev) => ({ ...prev, lesson_plan: full }));
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to refresh version data for ${tab}:`, err);
+    }
+  };
 
   // Load section-specific versions and current active version data on tab switch
   const loadSectionData = async (
@@ -154,12 +232,24 @@ const InsCourseArtifacts = () => {
             extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
             syllabi: Array.isArray(syllabiRes) ? syllabiRes : [],
           }));
+          if (selectedVersionData.syllabus?.extractions_id) {
+            try {
+              const full = await Models.syllabus.get_extraction(selectedVersionData.syllabus.extractions_id);
+              setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
+            } catch {}
+          }
         } else if (tab === "copo") {
           const copoRes: any = await Models.copo.list({ course_id: courseIdParam });
           setSectionVersions((prev) => ({
             ...prev,
             copo: Array.isArray(copoRes) ? copoRes : [],
           }));
+          if (selectedVersionData.copo?.copo_id) {
+            try {
+              const full = await Models.copo.get(selectedVersionData.copo.copo_id);
+              setSelectedVersionData((prev) => ({ ...prev, copo: full }));
+            } catch {}
+          }
         } else if (tab === "pedagogy") {
           const [pedRes, extractionsRes]: [any, any] = await Promise.all([
             Models.pedagogy.list({ course_id: courseIdParam }),
@@ -172,6 +262,12 @@ const InsCourseArtifacts = () => {
             pedagogies: Array.isArray(pedRes) ? pedRes : [],
             extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
           }));
+          if (selectedVersionData.pedagogy?.pedagogy_id) {
+            try {
+              const full = await Models.pedagogy.get(selectedVersionData.pedagogy.pedagogy_id);
+              setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
+            } catch {}
+          }
         } else if (tab === "lesson_plan") {
           const [lpRes, extractionsRes, pedRes]: [any, any, any] = await Promise.all([
             Models.lession_plan.list({ course_id: courseIdParam }),
@@ -188,9 +284,13 @@ const InsCourseArtifacts = () => {
             extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
             pedagogies: Array.isArray(pedRes) ? pedRes : [],
           }));
+          if (selectedVersionData.lesson_plan?.lesson_plan_id) {
+            try {
+              const full = await Models.lession_plan.get(selectedVersionData.lesson_plan.lesson_plan_id);
+              setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
+            } catch {}
+          }
         }
-        // NOTE: For coordinator, no automatic get call for version data is made here.
-        // The get call is only made when the coordinator clicks the "View" button on a version card.
       } else {
         // Instructor: Load confirmed active version for display
         if (tab === "syllabus") {
@@ -223,7 +323,27 @@ const InsCourseArtifacts = () => {
 
       const res: any = await Models.course.course_portfolio(courseIdParam);
       setPortfolio(res);
-      const userIsCoord = Boolean(res?.permissions?.is_coordinator);
+      let role = "";
+      let uid: any = null;
+      try {
+        const uStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+        if (uStr) {
+          const u = JSON.parse(uStr);
+          role = (u?.role || "").toLowerCase();
+          uid = u?.id;
+        }
+        if (!role && typeof window !== "undefined") {
+          role = (localStorage.getItem("role") || localStorage.getItem("group") || "").toLowerCase();
+        }
+      } catch {}
+      const userIsCoord = Boolean(
+        res?.permissions?.is_coordinator ||
+        res?.permissions?.can_edit ||
+        role.includes("coordinator") ||
+        role === "admin" ||
+        role === "super_admin" ||
+        (uid && res?.course && (res.course.coordinator_id === uid || res.course.course_coordinator_id === uid))
+      );
       loadSectionData(activeTab, true, userIsCoord);
     } catch (err: any) {
       console.error("Failed to load course portfolio:", err);
@@ -256,13 +376,13 @@ const InsCourseArtifacts = () => {
   const activePedagogy = sectionData.pedagogy || portfolio?.active_pedagogy;
   const activeLessonPlan = sectionData.lesson_plan || portfolio?.active_lesson_plan;
 
-  // Active / Selected item aliases
-  // For coordinator: ONLY what coordinator explicitly viewed via View button in selectedVersionData
-  // For instructor: only the active version in sectionData
-  const currentExt = isCoord ? selectedVersionData.syllabus : activeExt;
-  const currentCopo = isCoord ? selectedVersionData.copo : activeCopo;
-  const currentPedagogy = isCoord ? selectedVersionData.pedagogy : activePedagogy;
-  const currentLessonPlan = isCoord ? selectedVersionData.lesson_plan : activeLessonPlan;
+  // Active / Selected item aliases:
+  // When a coordinator explicitly views a version via "View" button, it takes precedence.
+  // Otherwise falls back to active version so data is immediately visible.
+  const currentExt = selectedVersionData.syllabus || activeExt;
+  const currentCopo = selectedVersionData.copo || activeCopo;
+  const currentPedagogy = selectedVersionData.pedagogy || activePedagogy;
+  const currentLessonPlan = selectedVersionData.lesson_plan || activeLessonPlan;
 
   const activeSyllabus =
     versionsSyllabi.find((s: any) => s.is_active) ||
@@ -851,11 +971,20 @@ const InsCourseArtifacts = () => {
         </div>
 
         {selectedVer && (
-          <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <div className={`flex items-center justify-between rounded-xl border px-4 py-2.5 text-xs ${
+            isCoord || perms.can_edit
+              ? "border-indigo-300 bg-indigo-50/80 text-indigo-950 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-200"
+              : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+          }`}>
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              {isCoord || perms.can_edit ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+              ) : (
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              )}
               <span>
-                Viewing historical version <strong>v{selectedVer.version_number || ""}</strong> ({selectedVer.is_approved ? "Approved" : "Draft"}). Artifact is in read-only mode.
+                Viewing version <strong>v{selectedVer.version_number || ""}</strong> ({selectedVer.is_approved ? (selectedVer.is_active ? "Active" : "Approved") : "Draft"}).
+                {isCoord || perms.can_edit ? " Edit permissions enabled for coordinator." : " Artifact is in read-only mode."}
               </span>
             </div>
             <button
@@ -864,9 +993,11 @@ const InsCourseArtifacts = () => {
                 setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
                 loadSectionData(tabType, true);
               }}
-              className="rounded-lg bg-amber-600 px-2.5 py-1 font-semibold text-white transition hover:bg-amber-700"
+              className={`rounded-lg px-2.5 py-1 font-semibold text-white transition ${
+                isCoord || perms.can_edit ? "bg-indigo-600 hover:bg-indigo-700" : "bg-amber-600 hover:bg-amber-700"
+              }`}
             >
-              Return to Active Version
+              Close View
             </button>
           </div>
         )}
@@ -884,6 +1015,7 @@ const InsCourseArtifacts = () => {
       }
       Success("CO-PO matrix delta changes saved successfully!");
       setCopoDirtyCells({});
+      await refreshCurrentVersion("copo", currentCopo.copo_id);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save CO-PO matrix changes"));
@@ -931,6 +1063,7 @@ const InsCourseArtifacts = () => {
       });
       Success("Topic pedagogy strategies updated successfully!");
       setEditingPedagogyTopicId(null);
+      await refreshCurrentVersion("pedagogy", currentPedagogy.pedagogy_id);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to update pedagogy topic"));
@@ -960,6 +1093,7 @@ const InsCourseArtifacts = () => {
       });
       Success("Topic slot schedule updated successfully!");
       setEditingLpSlotId(null);
+      await refreshCurrentVersion("lesson_plan", currentLessonPlan.lesson_plan_id);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to update lesson plan slot"));
@@ -988,6 +1122,7 @@ const InsCourseArtifacts = () => {
       });
       Success("Subtopic slot schedule updated successfully!");
       setEditingLpSubtopicSlotId(null);
+      await refreshCurrentVersion("lesson_plan", currentLessonPlan.lesson_plan_id);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to update subtopic slot"));
@@ -1001,7 +1136,7 @@ const InsCourseArtifacts = () => {
   const selectedUnit = units[selectedUnitIndex] || units[0];
 
   // ── Coordinator CRUD & Section Edit State ─────────────────────────────────
-  const canEdit = Boolean(isCoord && currentExt && !selectedVersionData.syllabus);
+  const canEdit = Boolean((isCoord || perms.can_edit) && currentExt);
 
   const KNOWLEDGE_LEVELS = [
     "K1 - Remember",
@@ -1071,6 +1206,7 @@ const InsCourseArtifacts = () => {
       });
       Success("Curriculum hours and credits updated successfully!");
       setEditingSection(null);
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to update hours"));
@@ -1135,6 +1271,7 @@ const InsCourseArtifacts = () => {
 
       Success("Course objectives saved successfully!");
       setEditingSection(null);
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save objectives"));
@@ -1213,6 +1350,7 @@ const InsCourseArtifacts = () => {
 
       Success("Course outcomes saved successfully!");
       setEditingSection(null);
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save outcomes"));
@@ -1296,6 +1434,7 @@ const InsCourseArtifacts = () => {
 
       Success("Textbooks saved successfully!");
       setEditingSection(null);
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save textbooks"));
@@ -1379,6 +1518,7 @@ const InsCourseArtifacts = () => {
 
       Success("Reference books saved successfully!");
       setEditingSection(null);
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save reference books"));
@@ -1535,6 +1675,7 @@ const InsCourseArtifacts = () => {
       }
 
       setHierarchyModal(null);
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to save changes"));
@@ -1550,6 +1691,7 @@ const InsCourseArtifacts = () => {
     try {
       await Models.syllabus.deleteUnit(extId, unitId);
       Success("Unit deleted successfully!");
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to delete unit"));
@@ -1563,6 +1705,7 @@ const InsCourseArtifacts = () => {
     try {
       await Models.syllabus.deleteTopic(extId, topicId);
       Success("Topic deleted successfully!");
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to delete topic"));
@@ -1576,6 +1719,7 @@ const InsCourseArtifacts = () => {
     try {
       await Models.syllabus.deleteSubtopic(extId, subtopicId);
       Success("Subtopic deleted successfully!");
+      await refreshCurrentVersion("syllabus", extId);
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to delete subtopic"));
@@ -2972,7 +3116,7 @@ const InsCourseArtifacts = () => {
               return numA - numB;
             });
 
-            const canEditMatrix = Boolean(isCoord && currentCopo && !selectedVersionData.copo);
+            const canEditMatrix = Boolean((isCoord || perms.can_edit) && currentCopo);
 
             return (
               <div className="space-y-4">
@@ -3200,7 +3344,7 @@ const InsCourseArtifacts = () => {
             const sugByTopicId = new Map<number, any>();
             topicSuggestions.forEach((s: any) => sugByTopicId.set(s.topic_id, s));
 
-            const canEditPedagogy = Boolean(isCoord && currentPedagogy && !selectedVersionData.pedagogy);
+            const canEditPedagogy = Boolean((isCoord || perms.can_edit) && currentPedagogy);
             const renderedSugIds = new Set<number>();
             const hasUnits = unitsList.length > 0;
 
@@ -3753,7 +3897,7 @@ const InsCourseArtifacts = () => {
             });
 
             const groupsList = Array.from(groupsMap.values());
-            const canEditLp = Boolean(isCoord && currentLessonPlan && !selectedVersionData.lesson_plan);
+            const canEditLp = Boolean((isCoord || perms.can_edit) && currentLessonPlan);
 
             return (
               <div className="space-y-6">
