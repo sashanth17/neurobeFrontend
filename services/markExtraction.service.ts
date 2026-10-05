@@ -163,7 +163,9 @@ export const MarkExtractionService = {
       );
       return res.data;
     } catch (primaryErr: any) {
-      if (primaryErr?.response?.status !== 404) throw primaryErr;
+      const status = primaryErr?.response?.status;
+      const isNetworkError = !primaryErr?.response;
+      if (!isNetworkError && status !== 404 && status !== 502) throw primaryErr;
 
       // Fallback: query course-instances from organization-service if unavailable
       let raw: any[] = [];
