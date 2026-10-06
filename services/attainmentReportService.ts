@@ -41,11 +41,19 @@ export interface ExtractionStudent {
   tests: ExtractionTest[];
 }
 
+export interface DirectAssessmentCO {
+  co_code: string;
+  mark_obtained: number;
+  max_mark: number;
+}
+
 export interface ComprehensiveExtractionResponse {
   course_id: number;
   course_code: string;
   course_name: string;
   students: ExtractionStudent[];
+  direct_assessments?: DirectAssessmentCO[];
+  external_exams?: DirectAssessmentCO[];
 }
 
 // Normalized Data Structures for UI Presentation
@@ -83,6 +91,10 @@ export interface NormalizedAttainmentData {
   co_max_totals: Record<string, number>;
   students: NormalizedStudentRow[];
   attainment_levels: AttainmentLevelConfig[];
+  // Direct assessments (assignments) per CO
+  direct_assessments: DirectAssessmentCO[];
+  // External exams (end semester) per CO
+  external_exams: DirectAssessmentCO[];
 }
 
 export interface COCalculationResult {
@@ -98,6 +110,39 @@ export interface AttainmentCalculationSummary {
   total_students: number;
   target_percentage: number;
   cos_summary: Record<string, COCalculationResult>;
+}
+
+// ── Weighted CO Attainment & PO Attainment Types ─────────────────────────────
+
+export interface COPOMatrixEntry {
+  id: number;
+  course_outcome_id: number;
+  po_id: number;
+  co_code: string;
+  po_code: string;
+  matrix_value: number;
+  justification?: string;
+}
+
+export interface COPOMatrixData {
+  copo_id: number;
+  matrix_entries: COPOMatrixEntry[];
+}
+
+export interface WeightedCOAttainment {
+  co: string;
+  internal_attainment: number;   // from CIA tests (attainment level)
+  direct_assessment_attainment: number; // from direct_assessments (mark_obtained / max_mark * 3)
+  external_attainment: number;   // from external_exams (mark_obtained / max_mark * 3)
+  // Combined internal = avg of CIA internal_attainment and direct_assessment if both exist
+  combined_internal: number;
+  total_attainment: number;      // Wint * combined_internal + Wext * external_attainment
+}
+
+export interface POAttainmentResult {
+  po_code: string;
+  attainment_value: number;  // average of (CO attainment * mapping weight / 3) for mapped COs
+  contributing_cos: { co: string; co_attainment: number; mapping_value: number }[];
 }
 
 export const DEFAULT_ATTAINMENT_LEVELS: AttainmentLevelConfig[] = [
@@ -220,6 +265,15 @@ export const normalizeComprehensiveExtractionData = (
     };
   });
 
+  // Ensure direct_assessments and external_exams COs are included in allCos
+  (raw.direct_assessments || []).forEach((da) => {
+    if (da.co_code && !allCos.includes(da.co_code)) allCos.push(da.co_code);
+  });
+  (raw.external_exams || []).forEach((ee) => {
+    if (ee.co_code && !allCos.includes(ee.co_code)) allCos.push(ee.co_code);
+  });
+  allCos.sort();
+
   return {
     course_id: raw.course_id || 1,
     course_code: raw.course_code || 'Ad3391',
@@ -235,6 +289,8 @@ export const normalizeComprehensiveExtractionData = (
     co_max_totals: coMaxTotals,
     students: studentsNormalized,
     attainment_levels: DEFAULT_ATTAINMENT_LEVELS,
+    direct_assessments: raw.direct_assessments || [],
+    external_exams: raw.external_exams || [],
   };
 };
 
@@ -290,6 +346,137 @@ export const calculateComprehensiveAttainment = (
     target_percentage: targetPct,
     cos_summary: cosSummary,
   };
+};
+
+/**
+ * Calculates weighted CO attainment combining internal (CIA + Direct Assessment) and external marks.
+ * Internal attainment = CIA test attainment level (from % students above target)
+ * Direct Assessment attainment = (mark_obtained / max_mark) * 3 (scaled to 0-3)
+ * External attainment = (mark_obtained / max_mark) * 3 (scaled to 0-3)
+ * Combined internal = average of CIA and Direct Assessment if both present
+ * Total = Wint * combined_internal + Wext * external_attainment
+ */
+export const calculateWeightedCOAttainment = (
+  data: NormalizedAttainmentData,
+  ciaSummary: AttainmentCalculationSummary,
+  weightInternal: number,
+  weightExternal: number
+): WeightedCOAttainment[] => {
+  return data.cos.map((co) => {
+    // CIA internal attainment level (0-3)
+    const ciaLevel = ciaSummary.cos_summary[co]?.attainment_level || 0;
+
+    // Direct assessment attainment (scaled 0-3)
+    const da = data.direct_assessments.find((d) => d.co_code === co);
+    const daAttainment = da && da.max_mark > 0
+      ? Number(((da.mark_obtained / da.max_mark) * 3).toFixed(2))
+      : 0;
+
+    // External exam attainment (scaled 0-3)
+    const ext = data.external_exams.find((e) => e.co_code === co);
+    const extAttainment = ext && ext.max_mark > 0
+      ? Number(((ext.mark_obtained / ext.max_mark) * 3).toFixed(2))
+      : 0;
+
+    // Combined internal: if both CIA and DA exist, average them; otherwise use whichever is available
+    let combinedInternal = 0;
+    const hasCia = ciaLevel > 0;
+    const hasDa = da != null && da.max_mark > 0;
+    if (hasCia && hasDa) {
+      combinedInternal = Number(((ciaLevel + daAttainment) / 2).toFixed(2));
+    } else if (hasCia) {
+      combinedInternal = ciaLevel;
+    } else if (hasDa) {
+      combinedInternal = daAttainment;
+    }
+
+    // Total weighted attainment
+    const total = Number(
+      (weightInternal * combinedInternal + weightExternal * extAttainment).toFixed(2)
+    );
+
+    return {
+      co,
+      internal_attainment: ciaLevel,
+      direct_assessment_attainment: daAttainment,
+      external_attainment: extAttainment,
+      combined_internal: combinedInternal,
+      total_attainment: total,
+    };
+  });
+};
+
+/**
+ * Calculates PO attainment from weighted CO attainment and the active CO-PO matrix.
+ * For each PO: attainment = sum(CO_attainment * mapping_value) / sum(mapping_value)
+ * Only COs with non-zero mapping values contribute.
+ */
+export const calculatePOAttainment = (
+  weightedCOs: WeightedCOAttainment[],
+  copoMatrix: COPOMatrixData | null
+): POAttainmentResult[] => {
+  if (!copoMatrix || !copoMatrix.matrix_entries || copoMatrix.matrix_entries.length === 0) {
+    return [];
+  }
+
+  const entries = copoMatrix.matrix_entries;
+
+  // Build CO attainment lookup
+  const coAttainmentMap = new Map<string, number>();
+  weightedCOs.forEach((w) => coAttainmentMap.set(w.co, w.total_attainment));
+
+  // Group entries by PO
+  const poGroupMap = new Map<string, { po_code: string; entries: COPOMatrixEntry[] }>();
+  entries.forEach((e) => {
+    const poKey = e.po_code || `PO${e.po_id}`;
+    if (!poGroupMap.has(poKey)) {
+      poGroupMap.set(poKey, { po_code: poKey, entries: [] });
+    }
+    poGroupMap.get(poKey)!.entries.push(e);
+  });
+
+  const results: POAttainmentResult[] = [];
+
+  const sortedPOs = Array.from(poGroupMap.entries()).sort((a, b) => {
+    const numA = parseInt(a[0].replace(/\D/g, '')) || 0;
+    const numB = parseInt(b[0].replace(/\D/g, '')) || 0;
+    return numA - numB;
+  });
+
+  sortedPOs.forEach(([poKey, group]) => {
+    const contributing: POAttainmentResult['contributing_cos'] = [];
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    group.entries.forEach((entry) => {
+      const mappingVal = entry.matrix_value || 0;
+      if (mappingVal === 0) return; // skip unmapped COs
+
+      const coCode = entry.co_code || `CO${entry.course_outcome_id}`;
+      const coAtt = coAttainmentMap.get(coCode) || 0;
+
+      contributing.push({
+        co: coCode,
+        co_attainment: coAtt,
+        mapping_value: mappingVal,
+      });
+
+      weightedSum += coAtt * mappingVal;
+      totalWeight += mappingVal;
+    });
+
+    const attainmentValue = totalWeight > 0
+      ? Number((weightedSum / totalWeight).toFixed(2))
+      : 0;
+
+    results.push({
+      po_code: group.po_code,
+      attainment_value: attainmentValue,
+      contributing_cos: contributing,
+    });
+  });
+
+  return results;
 };
 
 /**

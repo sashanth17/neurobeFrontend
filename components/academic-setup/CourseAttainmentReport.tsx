@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/router";
 import {
   FileSpreadsheet,
@@ -19,15 +19,26 @@ import {
   ExternalLink,
   ShieldCheck,
   Percent,
+  Sliders,
+  Scale,
+  Grid3X3,
+  BookOpen,
+  ArrowRight,
+  Info,
 } from "lucide-react";
 import Models from "@/imports/models.import";
 import { Success, Failure, getErrorMessage } from "@/utils/function.utils";
 import {
   NormalizedAttainmentData,
   AttainmentCalculationSummary,
+  WeightedCOAttainment,
+  POAttainmentResult,
+  COPOMatrixData,
   fetchComprehensiveExtractionResults,
   normalizeComprehensiveExtractionData,
   calculateComprehensiveAttainment,
+  calculateWeightedCOAttainment,
+  calculatePOAttainment,
   exportComprehensiveAttainmentToExcel,
 } from "@/services/attainmentReportService";
 
@@ -50,6 +61,17 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [targetPercentage, setTargetPercentage] = useState<number>(60);
   const [attainmentData, setAttainmentData] = useState<NormalizedAttainmentData | null>(null);
   const [expandedStudentId, setExpandedStudentId] = useState<string | number | null>(null);
+
+  // Sub-tab within CO Attainment: "internal" | "weighted" | "po-attainment"
+  const [subTab, setSubTab] = useState<"internal" | "weighted" | "po-attainment">("internal");
+
+  // Weightage state
+  const [weightInternal, setWeightInternal] = useState<number>(0.6);
+  const [weightExternal, setWeightExternal] = useState<number>(0.4);
+
+  // CO-PO matrix state
+  const [copoMatrix, setCopoMatrix] = useState<COPOMatrixData | null>(null);
+  const [loadingCopo, setLoadingCopo] = useState<boolean>(false);
 
   // Course instances state
   const [instances, setInstances] = useState<any[]>([]);
@@ -191,6 +213,64 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     if (!attainmentData) return null;
     return calculateComprehensiveAttainment(attainmentData, targetPercentage);
   }, [attainmentData, targetPercentage]);
+
+  // Weighted CO attainment calculation
+  const weightedCOAttainment: WeightedCOAttainment[] = useMemo(() => {
+    if (!attainmentData || !summary) return [];
+    return calculateWeightedCOAttainment(attainmentData, summary, weightInternal, weightExternal);
+  }, [attainmentData, summary, weightInternal, weightExternal]);
+
+  // PO attainment calculation
+  const poAttainment: POAttainmentResult[] = useMemo(() => {
+    if (weightedCOAttainment.length === 0 || !copoMatrix) return [];
+    return calculatePOAttainment(weightedCOAttainment, copoMatrix);
+  }, [weightedCOAttainment, copoMatrix]);
+
+  // Fetch active CO-PO matrix
+  const loadCopoMatrix = useCallback(async () => {
+    const activeCourseId = courseId || 1;
+    setLoadingCopo(true);
+    try {
+      const res: any = await Models.copo.get_active(activeCourseId);
+      if (res && res.matrix_entries) {
+        setCopoMatrix(res);
+      } else if (res?.copo_id) {
+        setCopoMatrix(res);
+      }
+    } catch (err) {
+      console.warn("No active CO-PO matrix found:", err);
+      // Try list and get the first one
+      try {
+        const listRes: any = await Models.copo.list({ course_id: activeCourseId });
+        const versions = Array.isArray(listRes) ? listRes : listRes?.data || [];
+        if (versions.length > 0) {
+          const latest = versions[versions.length - 1];
+          const fullRes: any = await Models.copo.get(latest.copo_id || latest.id);
+          if (fullRes) setCopoMatrix(fullRes);
+        }
+      } catch (err2) {
+        console.warn("Could not load CO-PO matrix:", err2);
+      }
+    } finally {
+      setLoadingCopo(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    loadCopoMatrix();
+  }, [loadCopoMatrix]);
+
+  // Keep Wint + Wext = 1.0
+  const handleWeightInternalChange = (val: number) => {
+    const clamped = Math.max(0, Math.min(1, val));
+    setWeightInternal(Number(clamped.toFixed(2)));
+    setWeightExternal(Number((1 - clamped).toFixed(2)));
+  };
+  const handleWeightExternalChange = (val: number) => {
+    const clamped = Math.max(0, Math.min(1, val));
+    setWeightExternal(Number(clamped.toFixed(2)));
+    setWeightInternal(Number((1 - clamped).toFixed(2)));
+  };
 
   // Filter students based on search input
   const filteredStudents = useMemo(() => {
@@ -380,6 +460,48 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
           </button>
         </div>
       </div>
+
+      {/* ── Sub-Tab Navigation ── */}
+      <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <button
+          type="button"
+          onClick={() => setSubTab("internal")}
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${subTab === "internal"
+            ? "bg-indigo-600 text-white shadow-sm"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          Internal Assessment
+        </button>
+        <button
+          type="button"
+          onClick={() => setSubTab("weighted")}
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${subTab === "weighted"
+            ? "bg-indigo-600 text-white shadow-sm"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+        >
+          <Scale className="h-3.5 w-3.5" />
+          Weighted CO Attainment
+        </button>
+        <button
+          type="button"
+          onClick={() => setSubTab("po-attainment")}
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${subTab === "po-attainment"
+            ? "bg-indigo-600 text-white shadow-sm"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+        >
+          <Grid3X3 className="h-3.5 w-3.5" />
+          PO Attainment
+        </button>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* ── SUB-TAB: Internal Assessment (existing content) ──────────── */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {subTab === "internal" && (<>
 
       {/* ── CO Attainment KPI Cards (Clean SaaS Design) ── */}
       {summary && (
@@ -972,16 +1094,472 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                 </p>
               ) : null}
             </div>
-            <div className="text-right">
-              <div className="h-0.5 w-40 bg-slate-400 dark:bg-slate-600 mb-2 ml-auto"></div>
-              <p>Head of the Department (HoD)</p>
-              <p className="text-[11px] font-medium text-slate-500">
-                {attainmentData.department_name}
-              </p>
-            </div>
           </div>
         </div>
       </div>
+      </>)}
+
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* ── SUB-TAB: Weighted CO Attainment ──────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {subTab === "weighted" && (
+        <div className="space-y-6">
+
+          {/* ── Weightage Controls ── */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                  <Sliders className="h-4 w-4 text-indigo-500" />
+                  Internal & External Weightage
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Adjust the weightage for internal (CIA + Direct Assessment) and external (End Semester) components. Total must equal 1.0.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col items-center gap-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    W<sub>int</sub> (Internal)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={weightInternal}
+                      onChange={(e) => handleWeightInternalChange(Number(e.target.value))}
+                      className="h-1.5 w-28 cursor-pointer appearance-none rounded-full bg-indigo-200 accent-indigo-600 dark:bg-indigo-900"
+                    />
+                    <span className="min-w-[40px] rounded-lg bg-indigo-50 px-2 py-1 text-center font-mono text-xs font-black text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      {weightInternal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-lg font-light text-slate-300 dark:text-slate-600">+</div>
+
+                <div className="flex flex-col items-center gap-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    W<sub>ext</sub> (External)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={weightExternal}
+                      onChange={(e) => handleWeightExternalChange(Number(e.target.value))}
+                      className="h-1.5 w-28 cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600 dark:bg-emerald-900"
+                    />
+                    <span className="min-w-[40px] rounded-lg bg-emerald-50 px-2 py-1 text-center font-mono text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      {weightExternal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-lg font-light text-slate-300 dark:text-slate-600">=</div>
+
+                <span className="rounded-xl bg-slate-100 px-3 py-1.5 font-mono text-sm font-black text-slate-900 dark:bg-slate-800 dark:text-white">
+                  {(weightInternal + weightExternal).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick presets */}
+            <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Presets:</span>
+              {[
+                { label: "60 / 40", wi: 0.6, we: 0.4 },
+                { label: "50 / 50", wi: 0.5, we: 0.5 },
+                { label: "70 / 30", wi: 0.7, we: 0.3 },
+                { label: "80 / 20", wi: 0.8, we: 0.2 },
+              ].map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => { setWeightInternal(p.wi); setWeightExternal(p.we); }}
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${weightInternal === p.wi && weightExternal === p.we
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
+                    }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Direct Assessments (Assignments) & External Exams Side-by-Side ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Direct Assessments Card */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+              <div className="border-b border-slate-100 bg-indigo-50/50 px-5 py-3 dark:border-slate-800 dark:bg-indigo-950/30">
+                <h4 className="flex items-center gap-2 text-xs font-bold text-indigo-800 dark:text-indigo-300">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Direct Assessments (Assignments)
+                </h4>
+                <p className="mt-0.5 text-[10px] text-indigo-600/70 dark:text-indigo-400/70">
+                  CO-wise marks from uploaded assignment results
+                </p>
+              </div>
+              <div className="p-4">
+                {attainmentData.direct_assessments.length > 0 ? (
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="py-2 px-3 text-left font-bold text-slate-700 dark:text-slate-300">CO</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Marks Obtained</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Max Marks</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">% Score</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Attainment (0-3)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {attainmentData.direct_assessments.map((da) => {
+                        const pct = da.max_mark > 0 ? ((da.mark_obtained / da.max_mark) * 100).toFixed(1) : "0";
+                        const att = da.max_mark > 0 ? ((da.mark_obtained / da.max_mark) * 3).toFixed(2) : "0";
+                        return (
+                          <tr key={da.co_code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                            <td className="py-2 px-3 font-bold text-indigo-600 dark:text-indigo-400">{da.co_code}</td>
+                            <td className="py-2 px-3 text-center font-semibold text-slate-900 dark:text-white">{da.mark_obtained}</td>
+                            <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-300">{da.max_mark}</td>
+                            <td className="py-2 px-3 text-center font-semibold text-sky-700 dark:text-sky-400">{pct}%</td>
+                            <td className="py-2 px-3 text-center font-black text-indigo-700 dark:text-indigo-300">{att}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <BookOpen className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+                    <p className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500">No direct assessment data available</p>
+                    <p className="text-[10px] text-slate-400">Upload assignment marks to see CO-wise attainment</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* External Exams Card */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+              <div className="border-b border-slate-100 bg-emerald-50/50 px-5 py-3 dark:border-slate-800 dark:bg-emerald-950/30">
+                <h4 className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  External Exams (End Semester)
+                </h4>
+                <p className="mt-0.5 text-[10px] text-emerald-600/70 dark:text-emerald-400/70">
+                  CO-wise marks from end semester examination results
+                </p>
+              </div>
+              <div className="p-4">
+                {attainmentData.external_exams.length > 0 ? (
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="py-2 px-3 text-left font-bold text-slate-700 dark:text-slate-300">CO</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Marks Obtained</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Max Marks</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">% Score</th>
+                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Attainment (0-3)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {attainmentData.external_exams.map((ee) => {
+                        const pct = ee.max_mark > 0 ? ((ee.mark_obtained / ee.max_mark) * 100).toFixed(1) : "0";
+                        const att = ee.max_mark > 0 ? ((ee.mark_obtained / ee.max_mark) * 3).toFixed(2) : "0";
+                        return (
+                          <tr key={ee.co_code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                            <td className="py-2 px-3 font-bold text-emerald-600 dark:text-emerald-400">{ee.co_code}</td>
+                            <td className="py-2 px-3 text-center font-semibold text-slate-900 dark:text-white">{ee.mark_obtained}</td>
+                            <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-300">{ee.max_mark}</td>
+                            <td className="py-2 px-3 text-center font-semibold text-sky-700 dark:text-sky-400">{pct}%</td>
+                            <td className="py-2 px-3 text-center font-black text-emerald-700 dark:text-emerald-300">{att}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <GraduationCap className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+                    <p className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500">No external exam data available</p>
+                    <p className="text-[10px] text-slate-400">External exam marks will appear here when available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Weighted CO Attainment Summary Table ── */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+            <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 to-emerald-50/80 px-6 py-4 dark:border-slate-800 dark:from-indigo-950/30 dark:to-emerald-950/30">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                <Scale className="h-4 w-4 text-indigo-500" />
+                Total CO Attainment — Weighted Calculation
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Formula: <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">W<sub>int</sub> × Internal + W<sub>ext</sub> × External</span>
+                {" "}= <span className="font-mono font-bold">{weightInternal} × Internal + {weightExternal} × External</span>
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                <table className="w-full border-collapse text-xs text-center">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <th className="py-3 px-4 text-left">CO</th>
+                      <th className="py-3 px-3">CIA Attainment<br /><span className="text-[10px] font-normal text-slate-400">(Level 0-3)</span></th>
+                      <th className="py-3 px-3">Direct Assessment<br /><span className="text-[10px] font-normal text-slate-400">(Scaled 0-3)</span></th>
+                      <th className="py-3 px-3 bg-indigo-50/60 dark:bg-indigo-950/20">Combined Internal<br /><span className="text-[10px] font-normal text-indigo-500">(Avg of CIA + DA)</span></th>
+                      <th className="py-3 px-3 bg-emerald-50/60 dark:bg-emerald-950/20">External Attainment<br /><span className="text-[10px] font-normal text-emerald-500">(Scaled 0-3)</span></th>
+                      <th className="py-3 px-3 bg-violet-50/60 dark:bg-violet-950/20">
+                        <span className="text-violet-700 dark:text-violet-300">Total Attainment</span>
+                        <br /><span className="text-[10px] font-normal text-violet-500">{weightInternal}×Int + {weightExternal}×Ext</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {weightedCOAttainment.map((w) => {
+                      const totalLevel = w.total_attainment >= 2.5 ? 3 : w.total_attainment >= 1.5 ? 2 : w.total_attainment >= 0.5 ? 1 : 0;
+                      const levelColor =
+                        totalLevel === 3 ? "text-emerald-700 dark:text-emerald-400"
+                          : totalLevel === 2 ? "text-blue-700 dark:text-blue-400"
+                            : totalLevel === 1 ? "text-amber-700 dark:text-amber-400"
+                              : "text-slate-500";
+
+                      return (
+                        <tr key={w.co} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                          <td className="py-3 px-4 text-left font-bold text-indigo-600 dark:text-indigo-400">{w.co}</td>
+                          <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">{w.internal_attainment}</td>
+                          <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">{w.direct_assessment_attainment}</td>
+                          <td className="py-3 px-3 font-bold text-indigo-700 bg-indigo-50/40 dark:text-indigo-300 dark:bg-indigo-950/10">{w.combined_internal}</td>
+                          <td className="py-3 px-3 font-bold text-emerald-700 bg-emerald-50/40 dark:text-emerald-300 dark:bg-emerald-950/10">{w.external_attainment}</td>
+                          <td className={`py-3 px-3 font-black text-base bg-violet-50/40 dark:bg-violet-950/10 ${levelColor}`}>
+                            {w.total_attainment}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Visual bar representation */}
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {weightedCOAttainment.map((w) => (
+                  <div key={`bar-${w.co}`} className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{w.co}</span>
+                      <span className="font-mono text-sm font-black text-slate-900 dark:text-white">{w.total_attainment} / 3</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${w.total_attainment >= 2.5 ? "bg-emerald-500" : w.total_attainment >= 1.5 ? "bg-blue-500" : w.total_attainment >= 0.5 ? "bg-amber-500" : "bg-slate-400"}`}
+                        style={{ width: `${Math.min((w.total_attainment / 3) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* ── SUB-TAB: PO Attainment ───────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {subTab === "po-attainment" && (
+        <div className="space-y-6">
+
+          {/* CO-PO Matrix Status */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-1">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                  <Grid3X3 className="h-4 w-4 text-indigo-500" />
+                  Program Outcome (PO) Attainment
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  PO attainment is calculated by mapping weighted CO attainment through the active CO-PO matrix.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {copoMatrix ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    CO-PO Matrix Loaded (ID: {copoMatrix.copo_id})
+                  </span>
+                ) : loadingCopo ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Loading CO-PO Matrix...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+                    <Info className="h-3.5 w-3.5" />
+                    No active CO-PO matrix found
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => loadCopoMatrix()}
+                  disabled={loadingCopo}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <RefreshCw className={`h-3 w-3 ${loadingCopo ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {poAttainment.length > 0 ? (
+            <>
+              {/* PO Attainment Cards */}
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {poAttainment.map((po) => {
+                  const level = po.attainment_value >= 2.5 ? 3 : po.attainment_value >= 1.5 ? 2 : po.attainment_value >= 0.5 ? 1 : 0;
+                  const cardBorder =
+                    level === 3 ? "border-emerald-200 dark:border-emerald-800"
+                      : level === 2 ? "border-blue-200 dark:border-blue-800"
+                        : level === 1 ? "border-amber-200 dark:border-amber-800"
+                          : "border-slate-200 dark:border-slate-800";
+                  const barColor =
+                    level === 3 ? "bg-emerald-500" : level === 2 ? "bg-blue-500" : level === 1 ? "bg-amber-500" : "bg-slate-400";
+                  const valueColor =
+                    level === 3 ? "text-emerald-700 dark:text-emerald-400"
+                      : level === 2 ? "text-blue-700 dark:text-blue-400"
+                        : level === 1 ? "text-amber-700 dark:text-amber-400"
+                          : "text-slate-600 dark:text-slate-400";
+
+                  return (
+                    <div
+                      key={po.po_code}
+                      className={`relative overflow-hidden rounded-2xl border bg-white p-5 shadow-xs transition hover:shadow-md dark:bg-slate-900 ${cardBorder}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
+                          {po.po_code}
+                        </span>
+                        <span className={`text-2xl font-black ${valueColor}`}>
+                          {po.attainment_value}
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                          style={{ width: `${Math.min((po.attainment_value / 3) * 100, 100)}%` }}
+                        />
+                      </div>
+
+                      {/* Contributing COs */}
+                      <div className="mt-3 border-t border-slate-100 pt-2 dark:border-slate-800">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Contributing COs:</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {po.contributing_cos.map((c) => (
+                            <span
+                              key={c.co}
+                              className="inline-flex items-center gap-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                              title={`${c.co}: attainment=${c.co_attainment}, mapping=${c.mapping_value}`}
+                            >
+                              {c.co}
+                              <span className="text-slate-400">×{c.mapping_value}</span>
+                            </span>
+                          ))}
+                          {po.contributing_cos.length === 0 && (
+                            <span className="text-[10px] text-slate-400 italic">No mapped COs</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* PO Attainment Detailed Table */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    PO Attainment Calculation Breakdown
+                  </h4>
+                  <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                    PO Attainment = Σ(CO Attainment × Mapping Value) / Σ(Mapping Value) for each Program Outcome
+                  </p>
+                </div>
+                <div className="p-5 overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200 bg-slate-50 font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <th className="py-3 px-4 text-left">PO</th>
+                        <th className="py-3 px-4 text-center">Attainment Value</th>
+                        <th className="py-3 px-4 text-center">Level</th>
+                        <th className="py-3 px-4 text-left">Contributing COs (CO × Mapping)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {poAttainment.map((po) => {
+                        const level = po.attainment_value >= 2.5 ? 3 : po.attainment_value >= 1.5 ? 2 : po.attainment_value >= 0.5 ? 1 : 0;
+                        const levelBadge =
+                          level === 3 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            : level === 2 ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400"
+                              : level === 1 ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400"
+                                : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400";
+                        return (
+                          <tr key={po.po_code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                            <td className="py-3 px-4 font-bold text-indigo-600 dark:text-indigo-400">{po.po_code}</td>
+                            <td className="py-3 px-4 text-center font-mono text-base font-black text-slate-900 dark:text-white">
+                              {po.attainment_value}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold ${levelBadge}`}>
+                                Level {level}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {po.contributing_cos.map((c, idx) => (
+                                  <React.Fragment key={c.co}>
+                                    <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                      {c.co}
+                                      <span className="text-slate-400">({c.co_attainment} × {c.mapping_value})</span>
+                                    </span>
+                                    {idx < po.contributing_cos.length - 1 && (
+                                      <span className="text-slate-300 self-center">+</span>
+                                    )}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+              <Grid3X3 className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" />
+              <h4 className="mt-3 text-sm font-bold text-slate-700 dark:text-slate-300">
+                PO Attainment Not Available
+              </h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                {!copoMatrix
+                  ? "No active CO-PO matrix found for this course. Please generate and activate a CO-PO matrix in the CO-PO Mapping tab first."
+                  : "No weighted CO attainment data available. Ensure extraction results and assessment data are loaded."}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
