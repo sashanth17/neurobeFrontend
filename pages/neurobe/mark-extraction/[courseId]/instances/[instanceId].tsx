@@ -7,13 +7,15 @@ import { ArrowLeft, Loader2, Search, Users, FileText, BookOpen } from "lucide-re
 import ExtractionTab from "@/components/mark-extraction/ExtractionTab";
 import ExtractedViewTab from "@/components/mark-extraction/ExtractedViewTab";
 import ResultPageTab from "@/components/mark-extraction/ResultPageTab";
+import AssignmentUploadTab from "@/components/mark-extraction/AssignmentUploadTab";
 import { MarkExtractionService, CiaTestStatus } from "@/services/markExtraction.service";
 
 const TABS = [
-  { id: "extraction",     label: "Extraction" },
-  { id: "extracted-view", label: "Extracted View" },
-  { id: "result",         label: "Result Page" },
-  { id: "students",       label: "Student List" },
+  { id: "extraction",        label: "Extraction" },
+  { id: "extracted-view",    label: "Extracted View" },
+  { id: "result",            label: "Result Page" },
+  { id: "assignment-upload", label: "Upload Assignments" },
+  { id: "students",          label: "Student List" },
 ];
 
 function InstanceDashboardPage() {
@@ -109,43 +111,45 @@ function InstanceDashboardPage() {
           </div>
 
           {/* Assessment selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
-              Assessment:
-            </label>
-            {loadingTests ? (
-              <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
-            ) : (
-              <select
-                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                value={selectedCiaTest?.cia_test_id ?? ""}
-                onChange={handleCiaTestChange}
-              >
-                {ciaTests.map((t) => (
-                  <option key={t.cia_test_id} value={t.cia_test_id}>
-                    {t.test_name}
-                    {t.job_status ? ` — ${t.job_status === "COMPLETED" ? "✓ Extracted" : t.job_status === "PROCESSING" ? "⟳ Processing" : "Pending"}` : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-            {selectedCiaTest?.job_status && (
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getStatusBadgeClass(selectedCiaTest.job_status)}`}>
-                {selectedCiaTest.job_status}
-              </span>
-            )}
-          </div>
+          {activeTab !== "assignment-upload" && activeTab !== "students" && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                Assessment:
+              </label>
+              {loadingTests ? (
+                <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
+              ) : (
+                <select
+                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  value={selectedCiaTest?.cia_test_id ?? ""}
+                  onChange={handleCiaTestChange}
+                >
+                  {ciaTests.map((t) => (
+                    <option key={t.cia_test_id} value={t.cia_test_id}>
+                      {t.test_name}
+                      {t.job_status ? ` — ${t.job_status === "COMPLETED" ? "✓ Extracted" : t.job_status === "PROCESSING" ? "⟳ Processing" : "Pending"}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {selectedCiaTest?.job_status && (
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getStatusBadgeClass(selectedCiaTest.job_status)}`}>
+                  {selectedCiaTest.job_status}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── Tab Content ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-hidden p-6">
-        {loadingTests ? (
+        {loadingTests && activeTab !== "assignment-upload" && activeTab !== "students" ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <Loader2 className="h-8 w-8 animate-spin mb-3 text-violet-500" />
             <p className="text-sm">Loading CIA tests...</p>
           </div>
-        ) : !selectedCiaTest ? (
+        ) : !selectedCiaTest && activeTab !== "assignment-upload" && activeTab !== "students" ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <BookOpen className="h-12 w-12 mb-4 text-gray-300 dark:text-gray-600" />
             <p className="font-medium">No CIA Tests found</p>
@@ -153,7 +157,7 @@ function InstanceDashboardPage() {
           </div>
         ) : (
           <div className="h-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-            {activeTab === "extraction"     && (
+            {activeTab === "extraction" && selectedCiaTest && (
               <ExtractionTab
                 key={`extraction-${selectedCiaTest.cia_test_id}`}
                 ciaTestId={selectedCiaTest.cia_test_id}
@@ -163,7 +167,7 @@ function InstanceDashboardPage() {
                 onRefreshCiaTests={fetchCiaTests}
               />
             )}
-            {activeTab === "extracted-view" && (
+            {activeTab === "extracted-view" && selectedCiaTest && (
               <ExtractedViewTab 
                 key={`extracted-view-${selectedCiaTest.cia_test_id}`}
                 ciaTestId={selectedCiaTest.cia_test_id} 
@@ -172,7 +176,7 @@ function InstanceDashboardPage() {
                 onRefreshCiaTests={fetchCiaTests}
               />
             )}
-            {activeTab === "result"         && (
+            {activeTab === "result" && selectedCiaTest && (
               <ResultPageTab
                 key={`result-${selectedCiaTest.cia_test_id}`}
                 ciaTestId={selectedCiaTest.cia_test_id}
@@ -181,7 +185,13 @@ function InstanceDashboardPage() {
                 onRefreshCiaTests={fetchCiaTests}
               />
             )}
-            {activeTab === "students"       && <StudentListTab   instanceId={instanceId as string} />}
+            {activeTab === "assignment-upload" && (
+              <AssignmentUploadTab
+                instanceId={instanceId as string}
+                courseId={courseId as string}
+              />
+            )}
+            {activeTab === "students" && <StudentListTab instanceId={instanceId as string} />}
           </div>
         )}
       </div>

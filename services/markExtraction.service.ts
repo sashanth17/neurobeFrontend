@@ -22,64 +22,64 @@ import { BACKEND_URL } from "@/utils/constant.utils";
 const COURSE_API_BASE = "course/api/v1";
 
 export interface ExtractionSummary {
-  instance_id:                  number;
-  instance_name:                string;
-  total_enrolled_students:      number;
-  total_cia_tests:              number;
-  overall_extraction_status:    string; // PENDING | IN_PROGRESS | COMPLETED
+  instance_id: number;
+  instance_name: string;
+  total_enrolled_students: number;
+  total_cia_tests: number;
+  overall_extraction_status: string; // PENDING | IN_PROGRESS | COMPLETED
   completion_rate: {
     completed: number;
-    total:     number;
+    total: number;
   };
 }
 
 export interface CiaTestStatus {
-  cia_test_id:           number;
-  test_name:             string;
-  latest_job_id:         number | null;
-  job_status:            string; // PENDING | PROCESSING | COMPLETED | FAILED | NONE | null
-  progress_pct:          number | null;
+  cia_test_id: number;
+  test_name: string;
+  latest_job_id: number | null;
+  job_status: string; // PENDING | PROCESSING | COMPLETED | FAILED | NONE | null
+  progress_pct: number | null;
   last_run_completed_at: string | null;
 }
 
 export interface QuestionMark {
-  question_key:        string;
-  section_name?:       string;
-  max_marks_assigned:  number;
-  system_read?:        number;
-  final_mark:          number;
-  confidence?:         number;
-  status:              'VERIFIED' | 'NEEDS_REVIEW' | 'NEEDS_CORRECTION' | 'CORRECTED' | string;
-  target_co?:          string;
+  question_key: string;
+  section_name?: string;
+  max_marks_assigned: number;
+  system_read?: number;
+  final_mark: number;
+  confidence?: number;
+  status: 'VERIFIED' | 'NEEDS_REVIEW' | 'NEEDS_CORRECTION' | 'CORRECTED' | string;
+  target_co?: string;
 }
 
 export interface StudentMarks {
-  student_marks_id:             number;
-  student_id?:                  string | null;
-  register_number?:             string;
-  system_detected_reg_no?:      string;
-  actual_reg_number?:           string;
-  student_name?:                string;
-  verification_status:          'READY_TO_VERIFY' | 'NEEDS_REVIEW' | 'VERIFIED' | string;
-  mapping_status:               'AUTO_MAPPED' | 'NEEDS_REVIEW' | 'UNMAPPED' | 'NO_STUDENT_FOUND' | string;
-  paper_total_entered?:         number;
+  student_marks_id: number;
+  student_id?: string | null;
+  register_number?: string;
+  system_detected_reg_no?: string;
+  actual_reg_number?: string;
+  student_name?: string;
+  verification_status: 'READY_TO_VERIFY' | 'NEEDS_REVIEW' | 'VERIFIED' | string;
+  mapping_status: 'AUTO_MAPPED' | 'NEEDS_REVIEW' | 'UNMAPPED' | 'NO_STUDENT_FOUND' | string;
+  paper_total_entered?: number;
   total_marks_system_detected?: number;
-  final_total_mark:             number;
-  actual_max_mark:              number;
-  total_mismatch_flag?:         boolean;
-  total_selection_option?:      string;
-  is_locked?:                   boolean;
-  source_pages:                 number[];
-  marks:                        QuestionMark[];
-  co_marks?:                    Record<string, { obtained: number; max_mark: number; percentage: number }>;
+  final_total_mark: number;
+  actual_max_mark: number;
+  total_mismatch_flag?: boolean;
+  total_selection_option?: string;
+  is_locked?: boolean;
+  source_pages: number[];
+  marks: QuestionMark[];
+  co_marks?: Record<string, { obtained: number; max_mark: number; percentage: number }>;
 }
 
 export interface ExtractionVerificationSummary {
-  total_students:        number;
-  verified_count:        number;
+  total_students: number;
+  verified_count: number;
   ready_to_verify_count: number;
-  needs_review_count:    number;
-  remaining_count:       number;
+  needs_review_count: number;
+  remaining_count: number;
 }
 
 export interface VerifiedMarkQuestion {
@@ -132,20 +132,20 @@ export interface CIATestJobItem {
 }
 
 export interface LatestExtractionResults {
-  job_id?:              number;
-  cia_test_id?:         number;
-  course_code?:         string;
-  course_name?:         string;
-  image_base_url:       string;
-  job_status?:          string;
-  total_pages?:         number;
-  processed_pages?:     number;
-  error_message?:       string | null;
-  summary:              ExtractionVerificationSummary;
-  students:             StudentMarks[];
-  template_questions?:  any[];
-  unmapped?:            any[];
-  duplicates?:          any[][];
+  job_id?: number;
+  cia_test_id?: number;
+  course_code?: string;
+  course_name?: string;
+  image_base_url: string;
+  job_status?: string;
+  total_pages?: number;
+  processed_pages?: number;
+  error_message?: string | null;
+  summary: ExtractionVerificationSummary;
+  students: StudentMarks[];
+  template_questions?: any[];
+  unmapped?: any[];
+  duplicates?: any[][];
   template_co_distribution?: Record<string, number>;
   expected_questions?: string[];
 }
@@ -181,14 +181,14 @@ export const MarkExtractionService = {
 
       // Normalize to ExtractionSummary shape
       return raw.map((inst: any): ExtractionSummary => ({
-        instance_id:               inst.id ?? inst.instance_id,
-        instance_name:             inst.name ?? inst.course_instance_name ?? inst.instance_name ?? `Section ${inst.id}`,
-        total_enrolled_students:   inst.total_students ?? inst.enrolled_count ?? 0,
-        total_cia_tests:           inst.total_cia_tests ?? 0,
+        instance_id: inst.id ?? inst.instance_id,
+        instance_name: inst.name ?? inst.course_instance_name ?? inst.instance_name ?? `Section ${inst.id}`,
+        total_enrolled_students: inst.total_students ?? inst.enrolled_count ?? 0,
+        total_cia_tests: inst.total_cia_tests ?? 0,
         overall_extraction_status: inst.overall_extraction_status ?? "PENDING",
         completion_rate: inst.completion_rate ?? {
           completed: inst.extracted_count ?? 0,
-          total:     inst.total_students ?? inst.enrolled_count ?? 0,
+          total: inst.total_students ?? inst.enrolled_count ?? 0,
         },
       }));
     }
@@ -226,8 +226,8 @@ export const MarkExtractionService = {
   // ── 4. Upload answer-sheet PDF batch ─────────────────────────────────────
   uploadAnswerSheetBatch: async (
     ciaTestId: number,
-    file:      File
-  ): Promise<{ id: number; batch_id: number; [key: string]: any }> => {
+    file: File
+  ): Promise<{ id: number; batch_id: number;[key: string]: any }> => {
     const formData = new FormData();
     formData.append("file", file);
     const res = await commonInstance().post(
@@ -354,7 +354,7 @@ export const MarkExtractionService = {
   // ── 9. Update student marks ───────────────────────────────────────────────
   updateStudentMarks: async (
     studentMarksId: number,
-    payload:        any
+    payload: any
   ) => {
     const res = await commonInstance().patch(
       `${COURSE_API_BASE}/student-marks/${studentMarksId}`,
@@ -412,5 +412,72 @@ export const MarkExtractionService = {
     );
     return res.data;
   },
+
+  // ── 14. Upload Direct CO Marks / Assignment for Course Instance ──────────
+  uploadDirectCoMarks: async (
+    instanceId: number | string,
+    file: File | FormData
+  ): Promise<{ success: boolean; message?: string; detail?: string; error?: string; data?: any }> => {
+    const targetId =
+      instanceId && instanceId !== "undefined" && !isNaN(Number(instanceId))
+        ? Number(instanceId)
+        : 1;
+
+    let formData: FormData;
+    if (file instanceof FormData) {
+      formData = file;
+    } else {
+      formData = new FormData();
+      formData.append("file", file, file.name);
+    }
+
+    try {
+      const res = await commonInstance().post(
+        `${COURSE_API_BASE}/course-instances/${targetId}/direct-co-marks/upload`,
+        formData
+      );
+
+      return {
+        success: true,
+        message:
+          res.data?.message ||
+          res.data?.detail ||
+          "Direct CO marks uploaded successfully!",
+        data: res.data,
+      };
+    } catch (err: any) {
+      const resData = err?.response?.data;
+      const detailMsg =
+        typeof resData?.detail === "string"
+          ? resData.detail
+          : typeof resData?.message === "string"
+          ? resData.message
+          : typeof resData?.error === "string"
+          ? resData.error
+          : Array.isArray(resData?.detail)
+          ? resData.detail
+              .map((d: any) => {
+                if (typeof d === "string") return d;
+                const field = Array.isArray(d?.loc) ? d.loc.slice(-1)[0] : "";
+                return field ? `${field}: ${d?.msg || "invalid"}` : d?.msg || JSON.stringify(d);
+              })
+              .join(", ")
+          : err?.message || "Failed to upload direct CO marks.";
+
+      console.warn(
+        `[MarkExtractionService] uploadDirectCoMarks 400/error on instance ${targetId}:`,
+        detailMsg
+      );
+
+      return {
+        success: false,
+        error: detailMsg,
+        message: detailMsg,
+        detail: detailMsg,
+        data: resData,
+      };
+    }
+  },
 };
+
 
