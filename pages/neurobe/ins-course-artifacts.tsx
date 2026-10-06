@@ -1191,6 +1191,15 @@ const InsCourseArtifacts = () => {
     }
   };
 
+  // ── Lesson Plan Helpers ───────────────────────────────────────────────────
+  const formatMinutes = (hours: number | string | undefined | null) => {
+    if (hours === undefined || hours === null || hours === "") return "0 minutes";
+    const h = Number(hours);
+    if (isNaN(h)) return `${hours}`;
+    const mins = Math.round(h * 60);
+    return `${mins} ${mins === 1 ? "minute" : "minutes"}`;
+  };
+
   // ── Lesson Plan Per-Slot Edit & Save ───────────────────────────────────────
   const startEditLpSlot = (slot: any) => {
     setEditingLpSlotId(slot.id);
@@ -4160,7 +4169,7 @@ const InsCourseArtifacts = () => {
                         </h4>
                       </div>
                       <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                        {group.totalHours} Total Allocated Hours
+                        {formatMinutes(group.totalHours)} Total Allocated
                       </span>
                     </div>
 
@@ -4195,7 +4204,7 @@ const InsCourseArtifacts = () => {
 
                               <div className="flex items-center gap-2">
                                 <span className="rounded-lg bg-indigo-100/70 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                                  {slot.time_allocated || 1} Hr(s)
+                                  {formatMinutes(slot.time_allocated || 1)}
                                 </span>
                                 {slot.bloom_level && (
                                   <span className="rounded bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -4220,11 +4229,13 @@ const InsCourseArtifacts = () => {
                               <div className="rounded-lg border border-indigo-200 bg-white p-3 dark:border-indigo-900 dark:bg-slate-900 space-y-3">
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                   <div>
-                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Allocated Hours</label>
+                                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                      Allocated Time ({formatMinutes(lpSlotDraft.time_allocated)})
+                                    </label>
                                     <input
                                       type="number"
-                                      min={0.5}
-                                      step={0.5}
+                                      min={0.1}
+                                      step={0.05}
                                       value={lpSlotDraft.time_allocated}
                                       onChange={(e) => setLpSlotDraft({ ...lpSlotDraft, time_allocated: Number(e.target.value) })}
                                       className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -4298,11 +4309,13 @@ const InsCourseArtifacts = () => {
                                           </span>
                                           <div className="grid grid-cols-2 gap-2">
                                             <div>
-                                              <label className="text-[10px] font-semibold text-slate-500">Hours</label>
+                                              <label className="text-[10px] font-semibold text-slate-500">
+                                                Time ({formatMinutes(lpSubtopicSlotDraft.time_allocated)})
+                                              </label>
                                               <input
                                                 type="number"
-                                                min={0.25}
-                                                step={0.25}
+                                                min={0.05}
+                                                step={0.05}
                                                 value={lpSubtopicSlotDraft.time_allocated}
                                                 onChange={(e) => setLpSubtopicSlotDraft({ ...lpSubtopicSlotDraft, time_allocated: Number(e.target.value) })}
                                                 className="w-full rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
@@ -4356,7 +4369,7 @@ const InsCourseArtifacts = () => {
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                           <span className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-                                            {sub.time_allocated}h
+                                            {formatMinutes(sub.time_allocated)}
                                           </span>
                                           {canEditLp && (
                                             <button
