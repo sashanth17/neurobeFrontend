@@ -445,12 +445,16 @@ const LessonPlanPage = () => {
     },
     {
       accessor: "hours",
-      title: "HOURS",
-      render: ({ hours }: any) => (
-        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-          {hours}
-        </span>
-      ),
+      title: "DURATION",
+      render: ({ hours }: any) => {
+        const val = typeof hours === "number" ? hours : parseFloat(String(hours)) || 1;
+        const mins = Math.round(val * 60);
+        return (
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            {mins} minutes
+          </span>
+        );
+      },
     },
     {
       accessor: "pedagogy",
@@ -565,9 +569,9 @@ const LessonPlanPage = () => {
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500">Allocated Hours</p>
+              <p className="text-xs font-medium text-slate-500">Allocated Time</p>
               <h4 className="text-xl font-bold text-slate-900 dark:text-white">
-                {workspaceData?.selected_unit?.hours_allocated || sessions.length} Hours
+                {Math.round((Number(workspaceData?.selected_unit?.hours_allocated) || sessions.length) * 60)} mins
               </h4>
             </div>
           </div>
