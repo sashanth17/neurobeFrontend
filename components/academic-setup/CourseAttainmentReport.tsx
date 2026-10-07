@@ -40,6 +40,7 @@ import {
   calculateComprehensiveAttainment,
   calculatePOAttainment,
   exportComprehensiveAttainmentToExcel,
+  exportWeightedCOAttainmentToExcel,
 } from "@/services/attainmentReportService";
 
 interface CourseAttainmentReportProps {
@@ -66,8 +67,8 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [subTab, setSubTab] = useState<"internal" | "external" | "weighted" | "po-attainment">("internal");
 
   // Weightage state
-  const [weightInternal, setWeightInternal] = useState<number>(0.6);
-  const [weightExternal, setWeightExternal] = useState<number>(0.4);
+  const [weightInternal, setWeightInternal] = useState<number>(0.5);
+  const [weightExternal, setWeightExternal] = useState<number>(0.5);
 
   // CO-PO matrix state
   const [copoMatrix, setCopoMatrix] = useState<COPOMatrixData | null>(null);
@@ -288,14 +289,44 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
   // Handle Excel Export
   const handleExportExcel = () => {
-    if (!attainmentData || !summary) {
-      Failure("Attainment data is not ready for export");
+    if (subTab === "weighted") {
+      if (weightedCOAttainment.length === 0 || !attainmentData) {
+        Failure("Weighted CO attainment data is not ready for export");
+        return;
+      }
+      try {
+        setExporting(true);
+        const filename = `${attainmentData.course_code}_Weighted_CO_Attainment.xlsx`;
+        exportWeightedCOAttainmentToExcel(
+          attainmentData,
+          weightedCOAttainment,
+          weightInternal,
+          weightExternal,
+          filename
+        );
+        Success("Weighted CO Attainment exported successfully!");
+      } catch (err: any) {
+        console.error("Excel export error:", err);
+        Failure(getErrorMessage(err, "Failed to export Excel file"));
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
+
+    const isExternal = subTab === "external";
+    const dataToExport = isExternal ? externalAttainmentData : attainmentData;
+    const summaryToExport = isExternal ? externalSummary : summary;
+
+    if (!dataToExport || !summaryToExport) {
+      Failure(isExternal ? "External attainment data is not ready for export" : "Internal attainment data is not ready for export");
       return;
     }
     try {
       setExporting(true);
-      const filename = `${attainmentData.course_code}_CO_Attainment_Report.xlsx`;
-      exportComprehensiveAttainmentToExcel(attainmentData, summary, filename);
+      const suffix = isExternal ? "External_CO" : "Internal_CO";
+      const filename = `${dataToExport.course_code}_${suffix}_Attainment_Report.xlsx`;
+      exportComprehensiveAttainmentToExcel(dataToExport, summaryToExport, filename, isExternal);
       Success("Attainment report exported to Excel successfully!");
     } catch (err: any) {
       console.error("Excel export error:", err);

@@ -594,10 +594,11 @@ export const fetchComprehensiveExtractionResults = async (
 export const exportComprehensiveAttainmentToExcel = async (
   data: NormalizedAttainmentData,
   summary: AttainmentCalculationSummary,
-  fileName?: string
+  fileName?: string,
+  isExternal?: boolean
 ) => {
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Internal Attainment');
+  const worksheet = workbook.addWorksheet(isExternal ? 'External Attainment' : 'Internal Attainment');
 
   const setBorder = (cell: ExcelJS.Cell) => {
     cell.border = {
@@ -642,7 +643,9 @@ export const exportComprehensiveAttainmentToExcel = async (
 
   worksheet.mergeCells('A5:AB5');
   const a5 = worksheet.getCell('A5');
-  a5.value = 'Internal Assessment - Attainment of Course Outcomes [Through Direct Assessment]';
+  a5.value = isExternal
+    ? 'External Assessment - Attainment of Course Outcomes [Through Direct Assessment]'
+    : 'Internal Assessment - Attainment of Course Outcomes [Through Direct Assessment]';
   a5.font = { bold: true, size: 12, name: 'Times New Roman' };
   a5.alignment = { horizontal: 'center', vertical: 'middle' };
   setBorder(a5);
@@ -709,32 +712,40 @@ export const exportComprehensiveAttainmentToExcel = async (
 
   let currentCol = 4;
   data.tests.forEach(test => {
-    let startCol = currentCol;
-    let endCol = currentCol + test.cos.length - 1;
-    worksheet.mergeCells(14, startCol, 14, endCol);
-    worksheet.getCell(14, startCol).value = `${test.test_name.toUpperCase()} - MARKS ALLOTTED`;
-    worksheet.getCell(14, startCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F2FF' } };
+    if (test.cos.length > 0) {
+      let startCol = currentCol;
+      let endCol = currentCol + test.cos.length - 1;
+      if (startCol < endCol) {
+        worksheet.mergeCells(14, startCol, 14, endCol);
+      }
+      worksheet.getCell(14, startCol).value = `${test.test_name.toUpperCase()} - MARKS ALLOTTED`;
+      worksheet.getCell(14, startCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F2FF' } };
 
-    test.cos.forEach((co, idx) => {
-      worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
-      worksheet.getCell(16, startCol + idx).value = test.max_marks[co] ?? 0;
-      worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
-      worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
-    });
-    currentCol = endCol + 1;
+      test.cos.forEach((co, idx) => {
+        worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
+        worksheet.getCell(16, startCol + idx).value = test.max_marks[co] ?? 0;
+        worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+        worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+      });
+      currentCol = endCol + 1;
+    }
   });
 
   let startCol = currentCol;
-  let endCol = currentCol + data.cos.length - 1;
-  worksheet.mergeCells(14, startCol, 14, endCol);
-  worksheet.getCell(14, startCol).value = 'CO WISE MARKS SCORED';
+  let endCol = currentCol + Math.max(data.cos.length - 1, 0);
+  if (data.cos.length > 0) {
+    if (startCol < endCol) {
+      worksheet.mergeCells(14, startCol, 14, endCol);
+    }
+    worksheet.getCell(14, startCol).value = 'CO WISE MARKS SCORED';
 
-  data.cos.forEach((co, idx) => {
-    worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
-    worksheet.getCell(16, startCol + idx).value = data.co_max_totals[co] ?? 0;
-    worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
-    worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
-  });
+    data.cos.forEach((co, idx) => {
+      worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
+      worksheet.getCell(16, startCol + idx).value = data.co_max_totals[co] ?? 0;
+      worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+      worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+    });
+  }
 
   for (let r = 14; r <= 16; r++) {
     for (let c = 1; c <= endCol; c++) setBasicStyle(worksheet.getCell(r, c));
@@ -845,7 +856,7 @@ export const exportComprehensiveAttainmentToExcel = async (
       options: {
         title: {
           display: true,
-          text: 'CO ATTAINMENT THROUGH INTERNAL',
+          text: isExternal ? 'CO ATTAINMENT THROUGH EXTERNAL' : 'CO ATTAINMENT THROUGH INTERNAL',
           fontColor: '#808080',
           fontSize: 16,
           fontStyle: 'bold'
@@ -896,17 +907,189 @@ export const exportComprehensiveAttainmentToExcel = async (
   }
 
   let sigRow = worksheet.addRow([]);
-  worksheet.mergeCells(sigRow.number, 1, sigRow.number, 6);
+  worksheet.mergeCells(sigRow.number, 1, sigRow.number, 3);
   worksheet.getCell(sigRow.number, 1).value = 'Faculty Incharge';
   worksheet.getCell(sigRow.number, 1).font = { bold: true, name: 'Times New Roman', size: 12 };
 
-  worksheet.mergeCells(sigRow.number, startCol - 2, sigRow.number, endCol);
-  worksheet.getCell(sigRow.number, startCol - 2).value = 'HoD';
-  worksheet.getCell(sigRow.number, startCol - 2).font = { bold: true, name: 'Times New Roman', size: 12 };
-  worksheet.getCell(sigRow.number, startCol - 2).alignment = { horizontal: 'right' };
+  const hodCol = Math.max(4, startCol - 2);
+  if (hodCol < endCol) {
+    worksheet.mergeCells(sigRow.number, hodCol, sigRow.number, endCol);
+  }
+  worksheet.getCell(sigRow.number, hodCol).value = 'HoD';
+  worksheet.getCell(sigRow.number, hodCol).font = { bold: true, name: 'Times New Roman', size: 12 };
+  worksheet.getCell(sigRow.number, hodCol).alignment = { horizontal: 'right' };
 
   const buffer = await workbook.xlsx.writeBuffer();
   const safeName = (fileName || `${data.course_code}_CO_Attainment_Report.xlsx`).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, safeName);
+};
+
+export const exportWeightedCOAttainmentToExcel = async (
+  data: NormalizedAttainmentData,
+  weightedData: WeightedCOAttainment[],
+  weightInternal: number,
+  weightExternal: number,
+  fileName?: string
+) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Weighted CO Attainment');
+
+  const setBorder = (cell: ExcelJS.Cell) => {
+    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+  };
+
+  const setBasicStyle = (cell: ExcelJS.Cell, bold = true, size = 11) => {
+    cell.font = { name: 'Times New Roman', size: size, bold: bold };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    setBorder(cell);
+  };
+
+  // Same header rows as before
+  worksheet.mergeCells('A1:L1');
+  const a1 = worksheet.getCell('A1');
+  a1.value = 'KARPAGAM INSTITUTE OF TECHNOLOGY,';
+  a1.font = { bold: true, size: 16, name: 'Times New Roman' };
+  a1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A2:L2');
+  const a2 = worksheet.getCell('A2');
+  a2.value = 'COIMBATORE - 641105';
+  a2.font = { bold: true, size: 14, name: 'Times New Roman' };
+  a2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A3:L3');
+  const a3 = worksheet.getCell('A3');
+  a3.value = data.department_name.toUpperCase();
+  a3.font = { bold: true, size: 14, name: 'Times New Roman' };
+  a3.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A4:L4');
+  const a4 = worksheet.getCell('A4');
+  a4.value = data.academic_year.toUpperCase();
+  a4.font = { bold: true, size: 12, name: 'Times New Roman' };
+  a4.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A5:L5');
+  const a5 = worksheet.getCell('A5');
+  a5.value = `Computation of CO Direct Attainment in the course ${data.course_code}: ${data.course_name}; Academic Year: ${data.academic_year.replace('ACADEMIC YEAR: ', '')}`;
+  a5.font = { bold: true, size: 12, name: 'Times New Roman' };
+  a5.alignment = { horizontal: 'left', vertical: 'middle' };
+  setBorder(a5);
+
+  // Headers
+  worksheet.addRow([]);
+  const r6 = worksheet.getRow(6);
+  r6.height = 70; // Make header tall enough for wrapped text
+
+  worksheet.getCell('A6').value = 'CO';
+
+  worksheet.getCell('B6').value = 'CO-Attainment Internal (CO-INT)\n(Avg. Attainment of All section)';
+  worksheet.getCell('C6').value = 'CO-Attainment University\n(CO-UNI)\n(Avg. Attainment of All section)';
+  worksheet.getCell('D6').value = `Direct CO Attainment\n(${weightInternal.toFixed(2)} x CO-INT + ${weightExternal.toFixed(2)} x CO-UNI)`;
+
+  setBasicStyle(worksheet.getCell('A6'));
+  setBasicStyle(worksheet.getCell('B6'));
+  setBasicStyle(worksheet.getCell('C6'));
+  setBasicStyle(worksheet.getCell('D6'));
+
+  worksheet.getColumn(1).width = 12;
+  worksheet.getColumn(2).width = 25;
+  worksheet.getColumn(3).width = 25;
+  worksheet.getColumn(4).width = 25;
+
+  let row = 7;
+  weightedData.forEach(item => {
+    const coCell = worksheet.getCell(row, 1);
+    coCell.value = item.co.replace('CO', 'C');
+    coCell.font = { color: { argb: 'FFFF0000' }, name: 'Times New Roman', size: 11, bold: true };
+    coCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    setBorder(coCell);
+
+    const intCell = worksheet.getCell(row, 2);
+    intCell.value = item.internal_attainment;
+    intCell.numFmt = '0.00';
+    setBasicStyle(intCell, false);
+
+    const extCell = worksheet.getCell(row, 3);
+    extCell.value = item.external_attainment;
+    extCell.numFmt = '0.00';
+    setBasicStyle(extCell, false);
+
+    const totCell = worksheet.getCell(row, 4);
+    totCell.value = { formula: `${weightInternal.toFixed(2)}*B${row}+${weightExternal.toFixed(2)}*C${row}` };
+    totCell.numFmt = '0.00';
+    setBasicStyle(totCell, false);
+
+    row++;
+  });
+
+  worksheet.addRow([]);
+  worksheet.mergeCells(row, 1, row, 3);
+  setBorder(worksheet.getCell(row, 1));
+  setBorder(worksheet.getCell(row, 2));
+  setBorder(worksheet.getCell(row, 3));
+
+  const avgCell = worksheet.getCell(row, 4);
+  avgCell.value = { formula: `AVERAGE(D7:D${row - 1})` };
+  avgCell.numFmt = '0.00';
+  setBasicStyle(avgCell, true);
+
+  row++;
+  worksheet.addRow([]);
+  worksheet.mergeCells(row, 1, row, 4);
+  const legendCell = worksheet.getCell(row, 1);
+  legendCell.value = '(Level 1: 60-69% , Level 2: 70-79% , Level 3: >=80%)';
+  legendCell.font = { color: { argb: 'FF800080' }, name: 'Times New Roman', size: 11, bold: true };
+  legendCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  row += 3;
+  worksheet.addRow([]);
+  worksheet.mergeCells(row, 1, row, 2);
+  worksheet.getCell(row, 1).value = 'Faculty Incharge';
+  worksheet.getCell(row, 1).font = { bold: true, name: 'Times New Roman', size: 12 };
+  worksheet.getCell(row, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells(row, 3, row, 4);
+  worksheet.getCell(row, 3).value = 'HoD';
+  worksheet.getCell(row, 3).font = { bold: true, name: 'Times New Roman', size: 12 };
+  worksheet.getCell(row, 3).alignment = { horizontal: 'right', vertical: 'middle' };
+
+  try {
+    const chartConfig = {
+      type: 'bar',
+      data: {
+        labels: weightedData.map((_, idx) => (idx + 1).toString()),
+        datasets: [
+          { label: 'Internal', data: weightedData.map(d => d.internal_attainment), backgroundColor: '#4F81BD' },
+          { label: 'University', data: weightedData.map(d => d.external_attainment), backgroundColor: '#C0504D' },
+          { label: 'Overall', data: weightedData.map(d => d.total_attainment), backgroundColor: '#9BBB59' }
+        ]
+      },
+      options: {
+        title: { display: true, text: 'Overall CO Attainment', fontColor: '#808080', fontSize: 16, fontStyle: 'bold' },
+        legend: { display: true, position: 'bottom' },
+        scales: {
+          yAxes: [{ ticks: { min: 0, max: 3, stepSize: 0.5 } }]
+        },
+        plugins: {
+          datalabels: { display: true, align: 'top', anchor: 'end', font: { weight: 'bold', size: 10 } }
+        }
+      }
+    };
+
+    const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&w=500&h=300&bkg=white`;
+    const response = await fetch(chartUrl);
+    const arrayBuffer = await response.arrayBuffer();
+
+    const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
+    worksheet.addImage(imageId, { tl: { col: 6, row: 5 }, ext: { width: 500, height: 300 } });
+  } catch (err) {
+    console.error("Failed to generate chart image:", err);
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const safeName = (fileName || `${data.course_code}_Weighted_CO_Attainment.xlsx`).replace(/[^a-zA-Z0-9_.-]/g, '_');
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   saveAs(blob, safeName);
 };
