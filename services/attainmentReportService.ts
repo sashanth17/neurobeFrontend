@@ -134,12 +134,9 @@ export interface COPOMatrixData {
 
 export interface WeightedCOAttainment {
   co: string;
-  internal_attainment: number;   // from CIA tests (attainment level)
-  direct_assessment_attainment: number; // from direct_assessments (mark_obtained / max_mark * 3)
-  external_attainment: number;   // from external_exams (mark_obtained / max_mark * 3)
-  // Combined internal = avg of CIA internal_attainment and direct_assessment if both exist
-  combined_internal: number;
-  total_attainment: number;      // Wint * combined_internal + Wext * external_attainment
+  internal_attainment: number;   // from internal tests (attainment level)
+  external_attainment: number;   // from external tests (attainment level)
+  total_attainment: number;      // Wint * internal_attainment + Wext * external_attainment
 }
 
 export interface POAttainmentResult {
@@ -501,8 +498,8 @@ export const calculatePOAttainment = (
         mapping_value: mappingVal,
       });
 
-      weightedSum += coAtt * mappingVal;
-      totalWeight += mappingVal;
+      weightedSum += (coAtt * mappingVal) / 3;
+      totalWeight += 1; // count of contributing COs
     });
 
     const attainmentValue = totalWeight > 0
@@ -520,21 +517,58 @@ export const calculatePOAttainment = (
 };
 
 /**
+ * Fetches active CO-PO matrix for the given course directly via commonInstance
+ */
+export const fetchCopoMatrixDirect = async (
+  courseId: string | number
+): Promise<COPOMatrixData | null> => {
+  try {
+    const res = await commonInstance().get(`course/copo?course_id=${courseId}`);
+    const data = Array.isArray(res.data) ? res.data : [res.data];
+    // Find the active one (is_active === true)
+    const active = data.find((d: any) => d.is_active === true);
+    if (active && active.matrix_entries) {
+      return {
+        copo_id: active.copo_id,
+        matrix_entries: active.matrix_entries,
+      };
+    }
+    // Fallback: first one with matrix_entries
+    const withEntries = data.find((d: any) => d.matrix_entries?.length > 0);
+    if (withEntries) {
+      return {
+        copo_id: withEntries.copo_id,
+        matrix_entries: withEntries.matrix_entries,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn("[AttainmentService] Failed to fetch COPO matrix:", err);
+    return null;
+  }
+};
+
+/**
  * Fetches comprehensive extraction results from the backend API using commonInstance
  */
 export const fetchComprehensiveExtractionResults = async (
   courseId?: string | number,
-  courseInstanceId?: string | number | null
+  courseInstanceId?: string | number | null,
+  testType?: boolean
 ): Promise<ComprehensiveExtractionResponse> => {
   const targetId = courseId || 1;
-  const instanceParam =
-    courseInstanceId !== undefined && courseInstanceId !== null && courseInstanceId !== ""
-      ? `?course_instance_id=${courseInstanceId}`
-      : "";
+  const params = new URLSearchParams();
+  if (courseInstanceId !== undefined && courseInstanceId !== null && courseInstanceId !== "") {
+    params.set("course_instance_id", String(courseInstanceId));
+  }
+  if (testType !== undefined) {
+    params.set("test_type", String(testType));
+  }
+  const queryStr = params.toString() ? `?${params.toString()}` : "";
 
   const endpointsToTry = [
-    `course/api/v1/courses/${targetId}/comprehensive-extraction-results${instanceParam}`,
-    `course/api/v1/courses/1/comprehensive-extraction-results${instanceParam}`,
+    `course/api/v1/courses/${targetId}/comprehensive-extraction-results${queryStr}`,
+    `course/api/v1/courses/1/comprehensive-extraction-results${queryStr}`,
   ];
 
   for (const endpoint of endpointsToTry) {
@@ -740,19 +774,28 @@ export const exportComprehensiveAttainmentToExcel = async (
   let currentLastRow = startStudentRow + data.students.length;
 
   const summaryLabels = [
-    { label: "CO's Target Value", field: 'target_value' },
-    { label: "No. of Students scored above CO's Target Value", field: 'students_above_target_count' },
-    { label: 'Percentage of Students scored above Target', field: 'percentage_above_target' },
-    { label: 'CO Attainment', field: 'attainment_level' },
-    { label: 'CO attainment Values to plot the Graph', field: 'attainment_level' }
+    "CO's Target Value",
+    "No. of Students scored above CO's Target Value",
+    'Percentage of Students scored above Target',
+    'CO Attainment',
+    'CO attainment Values to plot the Graph'
   ];
 
-  summaryLabels.forEach((item, idx) => {
+  const targetPctCell = '$J$8';
+  const totalStudentsCell = '$J$9';
+  const startSt = 17;
+  const endSt = Math.max(17, currentLastRow - 1);
+  const tr = currentLastRow;     // Target Value row
+  const sr = currentLastRow + 1; // Students above row
+  const pr = currentLastRow + 2; // Percentage row
+  const ar = currentLastRow + 3; // Attainment row
+
+  summaryLabels.forEach((label, idx) => {
     let rIdx = currentLastRow + idx;
     worksheet.addRow([]);
     worksheet.mergeCells(rIdx, 1, rIdx, startCol - 1);
     let cell = worksheet.getCell(rIdx, 1);
-    cell.value = item.label;
+    cell.value = label;
     cell.alignment = { horizontal: 'right', vertical: 'middle' };
     cell.font = { name: 'Times New Roman', size: 11, bold: true };
     setBorder(cell);
@@ -760,9 +803,23 @@ export const exportComprehensiveAttainmentToExcel = async (
 
     data.cos.forEach((co, coIdx) => {
       let vCell = worksheet.getCell(rIdx, startCol + coIdx);
-      vCell.value = summary.cos_summary[co]?.[item.field] ?? 0;
+      const colLetter = worksheet.getColumn(startCol + coIdx).letter;
+
+      if (idx === 0) { // Target Value
+        vCell.value = { formula: `${colLetter}16*(${targetPctCell}/100)` };
+      } else if (idx === 1) { // No. of Students
+        vCell.value = { formula: `COUNTIF(${colLetter}${startSt}:${colLetter}${endSt},">="&${colLetter}${tr})` };
+      } else if (idx === 2) { // Percentage
+        vCell.value = { formula: `(${colLetter}${sr}/${totalStudentsCell})*100` };
+      } else if (idx === 3) { // CO Attainment
+        vCell.value = { formula: `IF(80<=${colLetter}${pr},3.00,IF(70<=${colLetter}${pr},2.00,IF(60<=${colLetter}${pr},1.00,0)))` };
+      } else if (idx === 4) { // Graph value (same as Attainment)
+        vCell.value = { formula: `${colLetter}${ar}` };
+      }
+
       vCell.font = { name: 'Times New Roman', size: 11, bold: true };
       vCell.alignment = { horizontal: 'center' };
+      vCell.numFmt = (idx === 0 || idx === 2 || idx === 3 || idx === 4) ? '0.00' : '0';
       setBorder(vCell);
     });
   });

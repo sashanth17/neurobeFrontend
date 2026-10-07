@@ -49,6 +49,7 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
             <option value="RETEST">Retest / Improvement</option>
             <option value="QUIZ">Quiz / Unit Assessment</option>
             <option value="ASSIGNMENT">Assignment Exam</option>
+            <option value="EXTERNAL">External Exam</option>
           </select>
         </div>
 
@@ -62,11 +63,10 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
             value={formData.test_name}
             onChange={(e) => onChange("test_name", e.target.value)}
             placeholder="e.g. CIA-1 Continuous Assessment 2026"
-            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs text-gray-800 transition-colors focus:border-purple-500 focus:outline-none dark:bg-gray-800 dark:text-gray-200 ${
-              formErrors.test_name
-                ? "border-red-400 bg-red-50 dark:border-red-600 dark:bg-red-900/20"
-                : "border-gray-200 bg-white dark:border-gray-700"
-            }`}
+            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs text-gray-800 transition-colors focus:border-purple-500 focus:outline-none dark:bg-gray-800 dark:text-gray-200 ${formErrors.test_name
+              ? "border-red-400 bg-red-50 dark:border-red-600 dark:bg-red-900/20"
+              : "border-gray-200 bg-white dark:border-gray-700"
+              }`}
           />
           {formErrors.test_name && (
             <p className="mt-1 text-[11px] text-red-500">{formErrors.test_name}</p>
@@ -83,11 +83,10 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
             value={formData.test_code}
             onChange={(e) => onChange("test_code", e.target.value)}
             placeholder="e.g. CS301-CIA1-2026"
-            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs font-mono text-gray-800 transition-colors focus:border-purple-500 focus:outline-none dark:bg-gray-800 dark:text-gray-200 ${
-              formErrors.test_code
-                ? "border-red-400 bg-red-50 dark:border-red-600 dark:bg-red-900/20"
-                : "border-gray-200 bg-white dark:border-gray-700"
-            }`}
+            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs font-mono text-gray-800 transition-colors focus:border-purple-500 focus:outline-none dark:bg-gray-800 dark:text-gray-200 ${formErrors.test_code
+              ? "border-red-400 bg-red-50 dark:border-red-600 dark:bg-red-900/20"
+              : "border-gray-200 bg-white dark:border-gray-700"
+              }`}
           />
           {formErrors.test_code && (
             <p className="mt-1 text-[11px] text-red-500">{formErrors.test_code}</p>

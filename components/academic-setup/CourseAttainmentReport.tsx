@@ -35,9 +35,9 @@ import {
   POAttainmentResult,
   COPOMatrixData,
   fetchComprehensiveExtractionResults,
+  fetchCopoMatrixDirect,
   normalizeComprehensiveExtractionData,
   calculateComprehensiveAttainment,
-  calculateWeightedCOAttainment,
   calculatePOAttainment,
   exportComprehensiveAttainmentToExcel,
 } from "@/services/attainmentReportService";
@@ -62,8 +62,8 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [attainmentData, setAttainmentData] = useState<NormalizedAttainmentData | null>(null);
   const [expandedStudentId, setExpandedStudentId] = useState<string | number | null>(null);
 
-  // Sub-tab within CO Attainment: "internal" | "weighted" | "po-attainment"
-  const [subTab, setSubTab] = useState<"internal" | "weighted" | "po-attainment">("internal");
+  // Sub-tab within CO Attainment: "internal" | "external" | "weighted" | "po-attainment"
+  const [subTab, setSubTab] = useState<"internal" | "external" | "weighted" | "po-attainment">("internal");
 
   // Weightage state
   const [weightInternal, setWeightInternal] = useState<number>(0.6);
@@ -72,6 +72,10 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   // CO-PO matrix state
   const [copoMatrix, setCopoMatrix] = useState<COPOMatrixData | null>(null);
   const [loadingCopo, setLoadingCopo] = useState<boolean>(false);
+
+  // External assessment state
+  const [externalAttainmentData, setExternalAttainmentData] = useState<NormalizedAttainmentData | null>(null);
+  const [loadingExternal, setLoadingExternal] = useState<boolean>(false);
 
   // Course instances state
   const [instances, setInstances] = useState<any[]>([]);
@@ -89,7 +93,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
           ? instanceIdToUse
           : selectedInstanceId || (router.query.course_instance_id as string) || 1;
 
-      const raw = await fetchComprehensiveExtractionResults(activeCourseId, instId);
+      const raw = await fetchComprehensiveExtractionResults(activeCourseId, instId, false);
 
       // Find selected instance for coordinator details
       const matchedInst = instances.find((i) => String(i.id) === String(instId));
@@ -129,9 +133,56 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     }
   };
 
+  const loadExternalData = async (instanceIdToUse?: string | number | null) => {
+    setLoadingExternal(true);
+    try {
+      const activeCourseId = courseId || 1;
+      const instId =
+        instanceIdToUse !== undefined
+          ? instanceIdToUse
+          : selectedInstanceId || (router.query.course_instance_id as string) || 1;
+
+      const raw = await fetchComprehensiveExtractionResults(activeCourseId, instId, true);
+
+      const matchedInst = instances.find((i) => String(i.id) === String(instId));
+      const actualCoordinator = (
+        matchedInst?.coordinator_name ||
+        courseDetail?.coordinator_name ||
+        courseMetadata?.coordinator_name ||
+        courseMetadata?.course_coordinator ||
+        ""
+      ).trim();
+
+      const normalized = normalizeComprehensiveExtractionData(
+        raw,
+        targetPercentage,
+        actualCoordinator
+      );
+
+      if (courseMetadata || courseDetail) {
+        const meta = courseMetadata || courseDetail;
+        normalized.course_code = meta.course_code || normalized.course_code;
+        normalized.course_name = meta.course_title || normalized.course_name;
+        if (meta.semester) {
+          normalized.year_sem = `Year II / Sem ${meta.semester}`;
+        }
+        if (meta.department_name) {
+          normalized.department_name = meta.department_name;
+        }
+      }
+
+      setExternalAttainmentData(normalized);
+    } catch (err: any) {
+      console.error("Failed to load external extraction results:", err);
+    } finally {
+      setLoadingExternal(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedInstanceId !== null) {
       loadExtractionData(selectedInstanceId);
+      loadExternalData(selectedInstanceId);
     }
   }, [selectedInstanceId, courseId]);
 
@@ -158,11 +209,33 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     return calculateComprehensiveAttainment(attainmentData, targetPercentage);
   }, [attainmentData, targetPercentage]);
 
+  const externalSummary: AttainmentCalculationSummary | null = useMemo(() => {
+    if (!externalAttainmentData) return null;
+    return calculateComprehensiveAttainment(externalAttainmentData, targetPercentage);
+  }, [externalAttainmentData, targetPercentage]);
+
   // Weighted CO attainment calculation
-  const weightedCOAttainment: WeightedCOAttainment[] = useMemo(() => {
-    if (!attainmentData || !summary) return [];
-    return calculateWeightedCOAttainment(attainmentData, summary, weightInternal, weightExternal);
-  }, [attainmentData, summary, weightInternal, weightExternal]);
+  const weightedCOAttainment = useMemo(() => {
+    if (!summary) return [];
+    
+    const allCos = attainmentData?.cos || [];
+    
+    return allCos.map((co) => {
+      const internalLevel = summary.cos_summary[co]?.attainment_level || 0;
+      const externalLevel = externalSummary?.cos_summary[co]?.attainment_level || 0;
+      
+      const total = Number(
+        (weightInternal * internalLevel + weightExternal * externalLevel).toFixed(2)
+      );
+      
+      return {
+        co,
+        internal_attainment: internalLevel,
+        external_attainment: externalLevel,
+        total_attainment: total,
+      };
+    });
+  }, [summary, externalSummary, weightInternal, weightExternal, attainmentData]);
 
   // PO attainment calculation
   const poAttainment: POAttainmentResult[] = useMemo(() => {
@@ -175,26 +248,10 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     const activeCourseId = courseId || 1;
     setLoadingCopo(true);
     try {
-      const res: any = await Models.copo.get_active(activeCourseId);
-      if (res && res.matrix_entries) {
-        setCopoMatrix(res);
-      } else if (res?.copo_id) {
-        setCopoMatrix(res);
-      }
+      const matrix = await fetchCopoMatrixDirect(activeCourseId);
+      if (matrix) setCopoMatrix(matrix);
     } catch (err) {
-      console.warn("No active CO-PO matrix found:", err);
-      // Try list and get the first one
-      try {
-        const listRes: any = await Models.copo.list({ course_id: activeCourseId });
-        const versions = Array.isArray(listRes) ? listRes : listRes?.data || [];
-        if (versions.length > 0) {
-          const latest = versions[versions.length - 1];
-          const fullRes: any = await Models.copo.get(latest.copo_id || latest.id);
-          if (fullRes) setCopoMatrix(fullRes);
-        }
-      } catch (err2) {
-        console.warn("Could not load CO-PO matrix:", err2);
-      }
+      console.warn("Could not load CO-PO matrix:", err);
     } finally {
       setLoadingCopo(false);
     }
@@ -402,6 +459,17 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
         </button>
         <button
           type="button"
+          onClick={() => setSubTab("external")}
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${subTab === "external"
+            ? "bg-indigo-600 text-white shadow-sm"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          External Assessment
+        </button>
+        <button
+          type="button"
           onClick={() => setSubTab("weighted")}
           className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${subTab === "weighted"
             ? "bg-indigo-600 text-white shadow-sm"
@@ -425,11 +493,58 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* ── SUB-TAB: Internal Assessment (existing content) ──────────── */}
+      {/* ── SUB-TAB: Internal & External Assessment ──────────── */}
       {/* ══════════════════════════════════════════════════════════════════ */}
-      {subTab === "internal" && (<>
+      {(subTab === "internal" || subTab === "external") && ((currentAttainmentData: any, currentSummary: any) => {
+        const isExternal = subTab === "external";
+        
+        if (isExternal && loadingExternal && !currentAttainmentData) {
+          return (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white p-12 py-24 text-center dark:border-slate-800 dark:bg-slate-900">
+              <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
+              <p className="mt-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Loading external assessment data...</p>
+            </div>
+          );
+        }
 
-        {/* ── CO Attainment KPI Cards (Clean SaaS Design) ── */}
+        if (!currentAttainmentData || (isExternal && currentAttainmentData.tests.length === 0)) {
+          return (
+             <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white p-12 py-24 text-center dark:border-slate-800 dark:bg-slate-900">
+               <div className="rounded-full bg-slate-100 p-4 dark:bg-slate-800">
+                 <BarChart3 className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+               </div>
+               <p className="mt-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                 {isExternal ? "No external assessment data available" : "No internal assessment data available"}
+               </p>
+               {isExternal && (
+                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                   External assessment results have not been processed for this course.
+                 </p>
+               )}
+             </div>
+          );
+        }
+
+        // Alias for the rest of the block to avoid renaming everything
+        const attainmentData = currentAttainmentData;
+        const summary = currentSummary;
+        
+        const filteredStudentsForTab = isExternal
+          ? attainmentData.students.filter((s: any) =>
+              !searchQuery.trim() ||
+              s.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+              s.register_no.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+              String(s.student_id).toLowerCase().includes(searchQuery.toLowerCase().trim())
+            )
+          : filteredStudents;
+
+        const assessmentTitle = isExternal 
+          ? "External Assessment — Attainment of Course Outcomes (Through End Semester)" 
+          : "Internal Assessment — Attainment of Course Outcomes (Through Direct Assessment)";
+
+        return (
+          <>
+            {/* ── CO Attainment KPI Cards (Clean SaaS Design) ── */}
         {summary && (
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {attainmentData.cos.map((co) => {
@@ -520,7 +635,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
               {attainmentData.academic_year}
             </p>
             <div className="mt-2 inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
-              Internal Assessment — Attainment of Course Outcomes (Through Direct Assessment)
+              {assessmentTitle}
             </div>
           </div>
 
@@ -740,7 +855,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
                   {/* ── Student Rows ── */}
                   <tbody className="divide-y divide-slate-100 text-slate-800 dark:divide-slate-800 dark:text-slate-200">
-                    {filteredStudents.map((st, idx) => {
+                    {filteredStudentsForTab.map((st: any, idx: number) => {
                       const isExpanded = expandedStudentId === st.student_id;
 
                       return (
@@ -848,7 +963,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       );
                     })}
 
-                    {filteredStudents.length === 0 && (
+                    {filteredStudentsForTab.length === 0 && (
                       <tr>
                         <td colSpan={100} className="p-8 text-center text-xs text-slate-400">
                           No students found matching "{searchQuery}".
@@ -1023,7 +1138,12 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
             </div>
           </div>
         </div>
-      </>)}
+        </>
+        );
+      })(
+        subTab === "external" ? externalAttainmentData : attainmentData,
+        subTab === "external" ? externalSummary : summary
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* ── SUB-TAB: Weighted CO Attainment ──────────────────────────── */}
@@ -1119,106 +1239,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
             </div>
           </div>
 
-          {/* ── Direct Assessments (Assignments) & External Exams Side-by-Side ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Direct Assessments Card */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-              <div className="border-b border-slate-100 bg-indigo-50/50 px-5 py-3 dark:border-slate-800 dark:bg-indigo-950/30">
-                <h4 className="flex items-center gap-2 text-xs font-bold text-indigo-800 dark:text-indigo-300">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  Direct Assessments (Assignments)
-                </h4>
-                <p className="mt-0.5 text-[10px] text-indigo-600/70 dark:text-indigo-400/70">
-                  CO-wise marks from uploaded assignment results
-                </p>
-              </div>
-              <div className="p-4">
-                {attainmentData.direct_assessments.length > 0 ? (
-                  <table className="w-full border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="py-2 px-3 text-left font-bold text-slate-700 dark:text-slate-300">CO</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Marks Obtained</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Max Marks</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">% Score</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Attainment (0-3)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {attainmentData.direct_assessments.map((da) => {
-                        const pct = da.max_mark > 0 ? ((da.mark_obtained / da.max_mark) * 100).toFixed(1) : "0";
-                        const att = da.max_mark > 0 ? ((da.mark_obtained / da.max_mark) * 3).toFixed(2) : "0";
-                        return (
-                          <tr key={da.co_code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                            <td className="py-2 px-3 font-bold text-indigo-600 dark:text-indigo-400">{da.co_code}</td>
-                            <td className="py-2 px-3 text-center font-semibold text-slate-900 dark:text-white">{da.mark_obtained}</td>
-                            <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-300">{da.max_mark}</td>
-                            <td className="py-2 px-3 text-center font-semibold text-sky-700 dark:text-sky-400">{pct}%</td>
-                            <td className="py-2 px-3 text-center font-black text-indigo-700 dark:text-indigo-300">{att}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <BookOpen className="h-8 w-8 text-slate-300 dark:text-slate-600" />
-                    <p className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500">No direct assessment data available</p>
-                    <p className="text-[10px] text-slate-400">Upload assignment marks to see CO-wise attainment</p>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* External Exams Card */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-              <div className="border-b border-slate-100 bg-emerald-50/50 px-5 py-3 dark:border-slate-800 dark:bg-emerald-950/30">
-                <h4 className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                  <GraduationCap className="h-3.5 w-3.5" />
-                  External Exams (End Semester)
-                </h4>
-                <p className="mt-0.5 text-[10px] text-emerald-600/70 dark:text-emerald-400/70">
-                  CO-wise marks from end semester examination results
-                </p>
-              </div>
-              <div className="p-4">
-                {attainmentData.external_exams.length > 0 ? (
-                  <table className="w-full border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="py-2 px-3 text-left font-bold text-slate-700 dark:text-slate-300">CO</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Marks Obtained</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Max Marks</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">% Score</th>
-                        <th className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">Attainment (0-3)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {attainmentData.external_exams.map((ee) => {
-                        const pct = ee.max_mark > 0 ? ((ee.mark_obtained / ee.max_mark) * 100).toFixed(1) : "0";
-                        const att = ee.max_mark > 0 ? ((ee.mark_obtained / ee.max_mark) * 3).toFixed(2) : "0";
-                        return (
-                          <tr key={ee.co_code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                            <td className="py-2 px-3 font-bold text-emerald-600 dark:text-emerald-400">{ee.co_code}</td>
-                            <td className="py-2 px-3 text-center font-semibold text-slate-900 dark:text-white">{ee.mark_obtained}</td>
-                            <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-300">{ee.max_mark}</td>
-                            <td className="py-2 px-3 text-center font-semibold text-sky-700 dark:text-sky-400">{pct}%</td>
-                            <td className="py-2 px-3 text-center font-black text-emerald-700 dark:text-emerald-300">{att}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <GraduationCap className="h-8 w-8 text-slate-300 dark:text-slate-600" />
-                    <p className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500">No external exam data available</p>
-                    <p className="text-[10px] text-slate-400">External exam marks will appear here when available</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
 
           {/* ── Weighted CO Attainment Summary Table ── */}
           <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
@@ -1238,10 +1259,8 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       <th className="py-3 px-4 text-left">CO</th>
-                      <th className="py-3 px-3">CIA Attainment<br /><span className="text-[10px] font-normal text-slate-400">(Level 0-3)</span></th>
-                      <th className="py-3 px-3">Direct Assessment<br /><span className="text-[10px] font-normal text-slate-400">(Scaled 0-3)</span></th>
-                      <th className="py-3 px-3 bg-indigo-50/60 dark:bg-indigo-950/20">Combined Internal<br /><span className="text-[10px] font-normal text-indigo-500">(Avg of CIA + DA)</span></th>
-                      <th className="py-3 px-3 bg-emerald-50/60 dark:bg-emerald-950/20">External Attainment<br /><span className="text-[10px] font-normal text-emerald-500">(Scaled 0-3)</span></th>
+                      <th className="py-3 px-3 bg-indigo-50/60 dark:bg-indigo-950/20">Internal Attainment<br /><span className="text-[10px] font-normal text-indigo-500">(Level 0-3)</span></th>
+                      <th className="py-3 px-3 bg-emerald-50/60 dark:bg-emerald-950/20">External Attainment<br /><span className="text-[10px] font-normal text-emerald-500">(Level 0-3)</span></th>
                       <th className="py-3 px-3 bg-violet-50/60 dark:bg-violet-950/20">
                         <span className="text-violet-700 dark:text-violet-300">Total Attainment</span>
                         <br /><span className="text-[10px] font-normal text-violet-500">{weightInternal}×Int + {weightExternal}×Ext</span>
@@ -1260,9 +1279,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       return (
                         <tr key={w.co} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                           <td className="py-3 px-4 text-left font-bold text-indigo-600 dark:text-indigo-400">{w.co}</td>
-                          <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">{w.internal_attainment}</td>
-                          <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">{w.direct_assessment_attainment}</td>
-                          <td className="py-3 px-3 font-bold text-indigo-700 bg-indigo-50/40 dark:text-indigo-300 dark:bg-indigo-950/10">{w.combined_internal}</td>
+                          <td className="py-3 px-3 font-bold text-indigo-700 bg-indigo-50/40 dark:text-indigo-300 dark:bg-indigo-950/10">{w.internal_attainment}</td>
                           <td className="py-3 px-3 font-bold text-emerald-700 bg-emerald-50/40 dark:text-emerald-300 dark:bg-emerald-950/10">{w.external_attainment}</td>
                           <td className={`py-3 px-3 font-black text-base bg-violet-50/40 dark:bg-violet-950/10 ${levelColor}`}>
                             {w.total_attainment}
@@ -1416,7 +1433,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                     PO Attainment Calculation Breakdown
                   </h4>
                   <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
-                    PO Attainment = Σ(CO Attainment × Mapping Value) / Σ(Mapping Value) for each Program Outcome
+                    PO Attainment = Average of ((CO Attainment × Mapping Value) / 3) for contributing COs
                   </p>
                 </div>
                 <div className="p-5 overflow-x-auto">
