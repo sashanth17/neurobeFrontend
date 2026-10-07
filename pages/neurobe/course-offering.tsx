@@ -68,6 +68,16 @@ const CourseOffering = () => {
     router.push(`/neurobe/student-enrollment?instance_id=${row.id}&course_id=${row.course_id || ""}`);
   };
 
+  const handleRowClick = (arg: any) => {
+    const row = arg && typeof arg === "object" && "record" in arg ? arg.record : arg;
+    if (!row) return;
+    const courseId = row.course_id ?? row.courseId ?? 1;
+    const instanceId = row.id ?? row.course_instance_id;
+    if (instanceId) {
+      router.push(`/neurobe/course-instance/${instanceId}`);
+    }
+  };
+
   const handleToggleArchive = async (row: any) => {
     try {
       setState({ loading: true });
@@ -259,6 +269,8 @@ const CourseOffering = () => {
           columns={makeCourseOfferingColumns(openEdit, handleManageStudents, handleToggleArchive)}
           loading={state.loading}
           noRecordsText="No course instances found"
+          onRowClick={handleRowClick}
+          rowClassName={() => "cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors"}
         />
       </div>
     </div>

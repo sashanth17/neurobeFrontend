@@ -186,12 +186,12 @@ export const OwnmenuConfig = {
       label: "Live Test Monitor",
       href: "/neurobe/ins-mcq-live-monitor",
     },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Marks Extraction & Verification",
-      href: "/neurobe/mark-extraction",
-    },
+    // {
+    //   type: "link",
+    //   icon: "IconMenuNotes",
+    //   label: "Marks Extraction & Verification",
+    //   href: "/neurobe/mark-extraction",
+    // },
     // {
     //   type: "submenu",
     //   icon: "IconMenuCharts",
@@ -254,12 +254,12 @@ export const OwnmenuConfig = {
       href: "/neurobe/ins-mcq-live-monitor",
     },
 
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Marks Extraction & Verification",
-      href: "/neurobe/mark-extraction",
-    },
+    // {
+    //   type: "link",
+    //   icon: "IconMenuNotes",
+    //   label: "Marks Extraction & Verification",
+    //   href: "/neurobe/mark-extraction",
+    // },
   ],
 };
 
@@ -306,12 +306,12 @@ OwnmenuConfig.FACULTY = [
     label: "Live Test Monitor",
     href: "/neurobe/ins-mcq-live-monitor",
   },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "Marks Extraction & Verification",
-    href: "/neurobe/mark-extraction",
-  },
+  // {
+  //   type: "link",
+  //   icon: "IconMenuNotes",
+  //   label: "Marks Extraction & Verification",
+  //   href: "/neurobe/mark-extraction",
+  // },
 ];
 
 OwnmenuConfig.STUDENT = [

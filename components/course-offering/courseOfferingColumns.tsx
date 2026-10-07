@@ -9,13 +9,6 @@ export const StatusCell = ({ status }: { status: string }) => (
   </span>
 );
 
-const FacultyBadge = ({ label }: { label: string }) => (
-  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-    {label}
-  </span>
-);
-
 const ProgrammeBadge = ({ programme }: { programme: string }) => (
   <span className="inline-flex items-center rounded-full bg-[#ede9fe] px-2.5 py-0.5 text-xs font-semibold text-color2">
     {programme}
@@ -226,7 +219,10 @@ export const makeCourseOfferingColumns = (
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => onManageStudents?.(row)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onManageStudents?.(row);
+          }}
           className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-color2 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/30 dark:hover:bg-purple-900/40"
           title="Manage Students"
         >
@@ -235,7 +231,10 @@ export const makeCourseOfferingColumns = (
         </button>
         <button
           type="button"
-          onClick={() => onToggleArchive?.(row)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleArchive?.(row);
+          }}
           className={`p-1.5 rounded-lg border text-xs transition ${
             row.is_archived
               ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
@@ -247,7 +246,10 @@ export const makeCourseOfferingColumns = (
         </button>
         <button
           type="button"
-          onClick={() => onEdit?.(row)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit?.(row);
+          }}
           className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-color2 dark:border-gray-700 dark:text-gray-300 dark:hover:text-purple-400"
           title="Edit Course Instance"
         >

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { DataTable } from "mantine-datatable";
 import IconLoader from "@/components/Icon/IconLoader";
-import { ArrowLeft, ArrowRight, Forward } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 interface TableComponentProps {
   records: any[];
@@ -11,6 +11,8 @@ interface TableComponentProps {
   pageSize?: number;
   showPagination?: boolean;
   paginationLabel?: string;
+  onRowClick?: (record: any, recordIndex: number) => void;
+  rowClassName?: string | ((record: any, recordIndex: number) => string | undefined);
 }
 
 const TableComponent = ({
@@ -21,6 +23,8 @@ const TableComponent = ({
   pageSize = 8,
   showPagination = false,
   paginationLabel = "records",
+  onRowClick,
+  rowClassName,
 }: TableComponentProps) => {
   const [page, setPage] = useState(1);
 
@@ -46,6 +50,8 @@ const TableComponent = ({
         records={paginated}
         columns={columns}
         fetching={loading}
+        onRowClick={onRowClick}
+        rowClassName={rowClassName}
         customLoader={
           <div className="flex items-center justify-center py-12">
             <IconLoader className="h-6 w-6 animate-spin text-color2" />

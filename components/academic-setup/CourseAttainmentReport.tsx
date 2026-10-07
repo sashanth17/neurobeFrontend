@@ -75,65 +75,9 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
   // Course instances state
   const [instances, setInstances] = useState<any[]>([]);
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | number | null>(null);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | number | null>(offeringId);
   const [courseDetail, setCourseDetail] = useState<any>(null);
 
-  // Fetch Course details and available instances
-  useEffect(() => {
-    const fetchCourseAndInstances = async () => {
-      const activeCourseId = courseId || 1;
-      try {
-        const [cRes, iRes]: [any, any] = await Promise.all([
-          Models.course.detail(activeCourseId).catch(() => null),
-          Models.course_instance.list({ course_id: activeCourseId }).catch(() => null),
-        ]);
-
-        if (cRes) {
-          setCourseDetail(cRes);
-        }
-
-        // Build list of instances from course detail and instance list
-        let instList: any[] = [];
-        if (Array.isArray(iRes)) {
-          instList = iRes;
-        } else if (iRes?.data && Array.isArray(iRes.data)) {
-          instList = iRes.data;
-        } else if (cRes?.instances && Array.isArray(cRes.instances)) {
-          instList = cRes.instances;
-        } else if (cRes?.course_instances && Array.isArray(cRes.course_instances)) {
-          instList = cRes.course_instances;
-        }
-
-        // If specific instance id is on course detail and not in list
-        if (cRes?.course_instance_id && !instList.some((inst) => String(inst.id) === String(cRes.course_instance_id))) {
-          instList.unshift({
-            id: cRes.course_instance_id,
-            course_instance_name: `Instance #${cRes.course_instance_id}`,
-            coordinator_name: cRes.coordinator_name || null,
-          });
-        }
-
-        if (instList.length === 0) {
-          instList = [{ id: 1, course_instance_name: "Instance 1" }];
-        }
-
-        setInstances(instList);
-
-        // Determine active instance ID
-        const urlInstanceId = (router.query.course_instance_id as string) || (router.query.instance_id as string);
-        const resolvedInstanceId =
-          urlInstanceId ||
-          cRes?.course_instance_id ||
-          (instList[0]?.id ? String(instList[0].id) : "1");
-
-        setSelectedInstanceId(resolvedInstanceId);
-      } catch (err) {
-        console.warn("Failed to fetch course detail or instances:", err);
-      }
-    };
-
-    fetchCourseAndInstances();
-  }, [courseId]);
 
   // Fetch extraction results for the active course and selected instance
   const loadExtractionData = async (instanceIdToUse?: string | number | null) => {
@@ -387,33 +331,15 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                 type="button"
                 onClick={() => setTargetPercentage(pct)}
                 className={`rounded-lg px-2 py-1 text-xs font-bold transition ${targetPercentage === pct
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                   }`}
               >
                 {pct}%
               </button>
             ))}
           </div>
-          {/* Course Instance Filter Dropdown */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1 dark:border-slate-700 dark:bg-slate-800/80">
-            <Layers className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-            <label htmlFor="course-instance-select" className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
-              Instance:
-            </label>
-            <select
-              id="course-instance-select"
-              value={selectedInstanceId || ""}
-              onChange={(e) => handleInstanceChange(e.target.value)}
-              className="h-7 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            >
-              {instances.map((inst) => (
-                <option key={inst.id} value={String(inst.id)}>
-                  {inst.course_instance_name || `Instance #${inst.id}`} {inst.semester ? `(Sem ${inst.semester})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+
 
           {/* Search Box */}
           <div className="relative">
@@ -503,600 +429,600 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
       {/* ══════════════════════════════════════════════════════════════════ */}
       {subTab === "internal" && (<>
 
-      {/* ── CO Attainment KPI Cards (Clean SaaS Design) ── */}
-      {summary && (
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-          {attainmentData.cos.map((co) => {
-            const data = summary.cos_summary[co];
-            const level = data?.attainment_level || 0;
-            const levelColor =
-              level === 3
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
-                : level === 2
-                  ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400"
-                  : level === 1
-                    ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400"
-                    : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400";
+        {/* ── CO Attainment KPI Cards (Clean SaaS Design) ── */}
+        {summary && (
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            {attainmentData.cos.map((co) => {
+              const data = summary.cos_summary[co];
+              const level = data?.attainment_level || 0;
+              const levelColor =
+                level === 3
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
+                  : level === 2
+                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400"
+                    : level === 1
+                      ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400"
+                      : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400";
 
-            return (
-              <div
-                key={co}
-                className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
-                      {co}
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      (Max {data?.max_marks || 0} Marks)
+              return (
+                <div
+                  key={co}
+                  className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
+                        {co}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        (Max {data?.max_marks || 0} Marks)
+                      </span>
+                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold ${levelColor}`}
+                    >
+                      Level {level}
                     </span>
                   </div>
-                  <span
-                    className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold ${levelColor}`}
-                  >
-                    Level {level}
-                  </span>
-                </div>
 
-                <div className="mt-3 flex items-baseline justify-between">
-                  <div>
-                    <span className="text-2xl font-black text-slate-900 dark:text-white">
-                      {data?.percentage_above_target || 0}%
-                    </span>
-                    <span className="ml-1.5 text-xs text-slate-500 dark:text-slate-400">
-                      students ≥ {targetPercentage}%
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-2xl font-black text-slate-900 dark:text-white">
+                        {data?.percentage_above_target || 0}%
+                      </span>
+                      <span className="ml-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        students ≥ {targetPercentage}%
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {data?.students_above_target_count || 0} / {summary.total_students}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    {data?.students_above_target_count || 0} / {summary.total_students}
-                  </span>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${level === 3
+                  {/* Progress Bar */}
+                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${level === 3
                         ? "bg-emerald-500"
                         : level === 2
                           ? "bg-blue-500"
                           : level === 1
                             ? "bg-amber-500"
                             : "bg-slate-400"
-                      }`}
-                    style={{ width: `${Math.min(data?.percentage_above_target || 0, 100)}%` }}
-                  />
-                </div>
+                        }`}
+                      style={{ width: `${Math.min(data?.percentage_above_target || 0, 100)}%` }}
+                    />
+                  </div>
 
-                <div className="mt-3 flex justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                  <span>Target Value:</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {data?.target_value} marks
-                  </span>
+                  <div className="mt-3 flex justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    <span>Target Value:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {data?.target_value} marks
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Main Sheet Container (Excel-Identical Structure, Modern SaaS Alignment) ── */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        {/* Institutional & Academic Header Strip */}
-        <div className="border-b border-slate-100 bg-slate-50/60 p-6 text-center dark:border-slate-800 dark:bg-slate-800/40">
-          <h3 className="text-base font-extrabold uppercase tracking-wide text-slate-900 dark:text-white sm:text-lg">
-            Karpagam Institute of Technology, Coimbatore - 641105
-          </h3>
-          <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
-            {attainmentData.department_name}
-          </p>
-          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {attainmentData.academic_year}
-          </p>
-          <div className="mt-2 inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
-            Internal Assessment — Attainment of Course Outcomes (Through Direct Assessment)
+              );
+            })}
           </div>
-        </div>
+        )}
 
-        <div className="p-6 space-y-6">
-          {/* ── Course Information & Attainment Level Scale Table (Unified Exact Excel Structure) ── */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <table className="w-full border-collapse text-xs">
-              <tbody>
-                {/* 1. Course Code */}
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                    COURSE CODE
-                  </td>
-                  <td className="border-r border-slate-200 p-2.5 font-mono font-bold text-slate-900 dark:border-slate-700 dark:text-white">
-                    {attainmentData.course_code}
-                  </td>
-                  <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                    YEAR / SEM / CLASS
-                  </td>
-                  <td className="w-44 p-2.5 font-bold text-slate-900 dark:text-white">
-                    {attainmentData.year_sem}
-                  </td>
-                </tr>
+        {/* ── Main Sheet Container (Excel-Identical Structure, Modern SaaS Alignment) ── */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          {/* Institutional & Academic Header Strip */}
+          <div className="border-b border-slate-100 bg-slate-50/60 p-6 text-center dark:border-slate-800 dark:bg-slate-800/40">
+            <h3 className="text-base font-extrabold uppercase tracking-wide text-slate-900 dark:text-white sm:text-lg">
+              Karpagam Institute of Technology, Coimbatore - 641105
+            </h3>
+            <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              {attainmentData.department_name}
+            </p>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              {attainmentData.academic_year}
+            </p>
+            <div className="mt-2 inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
+              Internal Assessment — Attainment of Course Outcomes (Through Direct Assessment)
+            </div>
+          </div>
 
-                {/* 2. Course Title */}
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                    COURSE TITLE
-                  </td>
-                  <td className="border-r border-slate-200 p-2.5 font-bold uppercase text-slate-900 dark:border-slate-700 dark:text-white">
-                    {attainmentData.course_name}
-                  </td>
-                  <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                    TARGET (%)
-                  </td>
-                  <td className="w-44 p-2.5 font-bold text-indigo-600 dark:text-indigo-400">
-                    {targetPercentage}%
-                  </td>
-                </tr>
-
-                {/* 3. Course Coordinator & Total Strength */}
-                {hasCoordinator ? (
+          <div className="p-6 space-y-6">
+            {/* ── Course Information & Attainment Level Scale Table (Unified Exact Excel Structure) ── */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full border-collapse text-xs">
+                <tbody>
+                  {/* 1. Course Code */}
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                      COURSE COORDINATOR
+                      COURSE CODE
                     </td>
-                    <td className="border-r border-slate-200 p-2.5 font-medium text-slate-900 dark:border-slate-700 dark:text-white">
-                      {attainmentData.course_coordinator}
+                    <td className="border-r border-slate-200 p-2.5 font-mono font-bold text-slate-900 dark:border-slate-700 dark:text-white">
+                      {attainmentData.course_code}
                     </td>
                     <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                      TOTAL STRENGTH
+                      YEAR / SEM / CLASS
                     </td>
                     <td className="w-44 p-2.5 font-bold text-slate-900 dark:text-white">
-                      {attainmentData.total_strength}
+                      {attainmentData.year_sem}
                     </td>
                   </tr>
-                ) : (
+
+                  {/* 2. Course Title */}
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                      TOTAL STRENGTH
+                      COURSE TITLE
                     </td>
-                    <td colSpan={3} className="p-2.5 font-bold text-slate-900 dark:text-white">
-                      {attainmentData.total_strength} Students Enrolled
+                    <td className="border-r border-slate-200 p-2.5 font-bold uppercase text-slate-900 dark:border-slate-700 dark:text-white">
+                      {attainmentData.course_name}
                     </td>
-                  </tr>
-                )}
-
-                {/* 4. Attainment Level Header */}
-                <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800/60 font-bold">
-                  <td
-                    rowSpan={attainmentData.attainment_levels.length + 1}
-                    className="w-48 border-r border-slate-200 p-3 text-center font-bold uppercase text-slate-700 dark:border-slate-700 dark:text-slate-300 align-middle bg-slate-50/90 dark:bg-slate-800/80"
-                  >
-                    ATTAINMENT LEVEL
-                  </td>
-                  <td className="w-32 border-r border-slate-200 p-2 text-center font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                    Level
-                  </td>
-                  <td
-                    colSpan={2}
-                    className="p-2 text-center font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300"
-                  >
-                    Range
-                  </td>
-                </tr>
-
-                {/* 5. Attainment Levels (1, 2, 3) */}
-                {attainmentData.attainment_levels.map((lvl, idx) => (
-                  <tr
-                    key={lvl.level}
-                    className={
-                      idx < attainmentData.attainment_levels.length - 1
-                        ? "border-b border-slate-200 dark:border-slate-700"
-                        : ""
-                    }
-                  >
-                    <td className="w-32 border-r border-slate-200 p-2 text-center font-bold text-slate-900 dark:border-slate-700 dark:text-white">
-                      {lvl.level}
+                    <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                      TARGET (%)
                     </td>
-                    <td
-                      colSpan={2}
-                      className="p-2 text-left font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      {lvl.range}
+                    <td className="w-44 p-2.5 font-bold text-indigo-600 dark:text-indigo-400">
+                      {targetPercentage}%
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
 
-          {/* ── Main Assessment Spreadsheet Matrix Table ── */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 shadow-xs dark:border-slate-700">
-            <div className="max-h-[720px] overflow-auto">
-              <table className="w-full border-collapse text-center text-xs">
-                {/* ── Table Headers ── */}
-                <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800">
-                  {/* Header Row 1 */}
-                  <tr className="border-b border-slate-200 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
-                    <th
-                      rowSpan={2}
-                      className="sticky left-0 z-30 min-w-[50px] border-r border-slate-200 bg-slate-100 p-2 dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      S.NO
-                    </th>
-                    <th
-                      rowSpan={2}
-                      className="sticky left-[50px] z-30 min-w-[130px] border-r border-slate-200 bg-slate-100 p-2 dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      REG NO
-                    </th>
-                    <th
-                      rowSpan={2}
-                      className="sticky left-[180px] z-30 min-w-[190px] border-r border-slate-200 bg-slate-100 p-2 text-left dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      NAME OF THE STUDENT
-                    </th>
-
-                    {/* Dynamic Tests Header Spans */}
-                    {attainmentData.tests.map((test) => (
-                      <th
-                        key={test.test_id}
-                        colSpan={test.cos.length}
-                        className="border-r border-slate-200 p-2 text-center uppercase tracking-tight dark:border-slate-700"
-                      >
-                        {test.test_name} - MARKS ALLOTTED
-                      </th>
-                    ))}
-
-                    {/* Cumulative CO Header Span */}
-                    <th colSpan={attainmentData.cos.length} className="p-2 text-center uppercase tracking-tight">
-                      CO WISE MARKS SCORED
-                    </th>
-                  </tr>
-
-                  {/* Header Row 2 (Sub-headers: C1..Cn) */}
-                  <tr className="border-b border-slate-200 font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                    {/* Per-test CO columns */}
-                    {attainmentData.tests.map((test) =>
-                      test.cos.map((co) => (
-                        <th
-                          key={`${test.test_id}-${co}`}
-                          className="min-w-[48px] border-r border-slate-200 p-1.5 text-center dark:border-slate-700"
-                        >
-                          {co.replace("CO", "C")}
-                        </th>
-                      ))
-                    )}
-                    {/* Total CO columns */}
-                    {attainmentData.cos.map((co, idx) => (
-                      <th
-                        key={`tot-${co}`}
-                        className={`min-w-[48px] p-1.5 text-center ${idx < attainmentData.cos.length - 1
-                            ? "border-r border-slate-200 dark:border-slate-700"
-                            : ""
-                          }`}
-                      >
-                        {co.replace("CO", "C")}
-                      </th>
-                    ))}
-                  </tr>
-
-                  {/* Header Row 3 (Allotted Marks - Distinct Blue Text) */}
-                  <tr className="border-b-2 border-slate-300 bg-sky-50/70 font-bold text-sky-700 dark:border-slate-600 dark:bg-sky-950/30 dark:text-sky-300">
-                    <td className="sticky left-0 z-30 border-r border-slate-200 bg-sky-50 dark:border-slate-700 dark:bg-sky-950/40 p-1.5"></td>
-                    <td className="sticky left-[50px] z-30 border-r border-slate-200 bg-sky-50 dark:border-slate-700 dark:bg-sky-950/40 p-1.5"></td>
-                    <td className="sticky left-[180px] z-30 border-r border-slate-200 bg-sky-50 dark:border-slate-700 dark:bg-sky-950/40 p-1.5 text-left uppercase text-[11px] tracking-wider text-sky-800 dark:text-sky-200">
-                      MARKS ALLOTTED
-                    </td>
-
-                    {/* Per-test Max Marks */}
-                    {attainmentData.tests.map((test) =>
-                      test.cos.map((co) => (
-                        <td
-                          key={`max-${test.test_id}-${co}`}
-                          className="border-r border-slate-200 p-1.5 dark:border-slate-700"
-                        >
-                          {test.max_marks[co] ?? "-"}
-                        </td>
-                      ))
-                    )}
-
-                    {/* Total Max Marks across tests */}
-                    {attainmentData.cos.map((co, idx) => (
-                      <td
-                        key={`max-tot-${co}`}
-                        className={`p-1.5 font-black text-sky-900 dark:text-sky-100 ${idx < attainmentData.cos.length - 1
-                            ? "border-r border-slate-200 dark:border-slate-700"
-                            : ""
-                          }`}
-                      >
-                        {attainmentData.co_max_totals[co] ?? "-"}
+                  {/* 3. Course Coordinator & Total Strength */}
+                  {hasCoordinator ? (
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                        COURSE COORDINATOR
                       </td>
-                    ))}
-                  </tr>
-                </thead>
-
-                {/* ── Student Rows ── */}
-                <tbody className="divide-y divide-slate-100 text-slate-800 dark:divide-slate-800 dark:text-slate-200">
-                  {filteredStudents.map((st, idx) => {
-                    const isExpanded = expandedStudentId === st.student_id;
-
-                    return (
-                      <React.Fragment key={st.student_id}>
-                        <tr className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/60">
-                          {/* S.No */}
-                          <td className="sticky left-0 z-10 border-r border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                            {idx + 1}
-                          </td>
-                          {/* Reg No */}
-                          <td className="sticky left-[50px] z-10 border-r border-slate-200 bg-white p-2 font-mono text-[11px] font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                            {st.register_no}
-                          </td>
-                          {/* Student Name */}
-                          <td className="sticky left-[180px] z-10 border-r border-slate-200 bg-white p-2 text-left font-semibold text-slate-900 truncate max-w-[210px] dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                            <div className="flex items-center justify-between">
-                              <span className="truncate">{st.name}</span>
-                              {st.test_details && Object.keys(st.test_details).length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedStudentId(isExpanded ? null : st.student_id)
-                                  }
-                                  className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5"
-                                  title="Toggle question breakdown"
-                                >
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-3 w-3" />
-                                  ) : (
-                                    <ChevronRight className="h-3 w-3" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Per-test Marks */}
-                          {attainmentData.tests.map((test) =>
-                            test.cos.map((co) => (
-                              <td
-                                key={`st-${st.student_id}-${test.test_id}-${co}`}
-                                className="border-r border-slate-100 p-1.5 font-medium tabular-nums dark:border-slate-800"
-                              >
-                                {formatMark(st.test_marks[test.test_id]?.[co])}
-                              </td>
-                            ))
-                          )}
-
-                          {/* Cumulative CO Total Marks */}
-                          {attainmentData.cos.map((co, cIdx) => {
-                            const score = st.co_totals[co] ?? 0;
-                            const target = summary?.cos_summary?.[co]?.target_value || 0;
-                            const isAbove = score >= target - 0.001;
-
-                            return (
-                              <td
-                                key={`st-${st.student_id}-tot-${co}`}
-                                className={`p-1.5 font-bold tabular-nums ${cIdx < attainmentData.cos.length - 1
-                                    ? "border-r border-slate-100 dark:border-slate-800"
-                                    : ""
-                                  } ${isAbove
-                                    ? "text-emerald-700 dark:text-emerald-400"
-                                    : "text-slate-600 dark:text-slate-400"
-                                  }`}
-                              >
-                                {score}
-                              </td>
-                            );
-                          })}
-                        </tr>
-
-                        {/* Optional Question-Level Detail Row */}
-                        {isExpanded && st.test_details && (
-                          <tr className="bg-indigo-50/30 dark:bg-indigo-950/20 text-[11px]">
-                            <td colSpan={3} className="sticky left-0 border-r border-slate-200 bg-indigo-50/40 p-2.5 text-left font-semibold text-indigo-900 dark:border-slate-700 dark:bg-indigo-950/40 dark:text-indigo-200">
-                              Question Breakdown for {st.name}:
-                            </td>
-                            <td colSpan={100} className="p-2.5 text-left">
-                              <div className="flex flex-wrap gap-2">
-                                {Object.values(st.test_details).map((td) => (
-                                  <div
-                                    key={td.cia_test_id}
-                                    className="rounded-lg border border-indigo-100 bg-white p-2 shadow-2xs dark:border-slate-700 dark:bg-slate-800"
-                                  >
-                                    <p className="font-bold text-slate-800 dark:text-slate-200">
-                                      {td.cia_test_name} (Total: {td.final_total_mark} / {td.actual_max_mark})
-                                    </p>
-                                    <div className="mt-1 flex flex-wrap gap-1.5">
-                                      {(td.marks || []).map((m, mIdx) => (
-                                        <span
-                                          key={mIdx}
-                                          className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-                                        >
-                                          {m.question_key} ({m.target_co}): {m.final_mark}/{m.max_marks_assigned}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {filteredStudents.length === 0 && (
-                    <tr>
-                      <td colSpan={100} className="p-8 text-center text-xs text-slate-400">
-                        No students found matching "{searchQuery}".
+                      <td className="border-r border-slate-200 p-2.5 font-medium text-slate-900 dark:border-slate-700 dark:text-white">
+                        {attainmentData.course_coordinator}
+                      </td>
+                      <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                        TOTAL STRENGTH
+                      </td>
+                      <td className="w-44 p-2.5 font-bold text-slate-900 dark:text-white">
+                        {attainmentData.total_strength}
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <td className="w-48 border-r border-slate-200 bg-slate-50/70 p-2.5 font-bold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                        TOTAL STRENGTH
+                      </td>
+                      <td colSpan={3} className="p-2.5 font-bold text-slate-900 dark:text-white">
+                        {attainmentData.total_strength} Students Enrolled
                       </td>
                     </tr>
                   )}
+
+                  {/* 4. Attainment Level Header */}
+                  <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800/60 font-bold">
+                    <td
+                      rowSpan={attainmentData.attainment_levels.length + 1}
+                      className="w-48 border-r border-slate-200 p-3 text-center font-bold uppercase text-slate-700 dark:border-slate-700 dark:text-slate-300 align-middle bg-slate-50/90 dark:bg-slate-800/80"
+                    >
+                      ATTAINMENT LEVEL
+                    </td>
+                    <td className="w-32 border-r border-slate-200 p-2 text-center font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                      Level
+                    </td>
+                    <td
+                      colSpan={2}
+                      className="p-2 text-center font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300"
+                    >
+                      Range
+                    </td>
+                  </tr>
+
+                  {/* 5. Attainment Levels (1, 2, 3) */}
+                  {attainmentData.attainment_levels.map((lvl, idx) => (
+                    <tr
+                      key={lvl.level}
+                      className={
+                        idx < attainmentData.attainment_levels.length - 1
+                          ? "border-b border-slate-200 dark:border-slate-700"
+                          : ""
+                      }
+                    >
+                      <td className="w-32 border-r border-slate-200 p-2 text-center font-bold text-slate-900 dark:border-slate-700 dark:text-white">
+                        {lvl.level}
+                      </td>
+                      <td
+                        colSpan={2}
+                        className="p-2 text-left font-medium text-slate-700 dark:text-slate-300"
+                      >
+                        {lvl.range}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
+              </table>
+            </div>
 
-                {/* ── Summary Calculation Rows (Exact Match) ── */}
-                {summary && (
-                  <tfoot className="border-t-2 border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
-                    {/* Row 1: CO's Target Value */}
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <td
-                        colSpan={3}
-                        className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase dark:border-slate-700 dark:bg-slate-800"
+            {/* ── Main Assessment Spreadsheet Matrix Table ── */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-xs dark:border-slate-700">
+              <div className="max-h-[720px] overflow-auto">
+                <table className="w-full border-collapse text-center text-xs">
+                  {/* ── Table Headers ── */}
+                  <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800">
+                    {/* Header Row 1 */}
+                    <tr className="border-b border-slate-200 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
+                      <th
+                        rowSpan={2}
+                        className="sticky left-0 z-30 min-w-[50px] border-r border-slate-200 bg-slate-100 p-2 dark:border-slate-700 dark:bg-slate-800"
                       >
-                        CO's Target Value
-                      </td>
-                      <td
-                        colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
-                        className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
+                        S.NO
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="sticky left-[50px] z-30 min-w-[130px] border-r border-slate-200 bg-slate-100 p-2 dark:border-slate-700 dark:bg-slate-800"
                       >
-                        ({targetPercentage}% of CO Total Allotted Marks)
-                      </td>
+                        REG NO
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="sticky left-[180px] z-30 min-w-[190px] border-r border-slate-200 bg-slate-100 p-2 text-left dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        NAME OF THE STUDENT
+                      </th>
+
+                      {/* Dynamic Tests Header Spans */}
+                      {attainmentData.tests.map((test) => (
+                        <th
+                          key={test.test_id}
+                          colSpan={test.cos.length}
+                          className="border-r border-slate-200 p-2 text-center uppercase tracking-tight dark:border-slate-700"
+                        >
+                          {test.test_name} - MARKS ALLOTTED
+                        </th>
+                      ))}
+
+                      {/* Cumulative CO Header Span */}
+                      <th colSpan={attainmentData.cos.length} className="p-2 text-center uppercase tracking-tight">
+                        CO WISE MARKS SCORED
+                      </th>
+                    </tr>
+
+                    {/* Header Row 2 (Sub-headers: C1..Cn) */}
+                    <tr className="border-b border-slate-200 font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                      {/* Per-test CO columns */}
+                      {attainmentData.tests.map((test) =>
+                        test.cos.map((co) => (
+                          <th
+                            key={`${test.test_id}-${co}`}
+                            className="min-w-[48px] border-r border-slate-200 p-1.5 text-center dark:border-slate-700"
+                          >
+                            {co.replace("CO", "C")}
+                          </th>
+                        ))
+                      )}
+                      {/* Total CO columns */}
                       {attainmentData.cos.map((co, idx) => (
-                        <td
-                          key={`sum-target-${co}`}
-                          className={`p-2 font-mono font-extrabold text-indigo-700 dark:text-indigo-400 ${idx < attainmentData.cos.length - 1
-                              ? "border-r border-slate-200 dark:border-slate-700"
-                              : ""
+                        <th
+                          key={`tot-${co}`}
+                          className={`min-w-[48px] p-1.5 text-center ${idx < attainmentData.cos.length - 1
+                            ? "border-r border-slate-200 dark:border-slate-700"
+                            : ""
                             }`}
                         >
-                          {summary.cos_summary[co]?.target_value}
-                        </td>
+                          {co.replace("CO", "C")}
+                        </th>
                       ))}
                     </tr>
 
-                    {/* Row 2: No. of Students scored above Target Value */}
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <td
-                        colSpan={3}
-                        className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase dark:border-slate-700 dark:bg-slate-800"
-                      >
-                        No. of Students scored above CO's Target Value
+                    {/* Header Row 3 (Allotted Marks - Distinct Blue Text) */}
+                    <tr className="border-b-2 border-slate-300 bg-sky-50/70 font-bold text-sky-700 dark:border-slate-600 dark:bg-sky-950/30 dark:text-sky-300">
+                      <td className="sticky left-0 z-30 border-r border-slate-200 bg-sky-50 dark:border-slate-700 dark:bg-sky-950/40 p-1.5"></td>
+                      <td className="sticky left-[50px] z-30 border-r border-slate-200 bg-sky-50 dark:border-slate-700 dark:bg-sky-950/40 p-1.5"></td>
+                      <td className="sticky left-[180px] z-30 border-r border-slate-200 bg-sky-50 dark:border-slate-700 dark:bg-sky-950/40 p-1.5 text-left uppercase text-[11px] tracking-wider text-sky-800 dark:text-sky-200">
+                        MARKS ALLOTTED
                       </td>
-                      <td
-                        colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
-                        className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
-                      >
-                        —
-                      </td>
+
+                      {/* Per-test Max Marks */}
+                      {attainmentData.tests.map((test) =>
+                        test.cos.map((co) => (
+                          <td
+                            key={`max-${test.test_id}-${co}`}
+                            className="border-r border-slate-200 p-1.5 dark:border-slate-700"
+                          >
+                            {test.max_marks[co] ?? "-"}
+                          </td>
+                        ))
+                      )}
+
+                      {/* Total Max Marks across tests */}
                       {attainmentData.cos.map((co, idx) => (
                         <td
-                          key={`sum-count-${co}`}
-                          className={`p-2 font-mono font-extrabold text-slate-900 dark:text-white ${idx < attainmentData.cos.length - 1
-                              ? "border-r border-slate-200 dark:border-slate-700"
-                              : ""
+                          key={`max-tot-${co}`}
+                          className={`p-1.5 font-black text-sky-900 dark:text-sky-100 ${idx < attainmentData.cos.length - 1
+                            ? "border-r border-slate-200 dark:border-slate-700"
+                            : ""
                             }`}
                         >
-                          {summary.cos_summary[co]?.students_above_target_count}
+                          {attainmentData.co_max_totals[co] ?? "-"}
                         </td>
                       ))}
                     </tr>
+                  </thead>
 
-                    {/* Row 3: Percentage of Students scored above Target */}
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <td
-                        colSpan={3}
-                        className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase dark:border-slate-700 dark:bg-slate-800"
-                      >
-                        Percentage of Students scored above Target
-                      </td>
-                      <td
-                        colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
-                        className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
-                      >
-                        —
-                      </td>
-                      {attainmentData.cos.map((co, idx) => (
+                  {/* ── Student Rows ── */}
+                  <tbody className="divide-y divide-slate-100 text-slate-800 dark:divide-slate-800 dark:text-slate-200">
+                    {filteredStudents.map((st, idx) => {
+                      const isExpanded = expandedStudentId === st.student_id;
+
+                      return (
+                        <React.Fragment key={st.student_id}>
+                          <tr className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/60">
+                            {/* S.No */}
+                            <td className="sticky left-0 z-10 border-r border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                              {idx + 1}
+                            </td>
+                            {/* Reg No */}
+                            <td className="sticky left-[50px] z-10 border-r border-slate-200 bg-white p-2 font-mono text-[11px] font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                              {st.register_no}
+                            </td>
+                            {/* Student Name */}
+                            <td className="sticky left-[180px] z-10 border-r border-slate-200 bg-white p-2 text-left font-semibold text-slate-900 truncate max-w-[210px] dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">{st.name}</span>
+                                {st.test_details && Object.keys(st.test_details).length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedStudentId(isExpanded ? null : st.student_id)
+                                    }
+                                    className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5"
+                                    title="Toggle question breakdown"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronRight className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Per-test Marks */}
+                            {attainmentData.tests.map((test) =>
+                              test.cos.map((co) => (
+                                <td
+                                  key={`st-${st.student_id}-${test.test_id}-${co}`}
+                                  className="border-r border-slate-100 p-1.5 font-medium tabular-nums dark:border-slate-800"
+                                >
+                                  {formatMark(st.test_marks[test.test_id]?.[co])}
+                                </td>
+                              ))
+                            )}
+
+                            {/* Cumulative CO Total Marks */}
+                            {attainmentData.cos.map((co, cIdx) => {
+                              const score = st.co_totals[co] ?? 0;
+                              const target = summary?.cos_summary?.[co]?.target_value || 0;
+                              const isAbove = score >= target - 0.001;
+
+                              return (
+                                <td
+                                  key={`st-${st.student_id}-tot-${co}`}
+                                  className={`p-1.5 font-bold tabular-nums ${cIdx < attainmentData.cos.length - 1
+                                    ? "border-r border-slate-100 dark:border-slate-800"
+                                    : ""
+                                    } ${isAbove
+                                      ? "text-emerald-700 dark:text-emerald-400"
+                                      : "text-slate-600 dark:text-slate-400"
+                                    }`}
+                                >
+                                  {score}
+                                </td>
+                              );
+                            })}
+                          </tr>
+
+                          {/* Optional Question-Level Detail Row */}
+                          {isExpanded && st.test_details && (
+                            <tr className="bg-indigo-50/30 dark:bg-indigo-950/20 text-[11px]">
+                              <td colSpan={3} className="sticky left-0 border-r border-slate-200 bg-indigo-50/40 p-2.5 text-left font-semibold text-indigo-900 dark:border-slate-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+                                Question Breakdown for {st.name}:
+                              </td>
+                              <td colSpan={100} className="p-2.5 text-left">
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.values(st.test_details).map((td) => (
+                                    <div
+                                      key={td.cia_test_id}
+                                      className="rounded-lg border border-indigo-100 bg-white p-2 shadow-2xs dark:border-slate-700 dark:bg-slate-800"
+                                    >
+                                      <p className="font-bold text-slate-800 dark:text-slate-200">
+                                        {td.cia_test_name} (Total: {td.final_total_mark} / {td.actual_max_mark})
+                                      </p>
+                                      <div className="mt-1 flex flex-wrap gap-1.5">
+                                        {(td.marks || []).map((m, mIdx) => (
+                                          <span
+                                            key={mIdx}
+                                            className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                                          >
+                                            {m.question_key} ({m.target_co}): {m.final_mark}/{m.max_marks_assigned}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {filteredStudents.length === 0 && (
+                      <tr>
+                        <td colSpan={100} className="p-8 text-center text-xs text-slate-400">
+                          No students found matching "{searchQuery}".
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+
+                  {/* ── Summary Calculation Rows (Exact Match) ── */}
+                  {summary && (
+                    <tfoot className="border-t-2 border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                      {/* Row 1: CO's Target Value */}
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
                         <td
-                          key={`sum-pct-${co}`}
-                          className={`p-2 font-mono font-extrabold ${summary.cos_summary[co]?.attainment_level > 0
+                          colSpan={3}
+                          className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          CO's Target Value
+                        </td>
+                        <td
+                          colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
+                          className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
+                        >
+                          ({targetPercentage}% of CO Total Allotted Marks)
+                        </td>
+                        {attainmentData.cos.map((co, idx) => (
+                          <td
+                            key={`sum-target-${co}`}
+                            className={`p-2 font-mono font-extrabold text-indigo-700 dark:text-indigo-400 ${idx < attainmentData.cos.length - 1
+                              ? "border-r border-slate-200 dark:border-slate-700"
+                              : ""
+                              }`}
+                          >
+                            {summary.cos_summary[co]?.target_value}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Row 2: No. of Students scored above Target Value */}
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <td
+                          colSpan={3}
+                          className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          No. of Students scored above CO's Target Value
+                        </td>
+                        <td
+                          colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
+                          className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
+                        >
+                          —
+                        </td>
+                        {attainmentData.cos.map((co, idx) => (
+                          <td
+                            key={`sum-count-${co}`}
+                            className={`p-2 font-mono font-extrabold text-slate-900 dark:text-white ${idx < attainmentData.cos.length - 1
+                              ? "border-r border-slate-200 dark:border-slate-700"
+                              : ""
+                              }`}
+                          >
+                            {summary.cos_summary[co]?.students_above_target_count}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Row 3: Percentage of Students scored above Target */}
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <td
+                          colSpan={3}
+                          className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          Percentage of Students scored above Target
+                        </td>
+                        <td
+                          colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
+                          className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
+                        >
+                          —
+                        </td>
+                        {attainmentData.cos.map((co, idx) => (
+                          <td
+                            key={`sum-pct-${co}`}
+                            className={`p-2 font-mono font-extrabold ${summary.cos_summary[co]?.attainment_level > 0
                               ? "text-emerald-600 dark:text-emerald-400"
                               : "text-slate-600 dark:text-slate-300"
-                            } ${idx < attainmentData.cos.length - 1
-                              ? "border-r border-slate-200 dark:border-slate-700"
-                              : ""
-                            }`}
-                        >
-                          {summary.cos_summary[co]?.percentage_above_target}%
-                        </td>
-                      ))}
-                    </tr>
-
-                    {/* Row 4: CO Attainment Level */}
-                    <tr className="border-b border-slate-200 bg-indigo-50/50 dark:border-slate-700 dark:bg-indigo-950/20">
-                      <td
-                        colSpan={3}
-                        className="sticky left-0 z-10 border-r border-slate-200 bg-indigo-50/70 p-2.5 text-right font-extrabold uppercase text-indigo-900 dark:border-slate-700 dark:bg-indigo-950/50 dark:text-indigo-200"
-                      >
-                        CO Attainment
-                      </td>
-                      <td
-                        colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
-                        className="border-r border-slate-200 p-2 text-center text-xs font-semibold text-indigo-600 dark:border-slate-700 dark:text-indigo-400"
-                      >
-                        Level achieved based on % students above target
-                      </td>
-                      {attainmentData.cos.map((co, idx) => {
-                        const lvl = summary.cos_summary[co]?.attainment_level || 0;
-                        return (
-                          <td
-                            key={`sum-level-${co}`}
-                            className={`p-2 font-mono text-sm font-black ${lvl > 0
-                                ? "text-indigo-700 dark:text-indigo-300"
-                                : "text-slate-500 dark:text-slate-400"
                               } ${idx < attainmentData.cos.length - 1
                                 ? "border-r border-slate-200 dark:border-slate-700"
                                 : ""
                               }`}
                           >
-                            {lvl.toFixed(2)}
+                            {summary.cos_summary[co]?.percentage_above_target}%
                           </td>
-                        );
-                      })}
-                    </tr>
+                        ))}
+                      </tr>
 
-                    {/* Row 5: CO attainment Values to plot the Graph */}
-                    <tr>
-                      <td
-                        colSpan={3}
-                        className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                      >
-                        CO attainment Values to plot the Graph
-                      </td>
-                      <td
-                        colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
-                        className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
-                      >
-                        —
-                      </td>
-                      {attainmentData.cos.map((co, idx) => (
+                      {/* Row 4: CO Attainment Level */}
+                      <tr className="border-b border-slate-200 bg-indigo-50/50 dark:border-slate-700 dark:bg-indigo-950/20">
                         <td
-                          key={`sum-graph-${co}`}
-                          className={`p-2 font-mono text-sm font-extrabold text-slate-900 dark:text-white ${idx < attainmentData.cos.length - 1
+                          colSpan={3}
+                          className="sticky left-0 z-10 border-r border-slate-200 bg-indigo-50/70 p-2.5 text-right font-extrabold uppercase text-indigo-900 dark:border-slate-700 dark:bg-indigo-950/50 dark:text-indigo-200"
+                        >
+                          CO Attainment
+                        </td>
+                        <td
+                          colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
+                          className="border-r border-slate-200 p-2 text-center text-xs font-semibold text-indigo-600 dark:border-slate-700 dark:text-indigo-400"
+                        >
+                          Level achieved based on % students above target
+                        </td>
+                        {attainmentData.cos.map((co, idx) => {
+                          const lvl = summary.cos_summary[co]?.attainment_level || 0;
+                          return (
+                            <td
+                              key={`sum-level-${co}`}
+                              className={`p-2 font-mono text-sm font-black ${lvl > 0
+                                ? "text-indigo-700 dark:text-indigo-300"
+                                : "text-slate-500 dark:text-slate-400"
+                                } ${idx < attainmentData.cos.length - 1
+                                  ? "border-r border-slate-200 dark:border-slate-700"
+                                  : ""
+                                }`}
+                            >
+                              {lvl.toFixed(2)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+
+                      {/* Row 5: CO attainment Values to plot the Graph */}
+                      <tr>
+                        <td
+                          colSpan={3}
+                          className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-2.5 text-right font-extrabold uppercase text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          CO attainment Values to plot the Graph
+                        </td>
+                        <td
+                          colSpan={attainmentData.tests.reduce((acc, t) => acc + t.cos.length, 0)}
+                          className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
+                        >
+                          —
+                        </td>
+                        {attainmentData.cos.map((co, idx) => (
+                          <td
+                            key={`sum-graph-${co}`}
+                            className={`p-2 font-mono text-sm font-extrabold text-slate-900 dark:text-white ${idx < attainmentData.cos.length - 1
                               ? "border-r border-slate-200 dark:border-slate-700"
                               : ""
-                            }`}
-                        >
-                          {summary.cos_summary[co]?.attainment_level || 0}
-                        </td>
-                      ))}
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+                              }`}
+                          >
+                            {summary.cos_summary[co]?.attainment_level || 0}
+                          </td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
             </div>
-          </div>
 
-          {/* ── Signatures Section ── */}
-          <div className="mt-8 flex items-center justify-between px-6 pt-4 text-xs font-bold text-slate-800 dark:text-slate-200">
-            <div>
-              <div className="h-0.5 w-40 bg-slate-400 dark:bg-slate-600 mb-2"></div>
-              <p>Faculty Incharge</p>
-              {hasCoordinator ? (
-                <p className="text-[11px] font-medium text-slate-500">
-                  {attainmentData.course_coordinator}
-                </p>
-              ) : null}
+            {/* ── Signatures Section ── */}
+            <div className="mt-8 flex items-center justify-between px-6 pt-4 text-xs font-bold text-slate-800 dark:text-slate-200">
+              <div>
+                <div className="h-0.5 w-40 bg-slate-400 dark:bg-slate-600 mb-2"></div>
+                <p>Faculty Incharge</p>
+                {hasCoordinator ? (
+                  <p className="text-[11px] font-medium text-slate-500">
+                    {attainmentData.course_coordinator}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </>)}
 
       {/* ══════════════════════════════════════════════════════════════════ */}
