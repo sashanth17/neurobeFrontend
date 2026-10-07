@@ -34,6 +34,8 @@
     "easymde": "^2.18.0",
     "eslint": "8.32.0",
     "eslint-config-next": "13.1.2",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
     "formik": "^2.2.9",
     "highlight.js": "^11.7.0",
     "i18next": "^22.4.10",

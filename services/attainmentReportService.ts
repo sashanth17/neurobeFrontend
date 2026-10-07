@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { commonInstance } from '@/utils/axios.utils';
 
 export interface AttainmentLevelConfig {
@@ -39,6 +41,7 @@ export interface ExtractionStudent {
   register_number: string;
   student_name: string;
   tests: ExtractionTest[];
+  direct_assessments?: any;
 }
 
 export interface DirectAssessmentCO {
@@ -160,6 +163,43 @@ export const normalizeComprehensiveExtractionData = (
   coordinatorName = ''
 ): NormalizedAttainmentData => {
   const studentsRaw = raw.students || [];
+
+  studentsRaw.forEach((student) => {
+    if (!student.tests) student.tests = [];
+
+    // Check if the assignment test already exists to avoid duplicates
+    if (!student.tests.find(t => t.cia_test_id === 9999)) {
+      const assignmentTest: ExtractionTest = {
+        cia_test_id: 9999,
+        cia_test_name: "Assignment / Mini Project /Tutorial / Seminar",
+        final_total_mark: 0,
+        actual_max_mark: 0,
+        co_marks: {}
+      };
+
+      if (student.direct_assessments && Array.isArray(student.direct_assessments)) {
+        student.direct_assessments.forEach((da: any) => {
+          const coCode = da.co_code || da.co;
+          if (coCode) {
+            assignmentTest.co_marks![coCode] = {
+              final_mark: da.mark_obtained ?? da.mark ?? da.final_mark ?? 0,
+              max_marks_assigned: da.max_mark ?? da.max ?? da.max_marks_assigned ?? 10
+            };
+          }
+        });
+      } else if (student.direct_assessments && typeof student.direct_assessments === 'object') {
+        Object.entries(student.direct_assessments).forEach(([coCode, da]: [string, any]) => {
+          assignmentTest.co_marks![coCode] = {
+            final_mark: da.mark_obtained ?? da.mark ?? da.final_mark ?? 0,
+            max_marks_assigned: da.max_mark ?? da.max ?? da.max_marks_assigned ?? 10
+          };
+        });
+      }
+
+      student.tests.push(assignmentTest);
+    }
+  });
+
   const testMap = new Map<number, NormalizedTestInfo>();
   const allCosSet = new Set<string>();
 
@@ -517,212 +557,299 @@ export const fetchComprehensiveExtractionResults = async (
 /**
  * Exports the attainment report to Excel (.xlsx) matching the official Excel layout
  */
-export const exportComprehensiveAttainmentToExcel = (
+export const exportComprehensiveAttainmentToExcel = async (
   data: NormalizedAttainmentData,
   summary: AttainmentCalculationSummary,
   fileName?: string
 ) => {
-  const wb = XLSX.utils.book_new();
-  const rows: any[][] = [];
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Internal Attainment');
 
-  // Institutional Header
-  rows.push(['KARPAGAM INSTITUTE OF TECHNOLOGY, COIMBATORE - 641105']);
-  rows.push([data.department_name]);
-  rows.push([data.academic_year]);
-  rows.push(['Internal Assessment - Attainment of Course Outcomes (Through Direct Assessment)']);
-  rows.push([]);
+  const setBorder = (cell: ExcelJS.Cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+  };
 
-  // Course Details Table
-  rows.push([
-    'COURSE CODE',
-    null,
-    data.course_code,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    'YEAR/SEM/CLASS',
-    null,
-    null,
-    null,
-    data.year_sem,
-  ]);
-  rows.push([
-    'COURSE TITLE',
-    null,
-    data.course_name,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    'TARGET(%)',
-    null,
-    null,
-    null,
-    summary.target_percentage,
-  ]);
-  if (data.course_coordinator) {
-    rows.push([
-      'COURSE COORDINATOR',
-      null,
-      data.course_coordinator,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      'TOTAL STRENGTH',
-      null,
-      null,
-      null,
-      data.total_strength,
-    ]);
-  } else {
-    rows.push([
-      'TOTAL STRENGTH',
-      null,
-      data.total_strength,
-    ]);
+  const setBasicStyle = (cell: ExcelJS.Cell, bold = true, size = 11) => {
+    cell.font = { name: 'Times New Roman', size: size, bold: bold };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    setBorder(cell);
+  };
+
+  for (let i = 0; i < 5; i++) worksheet.addRow([]);
+
+  worksheet.mergeCells('A1:AB1');
+  const a1 = worksheet.getCell('A1');
+  a1.value = 'KARPAGAM INSTITUTE OF TECHNOLOGY,';
+  a1.font = { bold: true, size: 16, name: 'Times New Roman' };
+  a1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A2:AB2');
+  const a2 = worksheet.getCell('A2');
+  a2.value = 'COIMBATORE - 641105';
+  a2.font = { bold: true, size: 14, name: 'Times New Roman' };
+  a2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A3:AB3');
+  const a3 = worksheet.getCell('A3');
+  a3.value = data.department_name.toUpperCase();
+  a3.font = { bold: true, size: 14, name: 'Times New Roman' };
+  a3.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A4:AB4');
+  const a4 = worksheet.getCell('A4');
+  a4.value = data.academic_year.toUpperCase();
+  a4.font = { bold: true, size: 12, name: 'Times New Roman' };
+  a4.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.mergeCells('A5:AB5');
+  const a5 = worksheet.getCell('A5');
+  a5.value = 'Internal Assessment - Attainment of Course Outcomes [Through Direct Assessment]';
+  a5.font = { bold: true, size: 12, name: 'Times New Roman' };
+  a5.alignment = { horizontal: 'center', vertical: 'middle' };
+  setBorder(a5);
+
+  let lastColIndex = 3;
+  data.tests.forEach(test => { lastColIndex += test.cos.length; });
+  lastColIndex += data.cos.length;
+
+  const maxCol = Math.max(lastColIndex, 15);
+
+  worksheet.addRow([]); // Row 6
+  worksheet.mergeCells(6, 1, 6, 3); worksheet.getCell(6, 1).value = 'COURSE CODE';
+  worksheet.mergeCells(6, 4, 6, 8); worksheet.getCell(6, 4).value = data.course_code;
+  worksheet.mergeCells(6, 9, 6, 9); worksheet.getCell(6, 9).value = 'BATCH';
+  worksheet.mergeCells(6, 10, 6, maxCol); worksheet.getCell(6, 10).value = '2021-2025';
+
+  worksheet.addRow([]); // Row 7
+  worksheet.mergeCells(7, 1, 7, 3); worksheet.getCell(7, 1).value = 'COURSE TITLE';
+  worksheet.mergeCells(7, 4, 7, 8); worksheet.getCell(7, 4).value = data.course_name;
+  worksheet.mergeCells(7, 9, 7, 9); worksheet.getCell(7, 9).value = 'YEAR/SEM/CLASS';
+  worksheet.mergeCells(7, 10, 7, maxCol); worksheet.getCell(7, 10).value = data.year_sem;
+
+  worksheet.addRow([]); // Row 8
+  worksheet.mergeCells(8, 1, 8, 3); worksheet.getCell(8, 1).value = 'COURSE COORDINATOR';
+  worksheet.mergeCells(8, 4, 8, 8); worksheet.getCell(8, 4).value = data.course_coordinator || '';
+  worksheet.mergeCells(8, 9, 8, 9); worksheet.getCell(8, 9).value = 'TARGET(%)';
+  worksheet.mergeCells(8, 10, 8, maxCol); worksheet.getCell(8, 10).value = summary.target_percentage;
+
+  worksheet.addRow([]); // Row 9
+  worksheet.mergeCells(9, 1, 9, 8);
+  worksheet.mergeCells(9, 9, 9, 9); worksheet.getCell(9, 9).value = 'TOTAL STUDENTS';
+  worksheet.mergeCells(9, 10, 9, maxCol); worksheet.getCell(9, 10).value = data.total_strength;
+
+  for (let r = 6; r <= 9; r++) {
+    for (let c = 1; c <= maxCol; c++) setBasicStyle(worksheet.getCell(r, c));
   }
-  rows.push([]);
 
-  // Attainment Level Reference
-  rows.push(['ATTAINMENT LEVEL', null, 'Level', 'Range']);
-  data.attainment_levels.forEach((lvl) => {
-    rows.push([null, null, lvl.level, lvl.range]);
-  });
-  rows.push([]);
+  worksheet.addRow([]); // Row 10
+  worksheet.mergeCells(10, 1, 13, 3);
+  worksheet.getCell(10, 1).value = 'ATTAINMENT LEVEL';
+  worksheet.getCell(10, 1).alignment = { horizontal: 'center', vertical: 'middle' };
 
-  // Table Headers - Row 1
-  const headerRow1: any[] = ['S.NO', 'REG NO', 'NAME OF THE STUDENT'];
-  data.tests.forEach((test) => {
-    headerRow1.push(`${test.test_name.toUpperCase()} - MARKS ALLOTTED`);
-    for (let i = 1; i < test.cos.length; i++) {
-      headerRow1.push(null);
-    }
+  worksheet.mergeCells(10, 4, 10, 8); worksheet.getCell(10, 4).value = 'Level';
+  worksheet.mergeCells(10, 9, 10, maxCol); worksheet.getCell(10, 9).value = 'Range';
+
+  data.attainment_levels.forEach((lvl, idx) => {
+    worksheet.addRow([]);
+    let r = 11 + idx;
+    worksheet.mergeCells(r, 4, r, 8); worksheet.getCell(r, 4).value = lvl.level;
+    worksheet.mergeCells(r, 9, r, maxCol); worksheet.getCell(r, 9).value = lvl.range;
   });
-  headerRow1.push('CO WISE MARKS SCORED');
-  for (let i = 1; i < data.cos.length; i++) {
-    headerRow1.push(null);
+
+  for (let r = 10; r <= 13; r++) {
+    for (let c = 1; c <= maxCol; c++) setBasicStyle(worksheet.getCell(r, c));
   }
-  rows.push(headerRow1);
 
-  // Table Sub-headers - Row 2 (CO labels)
-  const headerRow2: any[] = [null, null, null];
-  data.tests.forEach((test) => {
-    test.cos.forEach((co) => {
-      headerRow2.push(co.replace('CO', 'C'));
+  worksheet.addRow([]); // 14
+  worksheet.addRow([]); // 15
+  worksheet.addRow([]); // 16
+
+  worksheet.mergeCells(14, 1, 16, 1); worksheet.getCell(14, 1).value = 'S.NO';
+  worksheet.mergeCells(14, 2, 16, 2); worksheet.getCell(14, 2).value = 'REG NO';
+  worksheet.mergeCells(14, 3, 16, 3); worksheet.getCell(14, 3).value = 'NAME OF THE STUDENT';
+
+  let currentCol = 4;
+  data.tests.forEach(test => {
+    let startCol = currentCol;
+    let endCol = currentCol + test.cos.length - 1;
+    worksheet.mergeCells(14, startCol, 14, endCol);
+    worksheet.getCell(14, startCol).value = `${test.test_name.toUpperCase()} - MARKS ALLOTTED`;
+    worksheet.getCell(14, startCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F2FF' } };
+
+    test.cos.forEach((co, idx) => {
+      worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
+      worksheet.getCell(16, startCol + idx).value = test.max_marks[co] ?? 0;
+      worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+      worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
     });
+    currentCol = endCol + 1;
   });
-  data.cos.forEach((co) => {
-    headerRow2.push(co.replace('CO', 'C'));
-  });
-  rows.push(headerRow2);
 
-  // Allotted Marks - Row 3
-  const allottedRow: any[] = [null, null, 'MARKS ALLOTTED'];
-  data.tests.forEach((test) => {
-    test.cos.forEach((co) => {
-      allottedRow.push(test.max_marks[co] ?? null);
-    });
-  });
-  data.cos.forEach((co) => {
-    allottedRow.push(data.co_max_totals[co] ?? null);
-  });
-  rows.push(allottedRow);
+  let startCol = currentCol;
+  let endCol = currentCol + data.cos.length - 1;
+  worksheet.mergeCells(14, startCol, 14, endCol);
+  worksheet.getCell(14, startCol).value = 'CO WISE MARKS SCORED';
 
-  // Student Rows
+  data.cos.forEach((co, idx) => {
+    worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
+    worksheet.getCell(16, startCol + idx).value = data.co_max_totals[co] ?? 0;
+    worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+    worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
+  });
+
+  for (let r = 14; r <= 16; r++) {
+    for (let c = 1; c <= endCol; c++) setBasicStyle(worksheet.getCell(r, c));
+  }
+
+  worksheet.getColumn(1).width = 6;
+  worksheet.getColumn(2).width = 16;
+  worksheet.getColumn(3).width = 30;
+  for (let i = 4; i <= endCol; i++) worksheet.getColumn(i).width = 8;
+
+  let startStudentRow = 17;
   data.students.forEach((st, idx) => {
-    const studentRow: any[] = [idx + 1, st.register_no, st.name];
-    data.tests.forEach((test) => {
-      test.cos.forEach((co) => {
-        studentRow.push(st.test_marks[test.test_id]?.[co] ?? null);
+    worksheet.addRow([]);
+    let rIdx = startStudentRow + idx;
+    worksheet.getCell(rIdx, 1).value = idx + 1;
+    worksheet.getCell(rIdx, 2).value = st.register_no;
+    worksheet.getCell(rIdx, 3).value = st.name;
+
+    let cCol = 4;
+    data.tests.forEach(test => {
+      test.cos.forEach(co => {
+        worksheet.getCell(rIdx, cCol++).value = st.test_marks[test.test_id]?.[co] ?? '';
       });
     });
-    data.cos.forEach((co) => {
-      studentRow.push(st.co_totals[co] ?? 0);
+    data.cos.forEach(co => {
+      worksheet.getCell(rIdx, cCol++).value = st.co_totals[co] ?? 0;
     });
-    rows.push(studentRow);
+
+    for (let c = 1; c < cCol; c++) {
+      let cell = worksheet.getCell(rIdx, c);
+      setBorder(cell);
+      cell.font = { name: 'Times New Roman', size: 11, bold: true };
+      if (c > 3) cell.alignment = { horizontal: 'center' };
+    }
   });
 
-  // Summary Rows
-  const totalColCount = headerRow1.length;
-  const coStartCol = totalColCount - data.cos.length;
+  let currentLastRow = startStudentRow + data.students.length;
 
-  // CO's Target Value
-  const targetRow: any[] = new Array(totalColCount).fill(null);
-  targetRow[2] = "CO's Target  Value";
-  data.cos.forEach((co, idx) => {
-    targetRow[coStartCol + idx] = summary.cos_summary[co]?.target_value ?? 0;
+  const summaryLabels = [
+    { label: "CO's Target Value", field: 'target_value' },
+    { label: "No. of Students scored above CO's Target Value", field: 'students_above_target_count' },
+    { label: 'Percentage of Students scored above Target', field: 'percentage_above_target' },
+    { label: 'CO Attainment', field: 'attainment_level' },
+    { label: 'CO attainment Values to plot the Graph', field: 'attainment_level' }
+  ];
+
+  summaryLabels.forEach((item, idx) => {
+    let rIdx = currentLastRow + idx;
+    worksheet.addRow([]);
+    worksheet.mergeCells(rIdx, 1, rIdx, startCol - 1);
+    let cell = worksheet.getCell(rIdx, 1);
+    cell.value = item.label;
+    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+    cell.font = { name: 'Times New Roman', size: 11, bold: true };
+    setBorder(cell);
+    for (let c = 1; c < startCol; c++) setBorder(worksheet.getCell(rIdx, c));
+
+    data.cos.forEach((co, coIdx) => {
+      let vCell = worksheet.getCell(rIdx, startCol + coIdx);
+      vCell.value = summary.cos_summary[co]?.[item.field] ?? 0;
+      vCell.font = { name: 'Times New Roman', size: 11, bold: true };
+      vCell.alignment = { horizontal: 'center' };
+      setBorder(vCell);
+    });
   });
-  rows.push(targetRow);
 
-  // No. of Students scored above Target Value
-  const countRow: any[] = new Array(totalColCount).fill(null);
-  countRow[2] = "No. of Students scored above CO's  Target Value";
-  data.cos.forEach((co, idx) => {
-    countRow[coStartCol + idx] = summary.cos_summary[co]?.students_above_target_count ?? 0;
-  });
-  rows.push(countRow);
+  currentLastRow += summaryLabels.length;
 
-  // Percentage of Students scored above Target
-  const pctRow: any[] = new Array(totalColCount).fill(null);
-  pctRow[2] = 'Percentage of Students scored above Target';
-  data.cos.forEach((co, idx) => {
-    pctRow[coStartCol + idx] = summary.cos_summary[co]?.percentage_above_target ?? 0;
-  });
-  rows.push(pctRow);
+  try {
+    const labels = data.cos.map((co, idx) => (idx + 1).toString());
+    const cData = data.cos.map(co => summary.cos_summary[co]?.attainment_level ?? 0);
+    const xLabelString = `Course Outcomes (${data.cos.map(c => c.replace('CO', 'C')).join(',')})`;
 
-  // CO Attainment
-  const attainmentRow: any[] = new Array(totalColCount).fill(null);
-  attainmentRow[2] = 'CO Attainment';
-  data.cos.forEach((co, idx) => {
-    attainmentRow[coStartCol + idx] = summary.cos_summary[co]?.attainment_level ?? 0;
-  });
-  rows.push(attainmentRow);
+    const chartConfig = {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: cData,
+          backgroundColor: '#4F81BD',
+          borderColor: '#000000',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        title: {
+          display: true,
+          text: 'CO ATTAINMENT THROUGH INTERNAL',
+          fontColor: '#808080',
+          fontSize: 16,
+          fontStyle: 'bold'
+        },
+        legend: { display: false },
+        scales: {
+          yAxes: [{
+            ticks: { min: 0, max: 3, stepSize: 1 },
+            scaleLabel: { display: true, labelString: 'Attainment Level', fontStyle: 'bold' }
+          }],
+          xAxes: [{
+            scaleLabel: { display: true, labelString: xLabelString, fontStyle: 'bold' }
+          }]
+        },
+        plugins: {
+          datalabels: {
+            display: true,
+            align: 'end',
+            anchor: 'end',
+            font: { weight: 'bold', size: 14 }
+          }
+        }
+      }
+    };
 
-  // Graph values
-  const graphRow: any[] = new Array(totalColCount).fill(null);
-  graphRow[2] = 'CO attainment Values  to  plot the Graph';
-  data.cos.forEach((co, idx) => {
-    graphRow[coStartCol + idx] = summary.cos_summary[co]?.attainment_level ?? 0;
-  });
-  rows.push(graphRow);
+    const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&w=500&h=300&bkg=white`;
+    const response = await fetch(chartUrl);
+    const arrayBuffer = await response.arrayBuffer();
 
-  // Signature Block
-  rows.push([]);
-  rows.push([]);
-  rows.push([
-    'Faculty Incharge                                                                                                                                                                                                      HoD',
-  ]);
+    const imageId = workbook.addImage({
+      buffer: arrayBuffer,
+      extension: 'png',
+    });
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+    worksheet.addImage(imageId, {
+      tl: { col: 1, row: currentLastRow + 2 },
+      ext: { width: 500, height: 300 }
+    });
 
-  // Set column widths
-  const cols = [{ wch: 6 }, { wch: 18 }, { wch: 28 }];
-  for (let i = 3; i < totalColCount; i++) {
-    cols.push({ wch: 8 });
+    currentLastRow += 18;
+  } catch (err) {
+    console.error("Failed to generate chart image:", err);
   }
-  ws['!cols'] = cols;
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Internal Attainment');
-  const safeName = (fileName || `${data.course_code}_CO_Attainment_Report.xlsx`).replace(
-    /[^a-zA-Z0-9_.-]/g,
-    '_'
-  );
-  XLSX.writeFile(wb, safeName);
+  // Add empty rows to create space for the chart image
+  for (let i = 0; i < 20; i++) {
+    worksheet.addRow([]);
+  }
+
+  let sigRow = worksheet.addRow([]);
+  worksheet.mergeCells(sigRow.number, 1, sigRow.number, 6);
+  worksheet.getCell(sigRow.number, 1).value = 'Faculty Incharge';
+  worksheet.getCell(sigRow.number, 1).font = { bold: true, name: 'Times New Roman', size: 12 };
+
+  worksheet.mergeCells(sigRow.number, startCol - 2, sigRow.number, endCol);
+  worksheet.getCell(sigRow.number, startCol - 2).value = 'HoD';
+  worksheet.getCell(sigRow.number, startCol - 2).font = { bold: true, name: 'Times New Roman', size: 12 };
+  worksheet.getCell(sigRow.number, startCol - 2).alignment = { horizontal: 'right' };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const safeName = (fileName || `${data.course_code}_CO_Attainment_Report.xlsx`).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, safeName);
 };
