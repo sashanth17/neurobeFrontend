@@ -23,6 +23,7 @@ import { QuestionPaperTemplate, CandidateQuestion, BlueprintSlot, COSummaryItem 
 import FormattedMathText from "@/components/common-components/FormattedMathText";
 import QuestionPaperStudioService from "@/services/questionPaperStudioService";
 import { toast } from "react-toastify";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 interface BlueprintSlotsPaneProps {
   courseId?: string | number;
@@ -164,12 +165,15 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
     });
   }, [apiCoSummary, template, candidates, sections]);
 
+  const { coCodes: activeCourseCoCodes } = useCourseOutcomes(courseId);
+
   // Open Sub-Question Configurator Modal
   const handleOpenConfigModal = (slot: any) => {
     setConfiguringSlot(slot);
     const existing = slot.sub_question_structure;
     const slotMarks = Number(slot.max_marks);
-    const targetCo = slot.target_co || "CO1";
+    const defaultCo = activeCourseCoCodes[0] || liveCoSummary[0]?.co_code || "CO1";
+    const targetCo = slot.target_co || defaultCo;
     setConfigTargetCo(targetCo);
 
     if (existing) {

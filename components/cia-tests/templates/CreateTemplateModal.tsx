@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, Trash2, AlertCircle, CheckCircle2, Award, Sparkles, Layers, Sliders, Check } from "lucide-react";
 import { CreateTemplatePayload, QuestionPaperTemplate } from "@/types/cia-test.types";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 interface CreateTemplateModalProps {
   isOpen: boolean;
   courseCode: string;
+  courseId?: string | number;
+  availableCos?: string[];
   initialData?: QuestionPaperTemplate | null;
   onClose: () => void;
   onSubmit: (payload: CreateTemplatePayload, editId?: number) => Promise<boolean>;
@@ -15,10 +18,14 @@ const ALL_COS = ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"];
 export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
   isOpen,
   courseCode,
+  courseId,
+  availableCos: customAvailableCos,
   initialData,
   onClose,
   onSubmit,
 }) => {
+  const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
+  const activeCos = customAvailableCos || (fetchedCoCodes.length > 0 ? fetchedCoCodes : ALL_COS);
   const isEditing = Boolean(initialData);
   const [submitting, setSubmitting] = useState(false);
   const [templateName, setTemplateName] = useState("CIA-1 Standard Blueprint");
@@ -467,7 +474,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
             {/* CO Chips and Inputs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-              {ALL_COS.map((co) => {
+              {activeCos.map((co) => {
                 const isActive = co in coDistribution;
                 const markVal = coDistribution[co] || 0;
 
@@ -731,7 +738,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                                 className="rounded border border-gray-200 bg-white px-1 py-0.5 text-[11px] font-bold text-purple-700 dark:border-gray-600 dark:bg-gray-700 dark:text-purple-300"
                               >
                                 <option value="">Auto</option>
-                                {ALL_COS.map((c) => (
+                                {activeCos.map((c) => (
                                   <option key={c} value={c}>{c}</option>
                                 ))}
                               </select>

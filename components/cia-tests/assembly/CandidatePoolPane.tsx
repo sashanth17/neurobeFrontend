@@ -31,6 +31,7 @@ import { CandidateFilters } from "@/hook/useQuestionAssembly";
 import FormattedMathText from "@/components/common-components/FormattedMathText";
 import QuestionPaperStudioService from "@/services/questionPaperStudioService";
 import { toast } from "react-toastify";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 interface CandidatePoolPaneProps {
   courseId?: string | number;
@@ -92,6 +93,15 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   // Single Question Tag Editor Inline Popover
   const [editingTagQuestionId, setEditingTagQuestionId] = useState<number | null>(null);
   const [singleTagInput, setSingleTagInput] = useState("");
+
+  const { coCodes } = useCourseOutcomes(courseId);
+  const availableCoCodes = useMemo(() => {
+    const candidateCos = candidates
+      .map((q) => (q.co_level || q.course_outcome || "").trim().toUpperCase())
+      .filter(Boolean);
+    const combined = Array.from(new Set([...coCodes, ...candidateCos])).sort();
+    return combined.length > 0 ? combined : ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"];
+  }, [coCodes, candidates]);
 
   // Interactive CO updating & Topic filter states
   const [coUpdatingId, setCoUpdatingId] = useState<number | null>(null);
@@ -509,13 +519,11 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
           >
             <option value="">All COs</option>
-            <option value="CO1">CO1</option>
-            <option value="CO2">CO2</option>
-            <option value="CO3">CO3</option>
-            <option value="CO4">CO4</option>
-            <option value="CO5">CO5</option>
-            <option value="CO6">CO6</option>
-            <option value="CO7">CO7</option>
+            {availableCoCodes.map((co) => (
+              <option key={co} value={co}>
+                {co}
+              </option>
+            ))}
           </select>
 
           {/* Marks Filter */}

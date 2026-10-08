@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X, Sparkles, BarChart2 } from "lucide-react";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 const UNITS = [
   {
@@ -157,6 +158,8 @@ interface GenerateQuestionsModalProps {
   open: boolean;
   onClose: () => void;
   courseCode?: string;
+  courseId?: string | number;
+  coOptions?: any[];
   onSubmit?: (data: any) => void;
 }
 
@@ -164,8 +167,12 @@ const GenerateQuestionsModal = ({
   open,
   onClose,
   courseCode = "CS2304 — Computer Networks",
+  courseId,
+  coOptions: customCoOptions,
   onSubmit,
 }: GenerateQuestionsModalProps) => {
+  const { coOptions: fetchedCoOptions } = useCourseOutcomes(courseId);
+  const activeCoOptions = customCoOptions || (fetchedCoOptions.length > 0 ? fetchedCoOptions : CO_OPTIONS);
   const [activeUnit, setActiveUnit] = useState(0);
   const [selectedTopics, setSelectedTopics] = useState<string[]>(["1.1"]);
   const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([
@@ -173,7 +180,7 @@ const GenerateQuestionsModal = ({
     "TCP/IP 5-Layer Protocol Suite",
     "Layer Functions & Protocol Data Units (PDU)",
   ]);
-  const [co, setCo] = useState(CO_OPTIONS[0]);
+  const [co, setCo] = useState(activeCoOptions[0] || CO_OPTIONS[0]);
   const [questionType, setQuestionType] = useState(QUESTION_TYPE_OPTIONS[0]);
   const [marks, setMarks] = useState(MARKS_OPTIONS[1]);
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">(
@@ -451,7 +458,7 @@ const GenerateQuestionsModal = ({
           <div className="mb-4 grid grid-cols-3 gap-4">
             <CustomSelect
               title="Course Outcome (CO)"
-              options={CO_OPTIONS}
+              options={activeCoOptions}
               value={co}
               onChange={(v: any) => setCo(v)}
               isSearchable={false}

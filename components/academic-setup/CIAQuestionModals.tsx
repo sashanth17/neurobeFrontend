@@ -4,6 +4,7 @@ import { ModalShell } from "@/components/academic-setup/AddModals";
 import TextArea from "@/components/FormFields/TextArea.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import TextInput from "@/components/FormFields/TextInput.component";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 const TOPIC_OPTIONS = [
   { value: "network-models", label: "Network Models & Layered Architecture" },
@@ -45,6 +46,8 @@ interface AddQuestionModalProps {
   onClose: () => void;
   sectionTitle?: string;
   questionNumber?: number;
+  courseId?: string | number;
+  coOptions?: any[];
 }
 
 export const AddQuestionModal = ({
@@ -52,7 +55,11 @@ export const AddQuestionModal = ({
   onClose,
   sectionTitle = "Section A",
   questionNumber = 1,
+  courseId,
+  coOptions: customCoOptions,
 }: AddQuestionModalProps) => {
+  const { coOptions: fetchedCoOptions } = useCourseOutcomes(courseId);
+  const activeCoOptions = customCoOptions || (fetchedCoOptions.length > 0 ? fetchedCoOptions : CO_OPTIONS);
   const [form, setForm] = useState({
     questionText: "",
     topic: null as any,
@@ -100,7 +107,7 @@ export const AddQuestionModal = ({
           <CustomSelect
             title="CO"
             required
-            options={CO_OPTIONS}
+            options={activeCoOptions}
             value={form.co}
             onChange={(v) => set("co", v)}
             placeholder="CO2"

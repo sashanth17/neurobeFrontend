@@ -2,6 +2,7 @@ import React from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import { useSetState } from "@/utils/function.utils";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 interface Option { value: string; label: string; }
 
@@ -78,10 +79,15 @@ const EMPTY: FilterValues = {
 
 interface Props {
   onApply: (filters: FilterValues) => void;
-  question?: boolean
+  question?: boolean;
+  courseId?: string | number;
+  coOptions?: Option[];
 }
 
-const QuestionBankFilter = ({ onApply, question }: Props) => {
+const QuestionBankFilter = ({ onApply, question, courseId, coOptions: customCoOptions }: Props) => {
+  const { coOptions: fetchedCoOptions } = useCourseOutcomes(courseId);
+  const rawCos = customCoOptions || (fetchedCoOptions.length > 0 ? fetchedCoOptions : CO_OPTIONS.slice(1));
+  const activeCoOptions: Option[] = [{ value: "all", label: "All COs" }, ...rawCos];
   const [state, setState] = useSetState({ ...EMPTY, showFilters: false, appliedFilters: null as FilterValues | null });
 
   const handleApply = () => {
@@ -173,7 +179,7 @@ const QuestionBankFilter = ({ onApply, question }: Props) => {
             </div>
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#000]">Course Outcome</p>
-              <CustomSelect options={CO_OPTIONS} value={state.courseOutcome} onChange={(v) => setState({ courseOutcome: v })} placeholder="All COs" isClearable={false} isSearchable={false} />
+              <CustomSelect options={activeCoOptions} value={state.courseOutcome} onChange={(v) => setState({ courseOutcome: v })} placeholder="All COs" isClearable={false} isSearchable={false} />
             </div>
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#000]">Knowledge Level</p>

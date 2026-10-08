@@ -6,6 +6,7 @@ import { ModalShell } from "@/components/academic-setup/AddModals";
 import TextInput from "@/components/FormFields/TextInput.component";
 import TextArea from "@/components/FormFields/TextArea.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 const UNIT_OPTIONS = [
   { value: "u1", label: "Unit 1 — Physical Layer & Network Architectures" },
@@ -64,6 +65,8 @@ interface EditQuestionModalProps {
   code?: string;
   initialData?: any;
   onSave?: (updated: any) => void;
+  courseId?: string | number;
+  coOptions?: any[];
 }
 
 export const EditQuestionModal = ({
@@ -73,7 +76,11 @@ export const EditQuestionModal = ({
   code,
   initialData,
   onSave,
+  courseId,
+  coOptions: customCoOptions,
 }: EditQuestionModalProps) => {
+  const { coOptions: fetchedCoOptions } = useCourseOutcomes(courseId);
+  const activeCoOptions = customCoOptions || (fetchedCoOptions.length > 0 ? fetchedCoOptions : CO_OPTIONS);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
     id: "",
@@ -243,7 +250,7 @@ export const EditQuestionModal = ({
           <CustomSelect
             title="Course Outcome"
             disabled={true}
-            options={CO_OPTIONS}
+            options={activeCoOptions}
             value={form.co}
             onChange={(v) => set("co", v)}
             isSearchable={false}

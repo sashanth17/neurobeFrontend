@@ -12,11 +12,14 @@ import {
   Compass,
 } from "lucide-react";
 import { CandidateQuestion, SubQuestionItem } from "@/types/cia-test.types";
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 interface ManualQuestionModalProps {
   isOpen: boolean;
   questionToEdit?: CandidateQuestion | null;
   defaultMarks?: number | null;
+  courseId?: string | number;
+  availableCos?: string[];
   onClose: () => void;
   onSave: (payload: any) => Promise<boolean>;
 }
@@ -25,9 +28,13 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   isOpen,
   questionToEdit,
   defaultMarks,
+  courseId,
+  availableCos: customAvailableCos,
   onClose,
   onSave,
 }) => {
+  const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
+  const activeCos = customAvailableCos || (fetchedCoCodes.length > 0 ? fetchedCoCodes : ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"]);
   const [questionType, setQuestionType] = useState<"DIRECT" | "SUB_QUESTIONS" | "EITHER_OR">("DIRECT");
   const [totalMarks, setTotalMarks] = useState<number>(defaultMarks || 10);
   const [courseOutcome, setCourseOutcome] = useState<string>("CO1");
@@ -293,13 +300,11 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
                 onChange={(e) => setCourseOutcome(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 p-2.5 font-semibold text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
               >
-                <option value="CO1">CO1</option>
-                <option value="CO2">CO2</option>
-                <option value="CO3">CO3</option>
-                <option value="CO4">CO4</option>
-                <option value="CO5">CO5</option>
-                <option value="CO6">CO6</option>
-                <option value="CO7">CO7</option>
+                {activeCos.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
 
