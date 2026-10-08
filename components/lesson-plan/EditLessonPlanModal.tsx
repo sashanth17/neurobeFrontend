@@ -49,6 +49,7 @@ export interface LessonPlanEditData {
   pedagogy: string;
   status: "Reviewed" | "Needs Review";
   unitLabel?: string;
+  activePedagogies?: string[];
 }
 
 interface EditLessonPlanModalProps {
@@ -212,6 +213,25 @@ const EditLessonPlanModal = ({
 
         {/* Pedagogy */}
         <div className="mt-4">
+          {Array.isArray(data?.activePedagogies) && data.activePedagogies.length > 0 && (
+            <div className="mb-2">
+              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                Active Topic Pedagogies (Click to select):
+              </label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {data.activePedagogies.map((ped, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => set("pedagogy", toOpt(ped))}
+                    className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800"
+                  >
+                    <span>{idx + 1}.</span> {ped}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <CustomSelect
             title="Pedagogy"
             options={PEDAGOGY_OPTS}
