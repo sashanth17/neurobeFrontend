@@ -652,7 +652,9 @@ export const exportComprehensiveAttainmentToExcel = async (
 
   let lastColIndex = 3;
   data.tests.forEach(test => { lastColIndex += test.cos.length; });
-  lastColIndex += data.cos.length;
+  if (!isExternal) {
+    lastColIndex += data.cos.length;
+  }
 
   const maxCol = Math.max(lastColIndex, 15);
 
@@ -732,8 +734,9 @@ export const exportComprehensiveAttainmentToExcel = async (
   });
 
   let startCol = currentCol;
-  let endCol = currentCol + Math.max(data.cos.length - 1, 0);
-  if (data.cos.length > 0) {
+  let endCol = currentCol - 1;
+  if (!isExternal && data.cos.length > 0) {
+    endCol = currentCol + Math.max(data.cos.length - 1, 0);
     if (startCol < endCol) {
       worksheet.mergeCells(14, startCol, 14, endCol);
     }
@@ -770,9 +773,11 @@ export const exportComprehensiveAttainmentToExcel = async (
         worksheet.getCell(rIdx, cCol++).value = st.test_marks[test.test_id]?.[co] ?? '';
       });
     });
-    data.cos.forEach(co => {
-      worksheet.getCell(rIdx, cCol++).value = st.co_totals[co] ?? 0;
-    });
+    if (!isExternal) {
+      data.cos.forEach(co => {
+        worksheet.getCell(rIdx, cCol++).value = st.co_totals[co] ?? 0;
+      });
+    }
 
     for (let c = 1; c < cCol; c++) {
       let cell = worksheet.getCell(rIdx, c);
@@ -804,17 +809,18 @@ export const exportComprehensiveAttainmentToExcel = async (
   summaryLabels.forEach((label, idx) => {
     let rIdx = currentLastRow + idx;
     worksheet.addRow([]);
-    worksheet.mergeCells(rIdx, 1, rIdx, startCol - 1);
+    const formulaStartCol = isExternal ? 4 : startCol;
+    worksheet.mergeCells(rIdx, 1, rIdx, formulaStartCol - 1);
     let cell = worksheet.getCell(rIdx, 1);
     cell.value = label;
     cell.alignment = { horizontal: 'right', vertical: 'middle' };
     cell.font = { name: 'Times New Roman', size: 11, bold: true };
     setBorder(cell);
-    for (let c = 1; c < startCol; c++) setBorder(worksheet.getCell(rIdx, c));
+    for (let c = 1; c < formulaStartCol; c++) setBorder(worksheet.getCell(rIdx, c));
 
     data.cos.forEach((co, coIdx) => {
-      let vCell = worksheet.getCell(rIdx, startCol + coIdx);
-      const colLetter = worksheet.getColumn(startCol + coIdx).letter;
+      let vCell = worksheet.getCell(rIdx, formulaStartCol + coIdx);
+      const colLetter = worksheet.getColumn(formulaStartCol + coIdx).letter;
 
       if (idx === 0) { // Target Value
         vCell.value = { formula: `${colLetter}16*(${targetPctCell}/100)` };
@@ -1093,3 +1099,205 @@ export const exportWeightedCOAttainmentToExcel = async (
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   saveAs(blob, safeName);
 };
+
+/**
+ * Exports PO Attainment to Excel matching the 3-table layout from the reference image:
+ * 1. CO PO Mapping table (raw mapping values)
+ * 2. PO Attainment Level table ((CO_att × mapping) / 3 per cell, average per PO)
+ * 3. Attainment of POs and PSOs summary (Mapping Average + Attained)
+ */
+export const exportPOAttainmentToExcel = async (
+  data: NormalizedAttainmentData,
+  poAttainment: POAttainmentResult[],
+  copoMatrix: COPOMatrixData,
+  weightedCOs: WeightedCOAttainment[],
+  fileName?: string
+) => {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet('PO Attainment');
+
+  const setBorder = (cell: ExcelJS.Cell) => {
+    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+  };
+  const header = (cell: ExcelJS.Cell, value: string, bg = 'FFE2EFDA', color = 'FF000000') => {
+    cell.value = value;
+    cell.font = { bold: true, name: 'Times New Roman', size: 11, color: { argb: color } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+    setBorder(cell);
+  };
+  const dataCell = (cell: ExcelJS.Cell, value: any, color = 'FF000000', bold = false) => {
+    cell.value = value;
+    cell.font = { name: 'Times New Roman', size: 11, color: { argb: color }, bold };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    setBorder(cell);
+  };
+
+  // Collect sorted data
+  const allPOs = poAttainment.map((p) => p.po_code);
+  const allCos = data.cos;
+
+  // Build lookups
+  const copoLookup: Record<string, Record<string, number>> = {};
+  allCos.forEach((co) => { copoLookup[co] = {}; });
+  copoMatrix.matrix_entries.forEach((e) => {
+    const co = e.co_code || `CO${e.course_outcome_id}`;
+    const po = e.po_code || `PO${e.po_id}`;
+    if (!copoLookup[co]) copoLookup[co] = {};
+    copoLookup[co][po] = e.matrix_value || 0;
+  });
+  const poAttLookup: Record<string, number> = {};
+  poAttainment.forEach((p) => { poAttLookup[p.po_code] = p.attainment_value; });
+  const weightedCOLookup: Record<string, number> = {};
+  weightedCOs.forEach((w) => { weightedCOLookup[w.co] = w.total_attainment; });
+
+  // Column widths
+  ws.getColumn(1).width = 18; // Course label
+  allPOs.forEach((_, i) => { ws.getColumn(i + 2).width = 8; });
+
+  let row = 1;
+
+  // ── Institutional Headers ──
+  const totalCols = 1 + allPOs.length;
+  const endCol = String.fromCharCode(64 + totalCols);
+
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const h1 = ws.getCell(`A${row}`);
+  h1.value = 'KARPAGAM INSTITUTE OF TECHNOLOGY, COIMBATORE - 641105';
+  h1.font = { bold: true, size: 14, name: 'Times New Roman' };
+  h1.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(row).height = 20;
+  row++;
+
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const h2 = ws.getCell(`A${row}`);
+  h2.value = data.department_name.toUpperCase();
+  h2.font = { bold: true, size: 12, name: 'Times New Roman' };
+  h2.alignment = { horizontal: 'center', vertical: 'middle' };
+  row++;
+
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const h3 = ws.getCell(`A${row}`);
+  h3.value = data.academic_year.toUpperCase();
+  h3.font = { bold: true, size: 12, name: 'Times New Roman' };
+  h3.alignment = { horizontal: 'center', vertical: 'middle' };
+  row += 2; // blank row
+
+  // ── TABLE 1: CO PO Mapping ──
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const t1Title = ws.getCell(`A${row}`);
+  t1Title.value = 'CO PO Mapping';
+  t1Title.font = { bold: true, size: 11, name: 'Times New Roman' };
+  t1Title.alignment = { horizontal: 'left', vertical: 'middle' };
+  row++;
+
+  // Header row
+  header(ws.getCell(row, 1), 'Course', 'FFD9E1F2');
+  allPOs.forEach((po, i) => { header(ws.getCell(row, i + 2), po, 'FFD9E1F2'); });
+  ws.getRow(row).height = 18;
+  row++;
+
+  // CO rows
+  allCos.forEach((co) => {
+    dataCell(ws.getCell(row, 1), co, 'FFFF0000', true);
+    ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+    allPOs.forEach((po, i) => {
+      const val = copoLookup[co]?.[po] ?? 0;
+      dataCell(ws.getCell(row, i + 2), val === 0 ? '-' : val.toFixed(2));
+    });
+    row++;
+  });
+
+  // Average row
+  dataCell(ws.getCell(row, 1), data.course_code, 'FF000000', true);
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  allPOs.forEach((po, i) => {
+    const vals = allCos.map((co) => copoLookup[co]?.[po] ?? 0).filter((v) => v > 0);
+    const avg = vals.length > 0 ? (vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, avg > 0 ? Number(avg.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  });
+  row += 2; // blank row
+
+  // ── TABLE 2: PO Attainment Level ──
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const t2Title = ws.getCell(`A${row}`);
+  t2Title.value = 'PO Attainment Level';
+  t2Title.font = { bold: true, size: 11, name: 'Times New Roman' };
+  t2Title.alignment = { horizontal: 'left', vertical: 'middle' };
+  row++;
+
+  header(ws.getCell(row, 1), 'Course', 'FFE2EFDA');
+  allPOs.forEach((po, i) => { header(ws.getCell(row, i + 2), po, 'FFE2EFDA'); });
+  ws.getRow(row).height = 18;
+  row++;
+
+  allCos.forEach((co) => {
+    const coAtt = weightedCOLookup[co] ?? 0;
+    dataCell(ws.getCell(row, 1), co, 'FFFF0000', true);
+    ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+    allPOs.forEach((po, i) => {
+      const mappingVal = copoLookup[co]?.[po] ?? 0;
+      const cellVal = mappingVal > 0 ? (coAtt * mappingVal) / 3 : 0;
+      dataCell(ws.getCell(row, i + 2), mappingVal === 0 ? '-' : Number(cellVal.toFixed(2)));
+    });
+    row++;
+  });
+
+  // Average row (PO attainment values)
+  dataCell(ws.getCell(row, 1), data.course_code, 'FF000000', true);
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  allPOs.forEach((po, i) => {
+    const attVal = poAttLookup[po];
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, attVal != null && attVal > 0 ? Number(attVal.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  });
+  row += 2; // blank row
+
+  // ── TABLE 3: Attainment of POs and PSOs ──
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const t3Title = ws.getCell(`A${row}`);
+  t3Title.value = 'Attainment of POs and PSOs';
+  t3Title.font = { bold: true, size: 11, name: 'Times New Roman' };
+  t3Title.alignment = { horizontal: 'left', vertical: 'middle' };
+  row++;
+
+  header(ws.getCell(row, 1), data.course_code, 'FFD9D9D9');
+  allPOs.forEach((po, i) => { header(ws.getCell(row, i + 2), po, 'FFD9D9D9'); });
+  ws.getRow(row).height = 18;
+  row++;
+
+  // Mapping Average row
+  dataCell(ws.getCell(row, 1), 'Mapping Average', 'FF1F3864', true);
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  allPOs.forEach((po, i) => {
+    const vals = allCos.map((co) => copoLookup[co]?.[po] ?? 0).filter((v) => v > 0);
+    const avg = vals.length > 0 ? (vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, avg > 0 ? Number(avg.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
+  });
+  row++;
+
+  // Attained row
+  dataCell(ws.getCell(row, 1), 'Attained', 'FF1E5631', true);
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6F5E0' } };
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  allPOs.forEach((po, i) => {
+    const attVal = poAttLookup[po];
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, attVal != null && attVal > 0 ? Number(attVal.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6F5E0' } };
+  });
+
+  const buffer2 = await workbook.xlsx.writeBuffer();
+  const safeName2 = (fileName || `${data.course_code}_PO_Attainment.xlsx`).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const blob2 = new Blob([buffer2], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob2, safeName2);
+};
+
