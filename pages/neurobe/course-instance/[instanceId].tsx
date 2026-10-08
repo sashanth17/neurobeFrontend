@@ -78,7 +78,13 @@ function InstanceDashboardPage() {
   const isCiaIndependent = CIA_INDEPENDENT_TABS.has(activeTab);
 
   return (
-    <div className="h-[calc(100vh-80px)] flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
+    <div
+      className={`flex flex-col bg-gray-50 dark:bg-gray-900 ${
+        activeTab === "co-po-attainment"
+          ? "min-h-full"
+          : "h-[calc(100vh-80px)] overflow-hidden"
+      }`}
+    >
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-6 pt-6 pb-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -150,11 +156,11 @@ function InstanceDashboardPage() {
       </div>
 
       {/* ── Tab Content ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden p-6">
+      <div className={`p-6 ${activeTab === "co-po-attainment" ? "flex-1" : "flex-1 overflow-hidden"}`}>
 
-        {/* CO/PO Attainment — renders independently, scrolls naturally */}
+        {/* CO/PO Attainment — renders independently, single unified scroll */}
         {activeTab === "co-po-attainment" && (
-          <div className="h-full overflow-y-auto">
+          <div className="w-full">
             <CourseAttainmentReport
               courseId={courseId as string}
               offeringId={instanceId as string}
