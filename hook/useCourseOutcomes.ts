@@ -30,13 +30,16 @@ export const useCourseOutcomes = (courseId?: string | number) => {
       try {
         let outcomes: any[] = [];
         try {
-          const res: any = await Models.COPOMap.get_active(courseId);
-          outcomes = res?.course_outcomes || res?.matrix_entries || (Array.isArray(res) ? res : []);
+          const res: any = await Models.syllabus.get_active_cos(courseId);
+          outcomes = Array.isArray(res) ? res : res?.course_outcomes || [];
         } catch {
-          const res: any = await commonInstance().get(`course/copo?course_id=${courseId}`);
-          const data = Array.isArray(res.data) ? res.data : [res.data];
-          const active = data.find((d: any) => d?.is_active === true) || data[0];
-          outcomes = active?.course_outcomes || active?.matrix_entries || [];
+          try {
+            const extRes: any = await Models.syllabus.get_active_extraction(courseId);
+            outcomes = extRes?.outcomes || extRes?.course_outcomes || [];
+          } catch {
+            const copoRes: any = await Models.COPOMap.get_active(courseId);
+            outcomes = copoRes?.course_outcomes || copoRes?.matrix_entries || [];
+          }
         }
 
         if (isMounted && Array.isArray(outcomes) && outcomes.length > 0) {
@@ -59,10 +62,20 @@ export const useCourseOutcomes = (courseId?: string | number) => {
           if (extractedCodes.length > 0) {
             setCoCodes(extractedCodes);
             setCoOptions(formattedOptions);
+          } else {
+            setCoCodes([]);
+            setCoOptions([]);
           }
+        } else if (isMounted) {
+          setCoCodes([]);
+          setCoOptions([]);
         }
       } catch (err) {
         console.warn("[useCourseOutcomes] Failed to fetch COs dynamically:", err);
+        if (isMounted) {
+          setCoCodes([]);
+          setCoOptions([]);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }

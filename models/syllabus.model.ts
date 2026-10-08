@@ -119,6 +119,18 @@ const syllabus = {
         });
     },
 
+    get_active_cos: (courseId: number | string) => {
+        return new Promise((resolve, reject) => {
+            commonInstance()
+                .get(`course/extractions/courses/${courseId}/active-cos`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
+
     get_extraction: (extractionsId: number | string) => {
         return new Promise((resolve, reject) => {
             commonInstance()

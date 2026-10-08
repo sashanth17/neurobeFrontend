@@ -41,6 +41,7 @@ import {
   calculatePOAttainment,
   exportComprehensiveAttainmentToExcel,
   exportWeightedCOAttainmentToExcel,
+  ExtractionTest,
 } from "@/services/attainmentReportService";
 
 interface CourseAttainmentReportProps {
@@ -966,7 +967,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                               </td>
                               <td colSpan={100} className="p-2.5 text-left">
                                 <div className="flex flex-wrap gap-2">
-                                  {Object.values(st.test_details).map((td) => (
+                                  {(Object.values(st.test_details) as ExtractionTest[]).map((td) => (
                                     <div
                                       key={td.cia_test_id}
                                       className="rounded-lg border border-indigo-100 bg-white p-2 shadow-2xs dark:border-slate-700 dark:bg-slate-800"
