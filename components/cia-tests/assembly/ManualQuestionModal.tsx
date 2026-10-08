@@ -34,10 +34,10 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   onSave,
 }) => {
   const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
-  const activeCos = customAvailableCos || (fetchedCoCodes.length > 0 ? fetchedCoCodes : ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"]);
+  const activeCos = customAvailableCos || fetchedCoCodes;
   const [questionType, setQuestionType] = useState<"DIRECT" | "SUB_QUESTIONS" | "EITHER_OR">("DIRECT");
   const [totalMarks, setTotalMarks] = useState<number>(defaultMarks || 10);
-  const [courseOutcome, setCourseOutcome] = useState<string>("CO1");
+  const [courseOutcome, setCourseOutcome] = useState<string>(activeCos[0] || "CO1");
   const [bloomLevel, setBloomLevel] = useState<string>("K3");
   const [topicName, setTopicName] = useState<string>("");
   const [questionText, setQuestionText] = useState<string>("");

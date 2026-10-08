@@ -17,8 +17,8 @@ export const DEFAULT_FALLBACK_COS: COOption[] = [
 ];
 
 export const useCourseOutcomes = (courseId?: string | number) => {
-  const [coOptions, setCoOptions] = useState<COOption[]>(DEFAULT_FALLBACK_COS);
-  const [coCodes, setCoCodes] = useState<string[]>(["CO1", "CO2", "CO3", "CO4", "CO5"]);
+  const [coOptions, setCoOptions] = useState<COOption[]>([]);
+  const [coCodes, setCoCodes] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {

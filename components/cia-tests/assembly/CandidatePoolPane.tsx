@@ -100,7 +100,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
       .map((q) => (q.co_level || q.course_outcome || "").trim().toUpperCase())
       .filter(Boolean);
     const combined = Array.from(new Set([...coCodes, ...candidateCos])).sort();
-    return combined.length > 0 ? combined : ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"];
+    return combined;
   }, [coCodes, candidates]);
 
   // Interactive CO updating & Topic filter states
@@ -744,13 +744,11 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                   title={isAssigned ? "Assigned question CO is locked" : "Change Course Outcome"}
                                 >
                                   <option value="" className="text-gray-600 dark:bg-gray-800">None</option>
-                                  <option value="CO1" className="text-gray-800 dark:bg-gray-800">CO1</option>
-                                  <option value="CO2" className="text-gray-800 dark:bg-gray-800">CO2</option>
-                                  <option value="CO3" className="text-gray-800 dark:bg-gray-800">CO3</option>
-                                  <option value="CO4" className="text-gray-800 dark:bg-gray-800">CO4</option>
-                                  <option value="CO5" className="text-gray-800 dark:bg-gray-800">CO5</option>
-                                  <option value="CO6" className="text-gray-800 dark:bg-gray-800">CO6</option>
-                                  <option value="CO7" className="text-gray-800 dark:bg-gray-800">CO7</option>
+                                  {availableCoCodes.map((co) => (
+                                    <option key={co} value={co} className="text-gray-800 dark:bg-gray-800">
+                                      {co}
+                                    </option>
+                                  ))}
                                 </select>
                                 {coUpdatingId === q.id && (
                                   <span className="ml-1 text-[10px] animate-pulse text-indigo-600">...</span>

@@ -998,7 +998,10 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                   onChange={(e) => setConfigTargetCo(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 p-2 text-xs font-bold text-purple-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-purple-300"
                 >
-                  {["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"].map((co) => (
+                  {(activeCourseCoCodes.length > 0
+                    ? activeCourseCoCodes
+                    : liveCoSummary.map((c) => c.co_code).filter(Boolean)
+                  ).map((co) => (
                     <option key={co} value={co}>
                       {co}
                     </option>
@@ -1244,7 +1247,10 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                           }}
                           className="rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
                         >
-                          {["CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7"].map((c) => (
+                          {(activeCourseCoCodes.length > 0
+                            ? activeCourseCoCodes
+                            : liveCoSummary.map((c) => c.co_code).filter(Boolean)
+                          ).map((c) => (
                             <option key={c} value={c}>
                               {c}
                             </option>
