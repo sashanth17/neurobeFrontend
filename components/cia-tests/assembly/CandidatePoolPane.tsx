@@ -39,6 +39,7 @@ interface CandidatePoolPaneProps {
   courseCode?: string;
   candidates: CandidateQuestion[];
   filteredCandidates: CandidateQuestion[];
+  coCodes?: string[];
   allSlots?: BlueprintSlot[];
   activeSlot: {
     id?: number;
@@ -64,6 +65,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   courseCode = "CS301",
   candidates,
   filteredCandidates,
+  coCodes: propCoCodes,
   allSlots = [],
   activeSlot,
   filters,
@@ -94,14 +96,8 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   const [editingTagQuestionId, setEditingTagQuestionId] = useState<number | null>(null);
   const [singleTagInput, setSingleTagInput] = useState("");
 
-  const { coCodes } = useCourseOutcomes(courseId);
-  const availableCoCodes = useMemo(() => {
-    const candidateCos = candidates
-      .map((q) => (q.co_level || q.course_outcome || "").trim().toUpperCase())
-      .filter(Boolean);
-    const combined = Array.from(new Set([...coCodes, ...candidateCos])).sort();
-    return combined;
-  }, [coCodes, candidates]);
+  const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
+  const coCodes = propCoCodes && propCoCodes.length > 0 ? propCoCodes : fetchedCoCodes;
 
   // Interactive CO updating & Topic filter states
   const [coUpdatingId, setCoUpdatingId] = useState<number | null>(null);
@@ -385,7 +381,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
   };
 
 
-  const coOptions = ["", "CO1", "CO2", "CO3", "CO4", "CO5"];
   const bloomOptions = [
     { value: "", label: "All Bloom's" },
     { value: "K1", label: "K1 - Remember" },
@@ -519,7 +514,7 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
           >
             <option value="">All COs</option>
-            {availableCoCodes.map((co) => (
+            {coCodes.map((co) => (
               <option key={co} value={co}>
                 {co}
               </option>
@@ -685,14 +680,14 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                             setDraggedQuestionId(null);
                           }}
                           className={`relative rounded-2xl border p-4 transition-all duration-150 ${draggedQuestionId === q.id
-                              ? "opacity-50 ring-2 ring-purple-500 scale-[0.98]"
-                              : isSelected
-                                ? "border-purple-500 bg-purple-50/20 ring-1 ring-purple-500/30 dark:border-purple-600 dark:bg-purple-950/20"
-                                : isAssigned
-                                  ? "border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-900/40"
-                                  : canAssign
-                                    ? "border-purple-300 bg-purple-50/10 shadow-sm hover:border-purple-500 hover:shadow-md dark:border-purple-800 cursor-grab"
-                                    : "border-gray-200/90 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-850 cursor-grab"
+                            ? "opacity-50 ring-2 ring-purple-500 scale-[0.98]"
+                            : isSelected
+                              ? "border-purple-500 bg-purple-50/20 ring-1 ring-purple-500/30 dark:border-purple-600 dark:bg-purple-950/20"
+                              : isAssigned
+                                ? "border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-900/40"
+                                : canAssign
+                                  ? "border-purple-300 bg-purple-50/10 shadow-sm hover:border-purple-500 hover:shadow-md dark:border-purple-800 cursor-grab"
+                                  : "border-gray-200/90 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-850 cursor-grab"
                             }`}
                         >
                           {/* Card Header row: Checkbox, Badges, and Action Popover */}
@@ -734,7 +729,11 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                               )}
 
                               {/* Interactive CO Dropdown */}
-                              <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+                              >
                                 <span className="text-[10px] text-indigo-500 mr-1 font-extrabold">CO:</span>
                                 <select
                                   value={q.co_level || q.course_outcome || ""}
@@ -744,7 +743,13 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                   title={isAssigned ? "Assigned question CO is locked" : "Change Course Outcome"}
                                 >
                                   <option value="" className="text-gray-600 dark:bg-gray-800">None</option>
-                                  {availableCoCodes.map((co) => (
+                                  {Array.from(
+                                    new Set(
+                                      coCodes
+                                        .map((c) => (c || "").trim().toUpperCase())
+                                        .filter(Boolean)
+                                    )
+                                  ).map((co) => (
                                     <option key={co} value={co} className="text-gray-800 dark:bg-gray-800">
                                       {co}
                                     </option>
@@ -845,8 +850,8 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                     }
                                     disabled={actionLoadingId !== null}
                                     className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all ${activeSlot && marksMatch
-                                        ? "border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                                        : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800"
+                                      ? "border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                      : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800"
                                       }`}
                                   >
                                     <Layers className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
@@ -921,8 +926,8 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
 
                                                 <span
                                                   className={`text-[10px] font-bold ${isCurrentlyAssigned
-                                                      ? "text-amber-600 dark:text-amber-400"
-                                                      : "text-green-600 dark:text-green-400"
+                                                    ? "text-amber-600 dark:text-amber-400"
+                                                    : "text-green-600 dark:text-green-400"
                                                     }`}
                                                 >
                                                   {isCurrentlyAssigned ? "Replace" : "Empty"}
@@ -1053,8 +1058,8 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                     : "Edit Question"
                                 }
                                 className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition-colors ${isAssigned
-                                    ? "text-gray-300 cursor-not-allowed dark:text-gray-600"
-                                    : "text-gray-600 hover:bg-gray-100 hover:text-purple-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                  ? "text-gray-300 cursor-not-allowed dark:text-gray-600"
+                                  : "text-gray-600 hover:bg-gray-100 hover:text-purple-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                   }`}
                               >
                                 <Edit className="h-3.5 w-3.5" />
@@ -1072,8 +1077,8 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                     : "Delete Question (Undo available for 5s)"
                                 }
                                 className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition-colors ${isAssigned
-                                    ? "text-gray-300 cursor-not-allowed dark:text-gray-600"
-                                    : "text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/30"
+                                  ? "text-gray-300 cursor-not-allowed dark:text-gray-600"
+                                  : "text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/30"
                                   }`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />

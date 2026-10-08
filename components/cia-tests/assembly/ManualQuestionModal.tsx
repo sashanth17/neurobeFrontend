@@ -34,7 +34,7 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   onSave,
 }) => {
   const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
-  const activeCos = customAvailableCos || fetchedCoCodes;
+  const activeCos = customAvailableCos && customAvailableCos.length > 0 ? customAvailableCos : fetchedCoCodes;
   const [questionType, setQuestionType] = useState<"DIRECT" | "SUB_QUESTIONS" | "EITHER_OR">("DIRECT");
   const [totalMarks, setTotalMarks] = useState<number>(defaultMarks || 10);
   const [courseOutcome, setCourseOutcome] = useState<string>(activeCos[0] || "CO1");

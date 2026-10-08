@@ -30,6 +30,7 @@ interface BlueprintSlotsPaneProps {
   templateId?: string | number;
   template: QuestionPaperTemplate | null;
   candidates: CandidateQuestion[];
+  coCodes?: string[];
   activeSlotId: number | null;
   actionLoadingId: number | string | null;
   onSelectSlot: (slotId: number) => void;
@@ -51,6 +52,7 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
   templateId,
   template,
   candidates,
+  coCodes: propCoCodes,
   activeSlotId,
   actionLoadingId,
   onSelectSlot,
@@ -165,7 +167,8 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
     });
   }, [apiCoSummary, template, candidates, sections]);
 
-  const { coCodes: activeCourseCoCodes } = useCourseOutcomes(courseId);
+  const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
+  const activeCourseCoCodes = propCoCodes && propCoCodes.length > 0 ? propCoCodes : fetchedCoCodes;
 
   // Open Sub-Question Configurator Modal
   const handleOpenConfigModal = (slot: any) => {

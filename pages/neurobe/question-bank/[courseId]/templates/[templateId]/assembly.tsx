@@ -15,6 +15,8 @@ import UploadPdfModal from "@/components/cia-tests/assembly/UploadPdfModal";
 import { CandidateQuestion } from "@/types/cia-test.types";
 import { Loader2, Sparkles, XCircle } from "lucide-react";
 
+import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
+
 const QuestionAssemblyStudioPage = () => {
   const router = useRouter();
   const dispatch = useDispatch();
@@ -22,6 +24,9 @@ const QuestionAssemblyStudioPage = () => {
 
   const validCourseId = Array.isArray(courseId) ? courseId[0] : courseId || "";
   const validTemplateId = Array.isArray(templateId) ? templateId[0] : templateId || "";
+
+  const { coCodes } = useCourseOutcomes(validCourseId);
+
 
   // Course Details State
   const [courseInfo, setCourseInfo] = useState<{
@@ -216,6 +221,7 @@ const QuestionAssemblyStudioPage = () => {
             templateId={validTemplateId}
             template={template}
             candidates={candidates}
+            coCodes={coCodes}
             activeSlotId={activeSlotId}
             actionLoadingId={actionLoadingId}
             onSelectSlot={(slotId) => setActiveSlotId(slotId)}
@@ -234,6 +240,7 @@ const QuestionAssemblyStudioPage = () => {
             courseCode={courseInfo.code}
             candidates={candidates}
             filteredCandidates={filteredCandidates}
+            coCodes={coCodes}
             allSlots={allSlots}
             activeSlot={activeSlot}
             filters={filters}
@@ -274,6 +281,7 @@ const QuestionAssemblyStudioPage = () => {
         isOpen={isManualModalOpen}
         questionToEdit={questionToEdit}
         defaultMarks={activeSlot?.max_marks || null}
+        availableCos={coCodes}
         onClose={() => {
           setIsManualModalOpen(false);
           setQuestionToEdit(null);
