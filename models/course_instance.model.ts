@@ -116,6 +116,10 @@ const course_instance = {
         return promise;
     },
 
+    get: (id: any) => {
+        return course_instance.detail(id);
+    },
+
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course-instances/${id}`;

@@ -139,8 +139,13 @@ export default function InstanceMCQExecutionTab({
   // 1. Resolve instance and courseId
   useEffect(() => {
     if (!instanceId) return;
-    Models.course_instance
-      .get(instanceId)
+    const fetchInstance = Models.course_instance?.detail
+      ? Models.course_instance.detail(instanceId)
+      : (Models.course_instance as any)?.get
+      ? (Models.course_instance as any).get(instanceId)
+      : Promise.reject(new Error("course_instance.detail not found"));
+
+    fetchInstance
       .then((res: any) => {
         const inst = res?.data || res;
         setCourseInstance(inst);
@@ -148,7 +153,7 @@ export default function InstanceMCQExecutionTab({
           setResolvedCourseId(Number(inst.course_id));
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.error("Failed to fetch instance details:", err);
       });
   }, [instanceId]);
