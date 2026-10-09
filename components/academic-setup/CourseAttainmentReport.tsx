@@ -36,6 +36,7 @@ import {
   COPOMatrixData,
   fetchComprehensiveExtractionResults,
   fetchCopoMatrixDirect,
+  normalizeCOCode,
   normalizeComprehensiveExtractionData,
   calculateComprehensiveAttainment,
   calculatePOAttainment,
@@ -94,11 +95,19 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const loadExtractionData = async (instanceIdToUse?: string | number | null) => {
     setLoading(true);
     try {
-      const activeCourseId = courseId || 1;
+      const activeCourseId =
+        courseId ||
+        (router.query.courseId as string) ||
+        (router.query.course_id as string) ||
+        1;
       const instId =
-        instanceIdToUse !== undefined
+        instanceIdToUse !== undefined && instanceIdToUse !== null
           ? instanceIdToUse
-          : selectedInstanceId || (router.query.course_instance_id as string) || 1;
+          : selectedInstanceId ||
+            offeringId ||
+            (router.query.course_instance_id as string) ||
+            (router.query.instanceId as string) ||
+            1;
 
       const raw = await fetchComprehensiveExtractionResults(activeCourseId, instId, false);
 
@@ -132,8 +141,8 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
       }
 
       setAttainmentData(normalized);
-      // Initialize all test IDs as selected (including assignment test 9999)
-      setSelectedTestIds(new Set(normalized.tests.map((t) => t.test_id as number)));
+      // Initialize all test IDs as selected
+      setSelectedTestIds(new Set(normalized.tests.map((t) => Number(t.test_id))));
     } catch (err: any) {
       console.error("Failed to load comprehensive extraction results:", err);
       Failure(getErrorMessage(err, "Failed to load comprehensive extraction results"));
@@ -146,10 +155,11 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const toggleTestId = (testId: number) => {
     setSelectedTestIds((prev) => {
       const next = new Set(prev);
-      if (next.has(testId)) {
-        next.delete(testId);
+      const id = Number(testId);
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        next.add(testId);
+        next.add(id);
       }
       return next;
     });
@@ -158,11 +168,19 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const loadExternalData = async (instanceIdToUse?: string | number | null) => {
     setLoadingExternal(true);
     try {
-      const activeCourseId = courseId || 1;
+      const activeCourseId =
+        courseId ||
+        (router.query.courseId as string) ||
+        (router.query.course_id as string) ||
+        1;
       const instId =
-        instanceIdToUse !== undefined
+        instanceIdToUse !== undefined && instanceIdToUse !== null
           ? instanceIdToUse
-          : selectedInstanceId || (router.query.course_instance_id as string) || 1;
+          : selectedInstanceId ||
+            offeringId ||
+            (router.query.course_instance_id as string) ||
+            (router.query.instanceId as string) ||
+            1;
 
       const raw = await fetchComprehensiveExtractionResults(activeCourseId, instId, true);
 
@@ -229,10 +247,11 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const filteredInternalData = useMemo((): NormalizedAttainmentData | null => {
     if (!attainmentData) return null;
     // Which tests are selected for calculation (CIAs and/or assignments)
+    // If selectedTestIds is empty (e.g. initial mount), default to all tests
     const activeCIAs = attainmentData.tests.filter(
-      (t) => selectedTestIds.has(t.test_id as number)
+      (t) => selectedTestIds.size === 0 || selectedTestIds.has(Number(t.test_id))
     );
-    // Keep assignment test visible in UI but exclude from totals
+    // Keep all tests visible in UI
     const allTests = attainmentData.tests;
 
     // Recompute co_totals for each student from selected CIAs only
@@ -241,10 +260,11 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
       attainmentData.cos.forEach((co) => {
         let total = 0;
         activeCIAs.forEach((test) => {
-          const mark = st.test_marks[test.test_id as number]?.[co];
+          const testIdNum = Number(test.test_id);
+          const mark = st.test_marks[testIdNum]?.[co] ?? st.test_marks[test.test_id as number]?.[co];
           if (mark != null) total += Number(mark);
         });
-        newCoTotals[co] = total;
+        newCoTotals[co] = Number(total.toFixed(2));
       });
       return { ...st, co_totals: newCoTotals };
     });
@@ -272,12 +292,12 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
     // External has only ONE assessment (the first assessment, excluding 9999)
     const validTests = externalAttainmentData.tests.filter(
-      (t) => (t.test_id as number) !== 9999
+      (t) => Number(t.test_id) !== 9999
     );
     const firstTest = validTests[0] || externalAttainmentData.tests[0];
     if (!firstTest) return null;
 
-    const testId = firstTest.test_id;
+    const testId = Number(firstTest.test_id);
     const externalCos = firstTest.cos && firstTest.cos.length > 0 ? firstTest.cos : externalAttainmentData.cos;
 
     // Max marks for each CO from this first assessment
@@ -294,7 +314,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
       };
 
       externalCos.forEach((co) => {
-        const mark = st.test_marks[testId]?.[co] ?? null;
+        const mark = st.test_marks[testId]?.[co] ?? st.test_marks[firstTest.test_id as number]?.[co] ?? null;
         singleTestMarks[testId][co] = mark;
         newCoTotals[co] = mark !== null ? Number(mark) : 0;
       });
@@ -955,7 +975,8 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
                         {/* Dynamic Tests Header Spans — with checkbox for CIAs & assignments (internal only) */}
                         {attainmentData.tests.map((test) => {
-                          const isSelected = selectedTestIds.has(test.test_id as number);
+                          const testIdNum = Number(test.test_id);
+                          const isSelected = selectedTestIds.has(testIdNum);
                           return (
                             <th
                               key={test.test_id}
@@ -968,7 +989,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
-                                    onChange={() => toggleTestId(test.test_id as number)}
+                                    onChange={() => toggleTestId(testIdNum)}
                                     title={`${isSelected ? "Exclude" : "Include"} ${test.test_name} from attainment`}
                                     className="h-3 w-3 cursor-pointer accent-indigo-600"
                                   />
@@ -990,7 +1011,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                         )}
                       </tr>
 
-                      {/* Header Row 2 (Sub-headers: C1..Cn) */}
+                      {/* Header Row 2 (Sub-headers: CO1..COn) */}
                       <tr className="border-b border-slate-200 font-bold text-slate-700 dark:border-slate-700 dark:text-slate-300">
                         {/* Per-test CO columns */}
                         {attainmentData.tests.map((test) =>
@@ -999,7 +1020,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                               key={`${test.test_id}-${co}`}
                               className="min-w-[48px] border-r border-slate-200 p-1.5 text-center dark:border-slate-700"
                             >
-                              {co.replace("CO", "C")}
+                              {co}
                             </th>
                           ))
                         )}
@@ -1013,7 +1034,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                                 : ""
                                 }`}
                             >
-                              {co.replace("CO", "C")}
+                              {co}
                             </th>
                           ))}
                       </tr>
@@ -1096,7 +1117,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                                     key={`st-${st.student_id}-${test.test_id}-${co}`}
                                     className="border-r border-slate-100 p-1.5 font-medium tabular-nums dark:border-slate-800"
                                   >
-                                    {formatMark(st.test_marks[test.test_id]?.[co])}
+                                    {formatMark(st.test_marks[Number(test.test_id)]?.[co] ?? st.test_marks[test.test_id]?.[co])}
                                   </td>
                                 ))
                               )}
@@ -1578,7 +1599,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
             const allCos = attainmentData?.cos || [];
             allCos.forEach((co) => { copoLookup[co] = {}; });
             copoMatrix.matrix_entries.forEach((e) => {
-              const co = e.co_code || `CO${e.course_outcome_id}`;
+              const co = normalizeCOCode(e.co_code || `CO${e.course_outcome_id}`);
               const po = e.po_code || `PO${e.po_id}`;
               if (!copoLookup[co]) copoLookup[co] = {};
               copoLookup[co][po] = e.matrix_value || 0;

@@ -79,11 +79,10 @@ function InstanceDashboardPage() {
 
   return (
     <div
-      className={`flex flex-col bg-gray-50 dark:bg-gray-900 ${
-        activeTab === "co-po-attainment"
-          ? "min-h-full"
-          : "h-[calc(100vh-80px)] overflow-hidden"
-      }`}
+      className={`flex flex-col bg-gray-50 dark:bg-gray-900 ${activeTab === "co-po-attainment"
+        ? "min-h-full"
+        : "h-[calc(100vh-80px)] overflow-hidden"
+        }`}
     >
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}

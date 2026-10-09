@@ -152,6 +152,42 @@ export const DEFAULT_ATTAINMENT_LEVELS: AttainmentLevelConfig[] = [
 ];
 
 /**
+ * Normalizes any CO string (e.g. "co1", "C1", "CO 1", "CO1") to standard uppercase "CO1"
+ */
+export const normalizeCOCode = (co: string | null | undefined): string => {
+  if (!co) return '';
+  const trimmed = String(co).trim();
+  // Standard CO pattern: CO1, co1, C1, c1, CO-1, CO_1, CO 1
+  const stdMatch = trimmed.match(/^c(?:o)?[-_\s.]*(\d+)$/i);
+  if (stdMatch) {
+    return `CO${stdMatch[1]}`;
+  }
+  // Course-prefixed dot notation: Ad3391.1, CS8492.2, etc.
+  const dotMatch = trimmed.match(/\.(\d+)$/);
+  if (dotMatch) {
+    return `CO${dotMatch[1]}`;
+  }
+  // Pure digit: "1", "2"
+  const digitMatch = trimmed.match(/^(\d+)$/);
+  if (digitMatch) {
+    return `CO${digitMatch[1]}`;
+  }
+  return trimmed.toUpperCase();
+};
+
+/**
+ * Natural sorting for CO codes (CO1, CO2, CO3, ... CO10)
+ */
+export const sortCOs = (cos: string[]): string[] => {
+  return [...cos].sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
+    if (numA !== numB) return numA - numB;
+    return a.localeCompare(b);
+  });
+};
+
+/**
  * Normalizes raw comprehensive-extraction-results from backend into a structured attainment model
  */
 export const normalizeComprehensiveExtractionData = (
@@ -161,40 +197,79 @@ export const normalizeComprehensiveExtractionData = (
 ): NormalizedAttainmentData => {
   const studentsRaw = raw.students || [];
 
+  // Check if ANY student actually has non-empty direct_assessments
+  const hasDirectAssessments = studentsRaw.some((student) => {
+    if (!student.direct_assessments) return false;
+    if (Array.isArray(student.direct_assessments)) {
+      return student.direct_assessments.some((da: any) => {
+        const coCode = da.co_code || da.co;
+        return Boolean(coCode) && (da.mark_obtained !== undefined || da.final_mark !== undefined || da.mark !== undefined);
+      });
+    }
+    if (typeof student.direct_assessments === 'object') {
+      return Object.keys(student.direct_assessments).length > 0;
+    }
+    return false;
+  });
+
+  // If direct_assessments exist, create/attach the direct assessment test on each student
+  if (hasDirectAssessments) {
+    studentsRaw.forEach((student) => {
+      if (!student.tests) student.tests = [];
+      if (!student.tests.find(t => Number(t.cia_test_id) === 9999)) {
+        const assignmentTest: ExtractionTest = {
+          cia_test_id: 9999,
+          cia_test_name: "Direct Assessment",
+          final_total_mark: 0,
+          actual_max_mark: 0,
+          co_marks: {}
+        };
+
+        if (student.direct_assessments && Array.isArray(student.direct_assessments)) {
+          student.direct_assessments.forEach((da: any) => {
+            const rawCo = da.co_code || da.co;
+            const coCode = normalizeCOCode(rawCo);
+            if (coCode) {
+              assignmentTest.co_marks![coCode] = {
+                final_mark: da.mark_obtained ?? da.mark ?? da.final_mark ?? 0,
+                max_marks_assigned: da.max_mark ?? da.max ?? da.max_marks_assigned ?? 10
+              };
+            }
+          });
+        } else if (student.direct_assessments && typeof student.direct_assessments === 'object') {
+          Object.entries(student.direct_assessments).forEach(([rawCo, da]: [string, any]) => {
+            const coCode = normalizeCOCode(rawCo);
+            if (coCode) {
+              assignmentTest.co_marks![coCode] = {
+                final_mark: da.mark_obtained ?? da.mark ?? da.final_mark ?? 0,
+                max_marks_assigned: da.max_mark ?? da.max ?? da.max_marks_assigned ?? 10
+              };
+            }
+          });
+        }
+
+        // Only add if this test actually has at least one valid co_mark
+        if (Object.keys(assignmentTest.co_marks!).length > 0) {
+          student.tests.push(assignmentTest);
+        }
+      }
+    });
+  }
+
+  // Normalize co_marks keys inside all student tests
   studentsRaw.forEach((student) => {
-    if (!student.tests) student.tests = [];
-
-    // Check if the assignment test already exists to avoid duplicates
-    if (!student.tests.find(t => t.cia_test_id === 9999)) {
-      const assignmentTest: ExtractionTest = {
-        cia_test_id: 9999,
-        cia_test_name: "Assignment / Mini Project /Tutorial / Seminar",
-        final_total_mark: 0,
-        actual_max_mark: 0,
-        co_marks: {}
-      };
-
-      if (student.direct_assessments && Array.isArray(student.direct_assessments)) {
-        student.direct_assessments.forEach((da: any) => {
-          const coCode = da.co_code || da.co;
-          if (coCode) {
-            assignmentTest.co_marks![coCode] = {
-              final_mark: da.mark_obtained ?? da.mark ?? da.final_mark ?? 0,
-              max_marks_assigned: da.max_mark ?? da.max ?? da.max_marks_assigned ?? 10
-            };
+    (student.tests || []).forEach((test) => {
+      if (test.co_marks) {
+        const normalizedCoMarks: Record<string, ExtractionCOMark> = {};
+        Object.entries(test.co_marks).forEach(([rawKey, val]) => {
+          const normKey = normalizeCOCode(rawKey);
+          if (normKey) {
+            normalizedCoMarks[normKey] = val;
           }
         });
-      } else if (student.direct_assessments && typeof student.direct_assessments === 'object') {
-        Object.entries(student.direct_assessments).forEach(([coCode, da]: [string, any]) => {
-          assignmentTest.co_marks![coCode] = {
-            final_mark: da.mark_obtained ?? da.mark ?? da.final_mark ?? 0,
-            max_marks_assigned: da.max_mark ?? da.max ?? da.max_marks_assigned ?? 10
-          };
-        });
+        test.co_marks = normalizedCoMarks;
       }
-
-      student.tests.push(assignmentTest);
-    }
+    });
   });
 
   const testMap = new Map<number, NormalizedTestInfo>();
@@ -203,10 +278,16 @@ export const normalizeComprehensiveExtractionData = (
   // Extract unique tests and their maximum marks per CO
   studentsRaw.forEach((student) => {
     (student.tests || []).forEach((test) => {
-      const testId = test.cia_test_id;
+      const testId = Number(test.cia_test_id);
+      const testCos = Object.keys(test.co_marks || {});
+      // Skip empty tests with no COs and no marks
+      if (testCos.length === 0 && (!test.marks || test.marks.length === 0)) {
+        return;
+      }
+
+      testCos.forEach((c) => allCosSet.add(c));
+
       if (!testMap.has(testId)) {
-        const testCos = Object.keys(test.co_marks || {});
-        testCos.forEach((c) => allCosSet.add(c));
         const maxMarks: Record<string, number> = {};
         testCos.forEach((c) => {
           maxMarks[c] = test.co_marks?.[c]?.max_marks_assigned || 0;
@@ -215,39 +296,39 @@ export const normalizeComprehensiveExtractionData = (
         testMap.set(testId, {
           test_id: testId,
           test_name: test.cia_test_name || `CIA ${testId}`,
-          cos: testCos,
+          cos: sortCOs(testCos),
           max_marks: maxMarks,
         });
       } else {
-        // Ensure max marks are captured if first student had 0
         const existing = testMap.get(testId)!;
         Object.entries(test.co_marks || {}).forEach(([coKey, coObj]) => {
-          allCosSet.add(coKey);
           if (!existing.cos.includes(coKey)) existing.cos.push(coKey);
           if (coObj.max_marks_assigned && !existing.max_marks[coKey]) {
             existing.max_marks[coKey] = coObj.max_marks_assigned;
           }
         });
+        existing.cos = sortCOs(existing.cos);
       }
     });
   });
-
-  const testsList = Array.from(testMap.values());
-  // Sort tests by test_id
-  testsList.sort((a, b) => a.test_id - b.test_id);
 
   // If no COs found in co_marks, check question-level marks
   if (allCosSet.size === 0) {
     studentsRaw.forEach((s) => {
       s.tests?.forEach((t) => {
         t.marks?.forEach((m) => {
-          if (m.target_co) allCosSet.add(m.target_co);
+          const normCo = normalizeCOCode(m.target_co);
+          if (normCo) allCosSet.add(normCo);
         });
       });
     });
   }
 
-  const allCos = Array.from(allCosSet).sort();
+  const testsList = Array.from(testMap.values());
+  testsList.sort((a, b) => a.test_id - b.test_id);
+
+  // Available COs strictly derived from tests / direct assessments
+  const allCos = sortCOs(Array.from(allCosSet));
 
   // Calculate total max marks across all tests for each CO
   const coMaxTotals: Record<string, number> = {};
@@ -270,22 +351,22 @@ export const normalizeComprehensiveExtractionData = (
     });
 
     (s.tests || []).forEach((t) => {
-      testDetailsMap[t.cia_test_id] = t;
-      testMarksMap[t.cia_test_id] = {};
+      const testId = Number(t.cia_test_id);
+      testDetailsMap[testId] = t;
+      testMarksMap[testId] = {};
 
       allCos.forEach((co) => {
         let finalMark: number | null = null;
         if (t.co_marks?.[co] !== undefined) {
           finalMark = t.co_marks[co].final_mark;
         } else if (t.marks) {
-          // Sum up question marks matching this CO
-          const qMarks = t.marks.filter((m) => m.target_co === co);
+          const qMarks = t.marks.filter((m) => normalizeCOCode(m.target_co) === co);
           if (qMarks.length > 0) {
             finalMark = qMarks.reduce((sum, q) => sum + (q.final_mark || 0), 0);
           }
         }
 
-        testMarksMap[t.cia_test_id][co] = finalMark;
+        testMarksMap[testId][co] = finalMark;
         if (finalMark !== null) {
           coTotals[co] = Number((coTotals[co] + finalMark).toFixed(2));
         }
@@ -301,15 +382,6 @@ export const normalizeComprehensiveExtractionData = (
       test_details: testDetailsMap,
     };
   });
-
-  // Ensure direct_assessments and external_exams COs are included in allCos
-  (raw.direct_assessments || []).forEach((da) => {
-    if (da.co_code && !allCos.includes(da.co_code)) allCos.push(da.co_code);
-  });
-  (raw.external_exams || []).forEach((ee) => {
-    if (ee.co_code && !allCos.includes(ee.co_code)) allCos.push(ee.co_code);
-  });
-  allCos.sort();
 
   return {
     course_id: raw.course_id || 1,
@@ -489,7 +561,7 @@ export const calculatePOAttainment = (
       const mappingVal = entry.matrix_value || 0;
       if (mappingVal === 0) return; // skip unmapped COs
 
-      const coCode = entry.co_code || `CO${entry.course_outcome_id}`;
+      const coCode = normalizeCOCode(entry.co_code || `CO${entry.course_outcome_id}`);
       const coAtt = coAttainmentMap.get(coCode) || 0;
 
       contributing.push({
@@ -556,6 +628,7 @@ export const fetchComprehensiveExtractionResults = async (
   courseInstanceId?: string | number | null,
   testType?: boolean
 ): Promise<ComprehensiveExtractionResponse> => {
+  console.log(courseId, courseInstanceId)
   const targetId = courseId || 1;
   const params = new URLSearchParams();
   if (courseInstanceId !== undefined && courseInstanceId !== null && courseInstanceId !== "") {
@@ -724,7 +797,7 @@ export const exportComprehensiveAttainmentToExcel = async (
       worksheet.getCell(14, startCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F2FF' } };
 
       test.cos.forEach((co, idx) => {
-        worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
+        worksheet.getCell(15, startCol + idx).value = co;
         worksheet.getCell(16, startCol + idx).value = test.max_marks[co] ?? 0;
         worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
         worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
@@ -743,7 +816,7 @@ export const exportComprehensiveAttainmentToExcel = async (
     worksheet.getCell(14, startCol).value = 'CO WISE MARKS SCORED';
 
     data.cos.forEach((co, idx) => {
-      worksheet.getCell(15, startCol + idx).value = co.replace('CO', 'C');
+      worksheet.getCell(15, startCol + idx).value = co;
       worksheet.getCell(16, startCol + idx).value = data.co_max_totals[co] ?? 0;
       worksheet.getCell(15, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
       worksheet.getCell(16, startCol + idx).font = { color: { argb: 'FF0070C0' }, bold: true };
@@ -846,7 +919,7 @@ export const exportComprehensiveAttainmentToExcel = async (
   try {
     const labels = data.cos.map((co, idx) => (idx + 1).toString());
     const cData = data.cos.map(co => summary.cos_summary[co]?.attainment_level ?? 0);
-    const xLabelString = `Course Outcomes (${data.cos.map(c => c.replace('CO', 'C')).join(',')})`;
+    const xLabelString = `Course Outcomes (${data.cos.join(',')})`;
 
     const chartConfig = {
       type: 'bar',
@@ -1007,7 +1080,7 @@ export const exportWeightedCOAttainmentToExcel = async (
   let row = 7;
   weightedData.forEach(item => {
     const coCell = worksheet.getCell(row, 1);
-    coCell.value = item.co.replace('CO', 'C');
+    coCell.value = item.co;
     coCell.font = { color: { argb: 'FFFF0000' }, name: 'Times New Roman', size: 11, bold: true };
     coCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBorder(coCell);
@@ -1141,7 +1214,7 @@ export const exportPOAttainmentToExcel = async (
   const copoLookup: Record<string, Record<string, number>> = {};
   allCos.forEach((co) => { copoLookup[co] = {}; });
   copoMatrix.matrix_entries.forEach((e) => {
-    const co = e.co_code || `CO${e.course_outcome_id}`;
+    const co = normalizeCOCode(e.co_code || `CO${e.course_outcome_id}`);
     const po = e.po_code || `PO${e.po_id}`;
     if (!copoLookup[co]) copoLookup[co] = {};
     copoLookup[co][po] = e.matrix_value || 0;

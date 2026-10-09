@@ -74,7 +74,7 @@ const CourseOffering = () => {
     const courseId = row.course_id ?? row.courseId ?? 1;
     const instanceId = row.id ?? row.course_instance_id;
     if (instanceId) {
-      router.push(`/neurobe/course-instance/${instanceId}`);
+      router.push(`/neurobe/course-instance/${instanceId}?courseId=${courseId}`);
     }
   };
 
