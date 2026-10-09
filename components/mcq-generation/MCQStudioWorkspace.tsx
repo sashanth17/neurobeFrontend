@@ -90,6 +90,7 @@ export const MCQStudioWorkspace: React.FC<MCQStudioWorkspaceProps> = ({
   selectedUnitIds,
   onToggleUnitSelection,
   onSelectAllUnits,
+  
   selectedSingleUnitId,
   onSingleUnitChange,
   topicRows,

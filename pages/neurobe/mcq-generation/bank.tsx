@@ -15,7 +15,6 @@ import {
   FALLBACK_COURSES,
   UNITS_CONFIG,
   normalizeMCQ,
-  MCQStatsBanner,
 } from "@/components/mcq-generation";
 
 const MCQGenerationBankPage = () => {
@@ -190,12 +189,6 @@ const MCQGenerationBankPage = () => {
               }
             }}
             onBack={() => router.push("/neurobe/mcq-generation")}
-          />
-
-          <MCQStatsBanner
-            questions={currentQuestions}
-            selectedFilter={state.selectedBannerFilter}
-            onSelectFilter={(selectedBannerFilter) => setState({ selectedBannerFilter })}
           />
 
           <CourseQuestionBankTab

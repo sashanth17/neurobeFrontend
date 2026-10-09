@@ -3,20 +3,7 @@ import {
   Layers,
   Plus,
   BookOpen,
-  Calendar,
-  Search,
-  Filter,
-  CheckCircle2,
-  Trash2,
-  ChevronDown,
   Sparkles,
-  FileCheck2,
-  Check,
-  Edit3,
-  Eye,
-  Archive,
-  Zap,
-  Target,
 } from "lucide-react";
 import Models from "@/imports/models.import";
 import { Success, Failure, getAuthUser } from "@/utils/function.utils";
@@ -28,12 +15,18 @@ import EditQuestionSetModal from "./EditQuestionSetModal";
 import AddQuestionsToSetModal from "./AddQuestionsToSetModal";
 import { EditQuestionModal } from "./EditQuestionModal";
 import ViewQuestionModal from "./ViewQuestionModal";
+import {
+  MCQQuestion,
+  normalizeMCQ,
+  MCQStatsBanner,
+  QuestionReviewPool,
+} from "@/components/mcq-generation";
 
 interface CourseQuestionBankTabProps {
   courseKey: string;
   courseTitle: string;
-  courseQuestions: any[];
-  courseUnits: any[];
+  courseQuestions?: any[];
+  courseUnits?: any[];
   onRefreshQuestions?: () => void;
 }
 
@@ -54,16 +47,20 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
   const [isEditSetModalOpen, setIsEditSetModalOpen] = useState(false);
   const [isAddQuestionsModalOpen, setIsAddQuestionsModalOpen] = useState(false);
 
+  // Questions state & Review Pool props
+  const [questions, setQuestions] = useState<MCQQuestion[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [selectedBannerFilter, setSelectedBannerFilter] = useState<
+    "recent" | "all" | "approved" | "archived" | "review" | "drafted"
+  >("all");
+  const [recentQuestionIds, setRecentQuestionIds] = useState<string[]>([]);
+  const [expandedQuestionIds, setExpandedQuestionIds] = useState<string[]>([]);
+
   // Modals state
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [viewQuestion, setViewQuestion] = useState<any | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
-  // All questions view filter & search
-  const [searchAll, setSearchAll] = useState("");
-  const [statusFilterAll, setStatusFilterAll] = useState<"all" | "approved" | "draft" | "archived">("all");
-  const [expandedAllIds, setExpandedAllIds] = useState<string[]>([]);
 
   // Coordinator toggle state: "Created by me" (default) vs "Others"
   const [ownershipFilter, setOwnershipFilter] = useState<"me" | "others">("me");
@@ -114,9 +111,178 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
     }
   };
 
+  const fetchQuestions = async () => {
+    if (!courseKey) return;
+    setLoadingQuestions(true);
+    try {
+      const res: any = await Models.mcq.get_questions_by_course(courseKey).catch(() => null);
+      let rawList: any[] = [];
+      if (res) {
+        if (Array.isArray(res)) rawList = res;
+        else if (res.items && Array.isArray(res.items)) rawList = res.items;
+        else if (res.questions && Array.isArray(res.questions)) rawList = res.questions;
+        else if (res.data && Array.isArray(res.data)) rawList = res.data;
+      }
+      const normalized = rawList.map((item, idx) => normalizeMCQ(item, idx));
+      setQuestions(normalized);
+    } catch (err) {
+      console.error("Failed to fetch questions in CourseQuestionBankTab:", err);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
   useEffect(() => {
     fetchSets();
   }, [courseKey]);
+
+  useEffect(() => {
+    if (courseQuestions && courseQuestions.length > 0) {
+      setQuestions(courseQuestions.map((q, idx) => normalizeMCQ(q, idx)));
+    } else {
+      fetchQuestions();
+    }
+  }, [courseKey, courseQuestions]);
+
+  // Filter questions for QuestionReviewPool
+  const displayedQuestions = useMemo(() => {
+    return questions.filter((q) => {
+      const st = (q.status || "").toLowerCase();
+      if (selectedBannerFilter === "approved" && st !== "approved") return false;
+      if (selectedBannerFilter === "archived" && st !== "archived") return false;
+      if (selectedBannerFilter === "review" && st !== "need review" && st !== "review") return false;
+      if (selectedBannerFilter === "drafted" && st !== "drafted" && st !== "draft") return false;
+      if (selectedBannerFilter === "recent") {
+        if (recentQuestionIds.length > 0) {
+          return recentQuestionIds.includes(q.id);
+        }
+        return questions.slice(0, 10).some((x) => x.id === q.id);
+      }
+      return true;
+    });
+  }, [questions, selectedBannerFilter, recentQuestionIds]);
+
+  // Review Pool Handlers
+  const handleToggleExpandOne = (id: string) => {
+    setExpandedQuestionIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleExpandAll = () => {
+    if (expandedQuestionIds.length === displayedQuestions.length && displayedQuestions.length > 0) {
+      setExpandedQuestionIds([]);
+    } else {
+      setExpandedQuestionIds(displayedQuestions.map((q) => q.id));
+    }
+  };
+
+  const handleToggleApprove = async (id: string) => {
+    const target = questions.find((q) => q.id === id);
+    if (!target) return;
+    const isCurrentlyApproved = (target.status || "").toLowerCase() === "approved";
+    const newStatus = isCurrentlyApproved ? "need review" : "approved";
+    try {
+      await Models.mcq.update_question(id, { status: newStatus });
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, status: newStatus as any } : q))
+      );
+      Success(`Question ${isCurrentlyApproved ? "moved to review" : "approved successfully"}.`);
+      if (onRefreshQuestions) onRefreshQuestions();
+    } catch (err: any) {
+      Failure(err?.message || "Failed to update question status.");
+    }
+  };
+
+  const handleToggleArchive = async (id: string) => {
+    const target = questions.find((q) => q.id === id);
+    if (!target) return;
+    const isCurrentlyArchived = (target.status || "").toLowerCase() === "archived";
+    const newStatus = isCurrentlyArchived ? "need review" : "archived";
+    try {
+      await Models.mcq.update_question(id, { status: newStatus });
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, status: newStatus as any } : q))
+      );
+      Success(`Question ${isCurrentlyArchived ? "restored from archive" : "archived successfully"}.`);
+      if (onRefreshQuestions) onRefreshQuestions();
+    } catch (err: any) {
+      Failure(err?.message || "Failed to archive question.");
+    }
+  };
+
+  const handleEditQuestion = (q: MCQQuestion) => {
+    setEditingQuestion(q);
+    setIsEditModalOpen(true);
+  };
+
+  const handleViewQuestion = (q: MCQQuestion) => {
+    const optA = q.options?.find((o) => o.key === "A")?.text || q.options?.[0]?.text || "";
+    const optB = q.options?.find((o) => o.key === "B")?.text || q.options?.[1]?.text || "";
+    const optC = q.options?.find((o) => o.key === "C")?.text || q.options?.[2]?.text || "";
+    const optD = q.options?.find((o) => o.key === "D")?.text || q.options?.[3]?.text || "";
+    const correctOpt = q.options?.find((o) => o.isCorrect)?.key || "A";
+
+    setViewQuestion({
+      id: q.id,
+      status: q.status as any,
+      unit: q.unit,
+      topic: q.topic,
+      subtopic: q.subtopic,
+      co: q.co,
+      level: q.level,
+      marks: q.marks,
+      difficulty: q.difficulty,
+      question: q.question || q.text || "",
+      optionA: optA,
+      optionB: optB,
+      optionC: optC,
+      optionD: optD,
+      correctAnswer: correctOpt,
+      explanation: q.explanation,
+    });
+    setIsViewModalOpen(true);
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    try {
+      await Models.mcq.delete_question(id);
+      setQuestions((prev) => prev.filter((q) => q.id !== id));
+      Success("Question deleted successfully.");
+      if (onRefreshQuestions) onRefreshQuestions();
+    } catch (err: any) {
+      Failure(err?.message || "Failed to delete question.");
+    }
+  };
+
+  const handleApproveAll = async () => {
+    const toApprove = displayedQuestions.filter(
+      (q) => (q.status || "").toLowerCase() !== "approved"
+    );
+    if (toApprove.length === 0) {
+      Success("All displayed questions are already approved.");
+      return;
+    }
+    try {
+      await Promise.all(
+        toApprove.map((q) => Models.mcq.update_question(q.id, { status: "approved" }))
+      );
+      setQuestions((prev) =>
+        prev.map((q) => {
+          const match = toApprove.find((item) => item.id === q.id);
+          return match ? { ...q, status: "approved" as any } : q;
+        })
+      );
+      Success(`Successfully approved ${toApprove.length} questions.`);
+      if (onRefreshQuestions) onRefreshQuestions();
+    } catch (err: any) {
+      Failure(err?.message || "Failed to approve all questions.");
+    }
+  };
+
+  const handleCreateQuestionSet = () => {
+    setIsCreateSetModalOpen(true);
+  };
 
   const handleOpenSet = (set: QuestionSetItem) => {
     setSelectedSet(set);
@@ -184,7 +350,6 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
     try {
       await Models.mcq.remove_question_from_set(selectedSet.id, questionId);
       Success("Question removed from set.");
-      // Update local state
       const updatedQIds = (selectedSet.question_ids || []).filter((id) => id !== questionId);
       const updatedSet = { ...selectedSet, question_ids: updatedQIds };
       setSelectedSet(updatedSet);
@@ -211,24 +376,8 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
       ? selectedSet.questions.map((q: any) => q.id || q)
       : [];
 
-    return courseQuestions.filter((q) => qIds.includes(q.id));
-  }, [selectedSet, courseQuestions]);
-
-  // Questions filtered in "all-questions" view
-  const filteredAllQuestions = useMemo(() => {
-    return courseQuestions.filter((q) => {
-      if (statusFilterAll === "approved" && (q.status || "").toLowerCase() !== "approved") return false;
-      if (statusFilterAll === "draft" && (q.status || "").toLowerCase() !== "draft" && (q.status || "").toLowerCase() !== "drafted") return false;
-      if (statusFilterAll === "archived" && (q.status || "").toLowerCase() !== "archived") return false;
-      if (searchAll) {
-        const text = (q.text || q.question || "").toLowerCase();
-        const code = (q.code || q.question_code || "").toLowerCase();
-        const term = searchAll.toLowerCase();
-        if (!text.includes(term) && !code.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [courseQuestions, statusFilterAll, searchAll]);
+    return questions.filter((q) => qIds.includes(q.id));
+  }, [selectedSet, questions]);
 
   return (
     <div className="space-y-6">
@@ -266,7 +415,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
               }`}
             >
               <Layers className="h-3.5 w-3.5" />
-              <span>Question Sets ({questionSets.length})</span>
+              <span>Question Sets ({displayedSets.length})</span>
             </button>
 
             <button
@@ -279,7 +428,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
               }`}
             >
               <BookOpen className="h-3.5 w-3.5" />
-              <span>All Questions ({courseQuestions.length})</span>
+              <span>All Questions ({questions.length})</span>
             </button>
           </div>
 
@@ -311,17 +460,15 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
             </div>
           )}
 
-          {/* Generate MCQs with AI (Coordinator only) */}
-          {isCoordOrAdmin && (
-            <button
-              type="button"
-              onClick={() => router.push(courseKey ? `/neurobe/mcq-generation?course_id=${courseKey}` : "/neurobe/mcq-generation")}
-              className="flex items-center gap-1.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-100 transition active:scale-98 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 cursor-pointer"
-            >
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-              <span>Generate MCQs</span>
-            </button>
-          )}
+          {/* Generate MCQs with AI */}
+          <button
+            type="button"
+            onClick={() => router.push(courseKey ? `/neurobe/mcq-generation?course_id=${courseKey}` : "/neurobe/mcq-generation")}
+            className="flex items-center gap-1.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-100 transition active:scale-98 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 cursor-pointer"
+          >
+            <Sparkles className="h-4 w-4 text-indigo-600" />
+            <span>Generate MCQs</span>
+          </button>
 
           {/* Primary Create Button */}
           <button
@@ -361,8 +508,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
             setIsEditModalOpen(true);
           }}
           onViewQuestion={(q) => {
-            setViewQuestion(q);
-            setIsViewModalOpen(true);
+            handleViewQuestion(q);
           }}
           onRemoveQuestionFromSet={handleRemoveQuestionFromSet}
           onEditSetName={(set) => {
@@ -374,197 +520,65 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
         />
       )}
 
-      {/* VIEW 3: All Course Questions Repository */}
+      {/* VIEW 3: All Course Questions Repository (Review Pool) */}
       {activeSubView === "all-questions" && (
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
-          {/* Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchAll}
-                onChange={(e) => setSearchAll(e.target.value)}
-                placeholder="Search questions by keyword or code..."
-                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2 text-xs font-medium text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
+        <div className="space-y-6">
+          <MCQStatsBanner
+            questions={questions}
+            selectedFilter={selectedBannerFilter}
+            onSelectFilter={(f) => setSelectedBannerFilter(f)}
+          />
 
-            <div className="flex items-center gap-2">
-              <select
-                value={statusFilterAll}
-                onChange={(e) => setStatusFilterAll(e.target.value as any)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              >
-                <option value="all">All Statuses ({courseQuestions.length})</option>
-                <option value="approved">Approved Only</option>
-                <option value="draft">Drafts Only</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Questions List */}
-          {filteredAllQuestions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileCheck2 className="h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-xs font-bold text-slate-500">No questions found matching criteria.</p>
+          {loadingQuestions ? (
+            <div className="flex h-48 items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                <span className="text-sm font-bold">Loading questions pool...</span>
+              </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredAllQuestions.map((q, idx) => {
-                const isExpanded = expandedAllIds.includes(q.id);
-                const isApproved = (q.status || "").toLowerCase() === "approved";
-                const isArchived = (q.status || "").toLowerCase() === "archived";
-
-                const toggleExpand = () => {
-                  setExpandedAllIds((prev) =>
-                    prev.includes(q.id) ? prev.filter((i) => i !== q.id) : [...prev, q.id]
-                  );
-                };
-
-                return (
-                  <div
-                    key={q.id}
-                    className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-2xs hover:shadow-xs transition dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 text-xs font-black text-white dark:bg-slate-100 dark:text-slate-900">
-                          #{idx + 1}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
-                          {q.code || q.question_code}
-                        </span>
-                        {q.level && (
-                          <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
-                            <Zap className="h-3 w-3" />
-                            {q.level}
-                          </span>
-                        )}
-                        {q.co && (
-                          <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                            <Target className="h-3 w-3" />
-                            {q.co}
-                          </span>
-                        )}
-                        {q.unit && (
-                          <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
-                            <BookOpen className="h-3 w-3" />
-                            {q.unit}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                            isApproved
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : isArchived
-                              ? "bg-purple-100 text-purple-800 border border-purple-300"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}
-                        >
-                          {isApproved ? "Approved" : isArchived ? "Archived" : "Draft"}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={toggleExpand}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                        >
-                          <span>{isExpanded ? "Hide" : "Details"}</span>
-                          <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="mt-3 text-sm font-bold text-slate-900 dark:text-white cursor-pointer" onClick={toggleExpand}>
-                      {q.question || q.text}
-                    </p>
-
-                    {isExpanded && (
-                      <div className="mt-4 border-t border-slate-100 pt-3.5 dark:border-slate-800 space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {(q.options || []).map((opt: any, oIdx: number) => {
-                            const isCorrect = opt.isCorrect === true || opt.is_correct === true;
-                            const key = opt.key || (oIdx === 0 ? "A" : oIdx === 1 ? "B" : oIdx === 2 ? "C" : "D");
-                            return (
-                              <div
-                                key={oIdx}
-                                className={`flex items-center gap-2 rounded-xl p-2.5 text-xs ${
-                                  isCorrect
-                                    ? "border-2 border-emerald-500 bg-emerald-50 font-bold text-emerald-950 dark:bg-emerald-950/40 dark:text-emerald-200"
-                                    : "border border-slate-200 bg-slate-50/50 text-slate-700 dark:border-slate-800 dark:bg-slate-800"
-                                }`}
-                              >
-                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-black ${isCorrect ? "bg-emerald-600 text-white" : "bg-white text-slate-700"}`}>
-                                  {key}
-                                </span>
-                                <span className="flex-1">{opt.text || opt.option}</span>
-                                {isCorrect && <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {q.explanation && (
-                          <div className="rounded-xl bg-indigo-50/60 p-3 text-xs text-indigo-950 dark:bg-indigo-950/20 dark:text-indigo-200">
-                            <strong>Rationale: </strong>{q.explanation}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <QuestionReviewPool
+              currentQuestions={questions}
+              displayedQuestions={displayedQuestions}
+              selectedBannerFilter={selectedBannerFilter}
+              onSelectBannerFilter={setSelectedBannerFilter}
+              recentQuestionIds={recentQuestionIds}
+              expandedQuestionIds={expandedQuestionIds}
+              onToggleExpandOne={handleToggleExpandOne}
+              onToggleExpandAll={handleToggleExpandAll}
+              onToggleApprove={handleToggleApprove}
+              onToggleArchive={handleToggleArchive}
+              onEditQuestion={handleEditQuestion}
+              onViewQuestion={handleViewQuestion}
+              onDeleteQuestion={handleDeleteQuestion}
+              onApproveAll={handleApproveAll}
+              onCreateQuestionSet={handleCreateQuestionSet}
+              isGeneratingAI={false}
+            />
           )}
         </div>
-      )}
-
-      {/* Create Question Set Modal */}
-      {isCreateSetModalOpen && (
-        <CreateQuestionSetModal
-          open={isCreateSetModalOpen}
-          onClose={() => setIsCreateSetModalOpen(false)}
-          courseId={courseKey}
-          courseTitle={courseTitle}
-          availableQuestions={courseQuestions}
-          units={courseUnits}
-          onCreated={handleSetCreated}
-        />
       )}
 
       {/* Edit Question Modal */}
       {isEditModalOpen && editingQuestion && (
         <EditQuestionModal
           open={isEditModalOpen}
+          courseId={courseKey}
           onClose={() => {
             setIsEditModalOpen(false);
             setEditingQuestion(null);
           }}
-          topicLabel={courseTitle}
-          code={editingQuestion?.code || editingQuestion?.question_code || "Q-MCQ-01"}
+          code={editingQuestion.code || editingQuestion.question_code}
           initialData={{
             id: editingQuestion.id,
-            question: editingQuestion.question || editingQuestion.text || "",
-            optionA: editingQuestion.options?.[0]?.text || "",
-            optionB: editingQuestion.options?.[1]?.text || "",
-            optionC: editingQuestion.options?.[2]?.text || "",
-            optionD: editingQuestion.options?.[3]?.text || "",
-            correctAnswer: (() => {
-              const opts = editingQuestion.options || [];
-              const foundIdx = opts.findIndex((o: any) => o.isCorrect === true || o.is_correct === true);
-              if (foundIdx === 0) return "A";
-              if (foundIdx === 1) return "B";
-              if (foundIdx === 2) return "C";
-              if (foundIdx === 3) return "D";
-              return "A";
-            })(),
+            questionText: editingQuestion.question || editingQuestion.text || "",
+            options: (editingQuestion.options || []).map((o: any) => ({
+              key: o.key,
+              text: o.text || o.option || "",
+              is_correct: o.isCorrect || o.is_correct || false,
+            })),
             explanation: editingQuestion.explanation || "",
-            unit: { value: editingQuestion.unit_number || "", label: editingQuestion.unit || "Unit" },
+            unit: { value: editingQuestion.unit || "", label: editingQuestion.unit || "Unit" },
             topic: { value: editingQuestion.topic || "", label: editingQuestion.topic || "Topic" },
             subtopic: { value: editingQuestion.subtopic || "", label: editingQuestion.subtopic || "Subtopic" },
             co: { value: editingQuestion.co || "", label: editingQuestion.co || "CO" },
@@ -575,6 +589,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
             blooms: { value: editingQuestion.level || "K2", label: editingQuestion.level || "K2" },
           }}
           onSave={() => {
+            fetchQuestions();
             if (onRefreshQuestions) onRefreshQuestions();
             fetchSets();
           }}
@@ -590,6 +605,19 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
             setViewQuestion(null);
           }}
           question={viewQuestion}
+        />
+      )}
+
+      {/* Create Question Set Modal */}
+      {isCreateSetModalOpen && (
+        <CreateQuestionSetModal
+          open={isCreateSetModalOpen}
+          courseId={courseKey}
+          courseTitle={courseTitle}
+          availableQuestions={questions}
+          units={courseUnits}
+          onClose={() => setIsCreateSetModalOpen(false)}
+          onCreated={handleSetCreated}
         />
       )}
 
@@ -612,7 +640,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
           open={isAddQuestionsModalOpen}
           onClose={() => setIsAddQuestionsModalOpen(false)}
           set={selectedSet}
-          availableQuestions={courseQuestions}
+          availableQuestions={questions}
           onAddQuestions={handleAddQuestionsToSet}
         />
       )}

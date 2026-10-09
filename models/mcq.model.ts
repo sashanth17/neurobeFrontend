@@ -34,6 +34,21 @@ const mcq = {
         return promise;
     },
 
+    get_questions_by_course: (course_id: any, params?: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/mcq/history/questions`;
+            commonInstance()
+                .get(url, { params: { course_id, limit: 100, ...params } })
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+        return promise;
+    },
+
+    get_job_status: (job_id: string) => {
+        return mcq.status(job_id);
+    },
+
     get_question: (question_id: string) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/mcq/history/questions/${question_id}`;

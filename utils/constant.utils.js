@@ -136,103 +136,6 @@ export const OwnmenuConfig = {
       ],
     },
   ],
-
-  COURSE_COORDINATOR: [
-    {
-      type: "link",
-      icon: "IconMenuDashboard",
-      label: "My Courses",
-      href: "/neurobe/my-assigned-courses",
-    },
-    {
-      type: "submenu",
-      icon: "IconMenuNotes",
-      label: "Coordinator",
-      key: "coordinator",
-      children: [
-        {
-          type: "submenu",
-          icon: "IconMenuNotes",
-          label: "Question Banks",
-          key: "question_banks",
-          children: [
-            {
-              label: "MCQ-bank",
-              href: "/neurobe/question-bank",
-            },
-            {
-              label: "CIQ-bank",
-              href: "/neurobe/cia-question-paper",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "submenu",
-      icon: "IconMenuUsers",
-      label: "Instructor",
-      key: "instructor",
-      children: [
-        {
-          label: "Instance management",
-          href: "/neurobe/course-offering",
-        },
-        {
-          label: "Live test monitoring",
-          href: "/neurobe/ins-mcq-live-monitor",
-        },
-      ],
-    },
-  ],
-  COURSE_INSTRUCTOR: [
-    {
-      type: "link",
-      icon: "IconMenuDashboard",
-      label: "My Courses",
-      href: "/neurobe/my-assigned-courses",
-    },
-    {
-      type: "submenu",
-      icon: "IconMenuNotes",
-      label: "Coordinator",
-      key: "coordinator",
-      children: [
-        {
-          type: "submenu",
-          icon: "IconMenuNotes",
-          label: "Question Banks",
-          key: "question_banks",
-          children: [
-            {
-              label: "MCQ-bank",
-              href: "/neurobe/question-bank",
-            },
-            {
-              label: "CIQ-bank",
-              href: "/neurobe/cia-question-paper",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "submenu",
-      icon: "IconMenuUsers",
-      label: "Instructor",
-      key: "instructor",
-      children: [
-        {
-          label: "Instance management",
-          href: "/neurobe/course-offering",
-        },
-        {
-          label: "Live test monitoring",
-          href: "/neurobe/ins-mcq-live-monitor",
-        },
-      ],
-    },
-  ],
 };
 
 OwnmenuConfig.FACULTY = [
@@ -256,11 +159,11 @@ OwnmenuConfig.FACULTY = [
         children: [
           {
             label: "MCQ-bank",
-            href: "/neurobe/question-bank",
+            href: "/neurobe/mcq-generation",
           },
           {
-            label: "CIQ-bank",
-            href: "/neurobe/cia-question-paper",
+            label: "CIA-bank",
+            href: "/neurobe/question-bank",
           },
         ],
       },

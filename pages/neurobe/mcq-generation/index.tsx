@@ -51,11 +51,11 @@ import {
   QuestionReviewPool,
 } from "@/components/mcq-generation";
 import {
-  SimplifiedMCQGenerator,
   HierarchyUnitItem,
 } from "@/components/mcq-generation/SimplifiedMCQGenerator";
 
-type MCQTabKey = "generator" | "questions" | "bank" | "tests";
+
+type MCQTabKey = "questions" | "bank" | "tests";
 
 const MCQGenerationIndexPage = () => {
   const dispatch = useDispatch();
@@ -67,7 +67,7 @@ const MCQGenerationIndexPage = () => {
     loading: false,
     courses: [] as CourseItem[],
     selectedCourse: null as CourseItem | null,
-    activeTab: "generator" as MCQTabKey,
+    activeTab: "questions" as MCQTabKey,
 
     /* Topic hierarchy version data */
     hierarchyUnits: [] as HierarchyUnitItem[],
@@ -130,7 +130,7 @@ const MCQGenerationIndexPage = () => {
   useEffect(() => {
     if (router.query.tab) {
       const tabParam = String(router.query.tab) as MCQTabKey;
-      if (["generator", "questions", "bank", "tests"].includes(tabParam)) {
+      if (["questions", "bank", "tests"].includes(tabParam)) {
         setState({ activeTab: tabParam });
       }
     }
@@ -164,9 +164,7 @@ const MCQGenerationIndexPage = () => {
         state.selectedCourse?.role_type === "coordinator" ||
         state.selectedCourse?.role === "Course Coordinator"
       );
-      if (!isCoord && state.activeTab === "generator") {
-        setState({ activeTab: "questions" });
-      }
+     
       fetchTopicHierarchyUnits(courseId);
       fetchQuestions(courseKey);
       fetchTests(courseId);
@@ -379,12 +377,12 @@ const MCQGenerationIndexPage = () => {
             testWindow:
               startT && endT
                 ? `${startT.toLocaleDateString()} ${startT.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })} – ${endT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })} – ${endT.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                 : status === "setup_required"
-                ? "Pending (Setup Required)"
-                : "Not Scheduled",
+                  ? "Pending (Setup Required)"
+                  : "Not Scheduled",
             isPendingWindow: !startT,
             topics: Array.isArray(t.topics) ? t.topics.join("; ") : t.topics || "",
             secureCode: t.secure_code,
@@ -719,7 +717,7 @@ const MCQGenerationIndexPage = () => {
   };
 
   const handleManageQuestions = (course: CourseItem) => {
-    setState({ selectedCourse: course, activeTab: "generator" });
+    setState({ selectedCourse: course, activeTab: "questions" });
     router.replace(
       { pathname: router.pathname, query: { course_id: course.code || course.id } },
       undefined,
@@ -750,9 +748,8 @@ const MCQGenerationIndexPage = () => {
       {/* Toast Notification */}
       {state.generationToast && (
         <div
-          className={`fixed right-5 top-5 z-[9999] flex items-start gap-3 rounded-2xl px-5 py-4 shadow-2xl text-sm font-semibold animate-in slide-in-from-top-2 ${
-            state.generationToast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-          }`}
+          className={`fixed right-5 top-5 z-[9999] flex items-start gap-3 rounded-2xl px-5 py-4 shadow-2xl text-sm font-semibold animate-in slide-in-from-top-2 ${state.generationToast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+            }`}
         >
           <span className="flex-1">{state.generationToast.msg}</span>
           <button onClick={() => setState({ generationToast: null })} className="ml-2 opacity-70 hover:opacity-100">
@@ -838,22 +835,13 @@ const MCQGenerationIndexPage = () => {
           <div className="mb-6 flex flex-wrap items-center justify-between border-b border-gray-200 dark:border-gray-800 gap-3">
             <div className="flex flex-wrap gap-1 sm:gap-2">
               {[
-                ...(isUserCoordinator
-                  ? [{ id: "generator", label: "Generate Questions", icon: Sparkles, badge: null }]
-                  : []),
                 {
                   id: "questions",
                   label: isUserCoordinator ? "Generated Questions" : "Course Questions",
                   icon: Eye,
                   badge: currentQuestions.length,
                 },
-                { id: "bank", label: "Question Banks", icon: FileCheck2, badge: null },
-                {
-                  id: "tests",
-                  label: "Tests & Execution",
-                  icon: Activity,
-                  badge: state.tests.length > 0 ? state.tests.length : null,
-                },
+                { id: "bank", label: "Question Banks", icon: FileCheck2, badge: null }
               ].map((tab) => {
                 const IconComp = tab.icon;
                 const isActive = state.activeTab === tab.id;
@@ -872,21 +860,19 @@ const MCQGenerationIndexPage = () => {
                         { shallow: true }
                       );
                     }}
-                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors cursor-pointer ${
-                      isActive
-                        ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
-                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    }`}
+                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors cursor-pointer ${isActive
+                      ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      }`}
                   >
                     <IconComp className="h-4 w-4" />
                     <span>{tab.label}</span>
                     {tab.badge !== null && (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                          isActive
-                            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300"
-                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${isActive
+                          ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                          }`}
                       >
                         {tab.badge}
                       </span>
@@ -895,48 +881,7 @@ const MCQGenerationIndexPage = () => {
                 );
               })}
             </div>
-
-            {/* Quick Action: Schedule Test button */}
-            <div className="pb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const c = state.selectedCourse;
-                  setState({
-                    isConfigureModalOpen: true,
-                    configureModalData: {
-                      testCode: `MCQ-${c?.code || "TEST"}-${Date.now().toString().slice(-4)}`,
-                      courseCodeTitle: c ? `${c.code || c.course_code} — ${c.title || c.course_title}` : "Course MCQ Test",
-                      testName: "Unit Assessment / MCQ Quiz",
-                      unitLabel: "Unit 1",
-                      topics: "Selected Question Bank Topics",
-                      questionsCount: currentQuestions.length > 0 ? Math.min(currentQuestions.length, 10) : 10,
-                      duration: "30 Minutes",
-                      secureCode: `SEC-${Math.floor(1000 + Math.random() * 9000)}`,
-                    },
-                  });
-                }}
-                className="flex items-center gap-1.5 rounded-xl bg-color1 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Schedule Test</span>
-              </button>
-            </div>
           </div>
-
-          {/* ══════════════════════════════════════════════════════════════
-              TAB 1: SIMPLIFIED STEP-BY-STEP GENERATOR
-              ══════════════════════════════════════════════════════════════ */}
-          {state.activeTab === "generator" && (
-            <SimplifiedMCQGenerator
-              courseCode={state.selectedCourse.code || state.selectedCourse.course_code || ""}
-              courseTitle={state.selectedCourse.title || state.selectedCourse.course_title || ""}
-              hierarchyUnits={state.hierarchyUnits}
-              loadingHierarchy={state.loadingHierarchy}
-              onGenerate={handleSimplifiedGenerate}
-              isGeneratingAI={state.isGeneratingAI}
-            />
-          )}
 
           {/* ══════════════════════════════════════════════════════════════
               TAB 2: GENERATED QUESTIONS & REVIEW POOL
@@ -982,9 +927,8 @@ const MCQGenerationIndexPage = () => {
               courseKey={currentCourseKey}
               courseTitle={
                 state.selectedCourse
-                  ? `${state.selectedCourse.code || state.selectedCourse.course_code} — ${
-                      state.selectedCourse.title || state.selectedCourse.course_title
-                    }`
+                  ? `${state.selectedCourse.code || state.selectedCourse.course_code} — ${state.selectedCourse.title || state.selectedCourse.course_title
+                  }`
                   : "Course Question Bank"
               }
               courseQuestions={currentQuestions}
@@ -1005,121 +949,6 @@ const MCQGenerationIndexPage = () => {
           )}
 
           {/* ══════════════════════════════════════════════════════════════
-              TAB 4: TESTS & EXECUTION
-              ══════════════════════════════════════════════════════════════ */}
-          {state.activeTab === "tests" && (
-            <div className="space-y-6">
-              {/* Controls bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={state.testSearch}
-                    onChange={(e) => setState({ testSearch: e.target.value })}
-                    placeholder="Search test code, title, topics..."
-                    className="h-10 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-xs text-gray-900 placeholder:text-gray-400 focus:border-indigo-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Status filter pill buttons */}
-                  {(["all", "live", "upcoming", "setup_required", "completed"] as const).map((st) => {
-                    const labels: Record<string, string> = {
-                      all: "All Statuses",
-                      live: "Live",
-                      upcoming: "Upcoming",
-                      setup_required: "Needs Setup",
-                      completed: "Completed",
-                    };
-                    const isSelected = state.testStatusFilter === st;
-                    return (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => setState({ testStatusFilter: st })}
-                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-indigo-600 text-white shadow-sm"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        {labels[st]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Test Cards List */}
-              <div className="space-y-4">
-                {state.loadingTests ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="h-40 animate-pulse rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-800/40"
-                      />
-                    ))}
-                  </div>
-                ) : filteredTests.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
-                    <BookOpen className="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                    <h4 className="mt-3 text-base font-bold text-gray-900 dark:text-white">
-                      No Scheduled MCQ Tests Found
-                    </h4>
-                    <p className="mt-1 max-w-sm text-xs text-gray-500 dark:text-gray-400">
-                      {state.testSearch
-                        ? `No tests match "${state.testSearch}". Try clearing your search.`
-                        : "No tests scheduled yet for this course. Click 'Schedule Test' to set up a live student assessment from your question banks."}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const c = state.selectedCourse;
-                        setState({
-                          isConfigureModalOpen: true,
-                          configureModalData: {
-                            testCode: `MCQ-${c?.code || "TEST"}-${Date.now().toString().slice(-4)}`,
-                            courseCodeTitle: c ? `${c.code || c.course_code} — ${c.title || c.course_title}` : "Course MCQ Test",
-                            testName: "Unit Assessment / MCQ Quiz",
-                            unitLabel: "Unit 1",
-                            topics: "Selected Question Bank Topics",
-                            questionsCount: currentQuestions.length > 0 ? Math.min(currentQuestions.length, 10) : 10,
-                            duration: "30 Minutes",
-                            secureCode: `SEC-${Math.floor(1000 + Math.random() * 9000)}`,
-                          },
-                        });
-                      }}
-                      className="mt-4 flex items-center gap-1.5 rounded-xl bg-color1 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>Schedule New Test</span>
-                    </button>
-                  </div>
-                ) : (
-                  filteredTests.map((testItem) => (
-                    <MCQTestExecutionCard
-                      key={testItem.id}
-                      test={testItem}
-                      onPreviewQuestions={handlePreviewQuestions}
-                      onEditSettings={(t) => setEditTestModal({ open: true, data: t })}
-                      onConfigureTest={(t) => setEditTestModal({ open: true, data: t })}
-                      onViewResults={(t) => handleViewReport(t.id)}
-                      onCopyCode={handleCopyCode}
-                      onMonitorLive={(t) => handleMonitorLive(t.id)}
-                      onViewReport={(t) => handleViewReport(t.id)}
-                      onCancelTest={(t) => handleCancelTest(t.id)}
-                      onCompleteTest={(t) => handleCompleteTest(t.id)}
-                      onDeleteTest={(t) => handleDeleteTest(t.id)}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════
               MODALS
               ══════════════════════════════════════════════════════════════ */}
           {/* Edit Question Modal */}
@@ -1132,12 +961,12 @@ const MCQGenerationIndexPage = () => {
               const updatedQuestions = currentQuestions.map((q) =>
                 q.id === updated.id
                   ? {
-                      ...q,
-                      text: updated.text,
-                      question: updated.text,
-                      options: updated.options,
-                      explanation: updated.explanation,
-                    }
+                    ...q,
+                    text: updated.text,
+                    question: updated.text,
+                    options: updated.options,
+                    explanation: updated.explanation,
+                  }
                   : q
               );
               setState({ courseQuestions: { ...state.courseQuestions, [currentCourseKey]: updatedQuestions } });
@@ -1148,50 +977,50 @@ const MCQGenerationIndexPage = () => {
             initialData={
               state.editingQuestion
                 ? {
-                    id: state.editingQuestion.id,
-                    question: state.editingQuestion.question || state.editingQuestion.text || "",
-                    optionA: state.editingQuestion.options?.[0]?.text || "",
-                    optionB: state.editingQuestion.options?.[1]?.text || "",
-                    optionC: state.editingQuestion.options?.[2]?.text || "",
-                    optionD: state.editingQuestion.options?.[3]?.text || "",
-                    correctAnswer: (() => {
-                      const opts = state.editingQuestion.options || [];
-                      const foundIdx = opts.findIndex((o: any) => o.isCorrect === true || o.is_correct === true);
-                      if (foundIdx === 0) return "A";
-                      if (foundIdx === 1) return "B";
-                      if (foundIdx === 2) return "C";
-                      if (foundIdx === 3) return "D";
-                      const foundKey = opts.find((o: any) => o.isCorrect || o.is_correct)?.key;
-                      return foundKey || "A";
-                    })(),
-                    explanation: state.editingQuestion.explanation || "",
-                    unit: {
-                      value: state.editingQuestion.unit || "",
-                      label: state.editingQuestion.unit || "Unit",
-                    },
-                    topic: {
-                      value: state.editingQuestion.topic || "",
-                      label: state.editingQuestion.topic || "Topic",
-                    },
-                    subtopic: {
-                      value: state.editingQuestion.subtopic || "",
-                      label: state.editingQuestion.subtopic || "Subtopic",
-                    },
-                    co: {
-                      value: state.editingQuestion.co || "",
-                      label: state.editingQuestion.co || "CO",
-                    },
-                    knowledge: {
-                      value: state.editingQuestion.level || "",
-                      label: state.editingQuestion.level || "Knowledge Level",
-                    },
-                    questionType: { value: "MCQ", label: "MCQ" },
-                    marks: state.editingQuestion.marks || "2",
-                    difficulty: {
-                      value: state.editingQuestion.difficulty || "medium",
-                      label: state.editingQuestion.difficulty || "Medium",
-                    },
-                  }
+                  id: state.editingQuestion.id,
+                  question: state.editingQuestion.question || state.editingQuestion.text || "",
+                  optionA: state.editingQuestion.options?.[0]?.text || "",
+                  optionB: state.editingQuestion.options?.[1]?.text || "",
+                  optionC: state.editingQuestion.options?.[2]?.text || "",
+                  optionD: state.editingQuestion.options?.[3]?.text || "",
+                  correctAnswer: (() => {
+                    const opts = state.editingQuestion.options || [];
+                    const foundIdx = opts.findIndex((o: any) => o.isCorrect === true || o.is_correct === true);
+                    if (foundIdx === 0) return "A";
+                    if (foundIdx === 1) return "B";
+                    if (foundIdx === 2) return "C";
+                    if (foundIdx === 3) return "D";
+                    const foundKey = opts.find((o: any) => o.isCorrect || o.is_correct)?.key;
+                    return foundKey || "A";
+                  })(),
+                  explanation: state.editingQuestion.explanation || "",
+                  unit: {
+                    value: state.editingQuestion.unit || "",
+                    label: state.editingQuestion.unit || "Unit",
+                  },
+                  topic: {
+                    value: state.editingQuestion.topic || "",
+                    label: state.editingQuestion.topic || "Topic",
+                  },
+                  subtopic: {
+                    value: state.editingQuestion.subtopic || "",
+                    label: state.editingQuestion.subtopic || "Subtopic",
+                  },
+                  co: {
+                    value: state.editingQuestion.co || "",
+                    label: state.editingQuestion.co || "CO",
+                  },
+                  knowledge: {
+                    value: state.editingQuestion.level || "",
+                    label: state.editingQuestion.level || "Knowledge Level",
+                  },
+                  questionType: { value: "MCQ", label: "MCQ" },
+                  marks: state.editingQuestion.marks || "2",
+                  difficulty: {
+                    value: state.editingQuestion.difficulty || "medium",
+                    label: state.editingQuestion.difficulty || "Medium",
+                  },
+                }
                 : null
             }
           />

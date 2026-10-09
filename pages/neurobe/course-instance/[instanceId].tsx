@@ -11,7 +11,7 @@ import AssignmentUploadTab from "@/components/mark-extraction/AssignmentUploadTa
 import { MarkExtractionService, CiaTestStatus } from "@/services/markExtraction.service";
 import CourseAttainmentReport from "@/components/academic-setup/CourseAttainmentReport";
 import InstanceMCQExecutionTab from "@/components/academic-setup/InstanceMCQExecutionTab";
-
+import MCQTestExecution from "../ins-mcq-test-execution"
 // Tabs that do NOT need a CIA test selected to render
 const CIA_INDEPENDENT_TABS = new Set(["mcq-test-execution", "assignment-upload", "co-po-attainment"]);
 
@@ -168,10 +168,7 @@ function InstanceDashboardPage() {
         {/* MCQ Test Execution — renders independently for this course instance */}
         {activeTab === "mcq-test-execution" && (
           <div className="h-full">
-            <InstanceMCQExecutionTab
-              instanceId={instanceId as string}
-              courseId={courseId as string}
-            />
+            <MCQTestExecution/>
           </div>
         )}
 

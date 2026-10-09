@@ -33,9 +33,11 @@ interface Props {
   onClose: () => void;
   initialData?: any;
   onSuccess?: () => void;
+  defaultCourseId?: string | number;
+  defaultCourseName?: string;
 }
 
-const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) => {
+const CourseOfferingModal = ({ open, onClose, initialData, onSuccess, defaultCourseId, defaultCourseName }: Props) => {
   const isEdit = !!initialData;
 
   const [state, setState] = useSetState({
@@ -59,7 +61,7 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
     if (open) {
       initModalData();
     }
-  }, [open, initialData]);
+  }, [open, initialData, defaultCourseId, defaultCourseName]);
 
   const fetchProgrammeList = async (): Promise<DropdownOption[]> => {
     try {
@@ -90,16 +92,40 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
   const fetchCourseList = async (): Promise<DropdownOption[]> => {
     try {
       const authUser = getAuthUser();
-      const body: any = {};
-      if (!authUser?.is_admin && authUser?.id) {
-        body.assigned_user_id = authUser.id;
+      const userId = authUser?.id || 1;
+      let raw: any[] = [];
+      try {
+        const res: any = await Models.course.my_assigned_courses({ faculty_id: userId });
+        if (res?.courses && Array.isArray(res.courses)) raw = res.courses;
+        else if (Array.isArray(res)) raw = res;
+      } catch (e) {
+        console.warn("my_assigned_courses error in modal:", e);
       }
-      const res: any = await Models.course.list(body);
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
-      return list.map((item: any) => ({
-        value: item.id,
-        label: item.course_title || item.title || item.course_name || item.code || `Course #${item.id}`,
-      }));
+
+      if (raw.length === 0) {
+        try {
+          const res2: any = await Models.course.faculty_dashboard_overview({ faculty_id: userId, coordinator_id: userId });
+          if (res2?.courses && Array.isArray(res2.courses)) raw = res2.courses;
+          else if (Array.isArray(res2)) raw = res2;
+        } catch (e2) {
+          console.warn("faculty_dashboard_overview error in modal:", e2);
+        }
+      }
+
+      const seen = new Set<string>();
+      const opts: DropdownOption[] = [];
+      for (const item of raw) {
+        const val = item.course_id || item.id;
+        if (!val || seen.has(String(val))) continue;
+        seen.add(String(val));
+        const code = item.course_code || item.code || "";
+        const title = item.course_title || item.title || item.name || `Course #${val}`;
+        opts.push({
+          value: val,
+          label: code ? `${code} - ${title}` : title,
+        });
+      }
+      return opts;
     } catch {
       return [];
     }
@@ -140,17 +166,24 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
         department: deptVal ? { value: deptVal, label: deptLabel } : null,
         term: termVal ? { value: String(termVal), label: termLabel } : null,
         course: crsVal ? { value: crsVal, label: crsLabel } : null,
-        term_visibility: initialData.term_visibility !== undefined ? Boolean(initialData.term_visibility) : true,
-        is_archived: initialData.is_archived !== undefined ? Boolean(initialData.is_archived) : false,
+        term_visibility: initialData.term_visibility ?? true,
+        is_archived: initialData.is_archived ?? false,
         errors: {},
       });
     } else {
+      let matchedCrs = defaultCourseId ? crses.find((c) => String(c.value) === String(defaultCourseId)) : null;
+      if (!matchedCrs && defaultCourseId) {
+        matchedCrs = {
+          value: defaultCourseId,
+          label: defaultCourseName || `Course #${defaultCourseId}`,
+        };
+      }
       setState({
         course_instance_name: "",
         programme: null,
         department: null,
         term: null,
-        course: null,
+        course: matchedCrs || null,
         term_visibility: true,
         is_archived: false,
         errors: {},
@@ -247,15 +280,32 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
             />
           </div>
 
-          <CustomSelect
-            title="Course"
-            required
-            options={state.courseList}
-            value={state.course}
-            onChange={(v) => setState({ course: v })}
-            placeholder="Select Course"
-            error={state.errors?.course}
-          />
+          {/* Resolved Course (Locked when opened from a specific course) */}
+          {defaultCourseId ? (
+            <div>
+              <label className="text-sm font-semibold text-[#000] dark:text-white mb-1.5 block">
+                Course <span className="text-red-500">*</span>
+              </label>
+              <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-100/90 px-3.5 py-2.5 text-sm font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                <span className="font-semibold">
+                  {state.course?.label || defaultCourseName || `Course #${defaultCourseId}`}
+                </span>
+                <span className="text-[11px] font-bold text-purple-700 bg-purple-100 border border-purple-300 px-2.5 py-0.5 rounded-lg dark:bg-purple-950/60 dark:text-purple-300">
+                  Fixed to Course
+                </span>
+              </div>
+            </div>
+          ) : (
+            <CustomSelect
+              title="Course"
+              required
+              options={state.courseList}
+              value={state.course}
+              onChange={(v) => setState({ course: v })}
+              placeholder="Select Course"
+              error={state.errors?.course}
+            />
+          )}
 
           {/* Visibility and Archive Settings */}
           <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 space-y-3 dark:border-gray-700 dark:bg-gray-800/50">

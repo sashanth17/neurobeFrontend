@@ -7,26 +7,17 @@ import {
   BookOpen,
   Layers,
   Plus,
-  Clock,
   Lock,
   Check,
-  Users,
   Calendar,
-  AlertCircle,
-  BarChart2,
   X,
   Key,
-  ChevronDown,
-  Filter,
-  Activity,
 } from "lucide-react";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/flatpickr.css";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import { Success, Failure, getAuthUser, useSetState } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
-import CourseBanner from "@/components/academic-setup/CourseBanner";
-import StepHeader from "@/components/academic-setup/StepHeader";
 import GenericTabs from "@/components/common-components/GenericTabs";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import MCQTestExecutionCard, {
@@ -411,27 +402,6 @@ const MCQTestExecution = () => {
     }
   };
 
-  // Safe handler for CourseBanner course switching
-  const handleCourseChange = (val: any) => {
-    const courseId = typeof val === "object" ? val?.value : val;
-    if (!courseId) return;
-
-    const matched = state.courses.find(
-      (c: any) =>
-        String(c.id) === String(courseId) ||
-        String(c.course_code || c.code).toLowerCase() === String(courseId).toLowerCase()
-    );
-
-    if (matched) {
-      const selectedOpt = state.courseOptions.find((o: any) => o.value === String(matched.id)) || {
-        value: String(matched.id),
-        label: `${matched.course_code || matched.code} — ${matched.course_title || matched.title}`,
-      };
-      setState({ selectedCourse: matched, selectedCourseOption: selectedOpt });
-      router.push(`/neurobe/ins-mcq-test-execution?course_id=${matched.id}`, undefined, { shallow: true });
-      loadCourseTestData(matched);
-    }
-  };
 
   // Helper to persist updated tests locally if needed
   const saveTestsState = (newTests: MCQTestExecutionItem[]) => {
@@ -774,21 +744,7 @@ const MCQTestExecution = () => {
 
   return (
     <div className="min-h-screen">
-      {/* 1. Dynamic Course Banner */}
-      <CourseBanner
-        courseCode={courseCode}
-        courseTitle={courseTitle}
-        description="Instructor View — Configure test execution schedules, assign Question Sets from the pool, generate secure passcodes, and monitor live submissions."
-        programme={activeCourse?.programme || "B.Tech CSE"}
-        batch={activeCourse?.batch_name || activeCourse?.batch || "2024–2028"}
-        academicYear={activeCourse?.semester ? `Semester ${activeCourse.semester}` : "Semester 5"}
-        students={`${studentCount} Students`}
-        toogle="instructor"
-        selectedCourse={state.selectedCourseOption}
-        activeView={state.activeTab}
-        onBack={() => router.push("/neurobe/mcq-generation")}
-        onViewChange={(view) => setState({ activeTab: view })}
-      />
+
 
       {/* 3. Summary Stats Banner */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1116,71 +1072,6 @@ const MCQTestExecution = () => {
                     ⚠️ No Question Sets found for this course. Please create a Question Set in MCQ Question Bank first.
                   </p>
                 )}
-              </div>
-
-              {/* Unit & Questions Count */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-gray-900 dark:text-white">Unit</label>
-                  <select
-                    value={createModal.unitLabel}
-                    onChange={(e) => setCreateModal((p) => ({ ...p, unitLabel: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer"
-                  >
-                    {state.unitOptions
-                      .filter((u) => u.value !== "all")
-                      .map((u) => (
-                        <option key={u.value} value={u.value}>
-                          {u.label}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-gray-900 dark:text-white">
-                    Questions Count
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={createModal.questionsCount}
-                    onChange={(e) =>
-                      setCreateModal((p) => ({ ...p, questionsCount: Number(e.target.value) || 1 }))
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              {/* Duration & Topics */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-gray-900 dark:text-white">Test Duration</label>
-                  <select
-                    value={createModal.duration}
-                    onChange={(e) => setCreateModal((p) => ({ ...p, duration: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer"
-                  >
-                    {DURATION_OPTIONS.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-gray-900 dark:text-white">Topics Covered</label>
-                  <input
-                    type="text"
-                    value={createModal.topics}
-                    onChange={(e) => setCreateModal((p) => ({ ...p, topics: e.target.value }))}
-                    placeholder="e.g. Protocol Stack, Physical Media"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </div>
               </div>
 
               {/* Schedule Date & Time */}
