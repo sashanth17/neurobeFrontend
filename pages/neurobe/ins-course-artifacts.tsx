@@ -39,6 +39,7 @@ import CourseAttainmentReport from "@/components/academic-setup/CourseAttainment
 import CoursePortfolioReport from "@/components/academic-setup/CoursePortfolioReport";
 import CiaAnalyticsTab from "@/components/academic-setup/CiaAnalyticsTab";
 import McqVivaTab from "@/components/academic-setup/McqVivaTab";
+import CourseMCQGenerationTab from "@/components/academic-setup/CourseMCQGenerationTab";
 import { BACKEND_URL } from "@/utils/constant.utils";
 
 const InsCourseArtifacts = () => {
@@ -69,7 +70,7 @@ const InsCourseArtifacts = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<"syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva">("syllabus");
+  const [activeTab, setActiveTab] = useState<"syllabus" | "copo" | "pedagogy" | "lesson_plan" | "mcq_generation" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva">("syllabus");
 
   // Per-section loaded version data
   const [sectionData, setSectionData] = useState<{
@@ -170,7 +171,7 @@ const InsCourseArtifacts = () => {
   const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
 
   // Helper to re-fetch and update currently viewed or active version data in state
-  const refreshCurrentVersion = async (tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva", id?: any) => {
+  const refreshCurrentVersion = async (tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "mcq_generation" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva", id?: any) => {
     try {
       if (tab === "syllabus") {
         const extId = id || selectedVersionData.syllabus?.extractions_id || currentExt?.extractions_id || activeExt?.extractions_id;
@@ -216,12 +217,12 @@ const InsCourseArtifacts = () => {
 
   // Load section-specific versions and current active version data on tab switch
   const loadSectionData = async (
-    tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva",
+    tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "mcq_generation" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva",
     forceRefresh = false,
     coordOverride?: boolean
   ) => {
     if (!courseIdParam) return;
-    if (tab === "co-attainment" || tab === "report" || tab === "cia_analytics" || tab === "mcq_viva") return;
+    if (tab === "co-attainment" || tab === "report" || tab === "cia_analytics" || tab === "mcq_viva" || tab === "mcq_generation") return;
     const userIsCoord = coordOverride !== undefined ? coordOverride : isCoord;
     setSectionLoading((prev) => ({ ...prev, [tab]: true }));
     try {
@@ -2064,6 +2065,20 @@ const InsCourseArtifacts = () => {
           >
             4. Lesson Plan & Timeline
           </button>
+
+          {isCoord && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("mcq_generation")}
+              className={`border-b-2 pb-3 text-sm font-semibold transition ${activeTab === "mcq_generation"
+                  ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+            >
+              5. MCQ Generation
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setActiveTab("report")}
@@ -2072,7 +2087,7 @@ const InsCourseArtifacts = () => {
                 : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
           >
-            5. Report
+            {isCoord ? "6. Report" : "5. Report"}
           </button>
 
           <button
@@ -2083,7 +2098,7 @@ const InsCourseArtifacts = () => {
                 : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
           >
-            6. CIA Analytics
+            {isCoord ? "7. CIA Analytics" : "6. CIA Analytics"}
           </button>
 
           <button
@@ -2094,7 +2109,7 @@ const InsCourseArtifacts = () => {
                 : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
           >
-            7. MCQ & Viva
+            {isCoord ? "8. MCQ & Viva" : "7. MCQ & Viva"}
           </button>
         </nav>
       </div>
@@ -4475,7 +4490,17 @@ const InsCourseArtifacts = () => {
               </div>
             )}
 
-            {/* ── TAB 5: COURSE PORTFOLIO COMPREHENSIVE REPORT ── */}
+            {/* ── TAB: MCQ GENERATION (COORDINATOR ONLY) ── */}
+            {activeTab === "mcq_generation" && isCoord && (
+              <CourseMCQGenerationTab
+                courseId={courseIdParam || 1}
+                course={course}
+                currentExt={currentExt || activeExt}
+                isCoord={isCoord}
+              />
+            )}
+
+            {/* ── TAB 5/6: COURSE PORTFOLIO COMPREHENSIVE REPORT ── */}
             {activeTab === "report" && (
               <CoursePortfolioReport
                 courseId={courseIdParam || 1}

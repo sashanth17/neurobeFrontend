@@ -89,7 +89,12 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess }: Props) =
 
   const fetchCourseList = async (): Promise<DropdownOption[]> => {
     try {
-      const res: any = await Models.course.list();
+      const authUser = getAuthUser();
+      const body: any = {};
+      if (!authUser?.is_admin && authUser?.id) {
+        body.assigned_user_id = authUser.id;
+      }
+      const res: any = await Models.course.list(body);
       const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
       return list.map((item: any) => ({
         value: item.id,

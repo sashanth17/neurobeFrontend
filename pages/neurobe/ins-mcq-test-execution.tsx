@@ -90,6 +90,7 @@ const MCQTestExecution = () => {
     questionSets: [] as QuestionSetItem[],
     questionPool: [] as any[],
     enrolledStudents: [] as any[],
+    courseInstances: [] as any[],
     search: "",
     statusFilter: "all",
     unitFilter: "all",
@@ -121,6 +122,7 @@ const MCQTestExecution = () => {
   const [createModal, setCreateModal] = useState<{
     open: boolean;
     submitting: boolean;
+    courseInstanceId: string;
     testCode: string;
     title: string;
     unitLabel: string;
@@ -140,6 +142,7 @@ const MCQTestExecution = () => {
   }>({
     open: false,
     submitting: false,
+    courseInstanceId: "",
     testCode: "",
     title: "",
     unitLabel: "Unit 1",
@@ -383,12 +386,22 @@ const MCQTestExecution = () => {
         else if (enrollRes.items && Array.isArray(enrollRes.items)) enrolledList = enrollRes.items;
       }
 
+      // 2f. Fetch Course Instances for section-scoped test hosting
+      const instRes: any = await Models.course_instance.list({ course_id: courseId }).catch(() => null);
+      let instanceList: any[] = [];
+      if (instRes) {
+        if (Array.isArray(instRes)) instanceList = instRes;
+        else if (instRes.data && Array.isArray(instRes.data)) instanceList = instRes.data;
+        else if (instRes.results && Array.isArray(instRes.results)) instanceList = instRes.results;
+      }
+
       setState({
         courseUnits: rawUnits,
         unitOptions: formattedUnitOptions,
         questionSets: setsList,
         questionPool: rawQuestions,
         enrolledStudents: enrolledList,
+        courseInstances: instanceList,
         tests: backendTests,
         loadingTests: false,
       });
@@ -452,9 +465,12 @@ const MCQTestExecution = () => {
       return `${hh.toString().padStart(2, "0")}:${mm} ${period}`;
     };
 
+    const defaultInstanceId = state.courseInstances?.[0]?.id ? String(state.courseInstances[0].id) : "";
+
     setCreateModal({
       open: true,
       submitting: false,
+      courseInstanceId: defaultInstanceId,
       testCode: `MCQ-${courseCode}-T${newTestNum}`,
       title: `${courseCode} — ${initialUnit} Assessment`,
       unitLabel: initialUnit,
@@ -477,6 +493,10 @@ const MCQTestExecution = () => {
   const handleSaveNewTest = async () => {
     if (!createModal.title.trim()) {
       Failure("Please enter a valid assessment title.");
+      return;
+    }
+    if (!createModal.courseInstanceId) {
+      Failure("Please select a Course Instance / Section to host this assessment.");
       return;
     }
     if (!createModal.questionSetId) {
@@ -536,6 +556,7 @@ const MCQTestExecution = () => {
     const payload = {
       question_set_id: createModal.questionSetId,
       course_id: Number(state.selectedCourse.id),
+      course_instance_id: Number(createModal.courseInstanceId),
       title: createModal.title.trim(),
       test_code: createModal.testCode.trim(),
       unit_name: createModal.unitLabel,
@@ -1027,6 +1048,30 @@ const MCQTestExecution = () => {
                   placeholder="e.g. Unit 1 Physical Layer Quiz"
                   className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
+              </div>
+
+              {/* Course Instance / Section Selector */}
+              <div className="space-y-1">
+                <label className="font-bold text-gray-900 dark:text-white">
+                  Course Instance / Section <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={createModal.courseInstanceId}
+                  onChange={(e) => setCreateModal((p) => ({ ...p, courseInstanceId: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer"
+                >
+                  <option value="">-- Select Course Instance / Section --</option>
+                  {(state.courseInstances || []).map((ci: any) => (
+                    <option key={ci.id} value={ci.id}>
+                      {ci.course_instance_name || ci.name || `Section #${ci.id}`} {ci.semester ? `(Semester ${ci.semester})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {state.courseInstances && state.courseInstances.length === 0 && (
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                    ⚠️ No Course Instances found for this course. Please create an instance first.
+                  </p>
+                )}
               </div>
 
               {/* Question Set Assignment Selector */}

@@ -27,6 +27,9 @@ const course = {
             if (body?.instructor_id) {
                 params.append("instructor_id", String(body.instructor_id));
             }
+            if (body?.assigned_user_id) {
+                params.append("assigned_user_id", String(body.assigned_user_id));
+            }
             if (body?.created_by_id !== undefined && body?.created_by_id !== null && body?.created_by_id !== "") {
                 params.append("created_by_id", String(body.created_by_id));
             }

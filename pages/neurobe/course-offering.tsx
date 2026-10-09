@@ -54,6 +54,7 @@ const CourseOffering = () => {
     batchFilter: "all",
     statusFilter: "all",
     archiveFilter: "active",
+    ownershipFilter: "me" as "me" | "others",
     loading: false,
     showModal: false,
     editRow: null as any,
@@ -105,12 +106,8 @@ const CourseOffering = () => {
   const course_instance_list = async () => {
     try {
       setState({ loading: true });
-      const authUser = getAuthUser();
       const res: any = await Models.course_instance.list();
       let list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
-      if (!authUser.is_admin) {
-        list = list.filter((item: any) => isCreatedByCurrentUser(item, authUser));
-      }
       setState({ instanceList: list, loading: false });
     } catch (error) {
       console.log("error", error);
@@ -120,10 +117,23 @@ const CourseOffering = () => {
 
   // ── filtered records ───────────────────────────────────────────────────────
   const authUser = getAuthUser();
+  const isCoordOrAdmin = Boolean(
+    authUser?.is_admin ||
+    (authUser as any)?.role_name === "Course Coordinator" ||
+    (authUser as any)?.role === "Course Coordinator" ||
+    (authUser as any)?.role_name === "Admin" ||
+    (authUser as any)?.role_name === "Super Admin"
+  );
   const rawList = state.instanceList || [];
   const records = rawList.filter((r: any) => {
-    if (!authUser.is_admin && !isCreatedByCurrentUser(r, authUser)) {
-      return false;
+    if (isCoordOrAdmin) {
+      if (state.ownershipFilter === "me") {
+        if (!isCreatedByCurrentUser(r, authUser)) return false;
+      } else {
+        if (isCreatedByCurrentUser(r, authUser)) return false;
+      }
+    } else {
+      if (!isCreatedByCurrentUser(r, authUser)) return false;
     }
     const s = state.search.toLowerCase();
     const courseTitle = r.course_instance_name || r.course || r.course_title || "";
@@ -212,6 +222,34 @@ const CourseOffering = () => {
             icon={<IconSearch className="h-4 w-4" />}
           />
         </div>
+
+        {/* Coordinator Sliding Toggle: Created by me | Others */}
+        {isCoordOrAdmin && (
+          <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setState({ ownershipFilter: "me" })}
+              className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                state.ownershipFilter === "me"
+                  ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              }`}
+            >
+              Created by me
+            </button>
+            <button
+              type="button"
+              onClick={() => setState({ ownershipFilter: "others" })}
+              className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                state.ownershipFilter === "others"
+                  ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              }`}
+            >
+              Others
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-3">
           <CustomSelect

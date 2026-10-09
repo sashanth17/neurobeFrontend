@@ -397,6 +397,59 @@ const Icons: Record<string, () => JSX.Element> = {
       <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" />
     </svg>
   ),
+  "My Courses": () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  ),
+  Coordinator: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <polyline points="16 11 18 13 22 9" />
+    </svg>
+  ),
+  Instructor: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  "Question Banks": () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  "MCQ-bank": () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 11 12 14 22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  ),
+  "CIQ-bank": () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="12" y1="18" x2="12" y2="12" />
+      <line x1="9" y1="15" x2="15" y2="15" />
+    </svg>
+  ),
+  "Instance management": () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  "Live test monitoring": () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+  ),
 };
 
 const FallbackIcon = () => (
@@ -429,7 +482,11 @@ const SidebarDynamic = () => {
   });
   const [hovered, setHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [expandedKey, setExpandedKey] = useState<string>("");
+  const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({
+    coordinator: true,
+    question_banks: true,
+    instructor: true,
+  });
   const [notifications, setNotifications] = useState<Record<string, number>>(
     {},
   );
@@ -587,6 +644,23 @@ const SidebarDynamic = () => {
       ? router.pathname === href || router.pathname.startsWith(href + "/")
       : false;
 
+  const isAnyDescendantActive = (item: any): boolean => {
+    if (item.href && isActive(item.href)) return true;
+    if (item.children && Array.isArray(item.children)) {
+      return item.children.some((c: any) => isAnyDescendantActive(c));
+    }
+    return false;
+  };
+
+  const toggleKey = (key: string) => {
+    setOpenKeys((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const isKeyOpen = (key: string) => Boolean(openKeys[key]);
+
   return (
     <div className={semidark ? "dark" : ""}>
       <nav
@@ -598,7 +672,6 @@ const SidebarDynamic = () => {
         onMouseLeave={() => {
           if (!isMobile) {
             setHovered(false);
-            setExpandedKey("");
           }
         }}
       >
@@ -778,105 +851,134 @@ const SidebarDynamic = () => {
             }
 
             if (item.type === "submenu") {
-              const Icon = Icons[item.label] || FallbackIcon;
-              const open = expandedKey === item.key;
-              const anyChildActive = item.children?.some((c: any) =>
-                isActive(c.href),
-              );
-              const isHighlighted = anyChildActive || open;
-              return (
-                <div key={idx} className={disabledClass}>
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    className="mx-[8px] flex items-center transition-colors duration-150"
-                    style={{
-                      minHeight: 40,
-                      width: "calc(100% - 16px)",
-                      borderRadius: "9999px",
-                      padding: showLabels ? "9px 12px" : "9px 0",
-                      justifyContent: showLabels ? "flex-start" : "center",
-                      background: isHighlighted ? ACTIVE_BG : "transparent",
-                      color: "#fff",
-                    }}
-                    onClick={() => {
-                      if (!disabled && showLabels)
-                        setExpandedKey(open ? "" : item.key);
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!disabled)
-                        (e.currentTarget as HTMLElement).style.background =
-                          ACTIVE_BG;
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background =
-                        isHighlighted ? ACTIVE_BG : "transparent";
-                    }}
-                  >
-                    <span
-                      className="flex shrink-0 items-center justify-center"
-                      style={{ width: 20 }}
+              const renderSubmenuItem = (subItem: any, level = 1, parentKey = "") => {
+                const key = subItem.key || subItem.label || `${parentKey}_${level}`;
+                const open = isKeyOpen(key);
+                const anyChildActive = isAnyDescendantActive(subItem);
+                const isHighlighted = anyChildActive || open;
+                const Icon = Icons[subItem.label] || FallbackIcon;
+
+                return (
+                  <div key={key} className={level === 1 ? disabledClass : "w-full"}>
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      className={`flex items-center transition-colors duration-150 cursor-pointer ${
+                        level === 1 ? "mx-[8px] rounded-full" : "rounded-full px-3 py-[7px] text-[13px]"
+                      }`}
+                      style={{
+                        minHeight: level === 1 ? 40 : 34,
+                        width: level === 1 ? "calc(100% - 16px)" : "100%",
+                        borderRadius: "9999px",
+                        padding: level === 1 ? (showLabels ? "9px 12px" : "9px 0") : "7px 10px",
+                        justifyContent: showLabels ? "flex-start" : "center",
+                        background: isHighlighted ? (level === 1 ? ACTIVE_BG : "rgba(255, 255, 255, 0.12)") : "transparent",
+                        color: "#fff",
+                      }}
+                      onClick={() => {
+                        if (!disabled && showLabels) toggleKey(key);
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled)
+                          (e.currentTarget as HTMLElement).style.background =
+                            level === 1 ? ACTIVE_BG : "rgba(255, 255, 255, 0.18)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = isHighlighted
+                          ? (level === 1 ? ACTIVE_BG : "rgba(255, 255, 255, 0.12)")
+                          : "transparent";
+                      }}
                     >
-                      <Icon />
-                    </span>
-                    {showLabels && (
-                      <>
-                        <span className="ml-3 flex-1 whitespace-nowrap text-left text-[14px] font-medium">
-                          {item.label}
-                        </span>
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          style={{
-                            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-                            transition: "transform 0.2s",
-                            flexShrink: 0,
-                            marginRight: 2,
-                          }}
-                        >
-                          <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                      </>
+                      <span
+                        className="flex shrink-0 items-center justify-center"
+                        style={{ width: level === 1 ? 28 : 20 }}
+                      >
+                        <Icon />
+                      </span>
+                      {showLabels && (
+                        <>
+                          <span
+                            className={`flex-1 whitespace-nowrap text-left font-medium ${
+                              level === 1 ? "ml-3 text-[14px]" : "ml-2 text-[13px]"
+                            }`}
+                          >
+                            {subItem.label}
+                          </span>
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#fff"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            style={{
+                              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform 0.2s",
+                              flexShrink: 0,
+                              marginRight: 2,
+                            }}
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </>
+                      )}
+                    </button>
+
+                    {showLabels && open && subItem.children && (
+                      <div
+                        className={`${
+                          level === 1
+                            ? "ml-[34px] mr-[8px] mt-[4px]"
+                            : "ml-[18px] mr-[4px] mt-[2px]"
+                        } flex flex-col gap-[3px]`}
+                      >
+                        {subItem.children.map((child: any, ci: number) => {
+                          if (child.type === "submenu" || (child.children && child.children.length > 0)) {
+                            return renderSubmenuItem(child, level + 1, key);
+                          }
+                          const ChildIcon = Icons[child.label] || FallbackIcon;
+                          const active = isActive(child.href);
+                          return (
+                            <Link
+                              key={ci}
+                              href={child.href || "#"}
+                              className="flex items-center gap-2 rounded-full px-3 py-[7px] text-[13px] font-medium transition-colors duration-150"
+                              style={{
+                                color: "#fff",
+                                background: active ? "rgba(255, 255, 255, 0.2)" : "transparent",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!active)
+                                  (e.currentTarget as HTMLElement).style.background =
+                                    "rgba(255, 255, 255, 0.15)";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!active)
+                                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                              }}
+                              onClick={() => {
+                                if (key.includes("coordinator") || parentKey.includes("coordinator")) {
+                                  dispatch(setCourseView("coordinator"));
+                                } else if (key.includes("instructor") || parentKey.includes("instructor")) {
+                                  dispatch(setCourseView("instructor"));
+                                }
+                              }}
+                            >
+                              <span className="flex shrink-0 items-center justify-center opacity-70" style={{ width: 14 }}>
+                                <ChildIcon />
+                              </span>
+                              <span className="truncate">{child.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     )}
-                  </button>
-                  {showLabels && open && (
-                    <div className="ml-[38px] mr-[8px] mt-[5px] flex flex-col gap-[5px]">
-                      {item.children?.map((child: any, ci: number) => (
-                        <Link
-                          key={ci}
-                          href={child.href || "#"}
-                          className="rounded-full px-3 py-[7px] text-[14px] transition-colors duration-150"
-                          style={{
-                            color: "#fff",
-                            background: isActive(child.href)
-                              ? "rgba(255, 255, 255, 0.18)"
-                              : "transparent",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isActive(child.href))
-                              (
-                                e.currentTarget as HTMLElement
-                              ).style.background = "rgba(255, 255, 255, 0.18)";
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isActive(child.href))
-                              (
-                                e.currentTarget as HTMLElement
-                              ).style.background = "transparent";
-                          }}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
+                  </div>
+                );
+              };
+
+              return renderSubmenuItem(item, 1);
             }
 
             return null;
