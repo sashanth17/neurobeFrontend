@@ -148,10 +148,25 @@ const MCQGenerationIndexPage = () => {
     }
   }, [router.query.course_id, state.courses]);
 
+  const authUser = getAuthUser();
+  const isUserCoordinator = Boolean(
+    authUser?.is_admin ||
+    state.selectedCourse?.role_type === "coordinator" ||
+    state.selectedCourse?.role === "Course Coordinator"
+  );
+
   useEffect(() => {
     if (state.selectedCourse) {
       const courseId = state.selectedCourse.id;
       const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+      const isCoord = Boolean(
+        authUser?.is_admin ||
+        state.selectedCourse?.role_type === "coordinator" ||
+        state.selectedCourse?.role === "Course Coordinator"
+      );
+      if (!isCoord && state.activeTab === "generator") {
+        setState({ activeTab: "questions" });
+      }
       fetchTopicHierarchyUnits(courseId);
       fetchQuestions(courseKey);
       fetchTests(courseId);
@@ -823,10 +838,12 @@ const MCQGenerationIndexPage = () => {
           <div className="mb-6 flex flex-wrap items-center justify-between border-b border-gray-200 dark:border-gray-800 gap-3">
             <div className="flex flex-wrap gap-1 sm:gap-2">
               {[
-                { id: "generator", label: "Generate Questions", icon: Sparkles, badge: null },
+                ...(isUserCoordinator
+                  ? [{ id: "generator", label: "Generate Questions", icon: Sparkles, badge: null }]
+                  : []),
                 {
                   id: "questions",
-                  label: "Generated Questions",
+                  label: isUserCoordinator ? "Generated Questions" : "Course Questions",
                   icon: Eye,
                   badge: currentQuestions.length,
                 },
@@ -944,12 +961,12 @@ const MCQGenerationIndexPage = () => {
                   expandedQuestionIds={state.expandedQuestionIds}
                   onToggleExpandOne={handleToggleExpandOne}
                   onToggleExpandAll={handleToggleExpandAll}
-                  onToggleApprove={handleToggleApprove}
-                  onToggleArchive={handleToggleArchive}
-                  onEditQuestion={(q) => setState({ editingQuestion: q, isEditModalOpen: true })}
+                  onToggleApprove={isUserCoordinator ? handleToggleApprove : undefined}
+                  onToggleArchive={isUserCoordinator ? handleToggleArchive : undefined}
+                  onEditQuestion={isUserCoordinator ? (q) => setState({ editingQuestion: q, isEditModalOpen: true }) : undefined}
                   onViewQuestion={(q) => setState({ viewQuestion: q, isViewModalOpen: true })}
-                  onDeleteQuestion={handleDeleteQuestion}
-                  onApproveAll={handleApproveAll}
+                  onDeleteQuestion={isUserCoordinator ? handleDeleteQuestion : undefined}
+                  onApproveAll={isUserCoordinator ? handleApproveAll : undefined}
                   onCreateQuestionSet={() => setState({ isSetModalOpen: true })}
                   isGeneratingAI={state.isGeneratingAI}
                 />

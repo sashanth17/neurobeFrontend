@@ -19,7 +19,7 @@ import {
   Target,
 } from "lucide-react";
 import Models from "@/imports/models.import";
-import { Success, Failure } from "@/utils/function.utils";
+import { Success, Failure, getAuthUser } from "@/utils/function.utils";
 import { useRouter } from "next/router";
 import QuestionSetsList, { QuestionSetItem } from "./QuestionSetsList";
 import QuestionSetDetailView from "./QuestionSetDetailView";
@@ -64,6 +64,35 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
   const [searchAll, setSearchAll] = useState("");
   const [statusFilterAll, setStatusFilterAll] = useState<"all" | "approved" | "draft" | "archived">("all");
   const [expandedAllIds, setExpandedAllIds] = useState<string[]>([]);
+
+  // Coordinator toggle state: "Created by me" (default) vs "Others"
+  const [ownershipFilter, setOwnershipFilter] = useState<"me" | "others">("me");
+  const authUser = getAuthUser();
+  const isCoordOrAdmin = Boolean(
+    authUser?.is_admin ||
+    (authUser as any)?.role_name === "Course Coordinator" ||
+    (authUser as any)?.role === "Course Coordinator" ||
+    (authUser as any)?.role_name === "Admin" ||
+    (authUser as any)?.role_name === "Super Admin"
+  );
+
+  const displayedSets = useMemo(() => {
+    if (!authUser?.id) return questionSets;
+    if (isCoordOrAdmin) {
+      if (ownershipFilter === "me") {
+        return questionSets.filter(
+          (s: any) => String(s.user_id) === String(authUser.id) || !s.user_id
+        );
+      } else {
+        return questionSets.filter(
+          (s: any) => String(s.user_id) !== String(authUser.id) && Boolean(s.user_id)
+        );
+      }
+    }
+    return questionSets.filter(
+      (s: any) => String(s.user_id) === String(authUser.id) || !s.user_id
+    );
+  }, [questionSets, ownershipFilter, authUser, isCoordOrAdmin]);
 
   const fetchSets = async () => {
     if (!courseKey) return;
@@ -254,15 +283,45 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
             </button>
           </div>
 
-          {/* Generate MCQs with AI */}
-          <button
-            type="button"
-            onClick={() => router.push(courseKey ? `/neurobe/mcq-generation?course_id=${courseKey}` : "/neurobe/mcq-generation")}
-            className="flex items-center gap-1.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-100 transition active:scale-98 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 cursor-pointer"
-          >
-            <Sparkles className="h-4 w-4 text-indigo-600" />
-            <span>Generate MCQs</span>
-          </button>
+          {/* Coordinator Sliding Toggle: Created by me | Others */}
+          {isCoordOrAdmin && activeSubView === "sets" && (
+            <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setOwnershipFilter("me")}
+                className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                  ownershipFilter === "me"
+                    ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-white"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
+              >
+                Created by me
+              </button>
+              <button
+                type="button"
+                onClick={() => setOwnershipFilter("others")}
+                className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                  ownershipFilter === "others"
+                    ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-white"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
+              >
+                Others
+              </button>
+            </div>
+          )}
+
+          {/* Generate MCQs with AI (Coordinator only) */}
+          {isCoordOrAdmin && (
+            <button
+              type="button"
+              onClick={() => router.push(courseKey ? `/neurobe/mcq-generation?course_id=${courseKey}` : "/neurobe/mcq-generation")}
+              className="flex items-center gap-1.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-100 transition active:scale-98 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 cursor-pointer"
+            >
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <span>Generate MCQs</span>
+            </button>
+          )}
 
           {/* Primary Create Button */}
           <button
@@ -279,7 +338,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
       {/* VIEW 1: Question Sets List */}
       {activeSubView === "sets" && (
         <QuestionSetsList
-          sets={questionSets}
+          sets={displayedSets}
           loading={loadingSets}
           onOpenSet={handleOpenSet}
           onCreateNew={() => setIsCreateSetModalOpen(true)}

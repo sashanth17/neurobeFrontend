@@ -85,12 +85,6 @@ export const OwnmenuConfig = {
     },
     {
       type: "link",
-      icon: "IconMenuForms",
-      label: "Course instances",
-      href: "/neurobe/course-offering",
-    },
-    {
-      type: "link",
       icon: "IconMenuUsers",
       label: "User Management",
       href: "/neurobe/user-list",
@@ -147,119 +141,97 @@ export const OwnmenuConfig = {
     {
       type: "link",
       icon: "IconMenuDashboard",
-      label: "My Assigned Courses",
+      label: "My Courses",
       href: "/neurobe/my-assigned-courses",
-      className: "pb-2",
     },
     {
-      type: "link",
+      type: "submenu",
       icon: "IconMenuNotes",
-      label: "Question Bank",
-      href: "/neurobe/question-bank",
+      label: "Coordinator",
+      key: "coordinator",
+      children: [
+        {
+          type: "submenu",
+          icon: "IconMenuNotes",
+          label: "Question Banks",
+          key: "question_banks",
+          children: [
+            {
+              label: "MCQ-bank",
+              href: "/neurobe/question-bank",
+            },
+            {
+              label: "CIQ-bank",
+              href: "/neurobe/cia-question-paper",
+            },
+          ],
+        },
+      ],
     },
     {
-      type: "heading",
-      label: "INSTRUCTOR FUNCTIONS",
-      className: "pb-2 pt-2",
+      type: "submenu",
+      icon: "IconMenuUsers",
+      label: "Instructor",
+      key: "instructor",
+      children: [
+        {
+          label: "Instance management",
+          href: "/neurobe/course-offering",
+        },
+        {
+          label: "Live test monitoring",
+          href: "/neurobe/ins-mcq-live-monitor",
+        },
+      ],
     },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Instance Management",
-      href: "/neurobe/course-offering",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "MCQ",
-      href: "/neurobe/mcq-generation",
-    },
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "MCQ Test Execution",
-      href: "/neurobe/mcq-test-execution",
-    },
-    {
-      type: "link",
-      icon: "IconMenuCharts",
-      label: "Live Test Monitor",
-      href: "/neurobe/ins-mcq-live-monitor",
-    },
-    // {
-    //   type: "link",
-    //   icon: "IconMenuNotes",
-    //   label: "Marks Extraction & Verification",
-    //   href: "/neurobe/mark-extraction",
-    // },
-    // {
-    //   type: "submenu",
-    //   icon: "IconMenuCharts",
-    //   label: "Masters",
-    //   key: "master",
-    //   children: [
-    //     {
-    //       label: "Degree Level",
-    //       href: "/faculty/master/hr_panel",
-    //     },
-    //     {
-    //       label: "Batch",
-    //       href: "/faculty/master/additional_academic_responsibilities",
-    //     },
-    //     {
-    //       label: "Academic Term / Semester",
-    //       href: "/faculty/master/additional_academic_responsibilities",
-    //     },
-    //     {
-    //       label: "Entity",
-    //       href: "/faculty/master/additional_academic_responsibilities",
-    //     },
-    //   ],
-    // },
   ],
   COURSE_INSTRUCTOR: [
     {
-      type: "heading",
-      label: "INSTRUCTOR FUNCTIONS",
-    },
-    {
       type: "link",
       icon: "IconMenuDashboard",
-      label: "My Assigned Courses",
+      label: "My Courses",
       href: "/neurobe/my-assigned-courses",
     },
     {
-      type: "link",
-      icon: "IconMenuUsers",
-      label: "Instance Management",
-      href: "/neurobe/course-offering",
-    },
-    {
-      type: "link",
+      type: "submenu",
       icon: "IconMenuNotes",
-      label: "MCQ",
-      href: "/neurobe/mcq-generation",
+      label: "Coordinator",
+      key: "coordinator",
+      children: [
+        {
+          type: "submenu",
+          icon: "IconMenuNotes",
+          label: "Question Banks",
+          key: "question_banks",
+          children: [
+            {
+              label: "MCQ-bank",
+              href: "/neurobe/question-bank",
+            },
+            {
+              label: "CIQ-bank",
+              href: "/neurobe/cia-question-paper",
+            },
+          ],
+        },
+      ],
     },
     {
-      type: "link",
-      icon: "IconMenuTables",
-      label: "MCQ Test Execution",
-      href: "/neurobe/ins-mcq-test-execution",
-      notifyKey: "new_application_count",
+      type: "submenu",
+      icon: "IconMenuUsers",
+      label: "Instructor",
+      key: "instructor",
+      children: [
+        {
+          label: "Instance management",
+          href: "/neurobe/course-offering",
+        },
+        {
+          label: "Live test monitoring",
+          href: "/neurobe/ins-mcq-live-monitor",
+        },
+      ],
     },
-    {
-      type: "link",
-      icon: "IconMenuCharts",
-      label: "Live Test Monitor",
-      href: "/neurobe/ins-mcq-live-monitor",
-    },
-
-    // {
-    //   type: "link",
-    //   icon: "IconMenuNotes",
-    //   label: "Marks Extraction & Verification",
-    //   href: "/neurobe/mark-extraction",
-    // },
   ],
 };
 
@@ -267,51 +239,49 @@ OwnmenuConfig.FACULTY = [
   {
     type: "link",
     icon: "IconMenuDashboard",
-    label: "My Assigned Courses",
+    label: "My Courses",
     href: "/neurobe/my-assigned-courses",
-    className: "pb-2",
   },
   {
-    type: "link",
+    type: "submenu",
     icon: "IconMenuNotes",
-    label: "Question Bank",
-    href: "/neurobe/question-bank",
+    label: "Coordinator",
+    key: "coordinator",
+    children: [
+      {
+        type: "submenu",
+        icon: "IconMenuNotes",
+        label: "Question Banks",
+        key: "question_banks",
+        children: [
+          {
+            label: "MCQ-bank",
+            href: "/neurobe/question-bank",
+          },
+          {
+            label: "CIQ-bank",
+            href: "/neurobe/cia-question-paper",
+          },
+        ],
+      },
+    ],
   },
   {
-    type: "heading",
-    label: "INSTRUCTOR FUNCTIONS",
-    className: "pb-2 pt-2",
+    type: "submenu",
+    icon: "IconMenuUsers",
+    label: "Instructor",
+    key: "instructor",
+    children: [
+      {
+        label: "Instance management",
+        href: "/neurobe/course-offering",
+      },
+      {
+        label: "Live test monitoring",
+        href: "/neurobe/ins-mcq-live-monitor",
+      },
+    ],
   },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "Instance Management",
-    href: "/neurobe/course-offering",
-  },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "MCQ",
-    href: "/neurobe/mcq-generation",
-  },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "MCQ Test Execution",
-    href: "/neurobe/ins-mcq-test-execution",
-  },
-  {
-    type: "link",
-    icon: "IconMenuCharts",
-    label: "Live Test Monitor",
-    href: "/neurobe/ins-mcq-live-monitor",
-  },
-  // {
-  //   type: "link",
-  //   icon: "IconMenuNotes",
-  //   label: "Marks Extraction & Verification",
-  //   href: "/neurobe/mark-extraction",
-  // },
 ];
 
 OwnmenuConfig.STUDENT = [

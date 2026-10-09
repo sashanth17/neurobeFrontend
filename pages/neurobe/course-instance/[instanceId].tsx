@@ -10,11 +10,13 @@ import ResultPageTab from "@/components/mark-extraction/ResultPageTab";
 import AssignmentUploadTab from "@/components/mark-extraction/AssignmentUploadTab";
 import { MarkExtractionService, CiaTestStatus } from "@/services/markExtraction.service";
 import CourseAttainmentReport from "@/components/academic-setup/CourseAttainmentReport";
+import InstanceMCQExecutionTab from "@/components/academic-setup/InstanceMCQExecutionTab";
 
 // Tabs that do NOT need a CIA test selected to render
-const CIA_INDEPENDENT_TABS = new Set(["assignment-upload", "co-po-attainment"]);
+const CIA_INDEPENDENT_TABS = new Set(["mcq-test-execution", "assignment-upload", "co-po-attainment"]);
 
 const TABS = [
+  { id: "mcq-test-execution", label: "MCQ Test Execution" },
   { id: "extraction", label: "Extraction" },
   { id: "extracted-view", label: "Extracted View" },
   { id: "result", label: "Result Page" },
@@ -25,9 +27,15 @@ const TABS = [
 function InstanceDashboardPage() {
   const dispatch = useDispatch();
   const router = useRouter();
-  const { courseId, instanceId } = router.query;
+  const { courseId, instanceId, tab: queryTab } = router.query;
 
-  const [activeTab, setActiveTab] = useState("extraction");
+  const [activeTab, setActiveTab] = useState((queryTab as string) || "mcq-test-execution");
+
+  useEffect(() => {
+    if (queryTab && typeof queryTab === "string") {
+      setActiveTab(queryTab);
+    }
+  }, [queryTab]);
   const [ciaTests, setCiaTests] = useState<CiaTestStatus[]>([]);
   const [selectedCiaTest, setSelectedCiaTest] = useState<CiaTestStatus | null>(null);
   const [loadingTests, setLoadingTests] = useState(true);
@@ -156,6 +164,16 @@ function InstanceDashboardPage() {
 
       {/* ── Tab Content ──────────────────────────────────────────────────────── */}
       <div className={`p-6 ${activeTab === "co-po-attainment" ? "flex-1" : "flex-1 overflow-hidden"}`}>
+
+        {/* MCQ Test Execution — renders independently for this course instance */}
+        {activeTab === "mcq-test-execution" && (
+          <div className="h-full">
+            <InstanceMCQExecutionTab
+              instanceId={instanceId as string}
+              courseId={courseId as string}
+            />
+          </div>
+        )}
 
         {/* CO/PO Attainment — renders independently, single unified scroll */}
         {activeTab === "co-po-attainment" && (
