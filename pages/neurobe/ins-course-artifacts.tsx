@@ -37,6 +37,8 @@ import Models from "@/imports/models.import";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
 import CourseAttainmentReport from "@/components/academic-setup/CourseAttainmentReport";
 import CoursePortfolioReport from "@/components/academic-setup/CoursePortfolioReport";
+import CiaAnalyticsTab from "@/components/academic-setup/CiaAnalyticsTab";
+import McqVivaTab from "@/components/academic-setup/McqVivaTab";
 import { BACKEND_URL } from "@/utils/constant.utils";
 
 const InsCourseArtifacts = () => {
@@ -67,7 +69,7 @@ const InsCourseArtifacts = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<"syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report">("syllabus");
+  const [activeTab, setActiveTab] = useState<"syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva">("syllabus");
 
   // Per-section loaded version data
   const [sectionData, setSectionData] = useState<{
@@ -168,7 +170,7 @@ const InsCourseArtifacts = () => {
   const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
 
   // Helper to re-fetch and update currently viewed or active version data in state
-  const refreshCurrentVersion = async (tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report", id?: any) => {
+  const refreshCurrentVersion = async (tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva", id?: any) => {
     try {
       if (tab === "syllabus") {
         const extId = id || selectedVersionData.syllabus?.extractions_id || currentExt?.extractions_id || activeExt?.extractions_id;
@@ -214,12 +216,12 @@ const InsCourseArtifacts = () => {
 
   // Load section-specific versions and current active version data on tab switch
   const loadSectionData = async (
-    tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report",
+    tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan" | "co-attainment" | "report" | "cia_analytics" | "mcq_viva",
     forceRefresh = false,
     coordOverride?: boolean
   ) => {
     if (!courseIdParam) return;
-    if (tab === "co-attainment" || tab === "report") return;
+    if (tab === "co-attainment" || tab === "report" || tab === "cia_analytics" || tab === "mcq_viva") return;
     const userIsCoord = coordOverride !== undefined ? coordOverride : isCoord;
     setSectionLoading((prev) => ({ ...prev, [tab]: true }));
     try {
@@ -2071,6 +2073,28 @@ const InsCourseArtifacts = () => {
               }`}
           >
             5. Report
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("cia_analytics")}
+            className={`border-b-2 pb-3 text-sm font-semibold transition ${activeTab === "cia_analytics"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+          >
+            6. CIA Analytics
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("mcq_viva")}
+            className={`border-b-2 pb-3 text-sm font-semibold transition ${activeTab === "mcq_viva"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+          >
+            7. MCQ & Viva
           </button>
         </nav>
       </div>
@@ -4458,6 +4482,20 @@ const InsCourseArtifacts = () => {
                 portfolio={portfolio}
                 courseMetadata={course}
                 onRefresh={fetchPortfolio}
+              />
+            )}
+
+            {/* ── TAB 6: CIA PERFORMANCE & MARKS ANALYTICS ── */}
+            {activeTab === "cia_analytics" && (
+              <CiaAnalyticsTab
+                courseId={Number(courseIdParam) || 1}
+              />
+            )}
+
+            {/* ── TAB 7: MCQ PERFORMANCE & VIVA REPORTS ── */}
+            {activeTab === "mcq_viva" && (
+              <McqVivaTab
+                courseId={Number(courseIdParam) || 1}
               />
             )}
           </>
