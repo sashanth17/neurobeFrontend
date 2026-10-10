@@ -10,8 +10,6 @@ import {
   CheckCircle,
   CheckCircle2,
   Send,
-  Maximize2,
-  Minimize2,
   ChevronRight,
   ChevronLeft,
   Wifi,
@@ -173,7 +171,7 @@ export default function StudentMCQTestPage() {
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [warningMessage, setWarningMessage] = useState("");
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(1800); // 30 mins default
   const [wsConnected, setWsConnected] = useState(false);
   const [mcqPaletteFilter, setMcqPaletteFilter] = useState<"all" | "answered" | "unanswered" | "flagged">("all");
@@ -258,7 +256,7 @@ export default function StudentMCQTestPage() {
   const vivaContextRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Setup & Fullscreen styling
+  // Setup & Pure Dark Theme Styling
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     dispatch(setPageTitle("Proctored Assessment & AI Viva — Neurobe"));
@@ -308,7 +306,7 @@ export default function StudentMCQTestPage() {
 
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Fullscreen & Strict Tab Switching Enforcement
+  // Strict Tab Switching & Focus Enforcement
   // ─────────────────────────────────────────────────────────────────────────
   const reportTabSwitch = useCallback(() => {
     if (phase !== "mcq_active" && phase !== "viva_active") return;
@@ -321,24 +319,6 @@ export default function StudentMCQTestPage() {
       );
     }
   }, [phase]);
-
-  const toggleFullscreen = async () => {
-    try {
-      if (!document.fullscreenElement) {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
-          setIsFullscreen(true);
-        }
-      } else {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-          setIsFullscreen(false);
-        }
-      }
-    } catch (err) {
-      console.warn("Fullscreen toggle error:", err);
-    }
-  };
 
   useEffect(() => {
     if (phase !== "mcq_active") return;
@@ -357,16 +337,6 @@ export default function StudentMCQTestPage() {
       setWarningModalOpen(true);
     };
 
-    const handleFullscreenChange = () => {
-      const isNowFullscreen = Boolean(document.fullscreenElement);
-      setIsFullscreen(isNowFullscreen);
-      if (!isNowFullscreen && phase === "mcq_active") {
-        reportTabSwitch();
-        setWarningMessage("You have exited full-screen mode! Full-screen is strictly required during this examination.");
-        setWarningModalOpen(true);
-      }
-    };
-
     const preventCopyPaste = (e: ClipboardEvent) => {
       e.preventDefault();
       Failure("Copy, paste, and cut operations are disabled during this assessment.");
@@ -378,7 +348,6 @@ export default function StudentMCQTestPage() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleWindowBlur);
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("copy", preventCopyPaste);
     document.addEventListener("cut", preventCopyPaste);
     document.addEventListener("paste", preventCopyPaste);
@@ -387,7 +356,6 @@ export default function StudentMCQTestPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleWindowBlur);
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("copy", preventCopyPaste);
       document.removeEventListener("cut", preventCopyPaste);
       document.removeEventListener("paste", preventCopyPaste);
@@ -632,18 +600,9 @@ export default function StudentMCQTestPage() {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 2. Start Assessment & Enter Fullscreen
+  // 2. Start Assessment
   // ─────────────────────────────────────────────────────────────────────────
   const handleStartExam = async () => {
-    try {
-      if (document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen();
-        setIsFullscreen(true);
-      }
-    } catch {
-      console.warn("Fullscreen permission not granted or rejected by browser");
-    }
-
     setPhase("mcq_active");
     connectMcqWebSocket();
   };
@@ -658,7 +617,7 @@ export default function StudentMCQTestPage() {
     const emailQuery = encodeURIComponent(studentEmail);
 
     const candidateUrls = [
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}ws/test/connect?code=${codeQuery}&token=${emailQuery}`
+      `${process.env.NEXT_PUBLIC_SOCKET_URL}ws/test/connect?code=${codeQuery}&token=${emailQuery}`
     ];
 
     tryConnectMcqWs(0, candidateUrls);
@@ -922,13 +881,6 @@ export default function StudentMCQTestPage() {
       // If viva is disabled OR student did not pass the viva threshold:
       setSubmissionSuccess(true);
 
-      // Gracefully exit fullscreen
-      if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
-        try {
-          await document.exitFullscreen();
-        } catch { }
-      }
-
       if (mcqWsRef.current) {
         try {
           mcqWsRef.current.close();
@@ -980,7 +932,7 @@ export default function StudentMCQTestPage() {
     const emailQuery = encodeURIComponent(studentEmail);
 
     const vivaUrls = [
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}ws/test/viva/connect?test_id=${testId}&token=${emailQuery}`
+      `${process.env.NEXT_PUBLIC_SOCKET_URL}ws/test/viva/connect?test_id=${testId}&token=${emailQuery}`
     ];
 
     tryConnectVivaWs(0, vivaUrls);
@@ -1360,18 +1312,18 @@ export default function StudentMCQTestPage() {
   // ─────────────────────────────────────────────────────────────────────────────
   if (phase === "enter_code") {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-4 text-slate-100">
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-3 sm:p-4 text-slate-100">
         <Head>
           <title>Enter Assessment Code — Neurobe</title>
         </Head>
 
-        <div className="w-full max-w-md space-y-8 rounded-3xl border border-slate-800/90 bg-[#111625] p-8 shadow-2xl">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8 rounded-2xl sm:rounded-3xl border border-slate-800/90 bg-[#111625] p-5 sm:p-8 shadow-2xl">
           {/* Header */}
           <div className="text-center space-y-3">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30">
-              <Lock className="h-8 w-8" />
+            <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30">
+              <Lock className="h-7 w-7 sm:h-8 sm:w-8" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">Secure Test Portal</h1>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">Secure Test Portal</h1>
             <p className="text-xs text-slate-400">
               Enter the unique access passcode issued by your course instructor to join the examination.
             </p>
@@ -1389,14 +1341,14 @@ export default function StudentMCQTestPage() {
                 onChange={(e) => setPasscode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === "Enter" && handleVerifyCode()}
                 placeholder="e.g. CS-5HZ or MCQ-XXXX"
-                className="w-full rounded-2xl border border-slate-700 bg-[#0B0F19] px-4 py-3.5 text-center font-mono text-lg font-bold tracking-widest text-indigo-400 placeholder-slate-600 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 uppercase transition-all"
+                className="w-full rounded-2xl border border-slate-700 bg-[#0B0F19] px-3.5 sm:px-4 py-3 sm:py-3.5 text-center font-mono text-base sm:text-lg font-bold tracking-widest text-indigo-400 placeholder-slate-600 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 uppercase transition-all"
                 autoFocus
               />
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-3.5 text-xs text-slate-400 flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5 text-xs text-slate-400 flex items-center gap-3">
+              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="truncate">
                 Attending as: <strong className="text-slate-200">{studentEmail}</strong>
               </span>
             </div>
@@ -1405,7 +1357,7 @@ export default function StudentMCQTestPage() {
               type="button"
               disabled={verifying || !passcode.trim()}
               onClick={() => handleVerifyCode()}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] disabled:opacity-50 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 py-3 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] disabled:opacity-50 transition-all cursor-pointer"
             >
               {verifying ? (
                 <>
@@ -1445,26 +1397,26 @@ export default function StudentMCQTestPage() {
     const timeFormatted = `${hours > 0 ? `${hours}h ` : ""}${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-4 text-slate-100">
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-3 sm:p-4 text-slate-100">
         <Head>
           <title>Assessment Scheduled — Neurobe</title>
         </Head>
 
-        <div className="w-full max-w-md space-y-6 rounded-3xl border border-amber-500/30 bg-[#111625] p-8 shadow-2xl text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10">
-            <Clock className="h-8 w-8 animate-pulse" />
+        <div className="w-full max-w-md space-y-5 sm:space-y-6 rounded-2xl sm:rounded-3xl border border-amber-500/30 bg-[#111625] p-5 sm:p-8 shadow-2xl text-center">
+          <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10">
+            <Clock className="h-7 w-7 sm:h-8 sm:w-8 animate-pulse" />
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-xl font-bold text-white">Assessment Opening Soon</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-white">Assessment Opening Soon</h1>
             <p className="text-xs text-slate-400 leading-relaxed">
               {preWindowMsg || "The scheduled window for this assessment has not started yet. Please wait until the start time."}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 space-y-2">
+          <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-4 sm:p-6 space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Test Window Starts In</span>
-            <p className="text-4xl font-black font-mono text-amber-400 tracking-wider">
+            <p className="text-3xl sm:text-4xl font-black font-mono text-amber-400 tracking-wider">
               {timeFormatted}
             </p>
           </div>
@@ -1474,7 +1426,7 @@ export default function StudentMCQTestPage() {
               type="button"
               disabled={verifying || preWindowSeconds > 0}
               onClick={() => handleVerifyCode()}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-indigo-600/20"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3 sm:py-3.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-indigo-600/20"
             >
               {preWindowSeconds > 0 ? (
                 <span>Auto-opening when timer reaches zero...</span>
@@ -1504,59 +1456,56 @@ export default function StudentMCQTestPage() {
   // ─────────────────────────────────────────────────────────────────────────────
   if (phase === "instructions" && testDetails) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-4 text-slate-100">
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#0B0F19] p-3 sm:p-4 text-slate-100">
         <Head>
           <title>{testDetails.title} — Proctoring Instructions</title>
         </Head>
 
-        <div className="w-full max-w-2xl space-y-6 rounded-3xl border border-slate-800/90 bg-[#111625] p-8 shadow-2xl">
+        <div className="w-full max-w-2xl space-y-5 sm:space-y-6 rounded-2xl sm:rounded-3xl border border-slate-800/90 bg-[#111625] p-5 sm:p-8 shadow-2xl">
           {/* Header */}
-          <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-800 pb-4">
             <div>
               <span className="rounded-md bg-indigo-950 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-400 border border-indigo-800">
                 {testDetails.test_code || testDetails.secure_code}
               </span>
-              <h2 className="mt-2 text-xl font-bold text-white">{testDetails.title}</h2>
+              <h2 className="mt-2 text-lg sm:text-xl font-bold text-white">{testDetails.title}</h2>
               <p className="text-xs text-slate-400">
                 {testDetails.unit_name || "Academic Assessment"} • Duration: {testDetails.duration_minutes} Mins
               </p>
             </div>
-            <div className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+            <div className="self-start rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400 flex items-center gap-1.5 shrink-0">
               <CheckCircle2 className="h-3.5 w-3.5" />
               <span>Passcode Verified</span>
             </div>
           </div>
 
           {/* Test Meta Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-            <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-3.5">
-              <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Duration</span>
-              <p className="mt-1 text-base font-black text-indigo-400">{testDetails.duration_minutes} Mins</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-center">
+            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
+              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Duration</span>
+              <p className="mt-1 text-sm sm:text-base font-black text-indigo-400">{testDetails.duration_minutes} Mins</p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-3.5">
-              <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Tab Limit</span>
-              <p className="mt-1 text-base font-black text-amber-400">{testDetails.max_tab_switches || 3} Max</p>
+            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
+              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Tab Limit</span>
+              <p className="mt-1 text-sm sm:text-base font-black text-amber-400">{testDetails.max_tab_switches || 3} Max</p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-3.5">
-              <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Questions</span>
-              <p className="mt-1 text-base font-black text-emerald-400">Randomized</p>
+            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
+              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Questions</span>
+              <p className="mt-1 text-sm sm:text-base font-black text-emerald-400">Randomized</p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-3.5">
-              <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">AI Viva Voce</span>
-              <p className="mt-1 text-base font-black text-purple-400">{testDetails.have_viva ? "Included" : "None"}</p>
+            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
+              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">AI Viva Voce</span>
+              <p className="mt-1 text-sm sm:text-base font-black text-purple-400">{testDetails.have_viva ? "Included" : "None"}</p>
             </div>
           </div>
 
           {/* Strict Proctoring Warning Box */}
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3">
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-              <ShieldAlert className="h-5 w-5 shrink-0" />
+          <div className="rounded-xl sm:rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 space-y-2.5 sm:space-y-3">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs sm:text-sm">
+              <ShieldAlert className="h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0" />
               <span>Strict Proctoring Rules & Automated Integrity System</span>
             </div>
             <ul className="space-y-2 text-xs text-slate-300 list-disc list-inside">
-              <li>
-                <strong>Full-Screen Required:</strong> The examination runs exclusively in full-screen mode with no outer distractions.
-              </li>
               <li>
                 <strong>Tab Switching / App Blur:</strong> Navigating away from this tab, opening developer tools, or
                 switching applications will be recorded instantly.
@@ -1579,21 +1528,21 @@ export default function StudentMCQTestPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
             <button
               type="button"
               onClick={() => setPhase("enter_code")}
-              className="rounded-2xl border border-slate-700 px-6 py-3.5 text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors"
+              className="w-full sm:w-auto rounded-xl sm:rounded-2xl border border-slate-700 px-6 py-3 sm:py-3.5 text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer text-center"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleStartExam}
-              className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-xl shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 py-3 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-xl shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer"
             >
-              <Maximize2 className="h-4 w-4" />
-              <span>Enter Fullscreen & Begin Assessment</span>
+              <span>Begin Assessment</span>
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -1615,60 +1564,159 @@ export default function StudentMCQTestPage() {
     const isSaving = answerStatus[currentQId] === "saving";
     const isFlagged = flaggedQuestions.has(currentQIndex);
 
+    const renderQuestionPalette = (isMobileModal: boolean = false) => (
+      <div className={`rounded-2xl border border-slate-800 bg-[#111625] p-4 flex flex-col justify-between ${isMobileModal ? "" : "flex-1"}`}>
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Question Palette</h4>
+            <span className="font-mono text-xs text-indigo-400 font-semibold">
+              {Math.round((answeredCount / Math.max(totalQuestions, 1)) * 100)}%
+            </span>
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-1 mb-3 text-[10px] font-semibold border-b border-slate-800/80 pb-2">
+            <button
+              type="button"
+              onClick={() => setMcqPaletteFilter("all")}
+              className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "all" ? "bg-slate-800 text-white" : "text-slate-400 hover:text-slate-200"
+                }`}
+            >
+              All ({totalQuestions})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMcqPaletteFilter("answered")}
+              className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "answered"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : "text-slate-400 hover:text-slate-200"
+                }`}
+            >
+              Done ({answeredCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMcqPaletteFilter("flagged")}
+              className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "flagged"
+                ? "bg-amber-500/20 text-amber-300"
+                : "text-slate-400 hover:text-slate-200"
+                }`}
+            >
+              Flagged ({flaggedQuestions.size})
+            </button>
+          </div>
+
+          {/* Questions Grid */}
+          <div className={`grid ${isMobileModal ? "grid-cols-5 sm:grid-cols-6" : "grid-cols-5"} gap-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar`}>
+            {questions.map((q, idx) => {
+              const qId = q.question_id || String(idx);
+              const isAnswered = Boolean(answers[qId]);
+              const isCurrent = idx === currentQIndex;
+              const isFlg = flaggedQuestions.has(idx);
+
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setCurrentQIndex(idx);
+                    if (isMobileModal) setMobilePaletteOpen(false);
+                  }}
+                  className={`h-9 w-9 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${isCurrent
+                    ? "ring-2 ring-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-600/40"
+                    : isFlg
+                      ? "bg-amber-500/20 border border-amber-500/50 text-amber-300"
+                      : isAnswered
+                        ? "bg-emerald-600/25 border border-emerald-500/40 text-emerald-300"
+                        : "bg-[#0B0F19] border border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                >
+                  {idx + 1}
+                  {isFlg && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-400" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="mt-4 space-y-1.5 border-t border-slate-800/80 pt-3 text-[10px] text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-md bg-emerald-500/40 border border-emerald-500" />
+              <span>Answered ({answeredCount})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-md bg-amber-500/40 border border-amber-500" />
+              <span>Flagged for Review ({flaggedQuestions.size})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-md bg-[#0B0F19] border border-slate-800" />
+              <span>Unanswered ({totalQuestions - answeredCount})</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-800/80 pt-3 mt-4 text-[10px] text-slate-400">
+          <span className="font-semibold text-slate-300">Proctor Integrity:</span> All actions are streamed to the supervisor.
+        </div>
+      </div>
+    );
+
     return (
-      <div className="h-screen w-screen bg-[#0B0F19] text-slate-100 flex flex-col overflow-hidden select-none">
+      <div className="min-h-[100dvh] h-[100dvh] w-full bg-[#0B0F19] text-slate-100 flex flex-col overflow-hidden select-none">
         <Head>
           <title>{testDetails.title} — Active Assessment</title>
         </Head>
 
         {/* Top Sticky Proctor Bar */}
-        <header className="h-14 shrink-0 z-40 flex items-center justify-between border-b border-slate-800/80 bg-[#111625] px-6">
-          <div className="flex items-center gap-3">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
-            <h2 className="text-sm font-bold text-white tracking-tight">{testDetails.title}</h2>
-            <span className="hidden sm:inline-block rounded-md bg-[#0B0F19] px-2 py-0.5 font-mono text-xs text-indigo-400 border border-slate-800">
+        <header className="h-14 shrink-0 z-40 flex items-center justify-between border-b border-slate-800/80 bg-[#111625] px-3 sm:px-6 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate max-w-[110px] sm:max-w-xs md:max-w-md" title={testDetails.title}>
+              {testDetails.title}
+            </h2>
+            <span className="hidden sm:inline-block rounded-md bg-[#0B0F19] px-2 py-0.5 font-mono text-xs text-indigo-400 border border-slate-800 shrink-0">
               {testDetails.test_code || testDetails.secure_code}
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Tab switch tracker */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400">
-              <AlertTriangle className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-amber-400">
+              <AlertTriangle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
               <span>
-                Switches: {tabSwitchCount} / {testDetails.max_tab_switches || 3}
+                <span className="hidden sm:inline">Switches: </span>{tabSwitchCount}/{testDetails.max_tab_switches || 3}
               </span>
             </div>
 
             {/* Live Timer */}
             <div
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-mono font-bold ${secondsRemaining < 300
+              className={`flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-mono font-bold ${secondsRemaining < 300
                 ? "bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse"
                 : secondsRemaining < 600
                   ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                   : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                 }`}
             >
-              <Clock className="h-3.5 w-3.5" />
+              <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
               <span>{formatTime(secondsRemaining)}</span>
             </div>
 
-            {/* Fullscreen Toggle */}
+            {/* Mobile Palette Button */}
             <button
               type="button"
-              onClick={toggleFullscreen}
-              className="p-1.5 rounded-xl border border-slate-700 bg-[#0B0F19] text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-              title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              onClick={() => setMobilePaletteOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg sm:rounded-xl border border-slate-700 bg-[#0B0F19] text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Question Palette"
             >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <Target className="h-3.5 w-3.5 text-indigo-400" />
             </button>
 
             {/* WS Connectivity Badge */}
             <span
-              className={`flex items-center gap-1 text-[11px] font-semibold ${wsConnected ? "text-emerald-400" : "text-red-400"
+              className={`flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold ${wsConnected ? "text-emerald-400" : "text-red-400"
                 }`}
             >
-              {wsConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+              {wsConnected ? <Wifi className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <WifiOff className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
               <span className="hidden md:inline">{wsConnected ? "Live" : "Offline"}</span>
             </span>
 
@@ -1676,17 +1724,18 @@ export default function StudentMCQTestPage() {
             <button
               type="button"
               onClick={() => handleFinishMcq(false)}
-              className="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 px-4 py-1.5 text-xs font-bold text-white shadow-md transition-all cursor-pointer"
+              className="rounded-lg sm:rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 px-2.5 sm:px-4 py-1.5 text-xs font-bold text-white shadow-md transition-all cursor-pointer shrink-0"
             >
-              Finish & Submit →
+              <span className="hidden sm:inline">Finish & Submit →</span>
+              <span className="sm:hidden">Submit</span>
             </button>
           </div>
         </header>
 
-        {/* Main Split Pane: Left Question Area + Right Docked Side Bar (SAME COLOR, ZERO WHITE SPACE) */}
+        {/* Main Split Pane */}
         <div className="flex-1 flex flex-col lg:flex-row w-full bg-[#0B0F19] overflow-hidden">
           {/* Left: Question Box */}
-          <main className="flex-1 flex flex-col justify-between p-6 lg:p-8 bg-[#0B0F19] overflow-y-auto custom-scrollbar">
+          <main className="flex-1 flex flex-col justify-between p-4 sm:p-6 lg:p-8 bg-[#0B0F19] overflow-y-auto custom-scrollbar">
             {totalQuestions === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 space-y-3 py-20">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
@@ -1695,33 +1744,42 @@ export default function StudentMCQTestPage() {
             ) : (
               <div className="max-w-4xl mx-auto w-full">
                 {/* Question Top Header */}
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-xl bg-indigo-600/20 border border-indigo-500/40 px-3 py-1 font-bold text-xs text-indigo-300">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3 sm:pb-4 mb-4 sm:mb-6 gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMobilePaletteOpen(true)}
+                      className="lg:hidden flex items-center gap-1.5 rounded-xl bg-indigo-600/20 border border-indigo-500/40 px-2.5 py-1 font-bold text-xs text-indigo-300 hover:bg-indigo-600/30 transition-colors cursor-pointer"
+                      title="Open Question Palette"
+                    >
+                      <Target className="h-3 w-3" />
+                      <span>Q {currentQIndex + 1}/{totalQuestions}</span>
+                    </button>
+                    <span className="hidden lg:inline-flex rounded-xl bg-indigo-600/20 border border-indigo-500/40 px-3 py-1 font-bold text-xs text-indigo-300">
                       Question {currentQIndex + 1} of {totalQuestions}
                     </span>
-                    {isSaving && <span className="text-[11px] text-amber-400">Saving...</span>}
-                    {isSaved && <span className="text-[11px] text-emerald-400 font-semibold">✓ Saved</span>}
+                    {isSaving && <span className="text-[10px] sm:text-[11px] text-amber-400">Saving...</span>}
+                    {isSaved && <span className="text-[10px] sm:text-[11px] text-emerald-400 font-semibold">✓ Saved</span>}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => toggleFlagQuestion(currentQIndex)}
-                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all cursor-pointer ${isFlagged
+                      className={`flex items-center gap-1 sm:gap-1.5 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-semibold border transition-all cursor-pointer ${isFlagged
                         ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
                         : "border-slate-800 bg-[#111625] text-slate-400 hover:text-slate-200"
                         }`}
                     >
                       <Flag className="h-3.5 w-3.5" />
-                      <span>{isFlagged ? "Flagged" : "Flag for Review"}</span>
+                      <span>{isFlagged ? "Flagged" : <><span className="hidden sm:inline">Flag for Review</span><span className="sm:hidden">Flag</span></>}</span>
                     </button>
 
                     {selectedOption && (
                       <button
                         type="button"
                         onClick={() => handleClearOption(currentQId)}
-                        className="rounded-xl border border-slate-800 bg-[#111625] px-3 py-1.5 text-xs text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors cursor-pointer"
+                        className="rounded-xl border border-slate-800 bg-[#111625] px-2.5 sm:px-3 py-1.5 text-xs text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors cursor-pointer"
                       >
                         Clear
                       </button>
@@ -1730,12 +1788,12 @@ export default function StudentMCQTestPage() {
                 </div>
 
                 {/* Question Statement */}
-                <h3 className="text-lg md:text-xl font-semibold text-slate-100 leading-relaxed mb-8">
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-slate-100 leading-relaxed mb-6 sm:mb-8 break-words">
                   {currentQ?.question_string || "Question statement..."}
                 </h3>
 
                 {/* Options List */}
-                <div className="space-y-3 mb-8">
+                <div className="space-y-2.5 sm:space-y-3 mb-6 sm:mb-8">
                   {(currentQ?.options || []).map((opt, oIdx) => {
                     const optionLetter = String.fromCharCode(65 + oIdx);
                     const isSelected = selectedOption === opt;
@@ -1744,14 +1802,14 @@ export default function StudentMCQTestPage() {
                       <div
                         key={oIdx}
                         onClick={() => handleSelectOption(currentQId, opt)}
-                        className={`group flex items-center justify-between rounded-2xl border p-4 transition-all duration-200 cursor-pointer ${isSelected
+                        className={`group flex items-center justify-between rounded-xl sm:rounded-2xl border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer ${isSelected
                           ? "border-indigo-500 bg-indigo-600/15 shadow-lg shadow-indigo-500/10"
                           : "border-slate-800 bg-[#111625] hover:border-slate-700 hover:bg-[#161c30]"
                           }`}
                       >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 mr-2">
                           <span
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold transition-all ${isSelected
+                            className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold transition-all ${isSelected
                               ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                               : "bg-slate-800 text-slate-300 group-hover:bg-slate-700"
                               }`}
@@ -1759,7 +1817,7 @@ export default function StudentMCQTestPage() {
                             {optionLetter}
                           </span>
                           <span
-                            className={`text-sm md:text-base leading-relaxed ${isSelected ? "font-semibold text-white" : "text-slate-300"
+                            className={`text-xs sm:text-sm md:text-base leading-relaxed break-words flex-1 min-w-0 ${isSelected ? "font-semibold text-white" : "text-slate-300"
                               }`}
                           >
                             {opt}
@@ -1767,7 +1825,7 @@ export default function StudentMCQTestPage() {
                         </div>
 
                         <div
-                          className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${isSelected
+                          className={`h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0 rounded-full border flex items-center justify-center transition-all ${isSelected
                             ? "border-indigo-500 bg-indigo-600 text-white"
                             : "border-slate-700 bg-slate-900"
                             }`}
@@ -1782,26 +1840,27 @@ export default function StudentMCQTestPage() {
             )}
 
             {/* Bottom Question Navigation Controls */}
-            <div className="max-w-4xl mx-auto w-full flex items-center justify-between border-t border-slate-800 pt-6 mt-4">
+            <div className="max-w-4xl mx-auto w-full flex items-center justify-between border-t border-slate-800 pt-4 sm:pt-6 mt-auto gap-2">
               <button
                 type="button"
                 disabled={currentQIndex === 0}
                 onClick={() => setCurrentQIndex((prev) => Math.max(0, prev - 1))}
-                className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#111625] px-5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-30 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-slate-800 bg-[#111625] px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-30 transition-all cursor-pointer shrink-0"
               >
                 <ChevronLeft className="h-4 w-4" />
                 <span>Previous</span>
               </button>
 
-              <div className="text-xs text-slate-400 font-mono">
-                {answeredCount} of {totalQuestions} answered
+              <div className="text-[11px] sm:text-xs text-slate-400 font-mono text-center">
+                <span className="hidden sm:inline">{answeredCount} of {totalQuestions} answered</span>
+                <span className="sm:hidden">{answeredCount}/{totalQuestions}</span>
               </div>
 
               {currentQIndex < totalQuestions - 1 ? (
                 <button
                   type="button"
                   onClick={() => setCurrentQIndex((prev) => Math.min(totalQuestions - 1, prev + 1))}
-                  className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 sm:px-6 py-2 sm:py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
                 >
                   <span>Next</span>
                   <ChevronRight className="h-4 w-4" />
@@ -1810,127 +1869,58 @@ export default function StudentMCQTestPage() {
                 <button
                   type="button"
                   onClick={() => handleFinishMcq(false)}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 px-6 py-2.5 text-xs font-bold text-white shadow-lg transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 px-4 sm:px-6 py-2 sm:py-2.5 text-xs font-bold text-white shadow-lg transition-all cursor-pointer shrink-0"
                 >
-                  <span>Submit Exam</span>
+                  <span>Submit</span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
               )}
             </div>
           </main>
 
-          {/* Right: Docked Side Bar (Question Palette & Live Proctor Cam) — ZERO WHITE SPACE */}
-          <aside className="w-full lg:w-80 xl:w-96 flex flex-col bg-[#0B0F19] border-t lg:border-t-0 lg:border-l border-slate-800/80 p-5 overflow-y-auto custom-scrollbar gap-5 shrink-0">
-
-
-            {/* Question Navigation Palette */}
-            <div className="rounded-2xl border border-slate-800 bg-[#111625] p-4 flex flex-col justify-between flex-1">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Question Palette</h4>
-                  <span className="font-mono text-xs text-indigo-400 font-semibold">
-                    {Math.round((answeredCount / Math.max(totalQuestions, 1)) * 100)}%
-                  </span>
-                </div>
-
-                {/* Filters */}
-                <div className="flex items-center gap-1 mb-3 text-[10px] font-semibold border-b border-slate-800/80 pb-2">
-                  <button
-                    type="button"
-                    onClick={() => setMcqPaletteFilter("all")}
-                    className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "all" ? "bg-slate-800 text-white" : "text-slate-400 hover:text-slate-200"
-                      }`}
-                  >
-                    All ({totalQuestions})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMcqPaletteFilter("answered")}
-                    className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "answered"
-                      ? "bg-emerald-500/20 text-emerald-300"
-                      : "text-slate-400 hover:text-slate-200"
-                      }`}
-                  >
-                    Done ({answeredCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMcqPaletteFilter("flagged")}
-                    className={`rounded-md px-2 py-1 transition-colors ${mcqPaletteFilter === "flagged"
-                      ? "bg-amber-500/20 text-amber-300"
-                      : "text-slate-400 hover:text-slate-200"
-                      }`}
-                  >
-                    Flagged ({flaggedQuestions.size})
-                  </button>
-                </div>
-
-                {/* Questions Grid */}
-                <div className="grid grid-cols-5 gap-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-                  {questions.map((q, idx) => {
-                    const qId = q.question_id || String(idx);
-                    const isAnswered = Boolean(answers[qId]);
-                    const isCurrent = idx === currentQIndex;
-                    const isFlg = flaggedQuestions.has(idx);
-
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setCurrentQIndex(idx)}
-                        className={`h-9 w-9 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${isCurrent
-                          ? "ring-2 ring-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-600/40"
-                          : isFlg
-                            ? "bg-amber-500/20 border border-amber-500/50 text-amber-300"
-                            : isAnswered
-                              ? "bg-emerald-600/25 border border-emerald-500/40 text-emerald-300"
-                              : "bg-[#0B0F19] border border-slate-800 text-slate-400 hover:border-slate-700"
-                          }`}
-                      >
-                        {idx + 1}
-                        {isFlg && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-400" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Legend */}
-                <div className="mt-4 space-y-1.5 border-t border-slate-800/80 pt-3 text-[10px] text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-md bg-emerald-500/40 border border-emerald-500" />
-                    <span>Answered ({answeredCount})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-md bg-amber-500/40 border border-amber-500" />
-                    <span>Flagged for Review ({flaggedQuestions.size})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-md bg-[#0B0F19] border border-slate-800" />
-                    <span>Unanswered ({totalQuestions - answeredCount})</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-800/80 pt-3 mt-4 text-[10px] text-slate-400">
-                <span className="font-semibold text-slate-300">Proctor Integrity:</span> All actions are streamed to the supervisor.
-              </div>
-            </div>
+          {/* Right: Docked Side Bar (Question Palette) on lg: screens */}
+          <aside className="hidden lg:flex w-80 xl:w-96 flex-col bg-[#0B0F19] border-l border-slate-800/80 p-5 overflow-y-auto custom-scrollbar gap-5 shrink-0">
+            {renderQuestionPalette(false)}
           </aside>
         </div>
 
+        {/* Mobile Question Palette Drawer Modal (< lg screens) */}
+        {mobilePaletteOpen && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn lg:hidden">
+            <div className="w-full sm:max-w-md max-h-[85vh] rounded-t-3xl sm:rounded-3xl border border-slate-800 bg-[#111625] p-5 shadow-2xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-white">Question Palette</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobilePaletteOpen(false)}
+                  className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="overflow-y-auto custom-scrollbar flex-1">
+                {renderQuestionPalette(true)}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Proctor Warning Modal */}
         {warningModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-            <div className="w-full max-w-md rounded-3xl border border-red-500/40 bg-[#111625] p-6 shadow-2xl text-center space-y-4">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400">
-                <AlertTriangle className="h-7 w-7" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-md rounded-2xl sm:rounded-3xl border border-red-500/40 bg-[#111625] p-5 sm:p-6 shadow-2xl text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400">
+                <AlertTriangle className="h-6 w-6 sm:h-7 sm:w-7" />
               </div>
-              <h3 className="text-lg font-bold text-white">Proctor Alert!</h3>
+              <h3 className="text-base sm:text-lg font-bold text-white">Proctor Alert!</h3>
               <p className="text-xs text-slate-300 leading-relaxed">{warningMessage}</p>
               <button
                 type="button"
                 onClick={() => setWarningModalOpen(false)}
-                className="w-full rounded-2xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-500 transition-colors cursor-pointer"
+                className="w-full rounded-xl sm:rounded-2xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-500 transition-colors cursor-pointer"
               >
                 I Understand & Return to Exam
               </button>
@@ -1940,21 +1930,21 @@ export default function StudentMCQTestPage() {
 
         {/* Test Submission Summary & Confirmation Modal */}
         {showSubmitModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fadeIn overflow-y-auto">
             {submissionSuccess ? (
-              <div className="w-full max-w-md rounded-3xl border border-emerald-500/40 bg-[#111625] p-8 shadow-2xl text-center space-y-5">
-                <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-lg shadow-emerald-500/20">
-                  <CheckCircle2 className="h-10 w-10 animate-bounce" />
+              <div className="w-full max-w-md rounded-2xl sm:rounded-3xl border border-emerald-500/40 bg-[#111625] p-5 sm:p-8 shadow-2xl text-center space-y-4 sm:space-y-5 my-auto">
+                <div className="flex h-14 w-14 sm:h-16 sm:w-16 mx-auto items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-lg shadow-emerald-500/20">
+                  <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10 animate-bounce" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white">Assessment Submitted Successfully!</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-white">Assessment Submitted Successfully!</h3>
                   <p className="text-xs text-slate-300 mt-2 leading-relaxed">
                     All your responses have been recorded and evaluated. Below is your performance summary:
                   </p>
                 </div>
 
                 {/* Score & Correct Answer Stats Box */}
-                <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#0B0F19] p-4 border border-slate-800 text-left text-xs">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 rounded-2xl bg-[#0B0F19] p-3.5 sm:p-4 border border-slate-800 text-left text-xs">
                   <div>
                     <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Correct Answers</span>
                     <span className="font-mono text-base font-bold text-emerald-400">
@@ -1969,13 +1959,13 @@ export default function StudentMCQTestPage() {
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Time Elapsed</span>
-                    <span className="font-mono text-sm font-bold text-slate-200">
+                    <span className="font-mono text-xs sm:text-sm font-bold text-slate-200">
                       {Math.floor(Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining) / 60)}m {Math.max(0, (testDetails?.duration_minutes || 30) * 60 - secondsRemaining) % 60}s
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Score Percentage</span>
-                    <span className="font-mono text-sm font-bold text-indigo-400">
+                    <span className="font-mono text-xs sm:text-sm font-bold text-indigo-400">
                       {questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0}%
                     </span>
                   </div>
@@ -2012,7 +2002,6 @@ export default function StudentMCQTestPage() {
                       const timeFormatted = `${mins}m ${secs}s`;
                       const clientAnsweredCount = Object.keys(answers).length;
                       const totalCount = questions.length;
-                      // Use backend-verified correct & unanswered count from score_summary (available immediately after submit)
                       const authorativeCorrect =
                         studentReviewData?.score_summary?.correct_count ??
                         studentReviewData?.score_summary?.correct ??
@@ -2044,19 +2033,19 @@ export default function StudentMCQTestPage() {
                 </div>
               </div>
             ) : (
-              <div className="w-full max-w-lg rounded-3xl border border-indigo-500/30 bg-[#111625] p-6 sm:p-8 shadow-2xl text-left space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                    <CheckCircle2 className="h-6 w-6" />
+              <div className="w-full max-w-lg rounded-2xl sm:rounded-3xl border border-indigo-500/30 bg-[#111625] p-5 sm:p-8 shadow-2xl text-left space-y-4 sm:space-y-6 my-auto">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white">Submit Assessment?</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{testDetails.title}</p>
+                  <div className="min-w-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-white">Submit Assessment?</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">{testDetails.title}</p>
                   </div>
                 </div>
 
                 {/* Stats Breakdown Grid */}
-                <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#0B0F19] p-4 border border-slate-800 text-xs">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 rounded-2xl bg-[#0B0F19] p-3.5 sm:p-4 border border-slate-800 text-xs">
                   <div>
                     <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Questions Answered</span>
                     <span className="font-mono text-base font-bold text-emerald-400">
@@ -2071,13 +2060,13 @@ export default function StudentMCQTestPage() {
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Time Elapsed</span>
-                    <span className="font-mono text-sm font-bold text-slate-200">
+                    <span className="font-mono text-xs sm:text-sm font-bold text-slate-200">
                       {formatTime((testDetails.duration_minutes || 30) * 60 - secondsRemaining)}
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-0.5">Tab Switches</span>
-                    <span className="font-mono text-sm font-bold text-slate-200">
+                    <span className="font-mono text-xs sm:text-sm font-bold text-slate-200">
                       {tabSwitchCount} / {testDetails.max_tab_switches || 3}
                     </span>
                   </div>
@@ -2105,12 +2094,12 @@ export default function StudentMCQTestPage() {
                   </p>
                 )}
 
-                <div className="flex items-center justify-end gap-3 pt-2">
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-2">
                   <button
                     type="button"
                     disabled={submittingAssessment}
                     onClick={() => setShowSubmitModal(false)}
-                    className="rounded-xl border border-slate-700 bg-transparent px-5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                    className="w-full sm:w-auto rounded-xl border border-slate-700 bg-transparent px-5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer text-center"
                   >
                     Review Answers
                   </button>
@@ -2118,7 +2107,7 @@ export default function StudentMCQTestPage() {
                     type="button"
                     disabled={submittingAssessment}
                     onClick={confirmAndSubmitTest}
-                    className="flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50 transition-all cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50 transition-all cursor-pointer"
                   >
                     {submittingAssessment ? (
                       <>
@@ -2154,31 +2143,31 @@ export default function StudentMCQTestPage() {
         </Head>
 
         {/* Top Header Bar with Timers & Progress (Aligned with InterviewScreen.jsx) */}
-        <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 mb-2 gap-3 border-b border-slate-800">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-mono text-sm text-slate-400">
+        <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between p-3 sm:p-6 mb-2 gap-3 border-b border-slate-800">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center sm:justify-start">
+            <span className="font-mono text-xs sm:text-sm text-slate-400">
               Question {vivaStats.asked} {testDetails.topics?.length ? `• ${vivaTopic || testDetails.topics[0]}` : ""}
             </span>
 
             {/* Global Timer Badge */}
             <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border ${globalSecondsLeft < 120
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-mono font-medium border ${globalSecondsLeft < 120
                 ? "bg-red-500/20 border-red-500/40 text-red-400 animate-pulse"
                 : "bg-[#111625] border-slate-800 text-slate-300"
                 }`}
             >
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
               <span>Global: {formatGlobalTime(globalSecondsLeft)}</span>
             </div>
 
             {/* Question Timer Badge */}
             <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border ${questionSecondsLeft < 10
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-mono font-medium border ${questionSecondsLeft < 10
                 ? "bg-amber-500/20 border-amber-500/40 text-amber-400 animate-pulse"
                 : "bg-[#111625] border-slate-800 text-slate-300"
                 }`}
             >
-              <Timer className="w-3.5 h-3.5 text-indigo-400" />
+              <Timer className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
               <span>Q Timer: {formatQuestionTime(questionSecondsLeft)}</span>
             </div>
 
@@ -2188,7 +2177,7 @@ export default function StudentMCQTestPage() {
                 type="button"
                 disabled={concludingViva}
                 onClick={handleStopVivaInterview}
-                className="flex items-center gap-1.5 px-3.5 py-1 bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 disabled:opacity-50 rounded-full text-xs font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1 bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 disabled:opacity-50 rounded-full text-[11px] sm:text-xs font-medium transition-colors cursor-pointer"
               >
                 {concludingViva ? (
                   <>
@@ -2211,18 +2200,18 @@ export default function StudentMCQTestPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 w-full max-w-5xl mx-auto flex flex-col relative px-4 sm:px-6">
+        <div className="flex-1 w-full max-w-5xl mx-auto flex flex-col relative px-3 sm:px-6">
           {/* Welcome Card / Context Status Area — shown before interview starts */}
           {!vivaInterviewStarted && (
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               {/* ── CASE 1: Hard unrecoverable context error ───────────────── */}
               {vivaContextError && !vivaContextPreparing ? (
-                <div className="rounded-3xl border border-rose-500/40 bg-gradient-to-r from-rose-950/50 to-red-950/40 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xl">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 border border-rose-500/40">
-                    <span className="text-2xl">⚠️</span>
+                <div className="rounded-2xl sm:rounded-3xl border border-rose-500/40 bg-gradient-to-r from-rose-950/50 to-red-950/40 p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 shadow-xl">
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 border border-rose-500/40">
+                    <span className="text-xl sm:text-2xl">⚠️</span>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold text-rose-300">Context Preparation Error</h3>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-xs sm:text-sm font-bold text-rose-300">Context Preparation Error</h3>
                     <p className="mt-1 text-xs text-rose-400/80 leading-relaxed">{vivaContextError}</p>
                   </div>
                   <button
@@ -2233,26 +2222,26 @@ export default function StudentMCQTestPage() {
                       vivaContextRetryCountRef.current = 0;
                       handleStartVivaInterview();
                     }}
-                    className="flex items-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-rose-500 disabled:opacity-40 transition-all cursor-pointer shrink-0"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-rose-500 disabled:opacity-40 transition-all cursor-pointer shrink-0"
                   >
                     <span>Retry</span>
                   </button>
                 </div>
               ) : vivaContextPreparing ? (
                 /* ── CASE 2: Context job is running on ai-worker — show spinner ── */
-                <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/60 to-purple-950/50 p-6 flex flex-col sm:flex-row items-center gap-5 shadow-xl">
-                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
+                <div className="rounded-2xl sm:rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/60 to-purple-950/50 p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-5 shadow-xl">
+                  <div className="relative flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center">
                     <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
                     <div className="absolute inset-0 rounded-full border-4 border-t-indigo-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-                    <span className="text-lg">🧠</span>
+                    <span className="text-base sm:text-lg">🧠</span>
                   </div>
-                  <div className="flex-1 text-center sm:text-left">
-                    <h3 className="text-sm font-bold text-indigo-300 animate-pulse">Preparing Your Interview Context…</h3>
+                  <div className="flex-1 text-center sm:text-left min-w-0">
+                    <h3 className="text-xs sm:text-sm font-bold text-indigo-300 animate-pulse">Preparing Your Interview Context…</h3>
                     <p className="mt-1 text-xs text-slate-400 leading-relaxed">
                       The AI is analysing your MCQ performance and building a personalised viva context.
                       This usually takes under a minute. Retrying automatically…
                     </p>
-                    <div className="mt-2 w-full max-w-xs bg-slate-800 rounded-full h-1 overflow-hidden">
+                    <div className="mt-2 w-full max-w-xs mx-auto sm:mx-0 bg-slate-800 rounded-full h-1 overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse" style={{ width: `${Math.min(100, (vivaContextRetryCountRef.current / 8) * 100)}%` }} />
                     </div>
                     <p className="mt-1 text-[10px] text-slate-500 font-mono">
@@ -2262,17 +2251,17 @@ export default function StudentMCQTestPage() {
                 </div>
               ) : (
                 /* ── CASE 3: Ready — Informational status card ─────── */
-                <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 to-purple-950/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-indigo-400" />
-                      <h3 className="text-base font-bold text-white">AI Viva Voce Examiner Online</h3>
+                <div className="rounded-2xl sm:rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 to-purple-950/40 p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shadow-xl">
+                  <div className="text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-400" />
+                      <h3 className="text-sm sm:text-base font-bold text-white">AI Viva Voce Examiner Online</h3>
                     </div>
                     <p className="mt-1 text-xs text-slate-400">
                       Audio and speech synthesis are connected. Click <strong className="text-indigo-300">Begin Oral Interview</strong> below to initiate the evaluation.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shrink-0">
+                  <div className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shrink-0">
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span>Examiner Ready</span>
                   </div>
@@ -2283,11 +2272,11 @@ export default function StudentMCQTestPage() {
 
           {/* ── InterviewerTile (Aligned with InterviewerTile.jsx) ────────────────── */}
           <div
-            className={`w-full min-h-[280px] sm:min-h-[340px] md:min-h-[380px] bg-[#111625] rounded-3xl border border-slate-800 relative overflow-hidden flex flex-col justify-end p-8 transition-all duration-500 shadow-2xl ${isTransitioning ? "opacity-60 scale-[0.99]" : "opacity-100 scale-100"
+            className={`w-full min-h-[220px] sm:min-h-[320px] md:min-h-[380px] bg-[#111625] rounded-2xl sm:rounded-3xl border border-slate-800 relative overflow-hidden flex flex-col justify-end p-4 sm:p-8 transition-all duration-500 shadow-2xl ${isTransitioning ? "opacity-60 scale-[0.99]" : "opacity-100 scale-100"
               }`}
           >
             {/* Abstract Animated Concentric Rings Avatar */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-40 pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-40 pointer-events-none scale-75 sm:scale-100">
               <div
                 className={`w-48 h-48 rounded-full border border-indigo-500/20 absolute ${isPlayingAudio ? "animate-ping" : ""
                   }`}
@@ -2311,23 +2300,23 @@ export default function StudentMCQTestPage() {
 
             {/* Audio Controls Overlay */}
             {!isTransitioning && currentQuestionText && (
-              <div className="absolute top-5 right-5 z-20 flex items-center gap-2 bg-[#0B0F19]/80 backdrop-blur-md p-1.5 rounded-full border border-slate-800 shadow-lg">
+              <div className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 flex items-center gap-1.5 sm:gap-2 bg-[#0B0F19]/80 backdrop-blur-md p-1 sm:p-1.5 rounded-full border border-slate-800 shadow-lg">
                 <button
                   type="button"
                   onClick={toggleAudio}
-                  className="p-2 rounded-full hover:bg-slate-800 text-slate-300 hover:text-indigo-400 transition-colors"
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-slate-800 text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer"
                   title={isPlayingAudio ? "Pause Audio" : "Play Question Audio"}
                 >
-                  {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                  {isPlayingAudio ? <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />}
                 </button>
-                <div className="w-px h-4 bg-slate-800" />
+                <div className="w-px h-3.5 sm:h-4 bg-slate-800" />
                 <button
                   type="button"
                   onClick={replayAudio}
-                  className="p-2 rounded-full hover:bg-slate-800 text-slate-300 hover:text-indigo-400 transition-colors"
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-slate-800 text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer"
                   title="Replay Question Audio"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             )}
@@ -2335,27 +2324,27 @@ export default function StudentMCQTestPage() {
             {/* Question Text or Loader */}
             <div className="relative z-10 max-w-3xl flex h-full">
               {isTransitioning ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-slate-100 py-12">
-                  <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-base font-medium opacity-80 animate-pulse">
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 sm:gap-4 text-slate-100 py-8 sm:py-12">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm sm:text-base font-medium opacity-80 animate-pulse text-center">
                     Synthesizing Next Follow-up Question...
                   </span>
                 </div>
               ) : (
                 <div className="mt-auto w-full max-h-full overflow-y-auto pr-2 custom-scrollbar">
-                  <h2 className="font-serif text-xl sm:text-2xl md:text-3xl text-slate-100 leading-snug drop-shadow-md">
+                  <h2 className="font-serif text-lg sm:text-2xl md:text-3xl text-slate-100 leading-snug drop-shadow-md break-words">
                     {currentQuestionText ||
                       "Welcome to your AI Viva Voce evaluation. Click below to begin your personalized oral assessment."}
                   </h2>
                   {!vivaInterviewStarted && (
-                    <div className="mt-6">
+                    <div className="mt-4 sm:mt-6">
                       <button
                         type="button"
                         disabled={!vivaConnected || vivaContextPreparing}
                         onClick={handleStartVivaInterview}
-                        className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white text-sm sm:text-base font-bold shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
+                        className="inline-flex items-center gap-2.5 sm:gap-3 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white text-xs sm:text-base font-bold shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
                       >
-                        <Play className="w-4 h-4 fill-white" />
+                        <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" />
                         <span>Begin Oral Interview</span>
                       </button>
                     </div>
@@ -2366,17 +2355,17 @@ export default function StudentMCQTestPage() {
           </div>
 
           {/* ── CallControls (Aligned with CallControls.jsx) ──────────────────────── */}
-          <div className="flex items-center justify-between w-full max-w-xl px-6 py-3.5 bg-[#111625] backdrop-blur-md rounded-2xl border border-slate-800 mx-auto mt-5 shadow-xl">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between w-full max-w-xl px-4 sm:px-6 py-2.5 sm:py-3.5 bg-[#111625] backdrop-blur-md rounded-xl sm:rounded-2xl border border-slate-800 mx-auto mt-4 sm:mt-5 shadow-xl">
+            <div className="flex items-center gap-2 sm:gap-2.5">
               <div className={`w-2.5 h-2.5 rounded-full ${vivaInterviewStarted ? "bg-red-500 animate-pulse" : "bg-indigo-400"}`} />
-              <span className="font-mono text-xs font-bold tracking-wider text-slate-300">
+              <span className="font-mono text-[11px] sm:text-xs font-bold tracking-wider text-slate-300">
                 {vivaInterviewStarted ? "LIVE VIVA" : "VIVA READY"}
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {!vivaInterviewStarted ? (
-                <span className="text-xs font-mono text-slate-400 bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl">
+                <span className="text-[11px] sm:text-xs font-mono text-slate-400 bg-slate-800/60 border border-slate-700/50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl">
                   Awaiting Start
                 </span>
               ) : (
@@ -2384,18 +2373,18 @@ export default function StudentMCQTestPage() {
                   type="button"
                   disabled={concludingViva}
                   onClick={handleStopVivaInterview}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   title="Conclude Viva Session and generate final report"
                 >
                   {concludingViva ? (
                     <>
-                      <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
                       <span>Concluding...</span>
                     </>
                   ) : (
                     <>
-                      <XCircle className="w-4 h-4" />
-                      <span>Conclude Viva</span>
+                      <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Conclude</span>
                     </>
                   )}
                 </button>
@@ -2404,7 +2393,7 @@ export default function StudentMCQTestPage() {
               <button
                 type="button"
                 onClick={() => setIsMicOn(!isMicOn)}
-                className={`p-3 rounded-full transition-all focus:outline-none cursor-pointer ${isMicOn
+                className={`p-2.5 sm:p-3 rounded-full transition-all focus:outline-none cursor-pointer ${isMicOn
                   ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
                   : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                   }`}
@@ -2416,7 +2405,7 @@ export default function StudentMCQTestPage() {
               <button
                 type="button"
                 onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
-                className={`p-3 rounded-full transition-all focus:outline-none cursor-pointer ${showHistoryDrawer
+                className={`p-2.5 sm:p-3 rounded-full transition-all focus:outline-none cursor-pointer ${showHistoryDrawer
                   ? "bg-indigo-600 text-white"
                   : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                   }`}
@@ -2428,14 +2417,14 @@ export default function StudentMCQTestPage() {
           </div>
 
           {/* ── ResponsePanel (Aligned with ResponsePanel.jsx) ───────────────────── */}
-          <div className="w-full max-w-3xl mx-auto mt-6 bg-[#111625] rounded-3xl border border-slate-800 p-6 shadow-2xl">
+          <div className="w-full max-w-3xl mx-auto mt-4 sm:mt-6 bg-[#111625] rounded-2xl sm:rounded-3xl border border-slate-800 p-4 sm:p-6 shadow-2xl">
             {/* Tabs: Type vs Speak */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setActiveResponseTab("type")}
-                  className={`rounded-xl px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${activeResponseTab === "type"
+                  className={`rounded-xl px-3 sm:px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${activeResponseTab === "type"
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                     : "text-slate-400 hover:text-slate-200"
                     }`}
@@ -2445,7 +2434,7 @@ export default function StudentMCQTestPage() {
                 <button
                   type="button"
                   onClick={() => setActiveResponseTab("speak")}
-                  className={`rounded-xl px-4 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${activeResponseTab === "speak"
+                  className={`rounded-xl px-3 sm:px-4 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${activeResponseTab === "speak"
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                     : "text-slate-400 hover:text-slate-200"
                     }`}
@@ -2455,36 +2444,36 @@ export default function StudentMCQTestPage() {
                 </button>
               </div>
 
-              <span className="text-[11px] text-slate-500 font-mono">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 font-mono">
                 {vivaInput.length} chars
               </span>
             </div>
 
             {/* Response Input Body */}
             {activeResponseTab === "speak" ? (
-              <div className="flex flex-col items-center justify-center p-6 space-y-4 rounded-2xl bg-[#0B0F19] border border-slate-800/80">
+              <div className="flex flex-col items-center justify-center p-4 sm:p-6 space-y-3 sm:space-y-4 rounded-xl sm:rounded-2xl bg-[#0B0F19] border border-slate-800/80">
                 <button
                   type="button"
                   onClick={toggleSpeechRecording}
-                  className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-all cursor-pointer ${isRecordingSpeech
+                  className={`relative flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full transition-all cursor-pointer ${isRecordingSpeech
                     ? "bg-red-500 text-white shadow-[0_0_30px_rgba(239,68,68,0.6)] animate-pulse"
                     : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
                     }`}
                 >
-                  <Mic className="h-8 w-8" />
+                  <Mic className="h-6 w-6 sm:h-8 sm:w-8" />
                   {isRecordingSpeech && (
                     <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />
                   )}
                 </button>
 
-                <p className="text-xs text-slate-300 font-medium">
+                <p className="text-xs text-slate-300 font-medium text-center">
                   {isRecordingSpeech
                     ? "Listening... Speak your answer now. Click mic again to stop."
                     : "Click the microphone to start speaking your answer."}
                 </p>
 
                 {vivaInput && (
-                  <div className="w-full rounded-xl bg-[#111625] p-4 border border-slate-800 text-xs text-slate-200 leading-relaxed text-left max-h-32 overflow-y-auto">
+                  <div className="w-full rounded-xl bg-[#111625] p-3 sm:p-4 border border-slate-800 text-xs text-slate-200 leading-relaxed text-left max-h-32 overflow-y-auto">
                     {vivaInput}
                   </div>
                 )}
@@ -2500,22 +2489,22 @@ export default function StudentMCQTestPage() {
                 }}
                 disabled={isSubmitting || !vivaInterviewStarted}
                 placeholder="Type your structured answer to the question above (Press Ctrl+Enter or click Send)..."
-                className="w-full min-h-[110px] rounded-2xl border border-slate-800 bg-[#0B0F19] p-4 text-xs md:text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-indigo-500 transition-all custom-scrollbar resize-none"
+                className="w-full min-h-[90px] sm:min-h-[110px] rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-4 text-xs md:text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-indigo-500 transition-all custom-scrollbar resize-none"
               />
             )}
 
             {/* Bottom Actions */}
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-[11px] text-slate-400">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mt-4">
+              <span className="text-[10px] sm:text-[11px] text-slate-400">
                 {activeResponseTab === "type" ? "Tip: Press Ctrl+Enter to submit response" : "Voice transcription active"}
               </span>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-end gap-2.5 sm:gap-3">
                 {vivaInput && (
                   <button
                     type="button"
                     onClick={() => setVivaInput("")}
-                    className="text-xs text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                    className="text-xs text-slate-400 hover:text-red-400 transition-colors cursor-pointer px-2 py-1"
                   >
                     Clear
                   </button>
@@ -2525,7 +2514,7 @@ export default function StudentMCQTestPage() {
                   type="button"
                   disabled={!vivaInput.trim() || isSubmitting || !vivaInterviewStarted}
                   onClick={() => handleSendVivaAnswer()}
-                  className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] disabled:opacity-40 transition-all cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 sm:px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] disabled:opacity-40 transition-all cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
@@ -2545,16 +2534,16 @@ export default function StudentMCQTestPage() {
 
           {/* Collapsible Transcript History Drawer */}
           {showHistoryDrawer && (
-            <div className="w-full max-w-3xl mx-auto mt-6 rounded-3xl border border-slate-800 bg-[#111625] p-6 shadow-2xl animate-fadeIn">
+            <div className="w-full max-w-3xl mx-auto mt-4 sm:mt-6 rounded-2xl sm:rounded-3xl border border-slate-800 bg-[#111625] p-4 sm:p-6 shadow-2xl animate-fadeIn">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
                 <div className="flex items-center gap-2">
                   <Brain className="h-4 w-4 text-purple-400" />
-                  <h4 className="text-sm font-bold text-white">Interview Transcript & Live Evaluations</h4>
+                  <h4 className="text-xs sm:text-sm font-bold text-white">Interview Transcript & Live Evaluations</h4>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowHistoryDrawer(false)}
-                  className="text-xs text-slate-400 hover:text-slate-200"
+                  className="text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
                 >
                   Close
                 </button>
@@ -2574,9 +2563,9 @@ export default function StudentMCQTestPage() {
                   return (
                     <div
                       key={msg.id}
-                      className={`rounded-2xl p-3.5 text-xs leading-relaxed ${isAi
+                      className={`rounded-2xl p-3 sm:p-3.5 text-xs leading-relaxed ${isAi
                         ? "bg-[#0B0F19] border border-slate-800 text-slate-200"
-                        : "bg-indigo-950/40 border border-indigo-800/40 text-indigo-200 ml-6"
+                        : "bg-indigo-950/40 border border-indigo-800/40 text-indigo-200 ml-4 sm:ml-6"
                         }`}
                     >
                       <div className="flex items-center justify-between mb-1 text-[10px] font-bold opacity-70">
@@ -2606,11 +2595,11 @@ export default function StudentMCQTestPage() {
         {/* Fullscreen Overlay when Concluding Viva & Generating Report */}
         {concludingViva && (
           <div className="fixed inset-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
-            <div className="w-14 h-14 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-5 shadow-lg shadow-indigo-500/20" />
-            <h3 className="font-serif text-2xl sm:text-3xl text-white font-medium mb-3">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-5 shadow-lg shadow-indigo-500/20" />
+            <h3 className="font-serif text-xl sm:text-3xl text-white font-medium mb-3">
               Concluding Viva Examination
             </h3>
-            <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed animate-pulse">
+            <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto leading-relaxed animate-pulse">
               Synthesizing your assessment report and compiling topic-wise analysis. Please wait...
             </p>
           </div>
@@ -2631,22 +2620,22 @@ export default function StudentMCQTestPage() {
     const isPass = scorePctCalc >= 40;
 
     return (
-      <div className="min-h-screen w-full bg-[#0B0F19] text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 pb-20 justify-center">
+      <div className="min-h-screen w-full bg-[#0B0F19] text-slate-100 flex flex-col p-3 sm:p-6 lg:p-8 pb-16 justify-center">
         <Head>
           <title>Assessment Complete — {testDetails?.title || "Evaluation"}</title>
         </Head>
 
-        <div className="w-full max-w-3xl mx-auto space-y-8 my-auto py-8">
-          <div className="rounded-3xl border border-slate-800 bg-[#111625] p-8 shadow-2xl text-center space-y-6">
-            <div className="flex h-20 w-20 mx-auto items-center justify-center rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/20">
-              <CheckCircle2 className="h-10 w-10" />
+        <div className="w-full max-w-3xl mx-auto space-y-6 sm:space-y-8 my-auto py-6 sm:py-8">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-800 bg-[#111625] p-5 sm:p-8 shadow-2xl text-center space-y-5 sm:space-y-6">
+            <div className="flex h-16 w-16 sm:h-20 sm:w-20 mx-auto items-center justify-center rounded-2xl sm:rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>
 
             <div>
               <span className="font-mono text-emerald-400 text-xs tracking-widest uppercase font-semibold">
                 Examination Concluded
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white mt-1">
                 {testDetails?.title || "MCQ Assessment"}
               </h1>
               <p className="text-xs text-slate-400 mt-2">
@@ -2656,11 +2645,11 @@ export default function StudentMCQTestPage() {
             </div>
 
             {testDetails?.have_viva && studentReviewData?.viva_eligible === false && (
-              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 text-left flex items-start gap-3 max-w-lg mx-auto">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 sm:p-4 text-xs text-amber-300 text-left flex items-start gap-3 max-w-lg mx-auto">
+                <AlertTriangle className="h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0 text-amber-400 mt-0.5" />
                 <div>
                   <p className="font-bold">Viva Voce Requirement Notice</p>
-                  <p className="mt-0.5 text-amber-200/90 leading-relaxed">
+                  <p className="mt-0.5 text-amber-200/90 leading-relaxed text-[11px] sm:text-xs">
                     This test included an oral viva requiring a minimum score of {testDetails.viva_threshold ?? 50}%.
                     Your score ({scorePctCalc}%) did not meet this threshold, so the oral interview was not activated.
                   </p>
@@ -2669,32 +2658,32 @@ export default function StudentMCQTestPage() {
             )}
 
             {/* Score Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto text-left">
-              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 max-w-2xl mx-auto text-left">
+              <div className="rounded-xl sm:rounded-2xl bg-[#0B0F19] p-3 sm:p-4 border border-slate-800">
                 <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Score</span>
-                <span className="font-mono text-2xl font-bold text-indigo-400">{scorePctCalc}%</span>
+                <span className="font-mono text-xl sm:text-2xl font-bold text-indigo-400">{scorePctCalc}%</span>
               </div>
-              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+              <div className="rounded-xl sm:rounded-2xl bg-[#0B0F19] p-3 sm:p-4 border border-slate-800">
                 <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Correct</span>
-                <span className="font-mono text-2xl font-bold text-emerald-400">
+                <span className="font-mono text-xl sm:text-2xl font-bold text-emerald-400">
                   {studentReviewData?.score_summary?.correct ?? correctCount}
                 </span>
               </div>
-              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+              <div className="rounded-xl sm:rounded-2xl bg-[#0B0F19] p-3 sm:p-4 border border-slate-800">
                 <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Answered</span>
-                <span className="font-mono text-2xl font-bold text-slate-200">
+                <span className="font-mono text-xl sm:text-2xl font-bold text-slate-200">
                   {Object.keys(answers).length} / {questions.length}
                 </span>
               </div>
-              <div className="rounded-2xl bg-[#0B0F19] p-4 border border-slate-800">
+              <div className="rounded-xl sm:rounded-2xl bg-[#0B0F19] p-3 sm:p-4 border border-slate-800">
                 <span className="block text-[10px] uppercase font-semibold text-slate-500 mb-1">Result</span>
-                <span className={`font-mono text-sm font-bold block mt-1 ${isPass ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`font-mono text-xs sm:text-sm font-bold block mt-1 ${isPass ? "text-emerald-400" : "text-amber-400"}`}>
                   {isPass ? "PASSED" : "NEEDS REVIEW"}
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 max-w-md mx-auto">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-4 max-w-md mx-auto">
               <button
                 type="button"
                 onClick={() =>
@@ -2704,7 +2693,7 @@ export default function StudentMCQTestPage() {
                     )}`
                   )
                 }
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 py-3.5 px-6 text-xs font-bold text-white shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 py-3 sm:py-3.5 px-6 text-xs font-bold text-white shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
               >
                 <BookOpen className="h-4 w-4" />
                 <span>View Full Student Report</span>
@@ -2712,7 +2701,7 @@ export default function StudentMCQTestPage() {
               <button
                 type="button"
                 onClick={() => router.push("/neurobe/student-dashboard")}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-3.5 px-6 text-xs font-bold text-slate-300 transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-3 sm:py-3.5 px-6 text-xs font-bold text-slate-300 transition-all cursor-pointer"
               >
                 <span>Dashboard</span>
               </button>
@@ -2725,7 +2714,7 @@ export default function StudentMCQTestPage() {
 
   // If vivaReport exists, render the Comprehensive Assessment & Viva Evaluation Report
   return (
-    <div className="min-h-screen w-full bg-[#0B0F19] text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 pb-20">
+    <div className="min-h-screen w-full bg-[#0B0F19] text-slate-100 flex flex-col p-3 sm:p-6 lg:p-8 pb-16">
       <Head>
         <title>Assessment Report — {testDetails?.title || "Evaluation"}</title>
       </Head>

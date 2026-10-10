@@ -80,7 +80,7 @@ const StudentEnrollment = () => {
         loading: false,
       });
     } catch (error) {
-      console.log("Error loading course instances:", error);
+      console.log("Error loading Classrooms:", error);
       setState({ loading: false });
     }
   };

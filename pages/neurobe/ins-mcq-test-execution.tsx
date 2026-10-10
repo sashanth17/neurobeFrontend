@@ -377,7 +377,7 @@ const MCQTestExecution = () => {
         else if (enrollRes.items && Array.isArray(enrollRes.items)) enrolledList = enrollRes.items;
       }
 
-      // 2f. Fetch Course Instances for section-scoped test hosting
+      // 2f. Fetch Classrooms for section-scoped test hosting
       const instRes: any = await Models.course_instance.list({ course_id: courseId }).catch(() => null);
       let instanceList: any[] = [];
       if (instRes) {
@@ -1025,7 +1025,7 @@ const MCQTestExecution = () => {
                 </select>
                 {state.courseInstances && state.courseInstances.length === 0 && (
                   <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                    ⚠️ No Course Instances found for this course. Please create an instance first.
+                    ⚠️ No Classrooms found for this course. Please create an instance first.
                   </p>
                 )}
               </div>

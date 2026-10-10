@@ -85,7 +85,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   // CIA test selection — Set of test_ids included in internal attainment calc
   const [selectedTestIds, setSelectedTestIds] = useState<Set<number>>(new Set());
 
-  // Course instances state
+  // Classrooms state
   const [instances, setInstances] = useState<any[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | number | null>(offeringId);
   const [courseDetail, setCourseDetail] = useState<any>(null);

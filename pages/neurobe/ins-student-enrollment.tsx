@@ -78,7 +78,7 @@ const InsStudentEnrollment = () => {
         loading: false,
       });
     } catch (error) {
-      console.log("Error loading course instances:", error);
+      console.log("Error loading Classrooms:", error);
       setState({ loading: false });
     }
   };
@@ -281,7 +281,7 @@ const InsStudentEnrollment = () => {
       {/* Header */}
       <PageHeader
         title="Student Enrollment (Instructor View)"
-        subtitle="View and manage enrolled students for your assigned course instances."
+        subtitle="View and manage enrolled students for your assigned Classrooms."
         icon={<Users className="h-5 w-5 text-color2" />}
         records={`${filteredRecords.length} Students`}
         actionBtn1={{

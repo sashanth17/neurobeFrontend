@@ -104,7 +104,7 @@ const CourseOfferingPage = () => {
   const authUser = getAuthUser();
 
   useEffect(() => {
-    dispatch(setPageTitle("Course Instances & Offerings"));
+    dispatch(setPageTitle("Classrooms"));
   }, [dispatch]);
 
   // ── Fetch Only Assigned Courses (Coordinator & Instructor) ─────────────────
@@ -816,8 +816,8 @@ const CourseOfferingPage = () => {
           loading={instanceState.loadingInstances}
           noRecordsText={
             instanceState.ownershipFilter === "my_creations"
-              ? `No course instances created by you for ${selectedCourse.course_code}. Click "+ Create Instance" to add one.`
-              : `No course instances created by other instructors for ${selectedCourse.course_code}.`
+              ? `No Classrooms created by you for ${selectedCourse.course_code}. Click "+ Create Instance" to add one.`
+              : `No Classrooms created by other instructors for ${selectedCourse.course_code}.`
           }
           onRowClick={handleRowClick}
           rowClassName={() => "cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors"}

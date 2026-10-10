@@ -727,7 +727,7 @@ const StudentDashboard = () => {
                 No Enrolled Courses Found
               </h3>
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                You have not been assigned to any course instances yet.
+                You have not been assigned to any Classrooms yet.
               </p>
             </div>
           ) : (
