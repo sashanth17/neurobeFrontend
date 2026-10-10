@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { 
-  FileText, ZoomIn, ZoomOut, Check, AlertTriangle, Save, Loader2, Info, 
+import {
+  FileText, ZoomIn, ZoomOut, Check, AlertTriangle, Save, Loader2, Info,
   AlertCircle, Lock, Unlock, Search, RotateCw, Sparkles, User, ShieldCheck, RefreshCw,
   ChevronLeft, ChevronRight, Share2, Maximize2, ExternalLink, X, UserPlus, CheckCircle2, Trash2,
   Layers, ChevronDown
 } from 'lucide-react';
-import { 
-  MarkExtractionService, 
-  LatestExtractionResults, 
-  StudentMarks, 
+import {
+  MarkExtractionService,
+  LatestExtractionResults,
+  StudentMarks,
   QuestionMark,
   CIATestJobItem
 } from '@/services/markExtraction.service';
@@ -22,6 +22,77 @@ interface ExtractedViewTabProps {
   onRefreshCiaTests?: () => void;
 }
 
+export const isCoTotalMark = (questionKey?: string): boolean => {
+  if (!questionKey) return false;
+  const key = questionKey.toLowerCase().trim();
+  return (
+    key.includes('co totals') ||
+    key.includes('(co totals)') ||
+    key.includes('co total') ||
+    key.includes('(co total') ||
+    /^co\s*\d+(\s*\(?totals?\)?)?$/i.test(key) ||
+    /total/i.test(key)
+  );
+};
+
+export const isIndividualQuestionMark = (mark?: QuestionMark | null): boolean => {
+  if (!mark || !mark.question_key) return false;
+  if (isCoTotalMark(mark.question_key)) return false;
+  const qNum = parseInt(mark.question_key.replace(/\D/g, '') || '0', 10);
+  return qNum > 0 && qNum <= 15;
+};
+
+export const normalizeStudentMarks = (student: StudentMarks, coDist: Record<string, number>): StudentMarks => {
+  if (!student || !student.marks) return student;
+
+  // 1. Separate individual questions from CO totals / aggregate rows
+  const individualQuestions = student.marks.filter(isIndividualQuestionMark);
+  const coTotalEntries = student.marks.filter(m => isCoTotalMark(m.question_key));
+
+  // 2. Build or populate co_marks if not already fully defined
+  const currentCoMarks: Record<string, { obtained: number; max_mark: number; percentage: number }> = {
+    ...(student.co_marks || {}),
+  };
+
+  Object.entries(coDist).forEach(([co, maxM]) => {
+    if (!currentCoMarks[co] || currentCoMarks[co].obtained === undefined) {
+      const match = coTotalEntries.find(m =>
+        m.target_co === co || m.question_key.toUpperCase().includes(co)
+      );
+      if (match) {
+        const obt = Number(match.final_mark) || Number(match.system_read) || 0;
+        const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
+        currentCoMarks[co] = { obtained: obt, max_mark: maxM, percentage: pct };
+      }
+    }
+  });
+
+  // 3. Calculate true questions sum
+  const trueQuestionSum = individualQuestions.reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0);
+
+  // 4. Resolve final_total_mark:
+  let resolvedTotal = student.final_total_mark;
+  if (student.total_selection_option === 'KEEP_PAPER_TOTAL' && student.paper_total_entered !== undefined && student.paper_total_entered !== null) {
+    resolvedTotal = student.paper_total_entered;
+  } else if (student.total_selection_option === 'CUSTOM_OVERRIDE') {
+    resolvedTotal = student.final_total_mark;
+  } else {
+    resolvedTotal = Math.round(trueQuestionSum * 100) / 100;
+  }
+
+  // 5. Check mismatch flag based on true question sum vs paper_total_entered
+  const paperEntered = student.paper_total_entered;
+  const mismatch = paperEntered !== undefined && paperEntered !== null && Math.abs(trueQuestionSum - paperEntered) > 0.01;
+
+  return {
+    ...student,
+    marks: individualQuestions,
+    co_marks: Object.keys(currentCoMarks).length > 0 ? currentCoMarks : student.co_marks,
+    final_total_mark: resolvedTotal,
+    total_mismatch_flag: mismatch,
+  };
+};
+
 export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtraction, onRefreshCiaTests }: ExtractedViewTabProps) {
   const [results, setResults] = useState<LatestExtractionResults | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +100,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
   const [isUpdating, setIsUpdating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
   // Filter Tabs
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'NEEDS_REVIEW' | 'READY_TO_VERIFY' | 'VERIFIED' | 'UNMAPPED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,7 +218,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
       try {
         const data = await MarkExtractionService.getLatestExtractionResults(ciaTestId, selectedJobId ?? undefined);
         if (data) {
-          setResults(data);
+          const coDistribution = data.template_co_distribution || { CO1: 42, CO2: 42, CO3: 16 };
+          const normalizedStudents = (data.students || []).map((s: StudentMarks) => normalizeStudentMarks(s, coDistribution));
+          const normalizedData = { ...data, students: normalizedStudents };
+          setResults(normalizedData);
           if (data.job_status !== 'PROCESSING' && data.job_status !== 'PENDING') {
             await fetchJobs();
             if (onRefreshCiaTests) onRefreshCiaTests();
@@ -185,20 +259,23 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         setLoadError("NOT_EXTRACTED_YET");
         return;
       }
-      setResults(data);
-      if (data.job_id && selectedJobId !== data.job_id) {
-        setSelectedJobId(data.job_id);
+      const coDistribution = data.template_co_distribution || { CO1: 42, CO2: 42, CO3: 16 };
+      const normalizedStudents = (data.students || []).map((s: StudentMarks) => normalizeStudentMarks(s, coDistribution));
+      const normalizedData = { ...data, students: normalizedStudents };
+      setResults(normalizedData);
+      if (normalizedData.job_id && selectedJobId !== normalizedData.job_id) {
+        setSelectedJobId(normalizedData.job_id);
       }
-      if (data.students && data.students.length > 0) {
+      if (normalizedData.students && normalizedData.students.length > 0) {
         if (selectedStudent) {
-          const current = data.students.find((s: StudentMarks) => s.student_marks_id === selectedStudent.student_marks_id);
+          const current = normalizedData.students.find((s: StudentMarks) => s.student_marks_id === selectedStudent.student_marks_id);
           if (current) {
             setSelectedStudent(current);
             return;
           }
         }
         // Auto-select first student
-        const firstMatch = data.students.find((s: StudentMarks) => s.mapping_status === 'AUTO_MAPPED') || data.students[0];
+        const firstMatch = normalizedData.students.find((s: StudentMarks) => s.mapping_status === 'AUTO_MAPPED') || normalizedData.students[0];
         setSelectedStudent(firstMatch);
         if (firstMatch && firstMatch.source_pages && firstMatch.source_pages.length > 0) {
           setActivePage(firstMatch.source_pages[0]);
@@ -211,8 +288,8 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
       setResults(null);
       setSelectedStudent(null);
       setLoadError(
-        error?.response?.data?.detail || 
-        error?.message || 
+        error?.response?.data?.detail ||
+        error?.message ||
         "Unable to load extraction results. Please try again."
       );
     } finally {
@@ -222,14 +299,16 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
 
   const handleMarkChange = (questionKey: string, newValue: number) => {
     if (!selectedStudent) return;
-    
+
     const validVal = isNaN(newValue) ? 0 : newValue;
-    const updatedMarks = selectedStudent.marks.map(m => 
+    const updatedMarks = selectedStudent.marks.map(m =>
       m.question_key === questionKey ? { ...m, final_mark: validVal, status: 'VERIFIED' } : m
     );
-    
-    // Auto-recalculate total sum
-    const newTotal = updatedMarks.reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0);
+
+    // Auto-recalculate total sum (excluding CO summary totals)
+    const newTotal = updatedMarks
+      .filter(isIndividualQuestionMark)
+      .reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0);
     const paperEntered = selectedStudent.paper_total_entered;
     const mismatch = paperEntered !== undefined && paperEntered !== null && Math.abs(newTotal - paperEntered) > 0.01;
 
@@ -238,6 +317,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
       marks: updatedMarks,
       final_total_mark: Math.round(newTotal * 100) / 100,
       total_mismatch_flag: mismatch,
+      total_selection_option: 'USE_CALCULATED_TOTAL',
     });
     setMismatchDecision('calculated');
     setHasUnsavedChanges(true);
@@ -252,7 +332,9 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
     if (decision === 'paper' && selectedStudent.paper_total_entered !== undefined) {
       chosenTotal = selectedStudent.paper_total_entered;
     } else if (decision === 'calculated') {
-      chosenTotal = selectedStudent.marks.reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0);
+      chosenTotal = selectedStudent.marks
+        .filter(isIndividualQuestionMark)
+        .reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0);
     }
 
     setSelectedStudent({
@@ -293,7 +375,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         marks: selectedStudent.marks,
         co_marks: selectedStudent.co_marks,
       });
-      
+
       Success("Student marks updated successfully!");
       setHasUnsavedChanges(false);
       await fetchResults();
@@ -332,7 +414,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
 
       // 2. Confirm and lock the student marks
       await MarkExtractionService.verifyAndLockStudentMarks(selectedStudent.student_marks_id);
-      
+
       setHasUnsavedChanges(false);
       Success("Student marks verified and locked successfully!");
       await fetchResults();
@@ -352,7 +434,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
       const regNo = student.register_number || student.reg_no || '';
       const sId = student.student_id || student.id;
       const sName = student.student_name || student.name || `${student.first_name || ''} ${student.last_name || ''}`.trim() || regNo;
-      
+
       await MarkExtractionService.updateStudentMarks(selectedStudent.student_marks_id, {
         student_id: sId,
         actual_reg_number: regNo,
@@ -543,7 +625,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
   const filteredEnrolledStudents = useMemo(() => {
     if (!assignSearch.trim()) return enrolledStudents;
     const q = assignSearch.toLowerCase().trim();
-    return enrolledStudents.filter(s => 
+    return enrolledStudents.filter(s =>
       `${s.student_name || s.name || s.first_name || ''} ${s.last_name || ''} ${s.register_number || s.reg_no || ''}`.toLowerCase().includes(q)
     );
   }, [enrolledStudents, assignSearch]);
@@ -585,10 +667,9 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
   const subsectionTotals = useMemo(() => {
     if (!selectedStudent?.marks || selectedStudent.marks.length === 0) return [];
     const map: Record<string, { section: string; obtained: number; max: number; count: number }> = {};
-    selectedStudent.marks.forEach(m => {
+    selectedStudent.marks.filter(isIndividualQuestionMark).forEach(m => {
       const qNum = parseInt(m.question_key.replace(/\D/g, '') || '0', 10);
-      if (qNum > 15) return;
-      const sec = m.section_name || 'General';
+      const sec = m.section_name || (qNum <= 10 ? 'Part A' : 'Part B');
       if (!map[sec]) {
         map[sec] = { section: sec, obtained: 0, max: 0, count: 0 };
       }
@@ -616,6 +697,14 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         obt = Number(coData.obtained) || 0;
       } else if (typeof coData === 'number') {
         obt = coData;
+      } else {
+        // Fallback: match extracted CO totals row if present
+        const matchingCo = selectedStudent.marks?.find(m =>
+          isCoTotalMark(m.question_key) && (m.target_co === co || m.question_key.toUpperCase().includes(co))
+        );
+        if (matchingCo) {
+          obt = Number(matchingCo.final_mark) || Number(matchingCo.system_read) || 0;
+        }
       }
       const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
       res[co] = { obtained: Math.round(obt * 100) / 100, max_mark: maxM, percentage: pct };
@@ -694,7 +783,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               </span>
             </div>
             <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${pct}%` }}
               />
@@ -862,9 +951,9 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
   }
 
   const isSelectedUnmapped = !selectedStudent?.student_id || selectedStudent.mapping_status === 'UNMAPPED' || selectedStudent.mapping_status === 'NO_STUDENT_FOUND' || selectedStudent.mapping_status === 'UNDETECTED_STUDENT_MARK';
-  const calculatedSum = selectedStudent?.marks ? selectedStudent.marks.reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0) : 0;
-  const systemReadSum = selectedStudent?.marks ? selectedStudent.marks.reduce((sum, m) => sum + (Number(m.system_read) || 0), 0) : 0;
-  const maxMarkSum = selectedStudent?.actual_max_mark || (selectedStudent?.marks ? selectedStudent.marks.reduce((sum, m) => sum + (Number(m.max_marks_assigned) || 0), 0) : 50);
+  const calculatedSum = selectedStudent?.marks ? selectedStudent.marks.filter(isIndividualQuestionMark).reduce((sum, m) => sum + (Number(m.final_mark) || 0), 0) : 0;
+  const systemReadSum = selectedStudent?.marks ? selectedStudent.marks.filter(isIndividualQuestionMark).reduce((sum, m) => sum + (Number(m.system_read) || 0), 0) : 0;
+  const maxMarkSum = selectedStudent?.actual_max_mark || (selectedStudent?.marks ? selectedStudent.marks.filter(isIndividualQuestionMark).reduce((sum, m) => sum + (Number(m.max_marks_assigned) || 0), 0) : 50);
 
   const handleMarkStatusToggle = (questionKey: string) => {
     if (!selectedStudent || selectedStudent.is_locked) return;
@@ -970,11 +1059,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
           <button
             type="button"
             onClick={() => setActiveFilter('ALL')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
-              activeFilter === 'ALL'
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${activeFilter === 'ALL'
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
-            }`}
+              }`}
           >
             All ({filterCounts.ALL})
           </button>
@@ -983,11 +1071,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
           <button
             type="button"
             onClick={() => setActiveFilter('NEEDS_REVIEW')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
-              activeFilter === 'NEEDS_REVIEW'
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${activeFilter === 'NEEDS_REVIEW'
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
-            }`}
+              }`}
           >
             Needs Review ({filterCounts.NEEDS_REVIEW})
           </button>
@@ -996,11 +1083,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
           <button
             type="button"
             onClick={() => setActiveFilter('READY_TO_VERIFY')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
-              activeFilter === 'READY_TO_VERIFY'
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${activeFilter === 'READY_TO_VERIFY'
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
-            }`}
+              }`}
           >
             Ready to Verify ({filterCounts.READY_TO_VERIFY})
           </button>
@@ -1009,11 +1095,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
           <button
             type="button"
             onClick={() => setActiveFilter('VERIFIED')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
-              activeFilter === 'VERIFIED'
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${activeFilter === 'VERIFIED'
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
-            }`}
+              }`}
           >
             Verified ({filterCounts.VERIFIED})
           </button>
@@ -1023,11 +1108,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
             <button
               type="button"
               onClick={() => setActiveFilter('UNMAPPED')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
-                activeFilter === 'UNMAPPED'
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${activeFilter === 'UNMAPPED'
                   ? 'bg-violet-600 text-white'
                   : 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800'
-              }`}
+                }`}
             >
               Unmapped ({filterCounts.UNMAPPED})
             </button>
@@ -1083,7 +1167,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         </button>
 
         {/* Horizontal Scroll Area */}
-        <div 
+        <div
           ref={studentRailRef}
           className="w-full flex items-center space-x-3 overflow-x-auto py-2 px-1 scroll-smooth no-scrollbar"
           style={{ scrollbarWidth: 'none' }}
@@ -1111,18 +1195,16 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       setActivePage(student.source_pages[0]);
                     }
                   }}
-                  className={`w-56 shrink-0 p-3 rounded-2xl cursor-pointer text-left transition-all duration-150 border relative ${
-                    isSelected
+                  className={`w-56 shrink-0 p-3 rounded-2xl cursor-pointer text-left transition-all duration-150 border relative ${isSelected
                       ? 'bg-violet-50/50 dark:bg-violet-950/30 border-violet-500 shadow-sm ring-2 ring-violet-500/20'
                       : isUnmapped
-                      ? 'bg-violet-50/20 dark:bg-violet-950/15 border-violet-200/90 dark:border-violet-900/60 hover:border-violet-300 hover:shadow-xs'
-                      : 'bg-white dark:bg-gray-800 border-gray-200/90 dark:border-gray-700/80 hover:border-gray-300 hover:shadow-xs'
-                  }`}
+                        ? 'bg-violet-50/20 dark:bg-violet-950/15 border-violet-200/90 dark:border-violet-900/60 hover:border-violet-300 hover:shadow-xs'
+                        : 'bg-white dark:bg-gray-800 border-gray-200/90 dark:border-gray-700/80 hover:border-gray-300 hover:shadow-xs'
+                    }`}
                 >
                   {/* Student Name */}
-                  <div className={`font-bold text-xs truncate ${
-                    isUnmapped ? 'text-violet-900 dark:text-violet-200' : 'text-gray-900 dark:text-white'
-                  }`}>
+                  <div className={`font-bold text-xs truncate ${isUnmapped ? 'text-violet-900 dark:text-violet-200' : 'text-gray-900 dark:text-white'
+                    }`}>
                     {student.student_name || (isUnmapped ? 'Unmapped Answer Sheet' : 'Unknown Student')}
                   </div>
 
@@ -1209,7 +1291,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
 
         {/* ── Left Column: Physical Answer Script Viewer (Dark Canvas) ─────── */}
         <div className="lg:col-span-6 xl:col-span-6 bg-gray-950 rounded-2xl border border-gray-800 shadow-sm flex flex-col overflow-hidden h-[680px]">
-          
+
           {/* Canvas Top Bar */}
           <div className="px-4 py-2.5 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between text-xs text-gray-300 flex-shrink-0">
             {/* File info */}
@@ -1256,9 +1338,8 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
               <button
                 type="button"
                 onClick={() => setFitMode(m => m === 'width' ? 'page' : 'width')}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                  fitMode === 'width' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${fitMode === 'width' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
                 title={fitMode === 'width' ? "Switch to Fit Page" : "Switch to Fit Width"}
               >
                 {fitMode === 'width' ? 'Fit Width' : 'Fit Box'}
@@ -1303,7 +1384,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
           </div>
 
           {/* Canvas Scrollable Image Area */}
-          <div 
+          <div
             ref={imageContainerRef}
             className="flex-1 overflow-y-auto overflow-x-auto bg-gray-950 p-4 relative"
             style={{ scrollBehavior: 'smooth' }}
@@ -1341,7 +1422,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         <div className="lg:col-span-6 xl:col-span-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/90 dark:border-gray-700/80 p-5 xl:p-6 shadow-sm flex flex-col h-[680px] overflow-hidden">
           {selectedStudent ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-              
+
               {/* Student Header */}
               <div className="flex items-start justify-between pb-4 border-b border-gray-100 dark:border-gray-700/60 flex-shrink-0">
                 <div>
@@ -1447,11 +1528,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                         <button
                           type="button"
                           onClick={() => handleDecisionChange('paper')}
-                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                            mismatchDecision === 'paper'
+                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${mismatchDecision === 'paper'
                               ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                               : 'bg-white dark:bg-gray-800 text-amber-800 dark:text-amber-300 border-amber-300 hover:bg-amber-100'
-                          }`}
+                            }`}
                         >
                           <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${mismatchDecision === 'paper' ? 'border-white' : 'border-amber-500'}`}>
                             {mismatchDecision === 'paper' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -1463,11 +1543,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       <button
                         type="button"
                         onClick={() => handleDecisionChange('calculated')}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                          mismatchDecision === 'calculated'
+                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${mismatchDecision === 'calculated'
                             ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
                             : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${mismatchDecision === 'calculated' ? 'border-white' : 'border-gray-400'}`}>
                           {mismatchDecision === 'calculated' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -1627,9 +1706,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-750">
                         {selectedStudent.marks && selectedStudent.marks.length > 0 ? (
-                          selectedStudent.marks.map((mark) => {
+                          selectedStudent.marks
+                            .filter(isIndividualQuestionMark)
+                            .map((mark) => {
                             const qNum = parseInt(mark.question_key.replace(/\D/g, '') || '0', 10);
-                            if (qNum > 15) return null;
 
                             const isMarkVerified = mark.status === 'VERIFIED';
                             const sectionLabel = mark.section_name || (qNum <= 10 ? 'Part A' : 'Part B');
@@ -1669,11 +1749,10 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
                                     title={selectedStudent.is_locked ? 'Locked — cannot change status' : (isMarkVerified ? 'Click to mark as Needs Review' : 'Click to mark as Verified')}
                                     disabled={selectedStudent.is_locked}
                                     onClick={() => handleMarkStatusToggle(mark.question_key)}
-                                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer select-none ${
-                                      isMarkVerified
+                                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer select-none ${isMarkVerified
                                         ? 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
                                         : 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 hover:bg-amber-100'
-                                    } disabled:cursor-default disabled:opacity-60`}
+                                      } disabled:cursor-default disabled:opacity-60`}
                                   >
                                     {isMarkVerified ? (
                                       <><Check className="h-2.5 w-2.5 stroke-[2.5]" /> Verified</>
@@ -1829,7 +1908,7 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
       {isAssignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 max-w-lg w-full p-5 shadow-2xl space-y-4">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
               <div className="flex items-center space-x-2">

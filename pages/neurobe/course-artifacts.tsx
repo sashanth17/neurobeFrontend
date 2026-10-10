@@ -941,21 +941,20 @@ const InsCourseArtifacts = () => {
         })),
       }));
 
+      // Prefer numeric Course ID (e.g. "1") over alphanumeric course code ("Ad3391")
       const courseIdForPayload = String(
-        course?.course_code ||
-        course?.code ||
+        course?.course_id ||
+        course?.id ||
         courseIdParam ||
         1
       );
 
       const payload: any = {
-        course_id: courseIdForPayload,
         syllabus: {
           course_id: courseIdForPayload,
           units,
         },
         question_count: genData.totalQuestions,
-        total_questions: genData.totalQuestions,
         type: "mcq",
         language: "en",
         include_explanation: genData.includeExplanation,
