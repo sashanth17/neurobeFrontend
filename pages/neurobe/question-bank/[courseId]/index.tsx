@@ -39,7 +39,7 @@ const CourseQuestionBankPage = () => {
     title: (Array.isArray(title) ? title[0] : title) || "Course Assessments & Question Bank",
   });
 
-  const [activeMainTab, setActiveMainTab] = useState<"cia-tests" | "question-bank" | "blueprints">("cia-tests");
+  const [activeMainTab, setActiveMainTab] = useState<"blueprints" | "cia-tests">("cia-tests");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editCiaTestId, setEditCiaTestId] = useState<number | null>(null);
 
@@ -112,14 +112,6 @@ const CourseQuestionBankPage = () => {
     <div className="min-h-screen pb-16">
       {/* Top Navigation & Breadcrumbs */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <button
-          onClick={() => router.push("/neurobe/question-bank")}
-          className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to All Coordinator Courses</span>
-        </button>
-
         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <span>Question Bank</span>
           <span>/</span>
@@ -132,32 +124,6 @@ const CourseQuestionBankPage = () => {
       {/* Main Top Workspace Tabs */}
       <div className="mb-6 flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
         <button
-          onClick={() => setActiveMainTab("cia-tests")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeMainTab === "cia-tests"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
-              : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-            }`}
-        >
-          <FileCode className="h-4 w-4" />
-          <span>CIA Assessments</span>
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
-            {activeTests.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveMainTab("question-bank")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-            activeMainTab === "question-bank"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
-              : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-          }`}
-        >
-          <HelpCircle className="h-4 w-4" />
-          <span>MCQ Bank & Sets</span>
-        </button>
-
-        <button
           onClick={() => setActiveMainTab("blueprints")}
           className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeMainTab === "blueprints"
               ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
@@ -168,6 +134,20 @@ const CourseQuestionBankPage = () => {
           <span>Blueprints & Templates</span>
           <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
             {templates.length}
+          </span>
+        </button>
+        
+        <button
+          onClick={() => setActiveMainTab("cia-tests")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeMainTab === "cia-tests"
+              ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
+              : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+            }`}
+        >
+          <FileCode className="h-4 w-4" />
+          <span>CIA Assessments</span>
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
+            {activeTests.length}
           </span>
         </button>
       </div>
@@ -213,18 +193,6 @@ const CourseQuestionBankPage = () => {
               setEditCiaTestId(null);
               setIsCreateModalOpen(true);
             }}
-          />
-        </div>
-      )}
-
-      {/* TAB CONTENT 2: Question Bank Sets */}
-      {activeMainTab === "question-bank" && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <CourseQuestionBankTab
-            courseKey={String(validCourseId)}
-            courseTitle={courseInfo.title}
-            courseQuestions={[]}
-            courseUnits={[]}
           />
         </div>
       )}

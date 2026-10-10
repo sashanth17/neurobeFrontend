@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, Pencil, X, Check, Sparkle } from "lucide-react";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import { Failure } from "@/utils/function.utils";
+import { normalizeCoCode } from "@/hook/useCourseOutcomes";
 
 
 const KNOWLEDGE_OPTIONS = [
@@ -20,9 +21,12 @@ const CourseOutcomes = (props: any) => {
   const [editDescription, setEditDescription] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Sync outcomes prop changes to local state
+  // Sync outcomes prop changes to local state with normalized co_code
   useEffect(() => {
-    setCos(outcomes);
+    setCos((outcomes || []).map((c: any, idx: number) => ({
+      ...c,
+      co_code: normalizeCoCode(c.co_code, idx + 1),
+    })));
   }, [outcomes]);
 
   const acceptedCount = cos.filter((c: any) => c.is_accepted).length;
@@ -44,10 +48,11 @@ const CourseOutcomes = (props: any) => {
     }
 
     const updatedDesc = editDescription.trim();
+    const normalizedCode = normalizeCoCode(co_code);
     // Optimistic local update
     setCos((prev: any) =>
       prev.map((c: any) =>
-        c.id === id ? { ...c, description: updatedDesc } : c
+        c.id === id ? { ...c, description: updatedDesc, co_code: normalizedCode } : c
       )
     );
     setEditingId(null);
@@ -56,7 +61,7 @@ const CourseOutcomes = (props: any) => {
     if (onSaveOutcome) {
       try {
         setLoading(true);
-        await onSaveOutcome(id, updatedDesc, co_code);
+        await onSaveOutcome(id, updatedDesc, normalizedCode);
       } catch (error: any) {
         console.warn("handleSave backend call error, local state preserved:", error);
       } finally {
@@ -125,7 +130,7 @@ const CourseOutcomes = (props: any) => {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-bold text-white dark:bg-gray-100 dark:text-[#000]">
-                  {co.co_code}
+                  {normalizeCoCode(co.co_code, cos.indexOf(co) + 1)}
                 </span>
                 <div className="w-36">
                   <CustomSelect

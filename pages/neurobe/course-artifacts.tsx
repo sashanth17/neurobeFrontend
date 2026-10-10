@@ -41,6 +41,7 @@ import {
 } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import Models from "@/imports/models.import";
+import { normalizeCoCode } from "@/hook/useCourseOutcomes";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
 import CourseAttainmentReport from "@/components/academic-setup/CourseAttainmentReport";
 import CoursePortfolioReport from "@/components/academic-setup/CoursePortfolioReport";
@@ -1697,7 +1698,7 @@ const InsCourseArtifacts = () => {
         if (co.isNew) {
           if (co.description?.trim()) {
             await Models.syllabus.addOutcome(extId, {
-              co_code: co.co_code?.trim() || "CO1",
+              co_code: normalizeCoCode(co.co_code) || "CO1",
               description: co.description.trim(),
               knowledge_level: kLevel,
               bloom_level: bloomPart,
@@ -1705,7 +1706,7 @@ const InsCourseArtifacts = () => {
           }
         } else {
           await Models.syllabus.updateOutcome(extId, co.id, {
-            co_code: co.co_code?.trim() || "CO1",
+            co_code: normalizeCoCode(co.co_code) || "CO1",
             description: co.description?.trim() || "",
             knowledge_level: kLevel,
             bloom_level: bloomPart,

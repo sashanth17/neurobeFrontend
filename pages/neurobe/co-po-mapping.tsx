@@ -36,6 +36,7 @@ import StatTabCard from "@/components/academic-setup/StatTabCard";
 import PageHeader from "@/components/common-components/PageHeader";
 import COPOMappingModal from "@/components/co-po-mapping/COPOMappingModal";
 import Models from "@/imports/models.import";
+import { normalizeCoCode } from "@/hook/useCourseOutcomes";
 
 export interface ProgramOutcome {
   code: string;
@@ -252,11 +253,23 @@ const COPOMapping = () => {
       setState({ loading: true });
       const data: any = await Models.COPOMap.copo_map(course_id, verNum);
       if (data) {
+        const rawCos = data.course_outcomes || [];
+        const normalizedCos = rawCos.map((c: any, idx: number) => ({
+          ...c,
+          co_code: normalizeCoCode(c.co_code, idx + 1),
+        }));
+
+        const rawMatrix = data.matrix || {};
+        const normalizedMatrix: any = {};
+        Object.entries(rawMatrix).forEach(([coK, poMap]) => {
+          normalizedMatrix[normalizeCoCode(coK)] = poMap;
+        });
+
         setState({
           matrixData: data,
-          courseOutcomes: data.course_outcomes || [],
+          courseOutcomes: normalizedCos,
           programOutcomes: data.program_outcomes || [],
-          matrix: data.matrix || {},
+          matrix: normalizedMatrix,
           poAverages: data.po_averages || {},
           unmappedJustifications: data.unmapped_justifications || {},
           versionNumber: data.version_number,

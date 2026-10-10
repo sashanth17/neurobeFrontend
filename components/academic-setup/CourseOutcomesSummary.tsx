@@ -1,4 +1,5 @@
 import { GraduationCap, CheckCircle2 } from "lucide-react";
+import { normalizeCoCode } from "@/hook/useCourseOutcomes";
 
 interface CO {
   id: number;
@@ -50,12 +51,12 @@ const CourseOutcomesSummary = ({
             No outcomes available
           </p>
         ) : (
-          outcomes.map((co) => (
+          outcomes.map((co, idx) => (
             <div key={co.id} className="flex items-start justify-between gap-3 py-4">
               <div className="flex flex-1 items-start gap-3">
                 <div className="flex flex-col gap-2">
                   <span className="text-color2 rounded-md bg-purple-50 px-2.5 py-0.5 text-xs font-bold dark:bg-purple-900/20">
-                    {co.co_code}
+                    {normalizeCoCode(co.co_code, idx + 1)}
                   </span>
                 </div>
                 <div className="flex flex-1 flex-col gap-1">

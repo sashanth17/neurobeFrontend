@@ -34,7 +34,6 @@ import ConfigureMcqTestModal from "@/components/mcq-preparation/ConfigureMcqTest
 import SelectApprovedQuestionsModal from "@/components/mcq-preparation/SelectApprovedQuestionsModal";
 import ViewTestDetailsModal from "@/components/mcq-preparation/ViewTestDetailsModal";
 import QuestionBankPreviewModal from "@/components/mcq-preparation/QuestionBankPreviewModal";
-import { QuestionSetCardProps } from "@/components/question-bank/QuestionSetCard";
 
 const QUESTION_BANK_PREVIEW_QUESTIONS = [
   {

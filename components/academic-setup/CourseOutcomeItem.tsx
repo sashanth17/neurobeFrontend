@@ -1,4 +1,5 @@
 import React from "react";
+import { normalizeCoCode } from "@/hook/useCourseOutcomes";
 
 export interface CourseOutcomeItemProps {
   id?: string;
@@ -20,7 +21,7 @@ const CourseOutcomeItem: React.FC<CourseOutcomeItemProps> = ({
     >
       <div className="flex items-center gap-3.5 flex-1">
         <span className="rounded-lg bg-[#f5f3ff] px-2.5 py-1 text-xs font-bold text-color2 dark:bg-purple-950/60 dark:text-purple-300 shrink-0">
-          {coCode}
+          {normalizeCoCode(coCode)}
         </span>
         <p className="text-sm font-semibold text-[#000] dark:text-gray-200 leading-relaxed">
           {statement}

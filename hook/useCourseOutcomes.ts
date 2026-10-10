@@ -16,6 +16,20 @@ export const DEFAULT_FALLBACK_COS: COOption[] = [
   { value: "CO5", label: "CO5" },
 ];
 
+/**
+ * Normalizes any course outcome representation (e.g. 'co-1', 'co1', 'CO-1', 'CO 1', 'co_1')
+ * strictly to standard uppercase 'CO1', 'CO2', etc.
+ */
+export const normalizeCoCode = (code?: string | null, fallbackIndex?: number): string => {
+  if (!code) return fallbackIndex ? `CO${fallbackIndex}` : "";
+  const cleaned = String(code).trim();
+  const match = cleaned.match(/\d+/);
+  if (match) {
+    return `CO${parseInt(match[0], 10)}`;
+  }
+  return fallbackIndex ? `CO${fallbackIndex}` : cleaned.toUpperCase();
+};
+
 export const useCourseOutcomes = (courseId?: string | number) => {
   const [coOptions, setCoOptions] = useState<COOption[]>([]);
   const [coCodes, setCoCodes] = useState<string[]>([]);
@@ -46,8 +60,9 @@ export const useCourseOutcomes = (courseId?: string | number) => {
           const extractedCodes: string[] = [];
           const formattedOptions: COOption[] = [];
 
-          outcomes.forEach((co: any) => {
-            const code = (co.co_code || co.code || (co.course_outcome_id ? `CO${co.course_outcome_id}` : null) || "").trim();
+          outcomes.forEach((co: any, idx: number) => {
+            const rawCode = (co.co_code || co.code || (co.course_outcome_id ? `CO${co.course_outcome_id}` : null) || "").trim();
+            const code = normalizeCoCode(rawCode, idx + 1);
             if (code && !extractedCodes.includes(code)) {
               extractedCodes.push(code);
               const desc = co.description || co.co_description || "";
