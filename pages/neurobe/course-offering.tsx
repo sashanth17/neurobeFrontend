@@ -391,7 +391,7 @@ const CourseOfferingPage = () => {
       <div className="min-h-screen pb-16">
         {/* Top Banner */}
         <PageBanner
-          title="Course Instance Management"
+          title="Classrooms"
           description="Course Coordinator & Instructor Workspace — Select one of your assigned courses to view instances, configure section deliveries, allocate faculty, and manage student enrollments."
           icon={<BookOpen className="h-6 w-6 text-white" />}
         />

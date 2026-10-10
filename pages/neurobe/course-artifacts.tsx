@@ -2104,7 +2104,7 @@ const InsCourseArtifacts = () => {
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700 dark:text-indigo-400"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to My Assigned Courses</span>
+              <span>Back to My Courses</span>
             </button>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">

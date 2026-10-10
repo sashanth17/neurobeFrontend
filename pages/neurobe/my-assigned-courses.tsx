@@ -28,7 +28,7 @@ const MyAssignedCourses = () => {
   const [semesterFilter, setSemesterFilter] = useState<string>("all");
 
   useEffect(() => {
-    dispatch(setPageTitle("My Assigned Courses"));
+    dispatch(setPageTitle("My Courses"));
   }, [dispatch]);
 
   // Load once on mount / manual refresh only (ZERO background polling)
@@ -107,7 +107,7 @@ const MyAssignedCourses = () => {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            My Assigned Courses
+            My Courses
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             View course syllabus, curriculum extractions, CO-PO mappings, pedagogies, and lesson plans.

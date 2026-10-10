@@ -61,7 +61,7 @@ export const CourseSelectorView: React.FC<CourseSelectorViewProps> = ({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2.5 text-lg font-bold text-gray-900 dark:text-white">
-            <span>My Assigned Courses</span>
+            <span>My Courses</span>
             <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
               {filteredCourses.length} {filteredCourses.length === 1 ? "Course" : "Courses"}
             </span>

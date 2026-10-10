@@ -176,7 +176,7 @@ OwnmenuConfig.FACULTY = [
     key: "instructor",
     children: [
       {
-        label: "Instance management",
+        label: "Classrooms",
         href: "/neurobe/course-offering",
       },
       {
