@@ -131,7 +131,7 @@ const InsStudentEnrollment = () => {
   // 4. Batch Multi-Select Enrollment
   const handleBatchEnroll = async (selected: EnrollableStudent[]) => {
     if (!state.selectedInstance?.value) {
-      Failure("Please select a course instance first.");
+      Failure("Please select a course Classroom first.");
       return;
     }
 
@@ -180,7 +180,7 @@ const InsStudentEnrollment = () => {
         }
       },
       () => {},
-      `Remove ${row.student_name || row.name || row.student_id || "Student"} from this course instance?`
+      `Remove ${row.student_name || row.name || row.student_id || "Student"} from this course Classroom?`
     );
   };
 
@@ -253,7 +253,7 @@ const InsStudentEnrollment = () => {
             type="button"
             onClick={() => handleDeleteEnrollment(row)}
             className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/20"
-            title="Remove from course instance"
+            title="Remove from course Classroom"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -296,11 +296,11 @@ const InsStudentEnrollment = () => {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-[280px] flex-1">
             <CustomSelect
-              title="Select Course Instance (Section)"
+              title="Select Course Classroom (Section)"
               options={state.courseInstances}
               value={state.selectedInstance}
               onChange={(v) => setState({ selectedInstance: v })}
-              placeholder="Select Course Instance..."
+              placeholder="Select Course Classroom..."
             />
           </div>
           <div className="flex items-center gap-2 pt-5">
@@ -348,8 +348,8 @@ const InsStudentEnrollment = () => {
           loading={state.loading}
           noRecordsText={
             state.selectedInstance
-              ? "No students enrolled in this instance yet."
-              : "Please select a course instance above."
+              ? "No students enrolled in this Classroom yet."
+              : "Please select a course Classroom above."
           }
           showPagination
           pageSize={10}

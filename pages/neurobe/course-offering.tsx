@@ -55,9 +55,9 @@ const STATUS_OPTIONS = [
 ];
 
 const ARCHIVE_OPTIONS = [
-  { value: "all", label: "All Instances" },
-  { value: "active", label: "Active Instances" },
-  { value: "archived", label: "Archived Instances" },
+  { value: "all", label: "All Classrooms" },
+  { value: "active", label: "Active Classrooms" },
+  { value: "archived", label: "Archived Classrooms" },
 ];
 
 const semesterOptions = [
@@ -291,7 +291,7 @@ const CourseOfferingPage = () => {
         ...row,
         is_archived: nextArchived,
       });
-      Success(nextArchived ? "Course instance archived" : "Course instance unarchived");
+      Success(nextArchived ? "Course Classrooms archived" : "Course Classrooms unarchived");
       if (selectedCourse) {
         loadInstancesForCourse(selectedCourse.id);
       }
@@ -587,7 +587,7 @@ const CourseOfferingPage = () => {
                     {/* Quick Stats Grid */}
                     <div className="grid grid-cols-2 gap-3 mb-4 rounded-xl bg-gray-50/80 p-3 dark:bg-gray-700/40">
                       <div>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Instances</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Classrooms</span>
                         <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200">
                           {course.instances_count || 0} Offerings
                         </p>
@@ -605,7 +605,7 @@ const CourseOfferingPage = () => {
                   <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-xs font-semibold text-purple-600 dark:text-purple-400 group-hover:translate-x-0.5 transition-transform">
                     <span className="flex items-center gap-1.5">
                       <Layers className="h-3.5 w-3.5" />
-                      Manage Instances
+                      Manage Classrooms
                     </span>
                     <ArrowRight className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
                   </div>
@@ -634,7 +634,7 @@ const CourseOfferingPage = () => {
         </button>
 
         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-          <span>Instance Management</span>
+          <span>Classrooms Management</span>
           <span>/</span>
           <span className="font-bold text-gray-800 dark:text-gray-200">
             {selectedCourse.course_code}
@@ -693,17 +693,17 @@ const CourseOfferingPage = () => {
         <div className="mt-4 flex items-center gap-2 rounded-xl bg-purple-50/70 px-4 py-2 text-xs text-purple-800 dark:bg-purple-950/30 dark:text-purple-300 border border-purple-100 dark:border-purple-900/40">
           <UserCheck className="h-4 w-4 shrink-0 text-purple-600" />
           <span>
-            <strong>Co-delivery Mode: </strong>Course Coordinators possess full Course Instructor permissions for this course instance delivery.
+            <strong>Co-delivery Mode: </strong>Course Coordinators possess full Course Instructor permissions for this course Classrooms delivery.
           </span>
         </div>
       </div>
 
       {/* Main Action Header */}
       <PageHeader
-        title="Instance Deliveries & Sections"
-        subtitle={`Managing active and archived instance sections for ${selectedCourse.course_code}.`}
+        title="Classrooms Deliveries & Sections"
+        subtitle={`Managing active and archived Classrooms sections for ${selectedCourse.course_code}.`}
         icon={<Layers className="h-5 w-5 text-purple-600" />}
-        records={`${filteredInstances.length} Instances`}
+        records={`${filteredInstances.length} Classrooms`}
         actionBtn2={{
           label: "Enroll Students",
           icon: <Users className="h-4 w-4" />,
@@ -711,7 +711,7 @@ const CourseOfferingPage = () => {
           outline: true,
         }}
         actionBtn1={{
-          label: "Create Instance",
+          label: "Create Classroom",
           icon: <IconPlus className="h-4 w-4" />,
           onClick: openCreate,
           view: false,
@@ -778,7 +778,7 @@ const CourseOfferingPage = () => {
           {/* Search */}
           <div className="relative max-w-[280px] flex-1 min-w-[200px]">
             <TextInput
-              placeholder="Search by instance, faculty..."
+              placeholder="Search by Classrooms, faculty..."
               type="text"
               value={instanceState.search}
               onChange={(e) => setInstanceState({ search: e.target.value })}
@@ -801,7 +801,7 @@ const CourseOfferingPage = () => {
             options={ARCHIVE_OPTIONS}
             value={ARCHIVE_OPTIONS.find((o) => o.value === instanceState.archiveFilter) ?? null}
             onChange={(e) => setInstanceState({ archiveFilter: e?.value ?? "all" })}
-            placeholder="Active Instances"
+            placeholder="Active Classrooms"
             className="filter-input"
             isClearable={false}
           />
@@ -816,7 +816,7 @@ const CourseOfferingPage = () => {
           loading={instanceState.loadingInstances}
           noRecordsText={
             instanceState.ownershipFilter === "my_creations"
-              ? `No Classrooms created by you for ${selectedCourse.course_code}. Click "+ Create Instance" to add one.`
+              ? `No Classrooms created by you for ${selectedCourse.course_code}. Click "+ Create Classroom" to add one.`
               : `No Classrooms created by other instructors for ${selectedCourse.course_code}.`
           }
           onRowClick={handleRowClick}

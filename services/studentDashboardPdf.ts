@@ -57,7 +57,7 @@ export function generateStudentDashboardPdf(data: StudentDashboardResponse, cour
       [
         { content: "Email:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
         profile.email || "N/A",
-        { content: "Section / Instance:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
+        { content: "Section / Classroom:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
         profile.instance_name || `Section ${profile.instance_id}`,
       ],
       [

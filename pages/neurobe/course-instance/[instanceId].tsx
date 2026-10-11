@@ -41,7 +41,7 @@ function InstanceDashboardPage() {
   const [loadingTests, setLoadingTests] = useState(true);
 
   useEffect(() => {
-    dispatch(setPageTitle("Instance Dashboard"));
+    dispatch(setPageTitle("Classroom Dashboard"));
   }, [dispatch]);
 
   const fetchCiaTests = useCallback(async (silent = false) => {
@@ -104,10 +104,10 @@ function InstanceDashboardPage() {
           </button>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              Mark Extraction / Course {courseId} / Instance {instanceId}
+              Mark Extraction / Course {courseId} / Classroom {instanceId}
             </p>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
-              Instance Dashboard
+              Classroom Dashboard
             </h1>
           </div>
         </div>
@@ -204,7 +204,7 @@ function InstanceDashboardPage() {
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <BookOpen className="h-12 w-12 mb-4 text-gray-300 dark:text-gray-600" />
               <p className="font-medium">No CIA Tests found</p>
-              <p className="text-sm mt-1">This instance has no configured CIA tests yet</p>
+              <p className="text-sm mt-1">This Classroom has no configured CIA tests yet</p>
             </div>
           ) : (
             <div className="h-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">

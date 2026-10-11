@@ -751,7 +751,7 @@ const StudentDashboard = () => {
                       {c.course_name}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5 line-clamp-1">
-                      Instance: {c.instance_name || 'Standard Curriculum'}
+                      Classroom: {c.instance_name || 'Standard Curriculum'}
                     </p>
                   </div>
 

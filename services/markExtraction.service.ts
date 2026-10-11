@@ -467,7 +467,7 @@ export const MarkExtractionService = {
           : err?.message || "Failed to upload direct CO marks.";
 
       console.warn(
-        `[MarkExtractionService] uploadDirectCoMarks 400/error on instance ${targetId}:`,
+        `[MarkExtractionService] uploadDirectCoMarks 400/error on Classroom ${targetId}:`,
         detailMsg
       );
 

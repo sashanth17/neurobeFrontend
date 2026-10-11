@@ -466,7 +466,7 @@ const MCQTestExecution = () => {
       return;
     }
     if (!createModal.courseInstanceId) {
-      Failure("Please select a Course Instance / Section to host this assessment.");
+      Failure("Please select a Course Classroom / Section to host this assessment.");
       return;
     }
     if (!createModal.questionSetId) {
@@ -1009,7 +1009,7 @@ const MCQTestExecution = () => {
               {/* Course Instance / Section Selector */}
               <div className="space-y-1">
                 <label className="font-bold text-gray-900 dark:text-white">
-                  Course Instance / Section <span className="text-red-500">*</span>
+                  Course Classroom / Section <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={createModal.courseInstanceId}
@@ -1025,7 +1025,7 @@ const MCQTestExecution = () => {
                 </select>
                 {state.courseInstances && state.courseInstances.length === 0 && (
                   <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                    ⚠️ No Classrooms found for this course. Please create an instance first.
+                    ⚠️ No Classrooms found for this course. Please create an Classroom first.
                   </p>
                 )}
               </div>
