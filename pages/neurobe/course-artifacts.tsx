@@ -2252,8 +2252,8 @@ const InsCourseArtifacts = () => {
       )}
 
       {/* ── Tabs Navigation ── */}
-      <div className="border-b border-slate-200 dark:border-slate-800">
-        <nav className="flex space-x-6">
+      <div className="border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-thin">
+        <nav className="flex space-x-6 min-w-max pb-1">
           <button
             type="button"
             onClick={() => setActiveTab("syllabus")}
@@ -4799,14 +4799,14 @@ const InsCourseArtifacts = () => {
               </div>
 
               {/* Right Column: 6 Cols - Tab content with independent scroll */}
-              <div className="lg:col-span-6 h-[calc(100vh-210px)] min-h-[680px] overflow-y-auto pr-1 space-y-6">
+              <div className="lg:col-span-6 h-[calc(100vh-210px)] min-h-[680px] overflow-y-auto pr-1 space-y-6 scrollbar-thin">
                 {tabContent}
               </div>
             </div>
           );
         }
 
-        return <div className="mt-6 space-y-6">{tabContent}</div>;
+        return <div className="mt-6 space-y-6 overflow-x-auto scrollbar-thin">{tabContent}</div>;
       })()}
 
       {/* ── Hierarchy CRUD Modal (Unit / Topic / Subtopic) ── */}

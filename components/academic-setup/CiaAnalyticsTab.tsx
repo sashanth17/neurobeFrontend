@@ -211,7 +211,7 @@ const CiaAnalyticsTab: React.FC<CiaAnalyticsTabProps> = ({
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
               {instances.map((inst) => {
                 const selected = selectedInstanceIds.includes(inst.id);
                 return (
@@ -263,7 +263,7 @@ const CiaAnalyticsTab: React.FC<CiaAnalyticsTabProps> = ({
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
             {tests.length === 0 ? (
               <span className="text-xs text-slate-400 italic">No CIA tests found for this course.</span>
             ) : (
@@ -326,6 +326,7 @@ const CiaAnalyticsTab: React.FC<CiaAnalyticsTabProps> = ({
         )}
 
         <ScoreChart
+          key={`${chartType}-${scaleMode}-${yAxisMode}-${bandStep}-${selectedTestIds.join('_')}-${selectedInstanceIds.join('_')}`}
           binnedData={binnedResult}
           chartType={chartType}
           yAxisMode={yAxisMode}
@@ -333,6 +334,56 @@ const CiaAnalyticsTab: React.FC<CiaAnalyticsTabProps> = ({
           height={420}
         />
       </div>
+
+      {/* Distribution Data Breakdown Table with Scrollbar */}
+      {binnedResult.categories.length > 0 && binnedResult.series.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Distribution Breakdown ({yAxisMode === "percent" ? "% of Students in Class" : "Student Count"})
+            </h3>
+            <span className="text-[11px] text-slate-400">
+              Scroll horizontally for all sections & score bands
+            </span>
+          </div>
+          <div className="overflow-x-auto max-h-72 overflow-y-auto scrollbar-thin border border-slate-100 rounded-xl dark:border-slate-800">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 z-10">
+                <tr>
+                  <th className="py-2.5 px-3 font-semibold sticky left-0 bg-slate-50 dark:bg-slate-800">Score Band</th>
+                  {binnedResult.series.map((s) => (
+                    <th key={s.id} className="py-2.5 px-3 font-semibold text-center whitespace-nowrap">
+                      {s.name}
+                    </th>
+                  ))}
+                  <th className="py-2.5 px-3 font-semibold text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {binnedResult.categories.map((cat, idx) => {
+                  const total = binnedResult.series.map((s) => s.data[idx] || 0).reduce((a, b) => a + b, 0);
+                  return (
+                    <tr key={cat} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="py-2 px-3 font-mono font-medium text-slate-700 dark:text-slate-300 sticky left-0 bg-white dark:bg-slate-900">
+                        {cat}
+                      </td>
+                      {binnedResult.series.map((s) => (
+                        <td key={s.id} className="py-2 px-3 text-center font-mono">
+                          {s.data[idx] ?? 0}
+                          {yAxisMode === "percent" ? "%" : ""}
+                        </td>
+                      ))}
+                      <td className="py-2 px-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                        {yAxisMode === "percent" ? `${(total / (binnedResult.series.length || 1)).toFixed(1)}% avg` : total}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

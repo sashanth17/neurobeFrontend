@@ -193,6 +193,7 @@ const ScoreChart: React.FC<ScoreChartProps> = ({
         shared: !isScatter && !isBubble,
         intersect: isScatter || isBubble,
         custom: ({ series, seriesIndex, dataPointIndex, w }: any) => {
+          if (dataPointIndex === undefined || dataPointIndex === null || dataPointIndex < 0) return "";
           const bandLabel = binnedData.categories[dataPointIndex] || "";
           const coordKey = `${dataPointIndex}_${series[seriesIndex]?.[dataPointIndex] ?? 0}`;
           const overlappingInstances = binnedData.collisionMap.get(coordKey) || [];
@@ -299,21 +300,24 @@ const ScoreChart: React.FC<ScoreChartProps> = ({
         </div>
       )}
 
-      <div className="w-full">
-        {typeof window !== "undefined" && (
-          <Chart
-            options={apexConfig.options}
-            series={apexConfig.series}
-            type={
-              chartType === "spline"
-                ? "line"
-                : chartType === "histogram"
-                ? "bar"
-                : (chartType as any)
-            }
-            height={height}
-          />
-        )}
+      <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
+        <div className="min-w-[650px]">
+          {typeof window !== "undefined" && (
+            <Chart
+              key={`${chartType}-${yAxisMode}-${activePieSeries?.id || "multi"}-${binnedData.categories.length}`}
+              options={apexConfig.options}
+              series={apexConfig.series}
+              type={
+                chartType === "spline"
+                  ? "line"
+                  : chartType === "histogram"
+                  ? "bar"
+                  : (chartType as any)
+              }
+              height={height}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

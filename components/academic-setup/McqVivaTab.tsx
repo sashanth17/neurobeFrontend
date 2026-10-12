@@ -419,6 +419,7 @@ const McqVivaTab: React.FC<McqVivaTabProps> = ({
               </div>
             )}
             <ScoreChart
+              key={`${chartType}-${scaleMode}-${yAxisMode}-${bandStep}-${selectedTestIds.join('_')}-${selectedInstanceIds.join('_')}`}
               binnedData={binnedResult}
               chartType={chartType}
               yAxisMode={yAxisMode}
