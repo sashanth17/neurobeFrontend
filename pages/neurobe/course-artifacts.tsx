@@ -26,6 +26,9 @@ import {
   Trash2,
   Save,
   X,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import {
@@ -66,6 +69,25 @@ const sortAndNumberVersions = (items: any[], config: VersionSortConfig): any[] =
     }));
 };
 
+// Priority Resolver: 1. Active > 2. Approved (latest) > 3. Draft (latest)
+const pickPrioritizedVersion = (items: any[]): any | null => {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  // Priority 1: Active version
+  const active = items.find((v) => Boolean(v.is_active));
+  if (active) return active;
+  // Priority 2: Approved version (highest version number)
+  const approvedList = items.filter((v) => Boolean(v.is_approved));
+  if (approvedList.length > 0) {
+    return [...approvedList].sort(
+      (a, b) => (Number(b.version_number) || 0) - (Number(a.version_number) || 0)
+    )[0];
+  }
+  // Priority 3: Draft version (highest version number)
+  return [...items].sort(
+    (a, b) => (Number(b.version_number) || 0) - (Number(a.version_number) || 0)
+  )[0];
+};
+
 const InsCourseArtifacts = () => {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -81,7 +103,7 @@ const InsCourseArtifacts = () => {
     if (courseIdParam) {
       try {
         localStorage.setItem("active_course_id", courseIdParam);
-      } catch {}
+      } catch { }
     }
   }, [courseIdParam]);
 
@@ -203,6 +225,7 @@ const InsCourseArtifacts = () => {
     lesson_plan?: any;
   }>({});
   const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
+  const [expandedVersionHistory, setExpandedVersionHistory] = useState<Record<string, boolean>>({});
 
   // Normalized, sorted, and indexed version lists
   const versionsExtractions = useMemo(() => {
@@ -254,6 +277,56 @@ const InsCourseArtifacts = () => {
   const currentCopo = selectedVersionData.copo ?? activeCopo;
   const currentPedagogy = selectedVersionData.pedagogy ?? activePedagogy;
   const currentLessonPlan = selectedVersionData.lesson_plan ?? activeLessonPlan;
+
+  const prioritizedExt = useMemo(
+    () => pickPrioritizedVersion(versionsExtractions),
+    [versionsExtractions]
+  );
+  const prioritizedCopo = useMemo(
+    () => pickPrioritizedVersion(versionsCopo),
+    [versionsCopo]
+  );
+  const prioritizedPedagogy = useMemo(
+    () => pickPrioritizedVersion(versionsPedagogies),
+    [versionsPedagogies]
+  );
+  const prioritizedLessonPlan = useMemo(
+    () => pickPrioritizedVersion(versionsLessonPlans),
+    [versionsLessonPlans]
+  );
+
+  useEffect(() => {
+    if (!courseIdParam) return;
+    if (activeTab === "copo" && !currentCopo && prioritizedCopo?.copo_id && !sectionLoading.copo) {
+      Models.copo.get(prioritizedCopo.copo_id).then((full: any) => {
+        setSectionData((prev) => ({ ...prev, copo: full }));
+      }).catch(console.error);
+    } else if (activeTab === "syllabus" && !currentExt && prioritizedExt?.extractions_id && !sectionLoading.syllabus) {
+      Models.syllabus.get_extraction(prioritizedExt.extractions_id).then((full: any) => {
+        setSectionData((prev) => ({ ...prev, syllabus: full }));
+      }).catch(console.error);
+    } else if (activeTab === "pedagogy" && !currentPedagogy && prioritizedPedagogy?.pedagogy_id && !sectionLoading.pedagogy) {
+      Models.pedagogy.get(prioritizedPedagogy.pedagogy_id).then((full: any) => {
+        setSectionData((prev) => ({ ...prev, pedagogy: full }));
+      }).catch(console.error);
+    } else if (activeTab === "lesson_plan" && !currentLessonPlan && prioritizedLessonPlan?.lesson_plan_id && !sectionLoading.lesson_plan) {
+      Models.lession_plan.get(prioritizedLessonPlan.lesson_plan_id).then((full: any) => {
+        setSectionData((prev) => ({ ...prev, lesson_plan: full }));
+      }).catch(console.error);
+    }
+  }, [
+    activeTab,
+    courseIdParam,
+    currentCopo,
+    prioritizedCopo,
+    currentExt,
+    prioritizedExt,
+    currentPedagogy,
+    prioritizedPedagogy,
+    currentLessonPlan,
+    prioritizedLessonPlan,
+    sectionLoading,
+  ]);
 
   const activeSyllabus = useMemo(() => {
     const activeMatch = versionsSyllabi.find((s: any) => Boolean(s.is_active));
@@ -350,30 +423,50 @@ const InsCourseArtifacts = () => {
             Models.syllabus.list_extractions({ course_id: courseIdParam }),
             Models.syllabus.list_syllabi({ course_id: courseIdParam }),
           ]);
+          const rawExts = Array.isArray(extractionsRes) ? extractionsRes : [];
+          const sortedExts = sortAndNumberVersions(rawExts, { idKey: "extractions_id" });
           setSectionVersions((prev) => ({
             ...prev,
-            extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
+            extractions: rawExts,
             syllabi: Array.isArray(syllabiRes) ? syllabiRes : [],
           }));
-          if (selectedVersionData.syllabus?.extractions_id) {
+
+          const targetVer = selectedVersionData.syllabus?.extractions_id
+            ? sortedExts.find(
+                (e: any) => e.extractions_id === selectedVersionData.syllabus.extractions_id
+              )
+            : pickPrioritizedVersion(sortedExts);
+
+          if (targetVer?.extractions_id) {
             try {
-              const full = await Models.syllabus.get_extraction(
-                selectedVersionData.syllabus.extractions_id
-              );
-              setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
-            } catch {}
+              const full = await Models.syllabus.get_extraction(targetVer.extractions_id);
+              if (selectedVersionData.syllabus) {
+                setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
+              }
+              setSectionData((prev) => ({ ...prev, syllabus: full }));
+            } catch { }
           }
         } else if (tab === "copo") {
           const copoRes: any = await Models.copo.list({ course_id: courseIdParam });
+          const rawCopos = Array.isArray(copoRes) ? copoRes : [];
+          const sortedCopos = sortAndNumberVersions(rawCopos, { idKey: "copo_id" });
           setSectionVersions((prev) => ({
             ...prev,
-            copo: Array.isArray(copoRes) ? copoRes : [],
+            copo: rawCopos,
           }));
-          if (selectedVersionData.copo?.copo_id) {
+
+          const targetVer = selectedVersionData.copo?.copo_id
+            ? sortedCopos.find((c: any) => c.copo_id === selectedVersionData.copo.copo_id)
+            : pickPrioritizedVersion(sortedCopos);
+
+          if (targetVer?.copo_id) {
             try {
-              const full = await Models.copo.get(selectedVersionData.copo.copo_id);
-              setSelectedVersionData((prev) => ({ ...prev, copo: full }));
-            } catch {}
+              const full = await Models.copo.get(targetVer.copo_id);
+              if (selectedVersionData.copo) {
+                setSelectedVersionData((prev) => ({ ...prev, copo: full }));
+              }
+              setSectionData((prev) => ({ ...prev, copo: full }));
+            } catch { }
           }
         } else if (tab === "pedagogy") {
           const [pedRes, extractionsRes]: [any, any] = await Promise.all([
@@ -382,16 +475,26 @@ const InsCourseArtifacts = () => {
               ? Promise.resolve(sectionVersions.extractions)
               : Models.syllabus.list_extractions({ course_id: courseIdParam }),
           ]);
+          const rawPeds = Array.isArray(pedRes) ? pedRes : [];
+          const sortedPeds = sortAndNumberVersions(rawPeds, { idKey: "pedagogy_id" });
           setSectionVersions((prev) => ({
             ...prev,
-            pedagogies: Array.isArray(pedRes) ? pedRes : [],
+            pedagogies: rawPeds,
             extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
           }));
-          if (selectedVersionData.pedagogy?.pedagogy_id) {
+
+          const targetVer = selectedVersionData.pedagogy?.pedagogy_id
+            ? sortedPeds.find((p: any) => p.pedagogy_id === selectedVersionData.pedagogy.pedagogy_id)
+            : pickPrioritizedVersion(sortedPeds);
+
+          if (targetVer?.pedagogy_id) {
             try {
-              const full = await Models.pedagogy.get(selectedVersionData.pedagogy.pedagogy_id);
-              setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
-            } catch {}
+              const full = await Models.pedagogy.get(targetVer.pedagogy_id);
+              if (selectedVersionData.pedagogy) {
+                setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
+              }
+              setSectionData((prev) => ({ ...prev, pedagogy: full }));
+            } catch { }
           }
         } else if (tab === "lesson_plan") {
           const [lpRes, extractionsRes, pedRes]: [any, any, any] = await Promise.all([
@@ -403,33 +506,109 @@ const InsCourseArtifacts = () => {
               ? Promise.resolve(sectionVersions.pedagogies)
               : Models.pedagogy.list({ course_id: courseIdParam }),
           ]);
+          const rawLps = Array.isArray(lpRes) ? lpRes : [];
+          const sortedLps = sortAndNumberVersions(rawLps, { idKey: "lesson_plan_id" });
           setSectionVersions((prev) => ({
             ...prev,
-            lesson_plans: Array.isArray(lpRes) ? lpRes : [],
+            lesson_plans: rawLps,
             extractions: Array.isArray(extractionsRes) ? extractionsRes : [],
             pedagogies: Array.isArray(pedRes) ? pedRes : [],
           }));
-          if (selectedVersionData.lesson_plan?.lesson_plan_id) {
+
+          const targetVer = selectedVersionData.lesson_plan?.lesson_plan_id
+            ? sortedLps.find(
+                (l: any) => l.lesson_plan_id === selectedVersionData.lesson_plan.lesson_plan_id
+              )
+            : pickPrioritizedVersion(sortedLps);
+
+          if (targetVer?.lesson_plan_id) {
             try {
-              const full = await Models.lession_plan.get(
-                selectedVersionData.lesson_plan.lesson_plan_id
-              );
-              setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
-            } catch {}
+              const full = await Models.lession_plan.get(targetVer.lesson_plan_id);
+              if (selectedVersionData.lesson_plan) {
+                setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
+              }
+              setSectionData((prev) => ({ ...prev, lesson_plan: full }));
+            } catch { }
           }
         }
       } else {
         if (tab === "syllabus") {
-          const act = await Models.syllabus.get_active_extraction(courseIdParam);
+          let act = null;
+          try {
+            act = await Models.syllabus.get_active_extraction(courseIdParam);
+          } catch { }
+          if (!act) {
+            try {
+              const extractionsRes: any = await Models.syllabus.list_extractions({
+                course_id: courseIdParam,
+              });
+              const sorted = sortAndNumberVersions(
+                Array.isArray(extractionsRes) ? extractionsRes : [],
+                { idKey: "extractions_id" }
+              );
+              const best = pickPrioritizedVersion(sorted);
+              if (best?.extractions_id) {
+                act = await Models.syllabus.get_extraction(best.extractions_id);
+              }
+            } catch { }
+          }
           setSectionData((prev) => ({ ...prev, syllabus: act }));
         } else if (tab === "copo") {
-          const act = await Models.copo.get_active(courseIdParam);
+          let act = null;
+          try {
+            act = await Models.copo.get_active(courseIdParam);
+          } catch { }
+          if (!act) {
+            try {
+              const copoRes: any = await Models.copo.list({ course_id: courseIdParam });
+              const sorted = sortAndNumberVersions(
+                Array.isArray(copoRes) ? copoRes : [],
+                { idKey: "copo_id" }
+              );
+              const best = pickPrioritizedVersion(sorted);
+              if (best?.copo_id) {
+                act = await Models.copo.get(best.copo_id);
+              }
+            } catch { }
+          }
           setSectionData((prev) => ({ ...prev, copo: act }));
         } else if (tab === "pedagogy") {
-          const act = await Models.pedagogy.get_active(courseIdParam);
+          let act = null;
+          try {
+            act = await Models.pedagogy.get_active(courseIdParam);
+          } catch { }
+          if (!act) {
+            try {
+              const pedRes: any = await Models.pedagogy.list({ course_id: courseIdParam });
+              const sorted = sortAndNumberVersions(
+                Array.isArray(pedRes) ? pedRes : [],
+                { idKey: "pedagogy_id" }
+              );
+              const best = pickPrioritizedVersion(sorted);
+              if (best?.pedagogy_id) {
+                act = await Models.pedagogy.get(best.pedagogy_id);
+              }
+            } catch { }
+          }
           setSectionData((prev) => ({ ...prev, pedagogy: act }));
         } else if (tab === "lesson_plan") {
-          const act = await Models.lession_plan.get_active(courseIdParam);
+          let act = null;
+          try {
+            act = await Models.lession_plan.get_active(courseIdParam);
+          } catch { }
+          if (!act) {
+            try {
+              const lpRes: any = await Models.lession_plan.list({ course_id: courseIdParam });
+              const sorted = sortAndNumberVersions(
+                Array.isArray(lpRes) ? lpRes : [],
+                { idKey: "lesson_plan_id" }
+              );
+              const best = pickPrioritizedVersion(sorted);
+              if (best?.lesson_plan_id) {
+                act = await Models.lession_plan.get(best.lesson_plan_id);
+              }
+            } catch { }
+          }
           setSectionData((prev) => ({ ...prev, lesson_plan: act }));
         }
       }
@@ -467,15 +646,15 @@ const InsCourseArtifacts = () => {
             if (g) role = g.toLowerCase();
           }
         }
-      } catch {}
+      } catch { }
 
       const userIsCoord = Boolean(
         res?.permissions?.is_coordinator ||
-          res?.permissions?.can_edit ||
-          role.includes("coordinator") ||
-          role === "admin" ||
-          role === "super_admin" ||
-          (uid && res?.course && res.course.coordinator_id === uid)
+        res?.permissions?.can_edit ||
+        role.includes("coordinator") ||
+        role === "admin" ||
+        role === "super_admin" ||
+        (uid && res?.course && res.course.coordinator_id === uid)
       );
       loadSectionData(activeTab, true, userIsCoord);
     } catch (err: any) {
@@ -1253,180 +1432,316 @@ const InsCourseArtifacts = () => {
     if (versionsList.length === 0) return null;
 
     const selectedVer = selectedVersionData[tabType];
+    const isExpanded = Boolean(expandedVersionHistory[tabType]);
+    const activeVer = versionsList.find((v: any) => Boolean(v.is_active));
+    const prioritizedVer = pickPrioritizedVersion(versionsList);
+    const currentItemId = selectedVer
+      ? selectedVer[idKey]
+      : activeVer
+        ? activeVer[idKey]
+        : prioritizedVer?.[idKey] || versionsList[0]?.[idKey];
+    const currentItem =
+      versionsList.find((v: any) => v[idKey] === currentItemId) || activeVer || prioritizedVer || versionsList[0];
+    const isCurrentActive = Boolean(currentItem?.is_active);
+    const isCurrentApproved = Boolean(currentItem?.is_approved);
+    const isCurrentBusy = isBusyState(currentItem?.current_state);
+    const isViewingHistorical = Boolean(selectedVer && !selectedVer.is_active);
 
     return (
       <div className="space-y-2">
-        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-1.5">
-              <History className="h-3.5 w-3.5 text-indigo-500" />
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Version History ({versionsList.length})
-              </span>
+        {/* Main Version Control Bar: Clean, accessible, ~38px height */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white/95 px-3 py-1.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900/95">
+          {/* Left: Indicator, Quick Dropdown, Semantic Status Pill */}
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold shrink-0">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <History className="h-3.5 w-3.5" />
+              </div>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Version</span>
             </div>
-            {selectedVer && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+
+            {/* Quick Switch Dropdown */}
+            <div className="relative inline-flex items-center">
+              <select
+                value={currentItemId ?? ""}
+                onChange={(e) => {
+                  const targetId = Number(e.target.value) || e.target.value;
+                  const targetVer = versionsList.find((v: any) => v[idKey] == targetId);
+                  if (!targetVer) return;
+                  if (targetVer.is_active) {
+                    setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+                    loadSectionData(tabType, true);
+                  } else {
+                    handleSelectVersionCard(tabType, targetVer, idKey);
+                  }
                 }}
-                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                disabled={loadingVersionDetail}
+                className="h-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800 pl-2.5 pr-7 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200 transition hover:border-indigo-400 focus:border-indigo-500 focus:bg-white focus:outline-hidden cursor-pointer appearance-none shadow-2xs"
               >
-                Close View ✕
-              </button>
-            )}
+                {versionsList.map((ver: any) => {
+                  const itemId = ver[idKey];
+                  const tag = ver.is_active ? "★ Active" : ver.is_approved ? "✓ Approved" : "✎ Draft";
+                  return (
+                    <option key={itemId} value={itemId}>
+                      v{ver.version_number} — {tag}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-slate-400" />
+            </div>
+
+            {/* Semantic Lifecycle Badges */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {isCurrentActive ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Active
+                </span>
+              ) : isCurrentApproved ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200/80 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:border-sky-800/60 dark:text-sky-300">
+                  <Check className="h-3 w-3" />
+                  Approved
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300">
+                  <Edit2 className="h-2.5 w-2.5" />
+                  Draft v{currentItem?.version_number}
+                </span>
+              )}
+
+              {/* Reset button if viewing non-active version */}
+              {isViewingHistorical && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+                    loadSectionData(tabType, true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 transition"
+                  title="Return to the active live version"
+                >
+                  <RotateCcw className="h-2.5 w-2.5" />
+                  <span>Back to Live</span>
+                </button>
+              )}
+
+              {isCurrentBusy && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                  <Sparkles className="h-3 w-3 animate-spin" />
+                  <span>Processing</span>
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-            {versionsList.map((ver: any) => {
-              const itemId = ver[idKey];
-              const isItemActive = Boolean(ver.is_active);
-              const isItemApproved = Boolean(ver.is_approved);
-              const isSelected = Boolean(selectedVer && selectedVer[idKey] === itemId);
-              const isBusy = isBusyState(ver.current_state);
+          {/* Right: Quick Action Buttons (Approve / Activate) & Drawer Toggle */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Contextual Approve Action */}
+            {currentItem && !isCurrentApproved && approveFn && (
+              <button
+                type="button"
+                onClick={() => approveFn?.(currentItemId)}
+                disabled={isCurrentBusy || actionLoading === `${approveLoadingPrefix}${currentItemId}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition disabled:opacity-50"
+                title={`Approve v${currentItem.version_number}`}
+              >
+                <Check className="h-3 w-3" />
+                <span>
+                  {actionLoading === `${approveLoadingPrefix}${currentItemId}`
+                    ? "Approving..."
+                    : `Approve v${currentItem.version_number}`}
+                </span>
+              </button>
+            )}
 
-              return (
-                <div
-                  key={itemId}
-                  className={`min-w-[175px] shrink-0 rounded-lg border p-2 transition ${
-                    isSelected
-                      ? "border-indigo-500 bg-indigo-50/50 shadow-xs dark:border-indigo-600 dark:bg-indigo-950/40"
-                      : "border-slate-200 bg-slate-50/60 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      v{ver.version_number}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {isItemActive && (
-                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                          Active
-                        </span>
-                      )}
-                      {isItemApproved ? (
-                        <span className="rounded-full bg-sky-100 px-1.5 py-0.2 text-[9px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-                          Approved
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-amber-100 px-1.5 py-0.2 text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                          Draft
-                        </span>
-                      )}
-                    </div>
-                  </div>
+            {/* Contextual Activate Action */}
+            {currentItem && isCurrentApproved && !isCurrentActive && activateFn && (
+              <button
+                type="button"
+                onClick={() => activateFn?.(currentItemId)}
+                disabled={isCurrentBusy || actionLoading === `${activateLoadingPrefix}${currentItemId}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition disabled:opacity-50"
+                title={`Set v${currentItem.version_number} as active live version`}
+              >
+                <ShieldCheck className="h-3 w-3" />
+                <span>
+                  {actionLoading === `${activateLoadingPrefix}${currentItemId}`
+                    ? "Activating..."
+                    : `Set v${currentItem.version_number} Active`}
+                </span>
+              </button>
+            )}
 
-                  <p className="mt-0.5 text-[10px] text-slate-400">
-                    {ver.created_at
-                      ? new Date(ver.created_at).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "—"}
-                  </p>
-
-                  {isBusy && (
-                    <div
-                      className={`mt-1 flex items-center gap-1 text-[9px] font-semibold ${
-                        ver.current_state === "sent_to_llm" || ver.current_state === "processing"
-                          ? "text-purple-600 dark:text-purple-400"
-                          : "text-amber-600 dark:text-amber-400"
-                      }`}
-                    >
-                      {ver.current_state === "sent_to_llm" || ver.current_state === "processing" ? (
-                        <>
-                          <Sparkles className="h-2.5 w-2.5 animate-spin" />
-                          <span>Processing</span>
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="h-2.5 w-2.5" />
-                          <span>Queued</span>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-2 flex flex-wrap items-center gap-1 pt-1.5 border-t border-slate-200/60 dark:border-slate-800">
-                    {isSelected ? (
-                      <span className="rounded bg-indigo-600/10 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 dark:text-indigo-400">
-                        Viewing
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleSelectVersionCard(tabType, ver, idKey)}
-                        disabled={loadingVersionDetail}
-                        className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                      >
-                        View
-                      </button>
-                    )}
-
-                    {!isItemApproved && approveFn && (
-                      <button
-                        type="button"
-                        onClick={() => approveFn?.(itemId)}
-                        disabled={isBusy || actionLoading === `${approveLoadingPrefix}${itemId}`}
-                        className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {actionLoading === `${approveLoadingPrefix}${itemId}` ? "..." : "Approve"}
-                      </button>
-                    )}
-
-                    {isItemApproved && !isItemActive && activateFn && (
-                      <button
-                        type="button"
-                        onClick={() => activateFn?.(itemId)}
-                        disabled={isBusy || actionLoading === `${activateLoadingPrefix}${itemId}`}
-                        className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {actionLoading === `${activateLoadingPrefix}${itemId}` ? "..." : "Activate"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {/* Toggle Drawer Shelf */}
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedVersionHistory((prev) => ({
+                  ...prev,
+                  [tabType]: !prev[tabType],
+                }))
+              }
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+                isExpanded
+                  ? "border-indigo-300 bg-indigo-50/70 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300"
+                  : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              }`}
+              title="Toggle version history card drawer"
+            >
+              <span>All Versions ({versionsList.length})</span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  isExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </button>
           </div>
         </div>
 
-        {selectedVer && (
-          <div
-            className={`flex items-center justify-between rounded-xl border px-4 py-2.5 text-xs ${
-              isCoord || perms.can_edit
-                ? "border-indigo-300 bg-indigo-50/80 text-indigo-950 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-200"
-                : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {isCoord || perms.can_edit ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
-              ) : (
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              )}
-              <span>
-                Viewing version <strong>v{selectedVer.version_number}</strong>
-                {isCoord || perms.can_edit
-                  ? " Edit permissions enabled for coordinator."
-                  : " Artifact is in read-only mode."}
+        {/* Expandable Version Cards Shelf */}
+        {isExpanded && (
+          <div className="rounded-xl border border-slate-200/90 bg-white/95 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/95 animate-fadeIn">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Version Timeline & Approvals ({versionsList.length})
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Sorted chronologically (v1 = initial extraction)
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
-                loadSectionData(tabType, true);
-              }}
-              className={`rounded-lg px-2.5 py-1 font-semibold text-white transition ${
-                isCoord || perms.can_edit
-                  ? "bg-indigo-600 hover:bg-indigo-700"
-                  : "bg-amber-600 hover:bg-amber-700"
-              }`}
-            >
-              Close View
-            </button>
+
+            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-thin">
+              {versionsList.map((ver: any) => {
+                const itemId = ver[idKey];
+                const isItemActive = Boolean(ver.is_active);
+                const isItemApproved = Boolean(ver.is_approved);
+                const isSelected = Boolean(
+                  selectedVer
+                    ? selectedVer[idKey] === itemId
+                    : currentItemId === itemId
+                );
+                const isBusy = isBusyState(ver.current_state);
+
+                return (
+                  <div
+                    key={itemId}
+                    className={`min-w-[190px] max-w-[220px] shrink-0 rounded-xl border p-2.5 transition flex flex-col justify-between ${
+                      isSelected
+                        ? "border-indigo-500 bg-indigo-50/50 shadow-xs dark:border-indigo-600 dark:bg-indigo-950/40 ring-1 ring-indigo-500"
+                        : "border-slate-200 bg-slate-50/70 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          v{ver.version_number}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {isItemActive && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                              ★ Active
+                            </span>
+                          )}
+                          {isItemApproved && !isItemActive && (
+                            <span className="rounded-full bg-sky-100 px-2 py-0.2 text-[9px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                              ✓ Approved
+                            </span>
+                          )}
+                          {!isItemApproved && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.2 text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                              ✎ Draft
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        <span>
+                          {ver.created_at
+                            ? new Date(ver.created_at).toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </span>
+                      </div>
+
+                      {isBusy && (
+                        <div
+                          className={`mt-1.5 flex items-center gap-1 text-[9px] font-semibold ${
+                            ver.current_state === "sent_to_llm" || ver.current_state === "processing"
+                              ? "text-purple-600 dark:text-purple-400"
+                              : "text-amber-600 dark:text-amber-400"
+                          }`}
+                        >
+                          <Sparkles className="h-2.5 w-2.5 animate-spin" />
+                          <span>
+                            {ver.current_state === "sent_to_llm" || ver.current_state === "processing"
+                              ? "Processing LLM..."
+                              : "Queued..."}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                      {isSelected ? (
+                        <span className="rounded-md bg-indigo-600/10 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                          Viewing
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isItemActive) {
+                              setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+                              loadSectionData(tabType, true);
+                            } else {
+                              handleSelectVersionCard(tabType, ver, idKey);
+                            }
+                          }}
+                          disabled={loadingVersionDetail}
+                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
+                        >
+                          View
+                        </button>
+                      )}
+
+                      {!isItemApproved && approveFn && (
+                        <button
+                          type="button"
+                          onClick={() => approveFn?.(itemId)}
+                          disabled={isBusy || actionLoading === `${approveLoadingPrefix}${itemId}`}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                        >
+                          <Check className="h-2.5 w-2.5" />
+                          <span>
+                            {actionLoading === `${approveLoadingPrefix}${itemId}` ? "..." : "Approve"}
+                          </span>
+                        </button>
+                      )}
+
+                      {isItemApproved && !isItemActive && activateFn && (
+                        <button
+                          type="button"
+                          onClick={() => activateFn?.(itemId)}
+                          disabled={isBusy || actionLoading === `${activateLoadingPrefix}${itemId}`}
+                          className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                        >
+                          <ShieldCheck className="h-2.5 w-2.5" />
+                          <span>
+                            {actionLoading === `${activateLoadingPrefix}${itemId}` ? "..." : "Activate"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -1949,21 +2264,21 @@ const InsCourseArtifacts = () => {
     setModalForm(
       mode === "edit"
         ? {
-            unit_number: unit.unit_number ?? 1,
-            unit_title: unit.unit_title ?? "",
-            unit_overview: unit.unit_overview ?? "",
-            theory_hours: unit.theory_hours ?? 0,
-            lab_hours: unit.lab_hours ?? 0,
-            tutorial_hours: unit.tutorial_hours ?? 0,
-          }
+          unit_number: unit.unit_number ?? 1,
+          unit_title: unit.unit_title ?? "",
+          unit_overview: unit.unit_overview ?? "",
+          theory_hours: unit.theory_hours ?? 0,
+          lab_hours: unit.lab_hours ?? 0,
+          tutorial_hours: unit.tutorial_hours ?? 0,
+        }
         : {
-            unit_number: units.length + 1,
-            unit_title: "",
-            unit_overview: "",
-            theory_hours: 0,
-            lab_hours: 0,
-            tutorial_hours: 0,
-          }
+          unit_number: units.length + 1,
+          unit_title: "",
+          unit_overview: "",
+          theory_hours: 0,
+          lab_hours: 0,
+          tutorial_hours: 0,
+        }
     );
   };
 
@@ -1978,19 +2293,19 @@ const InsCourseArtifacts = () => {
     setModalForm(
       mode === "edit"
         ? {
-            topic_code: topic.topic_code ?? "",
-            topic_name: topic.topic_name ?? "",
-            topic_description: topic.topic_description ?? "",
-            knowledge_level: topic.knowledge_level ?? "K2 - Understand",
-            learning_sequence: topic.learning_sequence ?? 1,
-          }
+          topic_code: topic.topic_code ?? "",
+          topic_name: topic.topic_name ?? "",
+          topic_description: topic.topic_description ?? "",
+          knowledge_level: topic.knowledge_level ?? "K2 - Understand",
+          learning_sequence: topic.learning_sequence ?? 1,
+        }
         : {
-            topic_code: "",
-            topic_name: "",
-            topic_description: "",
-            knowledge_level: "K2 - Understand",
-            learning_sequence: 1,
-          }
+          topic_code: "",
+          topic_name: "",
+          topic_description: "",
+          knowledge_level: "K2 - Understand",
+          learning_sequence: 1,
+        }
     );
   };
 
@@ -2005,15 +2320,15 @@ const InsCourseArtifacts = () => {
     setModalForm(
       mode === "edit"
         ? {
-            subtopic_code: subtopic.subtopic_code ?? "",
-            subtopic_name: subtopic.subtopic_name ?? "",
-            subtopic_description: subtopic.subtopic_description ?? "",
-          }
+          subtopic_code: subtopic.subtopic_code ?? "",
+          subtopic_name: subtopic.subtopic_name ?? "",
+          subtopic_description: subtopic.subtopic_description ?? "",
+        }
         : {
-            subtopic_code: "",
-            subtopic_name: "",
-            subtopic_description: "",
-          }
+          subtopic_code: "",
+          subtopic_name: "",
+          subtopic_description: "",
+        }
     );
   };
 
@@ -2136,7 +2451,7 @@ const InsCourseArtifacts = () => {
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to delete subtopic"));
     }
-  };  return (
+  }; return (
     <div className="min-h-screen space-y-3 pb-8">
       {/* Compact Course Header Card */}
       <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -2180,11 +2495,10 @@ const InsCourseArtifacts = () => {
               <button
                 type="button"
                 onClick={() => setSplitScreenView(!splitScreenView)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-xs transition ${
-                  splitScreenView
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-xs transition ${splitScreenView
                     ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/70 dark:text-indigo-300"
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                }`}
+                  }`}
                 title={splitScreenView ? "Close split screen view" : "View source document in split screen"}
               >
                 <Columns className="h-3.5 w-3.5 text-indigo-500" />
@@ -2286,11 +2600,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("syllabus")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "syllabus"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "syllabus"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>1. Syllabus</span>
           </button>
@@ -2298,11 +2611,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("copo")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "copo"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copo"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>2. CO-PO</span>
           </button>
@@ -2310,11 +2622,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("pedagogy")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "pedagogy"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "pedagogy"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>3. Pedagogy</span>
           </button>
@@ -2322,11 +2633,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("lesson_plan")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "lesson_plan"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "lesson_plan"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>4. Lesson Plan</span>
           </button>
@@ -2335,11 +2645,10 @@ const InsCourseArtifacts = () => {
             <button
               type="button"
               onClick={() => setActiveTab("mcq_generation")}
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-                activeTab === "mcq_generation"
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "mcq_generation"
                   ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                   : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+                }`}
             >
               <span>5. MCQ Gen</span>
             </button>
@@ -2348,11 +2657,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("report")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "report"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "report"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>{isCoord ? "6. Report" : "5. Report"}</span>
           </button>
@@ -2360,11 +2668,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("cia_analytics")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "cia_analytics"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "cia_analytics"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>{isCoord ? "7. CIA Analytics" : "6. CIA Analytics"}</span>
           </button>
@@ -2372,11 +2679,10 @@ const InsCourseArtifacts = () => {
           <button
             type="button"
             onClick={() => setActiveTab("mcq_viva")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === "mcq_viva"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "mcq_viva"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+              }`}
           >
             <span>{isCoord ? "8. MCQ & Viva" : "7. MCQ & Viva"}</span>
           </button>
@@ -2449,11 +2755,10 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={() => setSplitScreenView(!splitScreenView)}
-                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-semibold shadow-xs transition ${
-                          splitScreenView
+                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-semibold shadow-xs transition ${splitScreenView
                             ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                        }`}
+                          }`}
                       >
                         <Columns className="h-3.5 w-3.5 text-indigo-500" />
                         <span>
@@ -3347,10 +3652,10 @@ const InsCourseArtifacts = () => {
                               ))}
                               {(!currentExt?.reference_books ||
                                 currentExt.reference_books.length === 0) && (
-                                <p className="text-xs text-slate-400 italic">
-                                  No reference books recorded.
-                                </p>
-                              )}
+                                  <p className="text-xs text-slate-400 italic">
+                                    No reference books recorded.
+                                  </p>
+                                )}
                             </div>
                           )}
                         </div>
@@ -3604,66 +3909,31 @@ const InsCourseArtifacts = () => {
               <div className="space-y-3">
                 {renderVersionCards("copo")}
 
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      Course Outcome to Program Outcome (CO-PO) Correlation Matrix
-                    </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Accreditation correlation matrix (1 = Low, 2 = Medium, 3 = High, 0 = None)
-                    </p>
+                {!currentCopo && (
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                        Course Outcome to Program Outcome (CO-PO) Correlation Matrix
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Accreditation correlation matrix (1 = Low, 2 = Medium, 3 = High, 0 = None)
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isCoord && (
+                        <button
+                          type="button"
+                          onClick={openGenerateCopoModal}
+                          disabled={isCopoBusy || actionLoading === "generate_copo"}
+                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
+                        </button>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {currentCopo?.is_approved ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        CO-PO Matrix Approved
-                      </span>
-                    ) : currentCopo ? (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-                        Draft Version {currentCopo.version_number}
-                      </span>
-                    ) : null}
-
-                    {isCoord && (
-                      <button
-                        type="button"
-                        onClick={openGenerateCopoModal}
-                        disabled={isCopoBusy || actionLoading === "generate_copo"}
-                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
-                      </button>
-                    )}
-
-                    {isCoord && currentCopo && !currentCopo.is_approved && (
-                      <button
-                        type="button"
-                        onClick={() => handleApproveCopo(currentCopo.copo_id)}
-                        disabled={actionLoading === `approve_copo_${currentCopo.copo_id}`}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {actionLoading === `approve_copo_${currentCopo.copo_id}`
-                          ? "Approving..."
-                          : "Approve CO-PO"}
-                      </button>
-                    )}
-
-                    {isCoord && currentCopo && currentCopo.is_approved && !currentCopo.is_active && (
-                      <button
-                        type="button"
-                        onClick={() => handleActivateCopo(currentCopo.copo_id)}
-                        disabled={actionLoading === `activate_copo_${currentCopo.copo_id}`}
-                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {actionLoading === `activate_copo_${currentCopo.copo_id}`
-                          ? "Activating..."
-                          : "Set as Active"}
-                      </button>
-                    )}
-                  </div>
-                </div>
+                )}
 
                 {Object.keys(copoDirtyCells).length > 0 && (
                   <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-2.5 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/50 dark:text-indigo-200">
@@ -3807,47 +4077,112 @@ const InsCourseArtifacts = () => {
 
                   return (
                     <div className="space-y-3">
-                      <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                              Correlation Matrix ({cosList.length} COs × {posList.length} POs)
-                            </span>
-                            {canEditMatrix && (
-                              <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                                Click any cell to edit score & justification
+                      <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
+                        {/* Streamlined Header Bar */}
+                        <div className="space-y-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                Course Outcome to Program Outcome (CO-PO) Correlation Matrix
+                              </h3>
+                              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                ({cosList.length} COs × {posList.length} POs)
                               </span>
-                            )}
+                              {currentCopo?.is_approved ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Approved
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                                  Draft Version {currentCopo?.version_number}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {isCoord && (
+                                <button
+                                  type="button"
+                                  onClick={openGenerateCopoModal}
+                                  disabled={isCopoBusy || actionLoading === "generate_copo"}
+                                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
+                                </button>
+                              )}
+
+                              {isCoord && currentCopo && !currentCopo.is_approved && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveCopo(currentCopo.copo_id)}
+                                  disabled={actionLoading === `approve_copo_${currentCopo.copo_id}`}
+                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {actionLoading === `approve_copo_${currentCopo.copo_id}`
+                                    ? "Approving..."
+                                    : "Approve CO-PO"}
+                                </button>
+                              )}
+
+                              {isCoord && currentCopo && currentCopo.is_approved && !currentCopo.is_active && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleActivateCopo(currentCopo.copo_id)}
+                                  disabled={actionLoading === `activate_copo_${currentCopo.copo_id}`}
+                                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  {actionLoading === `activate_copo_${currentCopo.copo_id}`
+                                    ? "Activating..."
+                                    : "Set as Active"}
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 3 = High
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 2 = Medium
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 1 = Low
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> 0 = None
-                            </span>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px] text-slate-500">
+                            <div>
+                              {canEditMatrix ? (
+                                <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                                  Click any cell to edit score & justification
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">
+                                  Matrix is read-only
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2.5 text-[10px] text-slate-500">
+                              <span className="flex items-center gap-1 font-medium">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500" /> 3 = High
+                              </span>
+                              <span className="flex items-center gap-1 font-medium">
+                                <span className="h-2 w-2 rounded-full bg-sky-500" /> 2 = Medium
+                              </span>
+                              <span className="flex items-center gap-1 font-medium">
+                                <span className="h-2 w-2 rounded-full bg-amber-500" /> 1 = Low
+                              </span>
+                              <span className="flex items-center gap-1 font-medium">
+                                <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" /> 0 = None
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        <table className="mt-2.5 w-full text-left text-xs border-collapse">
+                        <table className="mt-2 w-full text-left text-xs border-collapse">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
-                              <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 w-24">
+                              <th className="py-2 px-2.5 font-bold text-slate-700 dark:text-slate-300 w-20 text-[11px]">
                                 CO
                               </th>
-                              <th className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 min-w-[200px]">
+                              <th className="py-2 px-2.5 font-bold text-slate-700 dark:text-slate-300 min-w-[180px] text-[11px]">
                                 Outcome Description
                               </th>
                               {posList.map((po) => (
                                 <th
                                   key={po.po_id}
-                                  className="py-2.5 px-2 text-center font-bold text-slate-700 dark:text-slate-300 w-16"
+                                  className="py-2 px-1 text-center font-bold text-slate-700 dark:text-slate-300 w-14 text-[11px]"
                                 >
                                   {po.po_code}
                                 </th>
@@ -3860,10 +4195,10 @@ const InsCourseArtifacts = () => {
                                 key={co.course_outcome_id}
                                 className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition"
                               >
-                                <td className="py-2.5 px-3 font-bold text-indigo-600 dark:text-indigo-400">
+                                <td className="py-1.5 px-2.5 font-bold text-indigo-600 dark:text-indigo-400 text-xs">
                                   {co.co_code}
                                 </td>
-                                <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
+                                <td className="py-1.5 px-2.5 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
                                   {co.description ?? "—"}
                                 </td>
                                 {posList.map((po) => {
@@ -3874,7 +4209,7 @@ const InsCourseArtifacts = () => {
                                     return (
                                       <td
                                         key={po.po_id}
-                                        className="py-2.5 px-2 text-center text-slate-300"
+                                        className="py-1.5 px-1 text-center text-slate-300"
                                       >
                                         —
                                       </td>
@@ -3904,7 +4239,7 @@ const InsCourseArtifacts = () => {
                                       "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-semibold";
 
                                   return (
-                                    <td key={po.po_id} className="py-2 px-1 text-center">
+                                    <td key={po.po_id} className="py-1.5 px-1 text-center">
                                       <button
                                         type="button"
                                         disabled={!canEditMatrix}
@@ -3922,11 +4257,10 @@ const InsCourseArtifacts = () => {
                                             ? `${co.co_code} → ${po.po_code}: ${currentJust}`
                                             : `${co.co_code} → ${po.po_code} (${currentVal})`
                                         }
-                                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition ${colorClass} ${
-                                          canEditMatrix
-                                            ? "cursor-pointer hover:scale-110 hover:shadow-xs"
+                                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs transition ${colorClass} ${canEditMatrix
+                                            ? "cursor-pointer hover:scale-110 hover:shadow-sm"
                                             : "cursor-default"
-                                        } ${isDirty ? "ring-2 ring-indigo-500" : ""}`}
+                                          } ${isDirty ? "ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900" : ""}`}
                                       >
                                         {currentVal}
                                       </button>
@@ -4232,62 +4566,62 @@ const InsCourseArtifacts = () => {
                     <div className="space-y-3">
                       {hasUnits
                         ? unitsList.map((unit: any, uIdx: number) => {
-                            const uTopics = unit.topics ?? [];
-                            if (uTopics.length === 0) return null;
+                          const uTopics = unit.topics ?? [];
+                          if (uTopics.length === 0) return null;
 
-                            return (
-                              <div
-                                key={unit.id ?? uIdx}
-                                className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
-                                  <div className="flex items-center gap-2">
-                                    <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
-                                      Unit {unit.unit_number}
-                                    </span>
-                                    <div>
-                                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                                        {unit.unit_title}
-                                      </h4>
-                                    </div>
+                          return (
+                            <div
+                              key={unit.id ?? uIdx}
+                              className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                                    Unit {unit.unit_number}
+                                  </span>
+                                  <div>
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                      {unit.unit_title}
+                                    </h4>
                                   </div>
                                 </div>
-
-                                <div className="space-y-2">
-                                  {uTopics.map((topic: any, tIdx: number) => {
-                                    const sug = sugByTopicId.get(topic.id);
-                                    if (sug) renderedSugIds.add(sug.id);
-
-                                    return (
-                                      <div
-                                        key={topic.id ?? tIdx}
-                                        className="rounded-lg border border-slate-200/70 bg-slate-50/60 p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-2"
-                                      >
-                                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5 dark:border-slate-750">
-                                          <div className="flex items-center gap-2">
-                                            <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                                              Topic {unit.unit_number}.{topic.learning_sequence ?? tIdx + 1}
-                                            </span>
-                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                              {topic.topic_name}
-                                            </span>
-                                          </div>
-                                        </div>
-
-                                        {sug ? (
-                                          renderStrategyCards(sug)
-                                        ) : (
-                                          <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
-                                            No pedagogy strategies recorded for this topic.
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
                               </div>
-                            );
-                          })
+
+                              <div className="space-y-2">
+                                {uTopics.map((topic: any, tIdx: number) => {
+                                  const sug = sugByTopicId.get(topic.id);
+                                  if (sug) renderedSugIds.add(sug.id);
+
+                                  return (
+                                    <div
+                                      key={topic.id ?? tIdx}
+                                      className="rounded-lg border border-slate-200/70 bg-slate-50/60 p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-2"
+                                    >
+                                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5 dark:border-slate-750">
+                                        <div className="flex items-center gap-2">
+                                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                            Topic {unit.unit_number}.{topic.learning_sequence ?? tIdx + 1}
+                                          </span>
+                                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                            {topic.topic_name}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {sug ? (
+                                        renderStrategyCards(sug)
+                                      ) : (
+                                        <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
+                                          No pedagogy strategies recorded for this topic.
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })
                         : null}
                     </div>
                   );
@@ -4343,7 +4677,7 @@ const InsCourseArtifacts = () => {
                         className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
                       >
                         {actionLoading ===
-                        `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`
+                          `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`
                           ? "Approving..."
                           : "Approve Lesson Plan"}
                       </button>
@@ -4363,7 +4697,7 @@ const InsCourseArtifacts = () => {
                           className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
                         >
                           {actionLoading ===
-                          `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
+                            `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
                             ? "Activating..."
                             : "Set as Active"}
                         </button>
@@ -4624,12 +4958,12 @@ const InsCourseArtifacts = () => {
                     ? "Add Curriculum Unit"
                     : `Edit Unit ${modalForm.unit_number}`
                   : hierarchyModal.type === "topic"
-                  ? hierarchyModal.mode === "add"
-                    ? "Add Topic to Unit"
-                    : "Edit Topic"
-                  : hierarchyModal.mode === "add"
-                  ? "Add Subtopic to Topic"
-                  : "Edit Subtopic"}
+                    ? hierarchyModal.mode === "add"
+                      ? "Add Topic to Unit"
+                      : "Edit Topic"
+                    : hierarchyModal.mode === "add"
+                      ? "Add Subtopic to Topic"
+                      : "Edit Subtopic"}
               </h3>
               <button
                 type="button"
@@ -5075,11 +5409,10 @@ const InsCourseArtifacts = () => {
                       onClick={() =>
                         setCopoEditingCell({ ...copoEditingCell, matrix_value: opt.val })
                       }
-                      className={`rounded-lg border py-2 text-center text-xs font-bold transition ${opt.color} ${
-                        copoEditingCell.matrix_value === opt.val
+                      className={`rounded-lg border py-2 text-center text-xs font-bold transition ${opt.color} ${copoEditingCell.matrix_value === opt.val
                           ? "border-indigo-600 ring-2 ring-indigo-500/30"
                           : "border-slate-200 dark:border-slate-700"
-                      }`}
+                        }`}
                     >
                       {opt.label}
                     </button>
