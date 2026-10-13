@@ -49,6 +49,7 @@ import {
   CourseSelectorView,
   MCQStatsBanner,
   QuestionReviewPool,
+  AuthorManualQuestionModal,
 } from "@/components/mcq-generation";
 import {
   HierarchyUnitItem,
@@ -95,6 +96,7 @@ const MCQGenerationIndexPage = () => {
     isSetModalOpen: false,
     isConfigureModalOpen: false,
     configureModalData: null as any,
+    isAuthorModalOpen: false,
   });
 
   // Modal states for tests
@@ -305,7 +307,26 @@ const MCQGenerationIndexPage = () => {
         else if (res.data && Array.isArray(res.data)) rawList = res.data;
       }
       const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
-      setState({ courseQuestions: { ...state.courseQuestions, [courseKey]: fetched } });
+
+      // Merge local manual questions for this course
+      let manualQuestions: MCQQuestion[] = [];
+      try {
+        const rawManual = typeof window !== "undefined" ? localStorage.getItem(`neurobe_manual_questions_${courseKey}`) : null;
+        if (rawManual) {
+          const parsed = JSON.parse(rawManual);
+          if (Array.isArray(parsed)) {
+            manualQuestions = parsed.map((item, idx) => normalizeMCQ(item, idx));
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to load local manual questions:", e);
+      }
+
+      const existingIds = new Set(fetched.map((q) => q.id));
+      const filteredManual = manualQuestions.filter((q) => !existingIds.has(q.id));
+      const combined = [...filteredManual, ...fetched];
+
+      setState({ courseQuestions: { ...state.courseQuestions, [courseKey]: combined } });
     } catch (err) {
       console.error("Failed to fetch questions:", err);
     }
@@ -620,9 +641,70 @@ const MCQGenerationIndexPage = () => {
       await Models.mcq.delete_question(questionId);
       const updated = currentQuestions.filter((q) => q.id !== questionId);
       setState({ courseQuestions: { ...state.courseQuestions, [currentCourseKey]: updated } });
+
+      // Also clean up from localStorage if present
+      try {
+        const storageKey = `neurobe_manual_questions_${currentCourseKey}`;
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const existing = JSON.parse(raw);
+          localStorage.setItem(storageKey, JSON.stringify(existing.filter((q: any) => q.id !== questionId)));
+        }
+      } catch {}
+      Success("Question deleted successfully.");
     } catch {
       showToast("error", "Failed to delete question.");
     }
+  };
+
+  const handleSaveManualQuestion = async (newQuestionData: any) => {
+    if (!state.selectedCourse) return;
+    const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+
+    // 1. Attempt to persist to backend
+    let savedFromBackend: any = null;
+    try {
+      const apiPayload = {
+        course_id: String(courseKey),
+        ...newQuestionData,
+      };
+      savedFromBackend = await (Models.mcq as any).create_manual_question(apiPayload).catch(() => null);
+    } catch (e) {
+      console.warn("Backend manual question creation:", e);
+    }
+
+    const createdId = savedFromBackend?.id || `man-${Date.now()}`;
+    const questionObj = normalizeMCQ(
+      {
+        ...newQuestionData,
+        id: createdId,
+      },
+      currentQuestions.length || 0
+    );
+
+    // 2. Persist to localStorage
+    try {
+      const storageKey = `neurobe_manual_questions_${courseKey}`;
+      const raw = localStorage.getItem(storageKey);
+      const existing = raw ? JSON.parse(raw) : [];
+      const updated = [questionObj, ...existing.filter((q: any) => q.id !== createdId)];
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    } catch (e) {
+      console.warn("Failed to persist manual question to localStorage:", e);
+    }
+
+    // 3. Update state
+    const existingList = state.courseQuestions[courseKey] || [];
+    const updatedList = [questionObj, ...existingList.filter((q) => q.id !== createdId)];
+
+    setState({
+      courseQuestions: { ...state.courseQuestions, [courseKey]: updatedList },
+      recentQuestionIds: [createdId, ...(state.recentQuestionIds || [])],
+      selectedBannerFilter: "all",
+      isAuthorModalOpen: false,
+    });
+
+    Success("✓ Question authored manually and added to question pool!");
   };
 
   const handleToggleExpandOne = (id: string) => {
@@ -913,6 +995,7 @@ const MCQGenerationIndexPage = () => {
                   onDeleteQuestion={isUserCoordinator ? handleDeleteQuestion : undefined}
                   onApproveAll={isUserCoordinator ? handleApproveAll : undefined}
                   onCreateQuestionSet={() => setState({ isSetModalOpen: true })}
+                  onAuthorManually={() => setState({ isAuthorModalOpen: true })}
                   isGeneratingAI={state.isGeneratingAI}
                 />
               </div>
@@ -1067,6 +1150,20 @@ const MCQGenerationIndexPage = () => {
               onCreated={() => {
                 fetchQuestions(state.selectedCourse?.code || state.selectedCourse?.id);
               }}
+            />
+          )}
+
+          {/* Author Manual Question Modal */}
+          {state.isAuthorModalOpen && (
+            <AuthorManualQuestionModal
+              open={state.isAuthorModalOpen}
+              onClose={() => setState({ isAuthorModalOpen: false })}
+              courseId={state.selectedCourse?.code || state.selectedCourse?.id}
+              courseCode={state.selectedCourse?.code || state.selectedCourse?.course_code || "MCQ"}
+              courseTitle={state.selectedCourse?.title || state.selectedCourse?.course_title || "Course"}
+              hierarchyUnits={state.hierarchyUnits}
+              nextQuestionIndex={(currentQuestions.length || 0) + 1}
+              onSave={handleSaveManualQuestion}
             />
           )}
 

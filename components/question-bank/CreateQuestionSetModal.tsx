@@ -469,12 +469,20 @@ export const CreateQuestionSetModal: React.FC<CreateQuestionSetModalProps> = ({
                         </div>
 
                         {/* Question Text */}
-                        <p
-                          onClick={() => toggleSelect(q.id)}
-                          className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600 transition-colors leading-relaxed"
-                        >
-                          {q.question || q.text}
-                        </p>
+                        {(q.question || q.text || "").includes("<") ? (
+                          <div
+                            onClick={() => toggleSelect(q.id)}
+                            className="rich-text-content block text-xs sm:text-sm font-bold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600 transition-colors leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: q.question || q.text }}
+                          />
+                        ) : (
+                          <p
+                            onClick={() => toggleSelect(q.id)}
+                            className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600 transition-colors leading-relaxed"
+                          >
+                            {q.question || q.text}
+                          </p>
+                        )}
 
                         {/* Collapsible preview toggle */}
                         <div className="mt-2 flex items-center justify-between">
@@ -522,7 +530,14 @@ export const CreateQuestionSetModal: React.FC<CreateQuestionSetModalProps> = ({
                                     >
                                       {key}
                                     </span>
-                                    <span className="flex-1 leading-snug">{opt.text || opt.option}</span>
+                                    {(opt.text || opt.option || "").includes("<") ? (
+                                      <div
+                                        className="rich-text-content flex-1 leading-snug"
+                                        dangerouslySetInnerHTML={{ __html: opt.text || opt.option }}
+                                      />
+                                    ) : (
+                                      <span className="flex-1 leading-snug">{opt.text || opt.option}</span>
+                                    )}
                                     {isCorrect && <Check className="h-3 w-3 text-emerald-600 shrink-0" />}
                                   </div>
                                 );
@@ -533,10 +548,17 @@ export const CreateQuestionSetModal: React.FC<CreateQuestionSetModalProps> = ({
                             {q.explanation && (
                               <div className="flex items-start gap-2 rounded-lg bg-indigo-50/50 p-2 text-[11px] text-indigo-950 dark:bg-indigo-950/20 dark:text-indigo-200">
                                 <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
-                                <p>
+                                <div className="flex-1">
                                   <strong>Rationale: </strong>
-                                  {q.explanation}
-                                </p>
+                                  {(q.explanation || "").includes("<") ? (
+                                    <span
+                                      className="rich-text-content inline"
+                                      dangerouslySetInnerHTML={{ __html: q.explanation }}
+                                    />
+                                  ) : (
+                                    <span>{q.explanation}</span>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>

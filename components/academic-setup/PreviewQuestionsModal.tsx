@@ -149,9 +149,16 @@ export const PreviewQuestionsModal: React.FC<PreviewQuestionsModalProps> = ({
                   </div>
 
                   {/* Question Text */}
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white leading-relaxed">
-                    {qText}
-                  </p>
+                  {qText.includes("<") ? (
+                    <div
+                      className="rich-text-content block text-sm font-semibold text-gray-900 dark:text-white leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: qText }}
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white leading-relaxed">
+                      {qText}
+                    </p>
+                  )}
 
                   {/* Options */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -178,7 +185,14 @@ export const PreviewQuestionsModal: React.FC<PreviewQuestionsModalProps> = ({
                           >
                             {optKey}
                           </span>
-                          <span className="flex-1 min-w-0 pt-0.5">{optText}</span>
+                          {optText.includes("<") ? (
+                            <div
+                              className="rich-text-content flex-1 min-w-0 pt-0.5"
+                              dangerouslySetInnerHTML={{ __html: optText }}
+                            />
+                          ) : (
+                            <span className="flex-1 min-w-0 pt-0.5">{optText}</span>
+                          )}
                           {isCorrect && (
                             <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                           )}

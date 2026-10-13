@@ -277,7 +277,14 @@ const QuestionDetailCard: React.FC<QuestionDetailCardProps> = ({
         {/* Question Statement (Clickable to toggle expand) */}
         <div className="mt-3.5 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed tracking-tight hover:text-indigo-600 transition-colors">
-            {questionStatement}
+            {/<[a-z][\s\S]*>/i.test(questionStatement || "") ? (
+              <span
+                className="rich-text-content block"
+                dangerouslySetInnerHTML={{ __html: questionStatement }}
+              />
+            ) : (
+              questionStatement
+            )}
           </h3>
         </div>
 
@@ -325,15 +332,26 @@ const QuestionDetailCard: React.FC<QuestionDetailCardProps> = ({
                     </span>
 
                     {/* Option Text */}
-                    <span
-                      className={`flex-1 text-xs sm:text-sm leading-snug ${
-                        opt.isCorrect
-                          ? "font-bold text-emerald-950 dark:text-emerald-100"
-                          : "font-medium text-slate-700 dark:text-slate-300"
-                      }`}
-                    >
-                      {opt.text}
-                    </span>
+                    {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
+                      <span
+                        className={`rich-text-content flex-1 text-xs sm:text-sm leading-snug ${
+                          opt.isCorrect
+                            ? "font-bold text-emerald-950 dark:text-emerald-100"
+                            : "font-medium text-slate-700 dark:text-slate-300"
+                        }`}
+                        dangerouslySetInnerHTML={{ __html: opt.text }}
+                      />
+                    ) : (
+                      <span
+                        className={`flex-1 text-xs sm:text-sm leading-snug ${
+                          opt.isCorrect
+                            ? "font-bold text-emerald-950 dark:text-emerald-100"
+                            : "font-medium text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        {opt.text}
+                      </span>
+                    )}
 
                     {/* Correct Label Badge */}
                     {opt.isCorrect && (
@@ -357,9 +375,16 @@ const QuestionDetailCard: React.FC<QuestionDetailCardProps> = ({
                   <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 block">
                     Explanation & Rationale
                   </span>
-                  <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                    {explanation}
-                  </p>
+                  {/<[a-z][\s\S]*>/i.test(explanation || "") ? (
+                    <div
+                      className="rich-text-content text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal"
+                      dangerouslySetInnerHTML={{ __html: explanation }}
+                    />
+                  ) : (
+                    <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
+                      {explanation}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

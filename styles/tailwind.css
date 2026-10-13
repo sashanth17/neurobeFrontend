@@ -30,6 +30,9 @@
 /* markdown-editor css */
 @import "./markdown-editor.css";
 
+/* ckeditor css */
+@import "./ckeditor.css";
+
 /* file upload with preview */
 @import "./file-upload-preview.css";
 

@@ -33,6 +33,7 @@ interface QuestionReviewPoolProps {
   onDeleteQuestion: (id: string) => void;
   onApproveAll: () => void;
   onCreateQuestionSet: () => void;
+  onAuthorManually?: () => void;
   isGeneratingAI: boolean;
 }
 
@@ -52,6 +53,7 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
   onDeleteQuestion,
   onApproveAll,
   onCreateQuestionSet,
+  onAuthorManually,
   isGeneratingAI,
 }) => {
   const isAllExpanded =
@@ -120,6 +122,17 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
             </button>
           )}
 
+          {onAuthorManually && (
+            <button
+              type="button"
+              onClick={onAuthorManually}
+              className="flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs font-bold text-purple-700 transition hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 active:scale-98"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Author Manually</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onCreateQuestionSet}
@@ -146,13 +159,25 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
           <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">
             No questions found matching "{selectedBannerFilter}".
           </p>
-          <button
-            type="button"
-            onClick={() => onSelectBannerFilter("all")}
-            className="mt-3 text-xs font-bold text-indigo-600 hover:underline"
-          >
-            Show All Course Questions ({currentQuestions.length})
-          </button>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => onSelectBannerFilter("all")}
+              className="text-xs font-bold text-indigo-600 hover:underline px-2 py-1"
+            >
+              Show All Course Questions ({currentQuestions.length})
+            </button>
+            {onAuthorManually && (
+              <button
+                type="button"
+                onClick={onAuthorManually}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 transition"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Author Manually</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -311,7 +336,14 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
                   {/* Question Statement */}
                   <div className="mt-3.5 cursor-pointer" onClick={() => onToggleExpandOne(question.id)}>
                     <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed tracking-tight hover:text-indigo-600 transition-colors">
-                      {question.question || question.text}
+                      {/<[a-z][\s\S]*>/i.test(question.question || question.text || "") ? (
+                        <span
+                          className="rich-text-content block"
+                          dangerouslySetInnerHTML={{ __html: question.question || question.text }}
+                        />
+                      ) : (
+                        question.question || question.text
+                      )}
                     </h3>
                   </div>
 
@@ -338,15 +370,26 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
                             >
                               {opt.key}
                             </span>
-                            <span
-                              className={`flex-1 text-xs sm:text-sm leading-snug ${
-                                opt.isCorrect
-                                  ? "font-bold text-emerald-950 dark:text-emerald-100"
-                                  : "font-medium text-slate-700 dark:text-slate-300"
-                              }`}
-                            >
-                              {opt.text}
-                            </span>
+                            {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
+                              <span
+                                className={`rich-text-content flex-1 text-xs sm:text-sm leading-snug ${
+                                  opt.isCorrect
+                                    ? "font-bold text-emerald-950 dark:text-emerald-100"
+                                    : "font-medium text-slate-700 dark:text-slate-300"
+                                }`}
+                                dangerouslySetInnerHTML={{ __html: opt.text }}
+                              />
+                            ) : (
+                              <span
+                                className={`flex-1 text-xs sm:text-sm leading-snug ${
+                                  opt.isCorrect
+                                    ? "font-bold text-emerald-950 dark:text-emerald-100"
+                                    : "font-medium text-slate-700 dark:text-slate-300"
+                                }`}
+                              >
+                                {opt.text}
+                              </span>
+                            )}
                             {opt.isCorrect && (
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-xs shrink-0">
                                 <Check className="h-3 w-3 stroke-[3]" />
@@ -367,9 +410,16 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
                             <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 block">
                               Explanation & Rationale
                             </span>
-                            <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                              {question.explanation}
-                            </p>
+                            {/<[a-z][\s\S]*>/i.test(question.explanation || "") ? (
+                              <div
+                                className="rich-text-content text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal"
+                                dangerouslySetInnerHTML={{ __html: question.explanation }}
+                              />
+                            ) : (
+                              <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
+                                {question.explanation}
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}

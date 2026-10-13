@@ -6,6 +6,7 @@ interface ViewQuestionModalProps {
   onClose: () => void;
   question: {
     id: string;
+    code?: string;
     status: "approved" | "reviewed" | "pending";
     aiVersion?: string;
     unit: string;
@@ -30,6 +31,20 @@ interface ViewQuestionModalProps {
   onCreateDraft?: () => void;
 }
 
+const getCleanQuestionTitle = (raw: string, maxLen = 85) => {
+  if (!raw) return "Question Details";
+  const text = raw
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "Question Statement & Formula";
+  return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
+};
+
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
 const OptionCell = ({
@@ -53,13 +68,22 @@ const OptionCell = ({
     >
       {letter}
     </span>
-    <span
-      className={`text-sm font-medium ${
-        isCorrect ? "text-green-800" : "text-[#000]"
-      }`}
-    >
-      {text}
-    </span>
+    {/<[a-z][\s\S]*>/i.test(text || "") ? (
+      <span
+        className={`rich-text-content text-sm font-medium ${
+          isCorrect ? "text-green-800" : "text-[#000]"
+        }`}
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    ) : (
+      <span
+        className={`text-sm font-medium ${
+          isCorrect ? "text-green-800" : "text-[#000]"
+        }`}
+      >
+        {text}
+      </span>
+    )}
   </div>
 );
 
@@ -97,8 +121,8 @@ const ViewQuestionModal = ({
           {/* Top bar */}
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="border-color2 text-color2 rounded-lg border px-3 py-1 text-xs font-bold">
-                {question.id}
+              <span className="border-color2 text-color2 rounded-lg border px-3 py-1 text-xs font-bold font-mono">
+                {question.code || question.id}
               </span>
               {question.status === "approved" && (
                 <span className="flex items-center gap-1 rounded-lg border border-green-400 bg-white px-3 py-1 text-xs font-semibold text-green-600">
@@ -136,9 +160,8 @@ const ViewQuestionModal = ({
                 </>
               )}
             </p>
-            <h2 className="text-base font-bold text-[#000] dark:text-white">
-              {question.question.slice(0, 60)}
-              {question.question.length > 60 ? "..." : ""}
+            <h2 className="text-base font-bold text-[#000] dark:text-white leading-snug">
+              {getCleanQuestionTitle(question.question)}
             </h2>
           </div>
 
@@ -176,7 +199,14 @@ const ViewQuestionModal = ({
             Question Statement
           </p>
           <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm font-semibold text-[#000] dark:bg-gray-800 dark:text-gray-200">
-            {question.question}
+            {/<[a-z][\s\S]*>/i.test(question.question || "") ? (
+              <div
+                className="rich-text-content"
+                dangerouslySetInnerHTML={{ __html: question.question }}
+              />
+            ) : (
+              question.question
+            )}
           </div>
 
           {/* Answer Options */}
@@ -210,7 +240,14 @@ const ViewQuestionModal = ({
                 Solution & Explanation
               </p>
               <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-[#000] dark:bg-gray-800 dark:text-gray-300">
-                {question.explanation}
+                {/<[a-z][\s\S]*>/i.test(question.explanation || "") ? (
+                  <div
+                    className="rich-text-content"
+                    dangerouslySetInnerHTML={{ __html: question.explanation }}
+                  />
+                ) : (
+                  question.explanation
+                )}
               </div>
             </>
           )}

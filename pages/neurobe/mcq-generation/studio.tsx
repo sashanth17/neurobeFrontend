@@ -25,6 +25,7 @@ import {
   DistributionMode,
   KnowledgeLevelBreakdown,
   PEDAGOGICAL_PRESETS,
+  AuthorManualQuestionModal,
 } from "@/components/mcq-generation";
 
 const MCQGenerationStudioPage = () => {
@@ -88,6 +89,7 @@ const MCQGenerationStudioPage = () => {
     viewQuestion: null as MCQQuestion | null,
     isViewModalOpen: false,
     isSetModalOpen: false,
+    isAuthorModalOpen: false,
   });
 
   useEffect(() => {
@@ -690,6 +692,39 @@ const MCQGenerationStudioPage = () => {
     }
   };
 
+  const handleSaveManualQuestion = async (newQuestionData: any) => {
+    if (!state.selectedCourse) return;
+    const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+
+    try {
+      const apiPayload = {
+        course_id: String(courseKey),
+        ...newQuestionData,
+      };
+      await (Models.mcq as any).create_manual_question(apiPayload).catch(() => null);
+    } catch (e) {
+      console.warn("Backend manual question creation:", e);
+    }
+
+    const createdId = `man-${Date.now()}`;
+    const questionObj = normalizeMCQ(
+      {
+        ...newQuestionData,
+        id: createdId,
+      },
+      currentQuestions.length || 0
+    );
+
+    const updated = [questionObj, ...currentQuestions.filter((q) => q.id !== createdId)];
+    setState({
+      courseQuestions: updated,
+      recentQuestionIds: [createdId, ...(state.recentQuestionIds || [])],
+      selectedBannerFilter: "all",
+      isAuthorModalOpen: false,
+    });
+    showToast("success", "✓ Question authored manually and added to question pool!");
+  };
+
   const handleToggleExpandOne = (id: string) => {
     const current = state.expandedQuestionIds || [];
     if (current.includes(id)) {
@@ -857,6 +892,7 @@ const MCQGenerationStudioPage = () => {
             onDeleteQuestion={handleDeleteQuestion}
             onApproveAll={handleApproveAll}
             onCreateQuestionSet={() => setState({ isSetModalOpen: true })}
+            onAuthorManually={() => setState({ isAuthorModalOpen: true })}
           />
 
           <EditQuestionModal
@@ -969,6 +1005,19 @@ const MCQGenerationStudioPage = () => {
               onCreated={() => {
                 fetchQuestions(state.selectedCourse?.code || state.selectedCourse?.id);
               }}
+            />
+          )}
+
+          {/* Author Manual Question Modal */}
+          {state.isAuthorModalOpen && (
+            <AuthorManualQuestionModal
+              open={state.isAuthorModalOpen}
+              onClose={() => setState({ isAuthorModalOpen: false })}
+              courseId={state.selectedCourse?.code || state.selectedCourse?.id}
+              courseCode={state.selectedCourse?.code || state.selectedCourse?.course_code || "MCQ"}
+              courseTitle={state.selectedCourse?.title || state.selectedCourse?.course_title || "Course"}
+              nextQuestionIndex={(currentQuestions.length || 0) + 1}
+              onSave={handleSaveManualQuestion}
             />
           )}
         </>

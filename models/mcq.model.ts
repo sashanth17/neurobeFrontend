@@ -82,6 +82,28 @@ const mcq = {
         return promise;
     },
 
+    create_question: (data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/mcq/history/questions`;
+            commonInstance()
+                .post(url, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+        return promise;
+    },
+
+    create_manual_question: (data: any) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `course/mcq/history/questions`;
+            commonInstance()
+                .post(url, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data || error));
+        });
+        return promise;
+    },
+
     create_set: (data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course/mcq/sets`;
