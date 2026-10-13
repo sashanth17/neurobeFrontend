@@ -104,7 +104,7 @@ const MyAssignedCourses = () => {
   return (
     <div className="min-h-screen space-y-6 pb-12">
       {/* Header & Page Title */}
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center py-">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             My Courses
@@ -126,10 +126,10 @@ const MyAssignedCourses = () => {
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 px-10">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+            <div className="flex h-2 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
@@ -197,33 +197,30 @@ const MyAssignedCourses = () => {
             <button
               type="button"
               onClick={() => setRoleFilter("all")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                roleFilter === "all"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${roleFilter === "all"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
             >
               All
             </button>
             <button
               type="button"
               onClick={() => setRoleFilter("coordinator")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                roleFilter === "coordinator"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${roleFilter === "coordinator"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
             >
               Coordinator
             </button>
             <button
               type="button"
               onClick={() => setRoleFilter("instructor")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                roleFilter === "instructor"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${roleFilter === "instructor"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
             >
               Instructor
             </button>

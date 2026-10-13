@@ -276,7 +276,27 @@ const course = {
             let url = `course/dashboard/courses/${courseId}/portfolio`;
             commonInstance()
                 .get(url)
-                .then((res) => resolve(res.data))
+                .then((res) => {
+                    const sortedPortfolio = {
+                        ...res.data,
+                        versions: Object.fromEntries(
+                        Object.entries(res.data.versions).map(([key, value]: [string, any]) => [
+                            key,
+                            [...value]
+                        .sort(
+                            (a, b) =>
+                            (a.version_id ?? a.extraction_version_id) -
+                            (b.version_id ?? b.extraction_version_id)
+                        )
+                        .map((item, index) => ({
+                            ...item,
+                            version_number: index + 1,
+                        })),
+                    ])
+                    ),
+                };
+                    resolve(sortedPortfolio)
+                })
                 .catch((error) => {
                     reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
                 });
