@@ -163,11 +163,19 @@ function InstanceDashboardPage() {
       </div>
 
       {/* ── Tab Content ──────────────────────────────────────────────────────── */}
-      <div className={`p-6 ${activeTab === "co-po-attainment" ? "flex-1" : "flex-1 overflow-hidden"}`}>
+      <div
+        className={`p-6 ${
+          activeTab === "co-po-attainment"
+            ? "flex-1"
+            : activeTab === "mcq-test-execution"
+            ? "flex-1 min-h-0 overflow-y-auto"
+            : "flex-1 overflow-hidden"
+        }`}
+      >
 
         {/* MCQ Test Execution — renders independently for this course instance */}
         {activeTab === "mcq-test-execution" && (
-          <div className="h-full">
+          <div className="w-full pb-16">
             <MCQTestExecution/>
           </div>
         )}

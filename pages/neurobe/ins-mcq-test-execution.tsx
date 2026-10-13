@@ -743,7 +743,7 @@ const MCQTestExecution = () => {
   const studentCount = activeCourse?.students_count ?? activeCourse?.student_count ?? 0;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-16">
 
 
       {/* 3. Summary Stats Banner */}

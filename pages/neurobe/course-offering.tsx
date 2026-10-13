@@ -583,22 +583,6 @@ const CourseOfferingPage = () => {
                         {course.semester ? ` • Semester ${course.semester}` : ""}
                       </span>
                     </p>
-
-                    {/* Quick Stats Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-4 rounded-xl bg-gray-50/80 p-3 dark:bg-gray-700/40">
-                      <div>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Classrooms</span>
-                        <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200">
-                          {course.instances_count || 0} Offerings
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Enrolled</span>
-                        <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200">
-                          {course.students_count || 0} Students
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Footer CTA */}

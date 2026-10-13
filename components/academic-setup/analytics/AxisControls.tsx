@@ -46,18 +46,18 @@ const AxisControls: React.FC<AxisControlsProps> = ({
   onBandStepChange,
 }) => {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/60 overflow-x-auto scrollbar-thin">
       {/* Chart Type Selector */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-        <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-thin shrink-0 max-w-full">
+        <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
           Chart:
         </span>
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800 shrink-0">
           {CHART_TYPES.map((t) => (
             <button
               key={t.id}
               onClick={() => onChartTypeChange(t.id)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all shrink-0 ${
                 chartType === t.id
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/60"
@@ -71,7 +71,7 @@ const AxisControls: React.FC<AxisControlsProps> = ({
       </div>
 
       {/* Axis & Scale Adjustment */}
-      <div className="flex flex-wrap items-center gap-3 text-xs">
+      <div className="flex flex-wrap items-center gap-3 text-xs shrink-0">
         {/* X-Axis Scale: Percent vs Raw */}
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-semibold text-slate-500">X-Scale:</span>
