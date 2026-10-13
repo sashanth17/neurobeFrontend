@@ -20,6 +20,7 @@ import {
   normalizeMCQ,
   MCQStatsBanner,
   QuestionReviewPool,
+  AuthorManualQuestionModal,
 } from "@/components/mcq-generation";
 
 interface CourseQuestionBankTabProps {
@@ -61,6 +62,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [viewQuestion, setViewQuestion] = useState<any | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
 
   // Coordinator toggle state: "Created by me" (default) vs "Others"
   const [ownershipFilter, setOwnershipFilter] = useState<"me" | "others">("me");
@@ -225,6 +227,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
 
     setViewQuestion({
       id: q.id,
+      code: q.code || (q as any).question_code,
       status: q.status as any,
       unit: q.unit,
       topic: q.topic,
@@ -305,6 +308,43 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
     } catch {
       Failure("Failed to delete Question Set.");
     }
+  };
+
+  const handleSaveManualQuestion = async (newQuestionData: any) => {
+    try {
+      const apiPayload = {
+        course_id: String(courseKey),
+        ...newQuestionData,
+      };
+      await (Models.mcq as any).create_manual_question(apiPayload).catch(() => null);
+    } catch (e) {
+      console.warn("Backend manual question creation:", e);
+    }
+
+    const createdId = `man-${Date.now()}`;
+    const questionObj = normalizeMCQ(
+      {
+        ...newQuestionData,
+        id: createdId,
+      },
+      questions.length || 0
+    );
+
+    // Persist to localStorage
+    try {
+      const storageKey = `neurobe_manual_questions_${courseKey}`;
+      const raw = localStorage.getItem(storageKey);
+      const existing = raw ? JSON.parse(raw) : [];
+      const updated = [questionObj, ...existing.filter((q: any) => q.id !== createdId)];
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    } catch (e) {}
+
+    setQuestions((prev) => [questionObj, ...prev]);
+    setRecentQuestionIds((prev) => [createdId, ...prev]);
+    setSelectedBannerFilter("all");
+    setIsAuthorModalOpen(false);
+    Success("✓ Question authored manually and added to question pool!");
+    if (onRefreshQuestions) onRefreshQuestions();
   };
 
   const handleEditSetName = async (setId: string, newName: string) => {
@@ -470,6 +510,16 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
             <span>Generate MCQs</span>
           </button>
 
+          {/* Author Manually Button */}
+          <button
+            type="button"
+            onClick={() => setIsAuthorModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-2xl border border-purple-200 bg-white px-3.5 py-2.5 text-xs font-bold text-purple-700 shadow-sm hover:bg-purple-50 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300 transition active:scale-98"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Author Manually</span>
+          </button>
+
           {/* Primary Create Button */}
           <button
             type="button"
@@ -553,6 +603,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
               onDeleteQuestion={handleDeleteQuestion}
               onApproveAll={handleApproveAll}
               onCreateQuestionSet={handleCreateQuestionSet}
+              onAuthorManually={() => setIsAuthorModalOpen(true)}
               isGeneratingAI={false}
             />
           )}
@@ -642,6 +693,19 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
           set={selectedSet}
           availableQuestions={questions}
           onAddQuestions={handleAddQuestionsToSet}
+        />
+      )}
+
+      {/* Author Manual Question Modal */}
+      {isAuthorModalOpen && (
+        <AuthorManualQuestionModal
+          open={isAuthorModalOpen}
+          onClose={() => setIsAuthorModalOpen(false)}
+          courseId={courseKey}
+          courseCode={courseKey}
+          courseTitle={courseTitle}
+          nextQuestionIndex={(questions.length || 0) + 1}
+          onSave={handleSaveManualQuestion}
         />
       )}
     </div>

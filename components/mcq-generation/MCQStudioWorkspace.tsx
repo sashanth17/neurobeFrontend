@@ -80,6 +80,7 @@ export interface MCQStudioWorkspaceProps {
   onDeleteQuestion: (id: string) => void;
   onApproveAll: () => void;
   onCreateQuestionSet: () => void;
+  onAuthorManually?: () => void;
 }
 
 export const MCQStudioWorkspace: React.FC<MCQStudioWorkspaceProps> = ({
@@ -151,6 +152,7 @@ export const MCQStudioWorkspace: React.FC<MCQStudioWorkspaceProps> = ({
   onDeleteQuestion,
   onApproveAll,
   onCreateQuestionSet,
+  onAuthorManually,
 }) => {
   return (
     <div className="space-y-6">
@@ -229,6 +231,7 @@ export const MCQStudioWorkspace: React.FC<MCQStudioWorkspaceProps> = ({
         onDeleteQuestion={onDeleteQuestion}
         onApproveAll={onApproveAll}
         onCreateQuestionSet={onCreateQuestionSet}
+        onAuthorManually={onAuthorManually}
         isGeneratingAI={isGeneratingAI}
       />
     </div>

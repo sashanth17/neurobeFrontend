@@ -214,9 +214,16 @@ export const AddQuestionsToSetModal: React.FC<AddQuestionsToSetModalProps> = ({
                         {q.marks || "2"} Marks
                       </span>
                     </div>
-                    <p className="text-xs font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
-                      {q.question || q.text}
-                    </p>
+                    {(q.question || q.text || "").includes("<") ? (
+                      <div
+                        className="rich-text-content block text-xs font-medium text-slate-800 dark:text-slate-200 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: q.question || q.text }}
+                      />
+                    ) : (
+                      <p className="text-xs font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
+                        {q.question || q.text}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

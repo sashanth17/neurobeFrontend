@@ -272,9 +272,16 @@ export const QuestionSetDetailView: React.FC<QuestionSetDetailViewProps> = ({
 
                 {/* Question Statement */}
                 <div className="mt-3.5 cursor-pointer" onClick={() => toggleExpand(q.id)}>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed tracking-tight hover:text-indigo-600 transition-colors">
-                    {q.question || q.text}
-                  </h3>
+                  {(q.question || q.text || "").includes("<") ? (
+                    <div
+                      className="rich-text-content block text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed tracking-tight hover:text-indigo-600 transition-colors"
+                      dangerouslySetInnerHTML={{ __html: q.question || q.text }}
+                    />
+                  ) : (
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed tracking-tight hover:text-indigo-600 transition-colors">
+                      {q.question || q.text}
+                    </h3>
+                  )}
                 </div>
 
                 {/* Expanded Options, Explanation, Actions */}
@@ -304,15 +311,26 @@ export const QuestionSetDetailView: React.FC<QuestionSetDetailViewProps> = ({
                             >
                               {key}
                             </span>
-                            <span
-                              className={`flex-1 text-xs sm:text-sm ${
-                                isCorrect
-                                  ? "font-bold text-emerald-950 dark:text-emerald-100"
-                                  : "font-medium text-slate-700 dark:text-slate-300"
-                              }`}
-                            >
-                              {opt.text || opt.option}
-                            </span>
+                            {(opt.text || opt.option || "").includes("<") ? (
+                              <div
+                                className={`rich-text-content flex-1 text-xs sm:text-sm ${
+                                  isCorrect
+                                    ? "font-bold text-emerald-950 dark:text-emerald-100"
+                                    : "font-medium text-slate-700 dark:text-slate-300"
+                                }`}
+                                dangerouslySetInnerHTML={{ __html: opt.text || opt.option }}
+                              />
+                            ) : (
+                              <span
+                                className={`flex-1 text-xs sm:text-sm ${
+                                  isCorrect
+                                    ? "font-bold text-emerald-950 dark:text-emerald-100"
+                                    : "font-medium text-slate-700 dark:text-slate-300"
+                                }`}
+                              >
+                                {opt.text || opt.option}
+                              </span>
+                            )}
                             {isCorrect && (
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs shrink-0">
                                 <Check className="h-3 w-3 stroke-[3]" />
@@ -334,9 +352,16 @@ export const QuestionSetDetailView: React.FC<QuestionSetDetailViewProps> = ({
                           <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 block">
                             Explanation & Rationale
                           </span>
-                          <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                            {q.explanation}
-                          </p>
+                          {(q.explanation || "").includes("<") ? (
+                            <div
+                              className="rich-text-content text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal"
+                              dangerouslySetInnerHTML={{ __html: q.explanation }}
+                            />
+                          ) : (
+                            <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
+                              {q.explanation}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}

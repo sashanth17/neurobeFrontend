@@ -10,3 +10,4 @@ export * from "./PedagogicalFocusCard";
 export * from "./OutputConfigCard";
 export * from "./MCQStudioWorkspace";
 export * from "./SimplifiedMCQGenerator";
+export * from "./AuthorManualQuestionModal";

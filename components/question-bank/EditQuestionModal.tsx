@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import Models from "@/imports/models.import";
 import { Success, Failure } from "@/utils/function.utils";
-import { Check, RefreshCw, Lock } from "lucide-react";
+import { Check, RefreshCw, Lock, Image as ImageIcon } from "lucide-react";
 import { ModalShell } from "@/components/academic-setup/AddModals";
 import TextInput from "@/components/FormFields/TextInput.component";
 import TextArea from "@/components/FormFields/TextArea.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
+import CKEditorField from "@/components/FormFields/CKEditorField.component";
 import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 const UNIT_OPTIONS = [
@@ -101,31 +102,32 @@ export const EditQuestionModal = ({
     explanation: "",
   });
 
-  const correctAnswerOptions = [
-    { value: "A", label: `A. ${form.optionA || "Option A"}` },
-    { value: "B", label: `B. ${form.optionB || "Option B"}` },
-    { value: "C", label: `C. ${form.optionC || "Option C"}` },
-    { value: "D", label: `D. ${form.optionD || "Option D"}` },
-  ];
-
   useEffect(() => {
     if (initialData && open) {
-      const corrKey = typeof initialData.correctAnswer === "object"
-        ? (initialData.correctAnswer?.value || "A")
-        : (initialData.correctAnswer || "A");
+      let corrKey = "A";
+      if (initialData.correctAnswer) {
+        corrKey = typeof initialData.correctAnswer === "object"
+          ? (initialData.correctAnswer?.value || "A")
+          : String(initialData.correctAnswer);
+      } else if (Array.isArray(initialData.options)) {
+        const found = initialData.options.find((o: any) => o.isCorrect === true || o.is_correct === true);
+        if (found?.key) corrKey = found.key;
+      }
 
-      const optA = initialData.optionA ?? "";
-      const optB = initialData.optionB ?? "";
-      const optC = initialData.optionC ?? "";
-      const optD = initialData.optionD ?? "";
-
-      const getLabel = (k: string) => {
-        if (k === "A") return `A. ${optA || "Option A"}`;
-        if (k === "B") return `B. ${optB || "Option B"}`;
-        if (k === "C") return `C. ${optC || "Option C"}`;
-        if (k === "D") return `D. ${optD || "Option D"}`;
-        return `A. ${optA || "Option A"}`;
+      const getOpt = (k: string, idx: number) => {
+        if (initialData[`option${k}`] !== undefined) return initialData[`option${k}`];
+        if (Array.isArray(initialData.options)) {
+          const byKey = initialData.options.find((o: any) => (o.key || "").toUpperCase() === k);
+          if (byKey) return byKey.text || byKey.option || "";
+          return initialData.options[idx]?.text || initialData.options[idx]?.option || "";
+        }
+        return "";
       };
+
+      const optA = getOpt("A", 0);
+      const optB = getOpt("B", 1);
+      const optC = getOpt("C", 2);
+      const optD = getOpt("D", 3);
 
       setForm({
         id: initialData.id || "",
@@ -137,12 +139,12 @@ export const EditQuestionModal = ({
         questionType: initialData.questionType && typeof initialData.questionType === "object" ? initialData.questionType : { value: "MCQ", label: "MCQ" },
         marks: String(initialData.marks ?? "2"),
         difficulty: initialData.difficulty && typeof initialData.difficulty === "object" ? initialData.difficulty : { value: initialData.difficulty || "medium", label: initialData.difficulty || "Medium" },
-        question: initialData.question || initialData.text || "",
+        question: initialData.question || initialData.questionText || initialData.text || "",
         optionA: optA,
         optionB: optB,
         optionC: optC,
         optionD: optD,
-        correctAnswer: { value: corrKey, label: getLabel(corrKey) },
+        correctAnswer: corrKey,
         explanation: initialData.explanation || "",
       });
     }
@@ -158,6 +160,7 @@ export const EditQuestionModal = ({
       open={open}
       onClose={onClose}
       code={code}
+      maxWidth="max-w-3xl"
     >
       <form
         onSubmit={async (e) => {
@@ -295,73 +298,146 @@ export const EditQuestionModal = ({
         />
 
         {/* Question Statement (Editable) */}
-        <TextArea
-          title="Question Statement"
-          rows={4}
-          placeholder="Enter the question..."
-          value={form.question}
-          onChange={(e) => set("question", e.target.value)}
-          required
-        />
-
-        {/* Answer Options & Correct Key (Editable) */}
-        <div className="rounded-xl border border-gray-100 bg-slate-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
-          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
-            Answer Options & Correct Key
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <TextInput
-              title="Option A"
-              placeholder="Option A"
-              value={form.optionA}
-              onChange={(e) => set("optionA", e.target.value)}
-              required
-            />
-            <TextInput
-              title="Option B"
-              placeholder="Option B"
-              value={form.optionB}
-              onChange={(e) => set("optionB", e.target.value)}
-              required
-            />
-            <TextInput
-              title="Option C"
-              placeholder="Option C"
-              value={form.optionC}
-              onChange={(e) => set("optionC", e.target.value)}
-              required
-            />
-            <TextInput
-              title="Option D"
-              placeholder="Option D"
-              value={form.optionD}
-              onChange={(e) => set("optionD", e.target.value)}
-              required
-            />
-          </div>
-
-          {/* Correct Answer */}
-          <div className="mt-4">
-            <CustomSelect
-              title="Correct Answer Key"
-              options={correctAnswerOptions}
-              value={form.correctAnswer}
-              onChange={(v) => set("correctAnswer", v)}
-              isSearchable={false}
-              isClearable={false}
-              placeholder="Select correct answer..."
-            />
-          </div>
+        <div>
+          <CKEditorField
+            title="Question Statement"
+            placeholder="Enter the question..."
+            value={form.question}
+            onChange={(val) => set("question", val)}
+            required
+            minHeight="140px"
+            badgeLabel="CKEditor"
+          />
         </div>
 
-        {/* Explanation (Editable) */}
-        <TextArea
-          title="Solution / Explanation"
-          rows={3}
-          placeholder="Explain the correct answer..."
-          value={form.explanation}
-          onChange={(e) => set("explanation", e.target.value)}
-        />
+        {/* Answer Options & Correct Key (Editable) */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Answer Options & Correct Key *
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Click the radio badge next to an option to designate it as the correct answer.
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {[
+              { key: "A" as const, val: form.optionA, setter: "optionA" },
+              { key: "B" as const, val: form.optionB, setter: "optionB" },
+              { key: "C" as const, val: form.optionC, setter: "optionC" },
+              { key: "D" as const, val: form.optionD, setter: "optionD" },
+            ].map(({ key, val, setter }) => {
+              const currentCorrectKey = typeof form.correctAnswer === "object"
+                ? (form.correctAnswer?.value || "A")
+                : (form.correctAnswer || "A");
+              const isSelected = currentCorrectKey === key;
+
+              return (
+                <div
+                  key={key}
+                  className={`relative rounded-xl border p-3 transition-all ${
+                    isSelected
+                      ? "border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500/30 dark:bg-emerald-950/20"
+                      : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-900 text-[11px] font-bold text-white shadow-2xs dark:bg-slate-100 dark:text-slate-900">
+                        {key}
+                      </span>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Option {key}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                      {/* Direct Option Image Attachment */}
+                      <label
+                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50/90 px-2 py-0.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 hover:text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300 transition cursor-pointer active:scale-95 shadow-2xs shrink-0 whitespace-nowrap"
+                        title={`Attach image or diagram to Option ${key}`}
+                      >
+                        <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                        <span>Image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const base64 = reader.result as string;
+                              const currentVal = (form as any)[setter] || "";
+                              const imgHtml = `<p><img src="${base64}" alt="Option ${key}" /></p>`;
+                              set(setter, currentVal ? `${currentVal}${imgHtml}` : imgHtml);
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => set("correctAnswer", key)}
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                          isSelected
+                            ? "bg-emerald-600 text-white shadow-xs font-bold"
+                            : "border border-slate-200 bg-slate-100/90 text-slate-600 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        {isSelected ? (
+                          <>
+                            <Check className="h-3 w-3 stroke-[2.5]" />
+                            <span>Correct</span>
+                          </>
+                        ) : (
+                          <span>Mark Correct</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <CKEditorField
+                    placeholder={`Enter text or formula for Option ${key}...`}
+                    value={val}
+                    onChange={(newVal) => set(setter, newVal)}
+                    required
+                    minHeight="70px"
+                    compactToolbar
+                    hideBadge
+                    showImageUploadButton={false}
+                  />
+
+                  {val && val.includes("<img") && (
+                    <div className="mt-2 flex items-center justify-between gap-1 rounded-md border border-purple-200/60 bg-purple-50/60 px-2 py-1 text-[11px] text-purple-700 dark:border-purple-800/40 dark:bg-purple-950/30 dark:text-purple-300">
+                      <span className="flex items-center gap-1.5 font-medium truncate">
+                        <ImageIcon className="h-3 w-3 shrink-0 text-purple-600 dark:text-purple-400" />
+                        <span className="truncate">Image Attached</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const withoutImg = val
+                            .replace(/<figure[^>]*>.*?<\/figure>/gis, "")
+                            .replace(/<p>\s*<img[^>]*>\s*<\/p>/gis, "")
+                            .replace(/<img[^>]*>/gis, "");
+                          set(setter, withoutImg);
+                        }}
+                        className="text-[11px] font-bold text-rose-500 hover:text-rose-700 hover:underline cursor-pointer shrink-0 whitespace-nowrap ml-1.5"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">
