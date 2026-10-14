@@ -44,6 +44,7 @@ import { Success, Failure, getAuthUser } from "@/utils/function.utils";
 import Models from "@/imports/models.import";
 import BlankLayout from "@/components/Layouts/BlankLayout";
 import VivaResultComponent from "@/components/viva_result_component";
+import { loadKatex, renderMathInHtml } from "@/components/common-components/katexLoader";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -215,6 +216,10 @@ export default function StudentMCQTestPage() {
       setLoadingStudentReview(false);
     }
   }, [testDetails?.test_id, getEffectiveEmail]);
+
+  useEffect(() => {
+    loadKatex();
+  }, []);
 
   useEffect(() => {
     if (phase === "completed" && testDetails?.test_id) {
@@ -1788,9 +1793,13 @@ export default function StudentMCQTestPage() {
                 </div>
 
                 {/* Question Statement */}
-                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-slate-100 leading-relaxed mb-6 sm:mb-8 break-words">
-                  {currentQ?.question_string || "Question statement..."}
-                </h3>
+                <div className="text-base sm:text-lg md:text-xl font-semibold text-slate-100 leading-relaxed mb-6 sm:mb-8 break-words rich-text-content katex-rendered">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: renderMathInHtml(currentQ?.question_string || "Question statement..."),
+                    }}
+                  />
+                </div>
 
                 {/* Options List */}
                 <div className="space-y-2.5 sm:space-y-3 mb-6 sm:mb-8">
@@ -1816,12 +1825,14 @@ export default function StudentMCQTestPage() {
                           >
                             {optionLetter}
                           </span>
-                          <span
-                            className={`text-xs sm:text-sm md:text-base leading-relaxed break-words flex-1 min-w-0 ${isSelected ? "font-semibold text-white" : "text-slate-300"
-                              }`}
-                          >
-                            {opt}
-                          </span>
+                          <div
+                            className={`text-xs sm:text-sm md:text-base leading-relaxed break-words flex-1 min-w-0 rich-text-content katex-rendered ${
+                              isSelected ? "font-semibold text-white" : "text-slate-300"
+                            }`}
+                            dangerouslySetInnerHTML={{
+                              __html: renderMathInHtml(opt || ""),
+                            }}
+                          />
                         </div>
 
                         <div
@@ -2772,10 +2783,14 @@ export default function StudentMCQTestPage() {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <h4 className="text-sm font-bold text-white leading-snug">
-                          <span className="text-indigo-400 mr-2">Q{q.question_index}.</span>
-                          {q.question_string}
-                        </h4>
+                        <div className="text-sm font-bold text-white leading-snug rich-text-content katex-rendered flex-1 min-w-0">
+                          <span className="text-indigo-400 mr-2 font-mono">Q{q.question_index}.</span>
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: renderMathInHtml(q.question_string || ""),
+                            }}
+                          />
+                        </div>
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${
                             q.is_correct
@@ -2819,17 +2834,22 @@ export default function StudentMCQTestPage() {
                               key={oIdx}
                               className={`flex items-center justify-between rounded-xl border p-3 text-xs ${optStyle}`}
                             >
-                              <span className="flex items-center gap-2">
-                                <span className="font-mono text-slate-500">{String.fromCharCode(65 + oIdx)}.</span>
-                                <span>{optText}</span>
+                              <span className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className="font-mono text-slate-500 shrink-0">{String.fromCharCode(65 + oIdx)}.</span>
+                                <span
+                                  className="rich-text-content katex-rendered flex-1 min-w-0"
+                                  dangerouslySetInnerHTML={{
+                                    __html: renderMathInHtml(optText || ""),
+                                  }}
+                                />
                               </span>
                               {isCorrectOpt && (
-                                <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+                                <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30 shrink-0 ml-2">
                                   Correct Answer
                                 </span>
                               )}
                               {isSelected && !isCorrectOpt && (
-                                <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300 border border-red-500/30">
+                                <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300 border border-red-500/30 shrink-0 ml-2">
                                   Your Choice
                                 </span>
                               )}
@@ -2841,7 +2861,12 @@ export default function StudentMCQTestPage() {
                       {q.explanation && (
                         <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-xs text-indigo-300">
                           <span className="font-bold text-indigo-400 mr-1">Explanation:</span>
-                          {q.explanation}
+                          <div
+                            className="rich-text-content katex-rendered mt-1 text-slate-300"
+                            dangerouslySetInnerHTML={{
+                              __html: renderMathInHtml(q.explanation || ""),
+                            }}
+                          />
                         </div>
                       )}
                     </div>

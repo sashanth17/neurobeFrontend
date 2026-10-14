@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { ArrowLeft, ChevronDown, Sparkles, X } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, isLimitExhaustion, showLimitExhaustedModal, LIMIT_EXHAUSTED_MESSAGE, getErrorMessage } from "@/utils/function.utils";
+import { useSetState, isLimitExhaustion, showLimitExhaustedModal, LIMIT_EXHAUSTED_MESSAGE, getErrorMessage, getAuthUser } from "@/utils/function.utils";
 import PrivateRouter from "@/hook/privateRouter";
 import CourseBanner from "@/components/academic-setup/CourseBanner";
 import Models from "@/imports/models.import";
@@ -695,34 +695,50 @@ const MCQGenerationStudioPage = () => {
   const handleSaveManualQuestion = async (newQuestionData: any) => {
     if (!state.selectedCourse) return;
     const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+    const authUser = getAuthUser();
+
+    const options = (newQuestionData.options || []).map((o: any) => ({
+      text: o.text || o.option || "",
+      is_correct: Boolean(o.is_correct || o.isCorrect),
+    }));
+
+    const apiPayload = {
+      course_id: String(courseKey),
+      question_code: newQuestionData.question_code || newQuestionData.code,
+      text: newQuestionData.question || newQuestionData.text,
+      options: options,
+      explanation: newQuestionData.explanation || undefined,
+      knowledge_level: newQuestionData.knowledge_level || newQuestionData.level || "K2",
+      difficulty: (newQuestionData.difficulty || "medium").toLowerCase(),
+      unit_number: Number(newQuestionData.unit_number || 1),
+      topic: newQuestionData.topic || undefined,
+      subtopic: newQuestionData.subtopic || undefined,
+      course_outcome: newQuestionData.course_outcome || newQuestionData.co || "CO1",
+      marks: Number(newQuestionData.marks || 2),
+      status: newQuestionData.status || "Approved",
+      user_id: authUser?.id ? Number(authUser.id) : undefined,
+    };
 
     try {
-      const apiPayload = {
-        course_id: String(courseKey),
-        ...newQuestionData,
-      };
-      await (Models.mcq as any).create_manual_question(apiPayload).catch(() => null);
-    } catch (e) {
-      console.warn("Backend manual question creation:", e);
+      await Models.mcq.create_manual_question(apiPayload);
+
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`neurobe_manual_questions_${courseKey}`);
+        }
+      } catch {}
+
+      await fetchQuestions(courseKey);
+      setState({
+        selectedBannerFilter: "all",
+        isAuthorModalOpen: false,
+      });
+      showToast("success", "✓ Question authored manually and saved to database!");
+    } catch (err: any) {
+      console.error("[handleSaveManualQuestion] API Error:", err);
+      showToast("error", typeof err === "string" ? err : err?.message || "Failed to save question to server.");
+      throw err;
     }
-
-    const createdId = `man-${Date.now()}`;
-    const questionObj = normalizeMCQ(
-      {
-        ...newQuestionData,
-        id: createdId,
-      },
-      currentQuestions.length || 0
-    );
-
-    const updated = [questionObj, ...currentQuestions.filter((q) => q.id !== createdId)];
-    setState({
-      courseQuestions: updated,
-      recentQuestionIds: [createdId, ...(state.recentQuestionIds || [])],
-      selectedBannerFilter: "all",
-      isAuthorModalOpen: false,
-    });
-    showToast("success", "✓ Question authored manually and added to question pool!");
   };
 
   const handleToggleExpandOne = (id: string) => {

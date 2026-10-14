@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { X, Check, SquarePen } from "lucide-react";
+import { renderMathInHtml } from "@/components/common-components/katexLoader";
 
 interface ViewQuestionModalProps {
   open: boolean;
@@ -68,22 +69,12 @@ const OptionCell = ({
     >
       {letter}
     </span>
-    {/<[a-z][\s\S]*>/i.test(text || "") ? (
-      <span
-        className={`rich-text-content text-sm font-medium ${
-          isCorrect ? "text-green-800" : "text-[#000]"
-        }`}
-        dangerouslySetInnerHTML={{ __html: text }}
-      />
-    ) : (
-      <span
-        className={`text-sm font-medium ${
-          isCorrect ? "text-green-800" : "text-[#000]"
-        }`}
-      >
-        {text}
-      </span>
-    )}
+    <span
+      className={`rich-text-content katex-rendered text-sm font-medium ${
+        isCorrect ? "text-green-800 font-semibold" : "text-[#000]"
+      }`}
+      dangerouslySetInnerHTML={{ __html: renderMathInHtml(text || "") }}
+    />
   </div>
 );
 
@@ -199,14 +190,10 @@ const ViewQuestionModal = ({
             Question Statement
           </p>
           <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm font-semibold text-[#000] dark:bg-gray-800 dark:text-gray-200">
-            {/<[a-z][\s\S]*>/i.test(question.question || "") ? (
-              <div
-                className="rich-text-content"
-                dangerouslySetInnerHTML={{ __html: question.question }}
-              />
-            ) : (
-              question.question
-            )}
+            <div
+              className="rich-text-content katex-rendered"
+              dangerouslySetInnerHTML={{ __html: renderMathInHtml(question.question || "") }}
+            />
           </div>
 
           {/* Answer Options */}
@@ -240,14 +227,10 @@ const ViewQuestionModal = ({
                 Solution & Explanation
               </p>
               <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-[#000] dark:bg-gray-800 dark:text-gray-300">
-                {/<[a-z][\s\S]*>/i.test(question.explanation || "") ? (
-                  <div
-                    className="rich-text-content"
-                    dangerouslySetInnerHTML={{ __html: question.explanation }}
-                  />
-                ) : (
-                  question.explanation
-                )}
+                <div
+                  className="rich-text-content katex-rendered"
+                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(question.explanation || "") }}
+                />
               </div>
             </>
           )}
