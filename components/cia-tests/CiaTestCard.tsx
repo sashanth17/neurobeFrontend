@@ -276,8 +276,9 @@ export const CiaTestCard: React.FC<CiaTestCardProps> = ({
             <button
               onClick={() => {
                 const cId = test.course_id || router.query.courseId;
+                const testNameParam = test.test_name ? `&testName=${encodeURIComponent(test.test_name)}` : "";
                 router.push(
-                  `/neurobe/question-bank/${cId}/templates/${test.question_paper_template_id}/assembly`
+                  `/neurobe/question-bank/${cId}/templates/${test.question_paper_template_id}/assembly?testId=${test.id}${testNameParam}`
                 );
               }}
               className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 font-bold text-white shadow-sm shadow-purple-500/20 hover:bg-purple-700 transition-all text-xs"

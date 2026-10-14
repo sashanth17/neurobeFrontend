@@ -167,7 +167,7 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
       const textAlign = align;
       const alignClass = `image-align-${align}`;
       const sizeClass = `image-size-${size}`;
-      const styleStr = `max-height: ${size}px !important; max-width: ${size}px !important; width: auto !important; height: auto !important; object-fit: contain !important; display: block !important; margin: ${margin} !important;`;
+      const styleStr = `max-height: ${size}px; max-width: ${size}px; width: auto; height: auto; object-fit: contain; display: block; margin: ${margin};`;
 
       images.forEach((img) => {
         img.setAttribute("width", String(size));
@@ -182,7 +182,7 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
         if (figure) {
           figure.setAttribute(
             "style",
-            `max-width: ${size}px !important; width: auto !important; text-align: ${textAlign} !important; margin: ${margin} !important; display: block !important;`
+            `max-width: ${size}px; width: auto; text-align: ${textAlign}; margin: ${margin}; display: block;`
           );
           const curFigClass = (figure.getAttribute("class") || "")
             .replace(/image-size-\d+/g, "")
@@ -192,7 +192,7 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
         } else {
           const parentP = img.parentElement;
           if (parentP && parentP.tagName.toLowerCase() === "p" && parentP.children.length === 1) {
-            parentP.setAttribute("style", `text-align: ${textAlign} !important; margin: ${margin} !important;`);
+            parentP.setAttribute("style", `text-align: ${textAlign}; margin: ${margin};`);
             const curPClass = (parentP.getAttribute("class") || "")
               .replace(/image-size-\d+/g, "")
               .replace(/image-align-[a-z]+/g, "")

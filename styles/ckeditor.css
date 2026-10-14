@@ -404,39 +404,57 @@
 /* Exam Paper Preview & Print Document Image Constraints */
 .printable-exam-paper img,
 .printable-exam-paper figure img,
-.printable-exam-paper .rich-text-content img {
-  max-height: 140px !important;
-  max-width: 230px !important;
+.printable-exam-paper .rich-text-content img,
+.printable-exam-paper table img,
+.printable-exam-paper td img {
+  max-height: var(--exam-diagram-max-height, 140px) !important;
+  max-width: var(--exam-diagram-max-width, 220px) !important;
   width: auto !important;
   height: auto !important;
   object-fit: contain !important;
-  margin: 4px auto !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
   display: block !important;
   box-shadow: none !important;
   border: 1px solid #f1f5f9 !important;
   background-color: transparent !important;
 }
 
+.printable-exam-paper figure,
+.printable-exam-paper .rich-text-content figure,
+.printable-exam-paper table figure,
+.printable-exam-paper td figure {
+  max-width: var(--exam-diagram-max-width, 220px) !important;
+  width: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* User-selectable print diagram sizing presets */
 .exam-img-compact img,
 .exam-img-compact figure img,
-.exam-img-compact .rich-text-content img {
+.exam-img-compact .rich-text-content img,
+.exam-img-compact table img,
+.exam-img-compact td img {
   max-height: 100px !important;
-  max-width: 170px !important;
+  max-width: 160px !important;
 }
 
 .exam-img-standard img,
 .exam-img-standard figure img,
-.exam-img-standard .rich-text-content img {
+.exam-img-standard .rich-text-content img,
+.exam-img-standard table img,
+.exam-img-standard td img {
   max-height: 140px !important;
-  max-width: 230px !important;
+  max-width: 220px !important;
 }
 
 .exam-img-large img,
 .exam-img-large figure img,
-.exam-img-large .rich-text-content img {
+.exam-img-large .rich-text-content img,
+.exam-img-large table img,
+.exam-img-large td img {
   max-height: 190px !important;
-  max-width: 300px !important;
+  max-width: 280px !important;
 }
 
 /* Strictly Constrain Image Size inside Compact Option Cards */
@@ -486,8 +504,8 @@
   .printable-exam-paper figure img,
   .printable-exam-paper .rich-text-content img,
   table img {
-    max-height: 130px !important;
-    max-width: 220px !important;
+    max-height: var(--exam-diagram-max-height, 140px) !important;
+    max-width: var(--exam-diagram-max-width, 220px) !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
@@ -496,6 +514,25 @@
     box-shadow: none !important;
     border: none !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .printable-exam-paper.exam-img-compact img,
+  .printable-exam-paper.exam-img-compact figure img {
+    max-height: 100px !important;
+    max-width: 160px !important;
+  }
+
+  .printable-exam-paper.exam-img-standard img,
+  .printable-exam-paper.exam-img-standard figure img {
+    max-height: 140px !important;
+    max-width: 220px !important;
+  }
+
+  .printable-exam-paper.exam-img-large img,
+  .printable-exam-paper.exam-img-large figure img {
+    max-height: 190px !important;
+    max-width: 280px !important;
   }
 
   .printable-exam-paper .image-align-left,
@@ -504,6 +541,7 @@
   .printable-exam-paper figure.image-align-left img {
     margin-left: 0 !important;
     margin-right: auto !important;
+    text-align: left !important;
   }
 
   .printable-exam-paper .image-align-right,
@@ -512,6 +550,7 @@
   .printable-exam-paper figure.image-align-right img {
     margin-left: auto !important;
     margin-right: 0 !important;
+    text-align: right !important;
   }
 
   .printable-exam-paper .image-align-center,
@@ -520,6 +559,7 @@
   .printable-exam-paper figure.image-align-center img {
     margin-left: auto !important;
     margin-right: auto !important;
+    text-align: center !important;
   }
 }
 

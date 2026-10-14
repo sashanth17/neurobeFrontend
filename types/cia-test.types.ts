@@ -442,6 +442,8 @@ export interface ExamPaperPreviewSection {
 export interface ExamPaperPreviewData {
   institution_name?: string;
   institution_subtext?: string;
+  organization_name?: string;
+  test_name?: string;
   course_code: string;
   course_title: string;
   template_name: string;
@@ -450,6 +452,7 @@ export interface ExamPaperPreviewData {
   branch?: string;
   semester?: number | string;
   academic_year?: string;
+  regulation?: string;
   instructions?: string[];
   sections: ExamPaperPreviewSection[];
 }
