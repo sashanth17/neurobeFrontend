@@ -26,132 +26,91 @@ export const MCQStatsBanner: React.FC<MCQStatsBannerProps> = ({
     document.getElementById("questions-section")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const stats = [
+    {
+      id: "all" as const,
+      label: "Total Questions",
+      count: questions.length,
+      icon: BarChart3,
+      iconBg: "bg-indigo-600 text-white",
+      textColor: "text-indigo-700 dark:text-indigo-300",
+      activeBg: "border-indigo-500 bg-indigo-50/90 ring-1 ring-indigo-500/30 dark:bg-indigo-950/50",
+      defaultBg: "border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900",
+    },
+    {
+      id: "approved" as const,
+      label: "Approved",
+      count: approvedCount,
+      icon: CheckCircle2,
+      iconBg: "bg-emerald-600 text-white",
+      textColor: "text-emerald-700 dark:text-emerald-300",
+      activeBg: "border-emerald-500 bg-emerald-50/90 ring-1 ring-emerald-500/30 dark:bg-emerald-950/50",
+      defaultBg: "border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900",
+    },
+    {
+      id: "archived" as const,
+      label: "Archived",
+      count: archivedCount,
+      icon: Archive,
+      iconBg: "bg-purple-600 text-white",
+      textColor: "text-purple-700 dark:text-purple-300",
+      activeBg: "border-purple-600 bg-purple-50 ring-1 ring-purple-600/30 dark:bg-purple-950/50",
+      defaultBg: "border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900",
+    },
+    {
+      id: "review" as const,
+      label: "Need Review",
+      count: reviewCount,
+      icon: Clock,
+      iconBg: "bg-amber-500 text-white",
+      textColor: "text-amber-700 dark:text-amber-300",
+      activeBg: "border-amber-500 bg-amber-50/90 ring-1 ring-amber-500/30 dark:bg-amber-950/50",
+      defaultBg: "border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900",
+    },
+    {
+      id: "drafted" as const,
+      label: "Drafted",
+      count: draftedCount,
+      icon: FileCheck2,
+      iconBg: "bg-slate-600 text-white",
+      textColor: "text-slate-700 dark:text-slate-300",
+      activeBg: "border-slate-500 bg-slate-100 ring-1 ring-slate-500/30 dark:bg-slate-800",
+      defaultBg: "border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900",
+    },
+  ];
+
   return (
-    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {/* Total questions */}
-      <button
-        type="button"
-        onClick={() => {
-          onSelectFilter("all");
-          scrollToQuestions();
-        }}
-        className={`group flex items-center gap-4 rounded-2xl border p-5 shadow-sm text-left transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer ${
-          selectedFilter === "all"
-            ? "border-indigo-500 bg-indigo-50/90 ring-2 ring-indigo-500/30 dark:bg-indigo-950/50"
-            : "border-indigo-100 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-900/40 dark:from-indigo-950/30 dark:to-gray-900"
-        }`}
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow group-hover:scale-105 transition-transform">
-          <BarChart3 className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-2xl font-extrabold text-indigo-700 dark:text-indigo-300">{questions.length}</p>
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Total Questions</p>
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 underline">View All</span>
-          </div>
-        </div>
-      </button>
-
-      {/* Approved */}
-      <button
-        type="button"
-        onClick={() => {
-          onSelectFilter(selectedFilter === "approved" ? "all" : "approved");
-          scrollToQuestions();
-        }}
-        className={`group flex items-center gap-4 rounded-2xl border p-5 shadow-sm text-left transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer ${
-          selectedFilter === "approved"
-            ? "border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/30 dark:bg-emerald-950/50"
-            : "border-emerald-100 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-900/40 dark:from-emerald-950/30 dark:to-gray-900"
-        }`}
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow group-hover:scale-105 transition-transform">
-          <CheckCircle2 className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{approvedCount}</p>
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Approved</p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 underline">Filter</span>
-          </div>
-        </div>
-      </button>
-
-      {/* Archived with Distinct Violet Styling */}
-      <button
-        type="button"
-        onClick={() => {
-          onSelectFilter(selectedFilter === "archived" ? "all" : "archived");
-          scrollToQuestions();
-        }}
-        className={`group flex items-center gap-4 rounded-2xl border p-5 shadow-sm text-left transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer ${
-          selectedFilter === "archived"
-            ? "border-purple-600 bg-purple-50 ring-2 ring-purple-600/30 dark:bg-purple-950/50"
-            : "border-purple-200/80 bg-gradient-to-br from-purple-50/60 to-white dark:border-purple-900/40 dark:from-purple-950/30 dark:to-gray-900"
-        }`}
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow group-hover:scale-105 transition-transform">
-          <Archive className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-2xl font-extrabold text-purple-700 dark:text-purple-300">{archivedCount}</p>
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold text-purple-900 dark:text-purple-300">Archived</p>
-            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 underline">Filter</span>
-          </div>
-        </div>
-      </button>
-
-      {/* Need Review */}
-      <button
-        type="button"
-        onClick={() => {
-          onSelectFilter(selectedFilter === "review" ? "all" : "review");
-          scrollToQuestions();
-        }}
-        className={`group flex items-center gap-4 rounded-2xl border p-5 shadow-sm text-left transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer ${
-          selectedFilter === "review"
-            ? "border-amber-500 bg-amber-50/90 ring-2 ring-amber-500/30 dark:bg-amber-950/50"
-            : "border-amber-100 bg-gradient-to-br from-amber-50 to-white dark:border-amber-900/40 dark:from-amber-950/30 dark:to-gray-900"
-        }`}
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow group-hover:scale-105 transition-transform">
-          <Clock className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-2xl font-extrabold text-amber-700 dark:text-amber-300">{reviewCount}</p>
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Need Review</p>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 underline">Filter</span>
-          </div>
-        </div>
-      </button>
-
-      {/* Drafted */}
-      <button
-        type="button"
-        onClick={() => {
-          onSelectFilter(selectedFilter === "drafted" ? "all" : "drafted");
-          scrollToQuestions();
-        }}
-        className={`group flex items-center gap-4 rounded-2xl border p-5 shadow-sm text-left transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer ${
-          selectedFilter === "drafted"
-            ? "border-slate-500 bg-slate-100 ring-2 ring-slate-500/30 dark:bg-slate-800"
-            : "border-slate-100 bg-gradient-to-br from-slate-50 to-white dark:border-slate-800 dark:from-slate-900/50 dark:to-gray-900"
-        }`}
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-600 text-white shadow group-hover:scale-105 transition-transform">
-          <FileCheck2 className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-2xl font-extrabold text-slate-700 dark:text-slate-300">{draftedCount}</p>
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Drafted</p>
-            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 underline">Filter</span>
-          </div>
-        </div>
-      </button>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {stats.map((stat) => {
+        const Icon = stat.icon;
+        const isSelected = selectedFilter === stat.id;
+        return (
+          <button
+            key={stat.id}
+            type="button"
+            onClick={() => {
+              onSelectFilter(isSelected && stat.id !== "all" ? "all" : stat.id);
+              scrollToQuestions();
+            }}
+            className={`group flex items-center gap-2.5 rounded-xl border p-2 text-left shadow-2xs transition hover:shadow-xs active:scale-[0.99] cursor-pointer ${
+              isSelected ? stat.activeBg : stat.defaultBg
+            }`}
+          >
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-2xs ${stat.iconBg}`}>
+              <Icon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-1">
+                <span className={`text-base font-black tracking-tight ${stat.textColor}`}>{stat.count}</span>
+                {isSelected && (
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Active</span>
+                )}
+              </div>
+              <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">{stat.label}</p>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 };

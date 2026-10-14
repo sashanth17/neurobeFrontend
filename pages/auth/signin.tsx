@@ -194,17 +194,17 @@ const LoginBoxed = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#F7F9FE] p-4 font-nunito selection:bg-[#5C28CA] selection:text-white dark:bg-[#060818] sm:p-6 lg:p-10">
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#F7F9FE] p-3 font-nunito selection:bg-[#5C28CA] selection:text-white dark:bg-[#060818] sm:p-5 lg:p-6">
       {/* Background ambient lighting effects */}
       <div className="pointer-events-none absolute -left-40 -top-40 h-[480px] w-[480px] rounded-full bg-[#5C28CA]/10 blur-3xl filter dark:bg-[#5C28CA]/20" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-[480px] w-[480px] rounded-full bg-[#4361ee]/10 blur-3xl filter dark:bg-[#4361ee]/15" />
       <div className="pointer-events-none absolute left-1/3 top-1/2 h-[350px] w-[350px] -translate-y-1/2 rounded-full bg-[#805dca]/5 blur-3xl filter" />
 
       {/* Main Unified Split Card */}
-      <div className="relative z-10 flex w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(0,14,59,0.08)] dark:border-gray-800/80 dark:bg-[#0e1726] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] lg:min-h-[720px] lg:flex-row">
+      <div className="relative z-10 flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xl dark:border-gray-800/80 dark:bg-[#0e1726] lg:flex-row">
         
         {/* LEFT PANEL: Brand Hero Showcase (Desktop) */}
-        <div className="relative hidden w-full flex-col justify-between overflow-hidden bg-gradient-to-br from-[#000E3B] via-[#100c38] to-[#5C28CA] p-10 text-white lg:flex lg:w-1/2 xl:w-7/12 xl:p-12">
+        <div className="relative hidden w-full flex-col justify-between overflow-hidden bg-gradient-to-br from-[#000E3B] via-[#100c38] to-[#5C28CA] p-7 text-white lg:flex lg:w-1/2 xl:w-7/12 xl:p-8">
           {/* Subtle Grid Pattern Overlay */}
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.08]"
@@ -221,114 +221,114 @@ const LoginBoxed = () => {
 
           {/* Top Brand Pill & Logo */}
           <div className="relative z-10">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex items-center rounded-xl bg-white px-4 py-2 shadow-md">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex items-center rounded-xl bg-white px-3.5 py-1.5 shadow-md">
                 <img
                   src="/assets/images/neurobe/logo.png"
                   alt="Neurobe Logo"
-                  className="h-7 w-auto object-contain"
+                  className="h-6 w-auto object-contain"
                 />
               </div>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-white/90 backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/90 backdrop-blur-md">
+                <Sparkles className="h-3 w-3 text-amber-300" />
                 Higher Education OBE Platform
               </span>
             </div>
 
             {/* Hero Copy */}
-            <div className="mt-10">
-              <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-white xl:text-4xl">
+            <div className="mt-5">
+              <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white xl:text-3xl">
                 Outcome-Based Academic &amp; Curriculum Intelligence
               </h1>
-              <p className="mt-3.5 max-w-lg text-sm leading-relaxed text-white/75 xl:text-base">
+              <p className="mt-2 max-w-lg text-xs leading-relaxed text-white/75 xl:text-sm">
                 Streamline direct and indirect CO-PO attainment, Bloom’s taxonomy-aligned pedagogy, automated CIA evaluations, and institutional accreditation.
               </p>
             </div>
           </div>
 
           {/* Middle: Feature Highlights & Academic Setup Visual */}
-          <div className="relative z-10 my-8 space-y-4">
+          <div className="relative z-10 my-4 space-y-3">
             {/* Feature Pills */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] p-3 backdrop-blur-sm transition hover:bg-white/[0.12]">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
-                  <Target className="h-5 w-5 text-amber-300" />
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] p-2.5 backdrop-blur-sm transition hover:bg-white/[0.12]">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white">
+                  <Target className="h-4 w-4 text-amber-300" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-white">CO-PO Attainment</p>
-                  <p className="truncate text-[11px] text-white/70">
-                    Automated direct &amp; indirect targets
+                  <p className="truncate text-[10px] text-white/70">
+                    Direct &amp; indirect targets
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] p-3 backdrop-blur-sm transition hover:bg-white/[0.12]">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
-                  <BookOpen className="h-5 w-5 text-[#AEEAD3]" />
+              <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] p-2.5 backdrop-blur-sm transition hover:bg-white/[0.12]">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white">
+                  <BookOpen className="h-4 w-4 text-[#AEEAD3]" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-white">Pedagogy &amp; Topics</p>
-                  <p className="truncate text-[11px] text-white/70">
-                    Bloom&apos;s level taxonomy mapping
+                  <p className="truncate text-[10px] text-white/70">
+                    Bloom&apos;s level taxonomy
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Academic Asset Preview */}
-            <div className="relative flex items-center justify-center py-6">
-              <div className="absolute h-52 w-52 rounded-full bg-[#5C28CA]/35 blur-3xl filter" />
+            <div className="relative flex items-center justify-center py-2">
+              <div className="absolute h-40 w-40 rounded-full bg-[#5C28CA]/35 blur-3xl filter" />
               <img
                 src="/assets/images/neurobe/Rectangle.png"
                 alt="Neurobe Academic Platform"
-                className="relative z-10 max-h-[250px] w-auto object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.45)] transition-transform duration-500 hover:scale-105"
+                className="relative z-10 max-h-[170px] w-auto object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.45)] transition-transform duration-500 hover:scale-105"
               />
             </div>
           </div>
 
           {/* Bottom Security / Accreditation Footer */}
-          <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-4 text-xs text-white/70">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-[#10b981]" />
+          <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-3 text-xs text-white/70">
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <ShieldCheck className="h-3.5 w-3.5 text-[#10b981]" />
               <span>NBA, NAAC &amp; Washington Accord Aligned</span>
             </div>
-            <span className="font-semibold text-white/90">Institutional Portal</span>
+            <span className="text-[11px] font-semibold text-white/90">Institutional Portal</span>
           </div>
         </div>
 
         {/* RIGHT PANEL: Authentication Form */}
-        <div className="flex w-full flex-col justify-center bg-white px-6 py-10 dark:bg-[#0e1726] sm:px-12 md:px-16 lg:w-1/2 xl:w-5/12 xl:px-14">
+        <div className="flex w-full flex-col justify-center bg-white px-6 py-8 dark:bg-[#0e1726] sm:px-10 md:px-12 lg:w-1/2 xl:w-5/12 xl:px-10">
           {/* Mobile-Only Header with Logo */}
-          <div className="mb-6 flex flex-col items-center text-center lg:hidden">
-            <div className="mb-3 inline-flex items-center rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#181f32]">
+          <div className="mb-4 flex flex-col items-center text-center lg:hidden">
+            <div className="mb-2 inline-flex items-center rounded-xl border border-gray-100 bg-white p-2.5 shadow-sm dark:border-gray-800 dark:bg-[#181f32]">
               <img
                 src="/assets/images/neurobe/logo.png"
                 alt="Neurobe Logo"
-                className="h-8 w-auto object-contain"
+                className="h-7 w-auto object-contain"
               />
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-color2-l px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-color2 dark:bg-[#5C28CA]/20 dark:text-[#c4a6ff]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-color2-l px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-color2 dark:bg-[#5C28CA]/20 dark:text-[#c4a6ff]">
               <Sparkles className="h-3 w-3" /> OBE Academic Platform
             </span>
           </div>
 
-          <div className="mx-auto w-full max-w-[420px]">
+          <div className="mx-auto w-full max-w-[380px]">
             {/* Form Title & Subtitle */}
-            <div className="mb-8">
-              <div className="hidden lg:inline-flex items-center gap-1.5 rounded-full bg-color2-l px-3 py-1 text-xs font-bold uppercase tracking-wider text-color2 dark:bg-[#5C28CA]/20 dark:text-[#c4a6ff]">
-                <GraduationCap className="h-3.5 w-3.5" />
+            <div className="mb-5">
+              <div className="hidden lg:inline-flex items-center gap-1.5 rounded-full bg-color2-l px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-color2 dark:bg-[#5C28CA]/20 dark:text-[#c4a6ff]">
+                <GraduationCap className="h-3 w-3" />
                 Institutional Sign In
               </div>
-              <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-color1 dark:text-white sm:text-3xl">
+              <h2 className="mt-1.5 text-xl font-extrabold tracking-tight text-color1 dark:text-white sm:text-2xl">
                 Welcome Back
               </h2>
-              <p className="mt-1.5 text-sm font-medium text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                 Enter your institutional credentials to access your academic workspace.
               </p>
             </div>
 
             {/* Sign In Form */}
-            <form onSubmit={submitForm} className="space-y-5">
+            <form onSubmit={submitForm} className="space-y-4">
               {/* Email Address */}
               <div>
                 <TextInput
@@ -345,7 +345,7 @@ const LoginBoxed = () => {
                   }
                   error={state.error?.email}
                   icon={<IconMail fill={true} />}
-                  className="h-11 rounded-xl border-gray-200 text-sm transition focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-700 dark:bg-[#121e32] dark:text-white"
+                  className="h-10 rounded-xl border-gray-200 text-xs transition focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-700 dark:bg-[#121e32] dark:text-white"
                 />
               </div>
 
@@ -370,12 +370,12 @@ const LoginBoxed = () => {
                   rightIconOnlick={() =>
                     setState({ showPassword: !state.showPassword })
                   }
-                  className="h-11 rounded-xl border-gray-200 text-sm transition focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-700 dark:bg-[#121e32] dark:text-white"
+                  className="h-10 rounded-xl border-gray-200 text-xs transition focus:border-color2 focus:ring-1 focus:ring-color2 dark:border-gray-700 dark:bg-[#121e32] dark:text-white"
                 />
               </div>
 
               {/* Forgot Password Row */}
-              <div className="flex items-center justify-end pt-1">
+              <div className="flex items-center justify-end pt-0.5">
                 <button
                   type="button"
                   onClick={() => router.push("/auth/forget-password")}
@@ -385,64 +385,12 @@ const LoginBoxed = () => {
                 </button>
               </div>
 
-              {/* reCAPTCHA Verification */}
-              {/* <div className="relative flex w-full flex-col items-center justify-center rounded-2xl border border-gray-200/90 bg-gray-50/70 p-3 dark:border-gray-700/60 dark:bg-gray-900/40">
-                <ReCAPTCHA
-                  ref={captchaRef}
-                  sitekey={CAPTCHA_SITE_KEY}
-                  asyncScriptOnLoad={() => setCaptchaLoaded(true)}
-                  onChange={(token) => {
-                    setLoginCaptchaToken(token || "");
-                    if (token) {
-                      captchaVerifiedRef.current = true;
-                      setState({
-                        error: { ...state.error, loginCaptchaInput: undefined },
-                      });
-                    }
-                  }}
-                  onExpired={() => resetCaptcha()}
-                />
-
-                {!captchaLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-gray-50 dark:bg-gray-900">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-                      <svg
-                        className="h-5 w-5 animate-spin text-color2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v8z"
-                        />
-                      </svg>
-                      Loading Security Verification...
-                    </div>
-                  </div>
-                )}
-
-                {state.error?.loginCaptchaInput && (
-                  <p className="mt-2 text-center text-xs font-semibold text-red-500">
-                    {state.error.loginCaptchaInput}
-                  </p>
-                )}
-              </div> */}
-
               {/* Submit Button */}
-              <div className="pt-2">
+              <div className="pt-1">
                 <PrimaryButton
                   type="submit"
                   text="Sign In to Portal"
-                  className="!mt-0 flex h-12 w-full items-center justify-center gap-2 rounded-xl border-0 bg-color2 text-sm font-bold uppercase tracking-wider text-white shadow-[0_10px_20px_-6px_rgba(92,40,202,0.4)] transition hover:bg-[#4d1fb0] hover:shadow-[0_14px_24px_-6px_rgba(92,40,202,0.5)] active:scale-[0.99] disabled:opacity-60"
+                  className="!mt-0 flex h-10.5 w-full items-center justify-center gap-2 rounded-xl border-0 bg-color2 text-xs font-bold uppercase tracking-wider text-white shadow-[0_10px_20px_-6px_rgba(92,40,202,0.4)] transition hover:bg-[#4d1fb0] hover:shadow-[0_14px_24px_-6px_rgba(92,40,202,0.5)] active:scale-[0.99] disabled:opacity-60"
                   loading={state.btnLoading}
                 />
               </div>

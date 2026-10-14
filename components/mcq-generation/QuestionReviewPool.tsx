@@ -60,65 +60,63 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
     (expandedQuestionIds || []).length === displayedQuestions.length && displayedQuestions.length > 0;
 
   return (
-    <div id="questions-section" className="pt-2">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-bold text-gray-955 dark:text-white flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-indigo-600" />
-            <span>Question Studio & Review Pool</span>
-            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-              {displayedQuestions.length} Questions
-            </span>
+    <div id="questions-section" className="space-y-3">
+      {/* Sleek Toolbar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-indigo-600" />
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+            Question Studio & Review Pool
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Review question details, expand dropdown to inspect options & explanation, or edit metadata.
-          </p>
+          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+            {displayedQuestions.length} Questions
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {/* Recent vs All Quick Toggle */}
-          <div className="flex rounded-xl border border-gray-200 bg-white p-1 text-xs dark:border-gray-800 dark:bg-gray-800">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
               onClick={() => onSelectBannerFilter("recent")}
-              className={`rounded-lg px-3 py-1 font-semibold transition-colors ${
+              className={`rounded-md px-2.5 py-1 font-semibold transition-colors ${
                 selectedBannerFilter === "recent"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               }`}
             >
-              ⚡ Recent Batch ({recentQuestionIds?.length > 0 ? recentQuestionIds.length : Math.min(10, currentQuestions.length)})
+              ⚡ Recent ({recentQuestionIds?.length > 0 ? recentQuestionIds.length : Math.min(10, currentQuestions.length)})
             </button>
             <button
               type="button"
               onClick={() => onSelectBannerFilter("all")}
-              className={`rounded-lg px-3 py-1 font-semibold transition-colors ${
+              className={`rounded-md px-2.5 py-1 font-semibold transition-colors ${
                 selectedBannerFilter === "all"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               }`}
             >
-              📚 All History ({currentQuestions.length})
+              📚 All ({currentQuestions.length})
             </button>
           </div>
 
           <button
             type="button"
             onClick={onToggleExpandAll}
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 transition"
+            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
           >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isAllExpanded ? "rotate-180" : ""}`} />
-            <span>{isAllExpanded ? "Collapse All" : "Expand All"}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform ${isAllExpanded ? "rotate-180" : ""}`} />
+            <span>{isAllExpanded ? "Collapse" : "Expand All"}</span>
           </button>
 
           {selectedBannerFilter !== "recent" && selectedBannerFilter !== "all" && (
             <button
               type="button"
               onClick={() => onSelectBannerFilter("all")}
-              className="flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+              className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
             >
-              <span>Reset Filter ({selectedBannerFilter})</span>
-              <X className="h-3.5 w-3.5" />
+              <span>Reset ({selectedBannerFilter})</span>
+              <X className="h-3 w-3" />
             </button>
           )}
 
@@ -126,44 +124,44 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
             <button
               type="button"
               onClick={onAuthorManually}
-              className="flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs font-bold text-purple-700 transition hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 active:scale-98"
+              className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 transition hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
             >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Author Manually</span>
+              <Plus className="h-3 w-3" />
+              <span>Author Manual</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={onCreateQuestionSet}
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+            className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
           >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Create Question Set</span>
+            <Plus className="h-3 w-3" />
+            <span>Create Set</span>
           </button>
 
           <button
             type="button"
             onClick={onApproveAll}
-            className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+            className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
           >
-            <Check className="h-3.5 w-3.5" />
-            <span>Approve All to Bank</span>
+            <Check className="h-3 w-3" />
+            <span>Approve All</span>
           </button>
         </div>
       </div>
 
       {displayedQuestions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center dark:border-gray-800 dark:bg-gray-900">
-          <FileCheck2 className="h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" />
-          <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
+          <FileCheck2 className="h-7 w-7 text-slate-300 dark:text-slate-600 mb-1.5" />
+          <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
             No questions found matching "{selectedBannerFilter}".
           </p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               onClick={() => onSelectBannerFilter("all")}
-              className="text-xs font-bold text-indigo-600 hover:underline px-2 py-1"
+              className="text-xs font-bold text-indigo-600 hover:underline px-2 py-0.5"
             >
               Show All Course Questions ({currentQuestions.length})
             </button>
@@ -171,16 +169,16 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
               <button
                 type="button"
                 onClick={onAuthorManually}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 transition"
+                className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
                 <span>Author Manually</span>
               </button>
             )}
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2.5">
           {displayedQuestions.map((q, idx) => {
             const question = normalizeMCQ(q, idx);
             const isApproved = (question.status || "").toLowerCase() === "approved";
@@ -193,7 +191,7 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
             return (
               <div
                 key={question.id}
-                className={`group relative overflow-hidden rounded-2xl border transition-all duration-200 bg-white shadow-xs hover:shadow-md dark:bg-gray-900 ${
+                className={`group relative overflow-hidden rounded-xl border transition-all bg-white shadow-2xs hover:shadow-xs dark:bg-slate-900 ${
                   isApproved
                     ? "border-emerald-200/90 dark:border-emerald-900/50 hover:border-emerald-300"
                     : isArchived
@@ -203,14 +201,14 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
               >
                 {/* Left vertical accent bar */}
                 <div
-                  className={`absolute left-0 top-0 bottom-0 w-1.5 transition-colors ${
+                  className={`absolute left-0 top-0 bottom-0 w-1 transition-colors ${
                     isApproved ? "bg-emerald-500" : isArchived ? "bg-purple-600" : "bg-amber-500"
                   }`}
                 />
 
                 {/* Summary Header */}
-                <div className="p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3.5 dark:border-slate-800">
+                <div className="p-3 sm:p-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Question Number */}
                       <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-900 text-xs font-black text-white shadow-xs dark:bg-slate-100 dark:text-slate-900">

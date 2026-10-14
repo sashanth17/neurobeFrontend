@@ -1317,22 +1317,22 @@ export default function StudentMCQTestPage() {
           <title>Enter Assessment Code — Neurobe</title>
         </Head>
 
-        <div className="w-full max-w-md space-y-6 sm:space-y-8 rounded-2xl sm:rounded-3xl border border-slate-800/90 bg-[#111625] p-5 sm:p-8 shadow-2xl">
+        <div className="w-full max-w-md space-y-4 sm:space-y-5 rounded-2xl border border-slate-800/90 bg-[#111625] p-4 sm:p-6 shadow-2xl">
           {/* Header */}
-          <div className="text-center space-y-3">
-            <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30">
-              <Lock className="h-7 w-7 sm:h-8 sm:w-8" />
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20">
+              <Lock className="h-6 w-6 sm:h-7 sm:w-7" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">Secure Test Portal</h1>
+            <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">Secure Test Portal</h1>
             <p className="text-xs text-slate-400">
               Enter the unique access passcode issued by your course instructor to join the examination.
             </p>
           </div>
 
           {/* Form */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
                 Passcode / Secure Key
               </label>
               <input
@@ -1341,12 +1341,12 @@ export default function StudentMCQTestPage() {
                 onChange={(e) => setPasscode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === "Enter" && handleVerifyCode()}
                 placeholder="e.g. CS-5HZ or MCQ-XXXX"
-                className="w-full rounded-2xl border border-slate-700 bg-[#0B0F19] px-3.5 sm:px-4 py-3 sm:py-3.5 text-center font-mono text-base sm:text-lg font-bold tracking-widest text-indigo-400 placeholder-slate-600 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 uppercase transition-all"
+                className="w-full rounded-xl border border-slate-700 bg-[#0B0F19] px-3.5 sm:px-4 py-2.5 sm:py-3 text-center font-mono text-base font-bold tracking-widest text-indigo-400 placeholder-slate-600 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 uppercase transition-all"
                 autoFocus
               />
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5 text-xs text-slate-400 flex items-center gap-3">
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-2.5 sm:p-3 text-xs text-slate-400 flex items-center gap-2.5">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <span className="truncate">
                 Attending as: <strong className="text-slate-200">{studentEmail}</strong>
@@ -1357,7 +1357,7 @@ export default function StudentMCQTestPage() {
               type="button"
               disabled={verifying || !passcode.trim()}
               onClick={() => handleVerifyCode()}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 py-3 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] disabled:opacity-50 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white shadow-md shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] disabled:opacity-50 transition-all cursor-pointer"
             >
               {verifying ? (
                 <>
@@ -1373,7 +1373,7 @@ export default function StudentMCQTestPage() {
             </button>
           </div>
 
-          <div className="border-t border-slate-800/80 pt-4 text-center">
+          <div className="border-t border-slate-800/80 pt-3 text-center">
             <button
               type="button"
               onClick={() => router.push("/neurobe/student-dashboard")}
@@ -1402,31 +1402,31 @@ export default function StudentMCQTestPage() {
           <title>Assessment Scheduled — Neurobe</title>
         </Head>
 
-        <div className="w-full max-w-md space-y-5 sm:space-y-6 rounded-2xl sm:rounded-3xl border border-amber-500/30 bg-[#111625] p-5 sm:p-8 shadow-2xl text-center">
-          <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10">
-            <Clock className="h-7 w-7 sm:h-8 sm:w-8 animate-pulse" />
+        <div className="w-full max-w-md space-y-4 sm:space-y-5 rounded-2xl border border-amber-500/30 bg-[#111625] p-4 sm:p-6 shadow-2xl text-center">
+          <div className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-md">
+            <Clock className="h-6 w-6 sm:h-7 sm:w-7 animate-pulse" />
           </div>
 
-          <div className="space-y-2">
-            <h1 className="text-lg sm:text-xl font-bold text-white">Assessment Opening Soon</h1>
+          <div className="space-y-1.5">
+            <h1 className="text-base sm:text-lg font-bold text-white">Assessment Opening Soon</h1>
             <p className="text-xs text-slate-400 leading-relaxed">
               {preWindowMsg || "The scheduled window for this assessment has not started yet. Please wait until the start time."}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-4 sm:p-6 space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Test Window Starts In</span>
-            <p className="text-3xl sm:text-4xl font-black font-mono text-amber-400 tracking-wider">
+          <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-4 space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Test Window Starts In</span>
+            <p className="text-2xl sm:text-3xl font-black font-mono text-amber-400 tracking-wider">
               {timeFormatted}
             </p>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             <button
               type="button"
               disabled={verifying || preWindowSeconds > 0}
               onClick={() => handleVerifyCode()}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3 sm:py-3.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-indigo-600/20"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 sm:py-3 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               {preWindowSeconds > 0 ? (
                 <span>Auto-opening when timer reaches zero...</span>
@@ -1461,54 +1461,53 @@ export default function StudentMCQTestPage() {
           <title>{testDetails.title} — Proctoring Instructions</title>
         </Head>
 
-        <div className="w-full max-w-2xl space-y-5 sm:space-y-6 rounded-2xl sm:rounded-3xl border border-slate-800/90 bg-[#111625] p-5 sm:p-8 shadow-2xl">
+        <div className="w-full max-w-2xl space-y-4 sm:space-y-5 rounded-2xl border border-slate-800/90 bg-[#111625] p-4 sm:p-6 shadow-2xl">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 border-b border-slate-800 pb-3">
             <div>
-              <span className="rounded-md bg-indigo-950 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-400 border border-indigo-800">
+              <span className="rounded-md bg-indigo-950 px-2 py-0.5 font-mono text-xs font-bold text-indigo-400 border border-indigo-800">
                 {testDetails.test_code || testDetails.secure_code}
               </span>
-              <h2 className="mt-2 text-lg sm:text-xl font-bold text-white">{testDetails.title}</h2>
+              <h2 className="mt-1.5 text-base sm:text-lg font-bold text-white">{testDetails.title}</h2>
               <p className="text-xs text-slate-400">
                 {testDetails.unit_name || "Academic Assessment"} • Duration: {testDetails.duration_minutes} Mins
               </p>
             </div>
-            <div className="self-start rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400 flex items-center gap-1.5 shrink-0">
-              <CheckCircle2 className="h-3.5 w-3.5" />
+            <div className="self-start rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 flex items-center gap-1.5 shrink-0">
+              <CheckCircle2 className="h-3 w-3" />
               <span>Passcode Verified</span>
             </div>
           </div>
 
           {/* Test Meta Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-center">
-            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
-              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Duration</span>
-              <p className="mt-1 text-sm sm:text-base font-black text-indigo-400">{testDetails.duration_minutes} Mins</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-2 sm:p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Duration</span>
+              <p className="mt-0.5 text-sm font-black text-indigo-400">{testDetails.duration_minutes} Mins</p>
             </div>
-            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
-              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Tab Limit</span>
-              <p className="mt-1 text-sm sm:text-base font-black text-amber-400">{testDetails.max_tab_switches || 3} Max</p>
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-2 sm:p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Tab Limit</span>
+              <p className="mt-0.5 text-sm font-black text-amber-400">{testDetails.max_tab_switches || 3} Max</p>
             </div>
-            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
-              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">Questions</span>
-              <p className="mt-1 text-sm sm:text-base font-black text-emerald-400">Randomized</p>
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-2 sm:p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Questions</span>
+              <p className="mt-0.5 text-sm font-black text-emerald-400">Randomized</p>
             </div>
-            <div className="rounded-xl sm:rounded-2xl border border-slate-800 bg-[#0B0F19] p-3 sm:p-3.5">
-              <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-semibold tracking-wider">AI Viva Voce</span>
-              <p className="mt-1 text-sm sm:text-base font-black text-purple-400">{testDetails.have_viva ? "Included" : "None"}</p>
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-2 sm:p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">AI Viva Voce</span>
+              <p className="mt-0.5 text-sm font-black text-purple-400">{testDetails.have_viva ? "Included" : "None"}</p>
             </div>
           </div>
 
           {/* Strict Proctoring Warning Box */}
-          <div className="rounded-xl sm:rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 space-y-2.5 sm:space-y-3">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-4 space-y-2">
             <div className="flex items-center gap-2 text-amber-400 font-bold text-xs sm:text-sm">
-              <ShieldAlert className="h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0" />
+              <ShieldAlert className="h-4 w-4 shrink-0" />
               <span>Strict Proctoring Rules & Automated Integrity System</span>
             </div>
-            <ul className="space-y-2 text-xs text-slate-300 list-disc list-inside">
+            <ul className="space-y-1.5 text-xs text-slate-300 list-disc list-inside">
               <li>
-                <strong>Tab Switching / App Blur:</strong> Navigating away from this tab, opening developer tools, or
-                switching applications will be recorded instantly.
+                <strong>Tab Switching / App Blur:</strong> Navigating away from this tab or switching applications is recorded.
               </li>
               <li>
                 <strong>Automatic Force-Submission:</strong> Exceeding{" "}
@@ -1520,7 +1519,7 @@ export default function StudentMCQTestPage() {
               </li>
               {testDetails.have_viva && (
                 <li>
-                  <strong>Interactive AI Viva:</strong> Upon submitting your MCQ test, an interactive AI conversational
+                  <strong>Interactive AI Viva:</strong> Upon submitting your MCQ test, an interactive conversational
                   viva evaluation will begin immediately.
                 </li>
               )}
@@ -1528,18 +1527,18 @@ export default function StudentMCQTestPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
             <button
               type="button"
               onClick={() => setPhase("enter_code")}
-              className="w-full sm:w-auto rounded-xl sm:rounded-2xl border border-slate-700 px-6 py-3 sm:py-3.5 text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer text-center"
+              className="w-full sm:w-auto rounded-xl border border-slate-700 px-5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer text-center"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleStartExam}
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 py-3 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-xl shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer"
             >
               <span>Begin Assessment</span>
               <ArrowRight className="h-4 w-4" />
