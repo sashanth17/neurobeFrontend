@@ -311,40 +311,53 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
   };
 
   const handleSaveManualQuestion = async (newQuestionData: any) => {
+    const authUser = getAuthUser();
+
+    const options = (newQuestionData.options || []).map((o: any) => ({
+      text: o.text || o.option || "",
+      is_correct: Boolean(o.is_correct || o.isCorrect),
+    }));
+
+    const apiPayload = {
+      course_id: String(courseKey),
+      question_code: newQuestionData.question_code || newQuestionData.code,
+      text: newQuestionData.question || newQuestionData.text,
+      options: options,
+      explanation: newQuestionData.explanation || undefined,
+      knowledge_level: newQuestionData.knowledge_level || newQuestionData.level || "K2",
+      difficulty: (newQuestionData.difficulty || "medium").toLowerCase(),
+      unit_number: Number(newQuestionData.unit_number || 1),
+      topic: newQuestionData.topic || undefined,
+      subtopic: newQuestionData.subtopic || undefined,
+      course_outcome: newQuestionData.course_outcome || newQuestionData.co || "CO1",
+      marks: Number(newQuestionData.marks || 2),
+      status: newQuestionData.status || "Approved",
+      user_id: authUser?.id ? Number(authUser.id) : undefined,
+    };
+
     try {
-      const apiPayload = {
-        course_id: String(courseKey),
-        ...newQuestionData,
-      };
-      await (Models.mcq as any).create_manual_question(apiPayload).catch(() => null);
-    } catch (e) {
-      console.warn("Backend manual question creation:", e);
+      // 1. Save directly to backend database
+      await Models.mcq.create_manual_question(apiPayload);
+
+      // 2. Clear any legacy localStorage entry
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`neurobe_manual_questions_${courseKey}`);
+        }
+      } catch {}
+
+      // 3. Re-fetch from backend database
+      await fetchQuestions();
+      if (onRefreshQuestions) onRefreshQuestions();
+
+      setSelectedBannerFilter("all");
+      setIsAuthorModalOpen(false);
+      Success("✓ Question authored manually and saved to database successfully!");
+    } catch (err: any) {
+      console.error("[handleSaveManualQuestion] API Error:", err);
+      Failure(typeof err === "string" ? err : err?.message || "Failed to save question to server.");
+      throw err;
     }
-
-    const createdId = `man-${Date.now()}`;
-    const questionObj = normalizeMCQ(
-      {
-        ...newQuestionData,
-        id: createdId,
-      },
-      questions.length || 0
-    );
-
-    // Persist to localStorage
-    try {
-      const storageKey = `neurobe_manual_questions_${courseKey}`;
-      const raw = localStorage.getItem(storageKey);
-      const existing = raw ? JSON.parse(raw) : [];
-      const updated = [questionObj, ...existing.filter((q: any) => q.id !== createdId)];
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    } catch (e) {}
-
-    setQuestions((prev) => [questionObj, ...prev]);
-    setRecentQuestionIds((prev) => [createdId, ...prev]);
-    setSelectedBannerFilter("all");
-    setIsAuthorModalOpen(false);
-    Success("✓ Question authored manually and added to question pool!");
-    if (onRefreshQuestions) onRefreshQuestions();
   };
 
   const handleEditSetName = async (setId: string, newName: string) => {

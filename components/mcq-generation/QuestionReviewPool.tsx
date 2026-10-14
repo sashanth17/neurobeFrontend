@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { MCQQuestion, normalizeMCQ } from "./types";
+import { renderMathInHtml } from "@/components/common-components/katexLoader";
 
 interface QuestionReviewPoolProps {
   currentQuestions: MCQQuestion[];
@@ -334,14 +335,12 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
                   {/* Question Statement */}
                   <div className="mt-3.5 cursor-pointer" onClick={() => onToggleExpandOne(question.id)}>
                     <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed tracking-tight hover:text-indigo-600 transition-colors">
-                      {/<[a-z][\s\S]*>/i.test(question.question || question.text || "") ? (
-                        <span
-                          className="rich-text-content block"
-                          dangerouslySetInnerHTML={{ __html: question.question || question.text }}
-                        />
-                      ) : (
-                        question.question || question.text
-                      )}
+                      <span
+                        className="rich-text-content katex-rendered block"
+                        dangerouslySetInnerHTML={{
+                          __html: renderMathInHtml(question.question || question.text || ""),
+                        }}
+                      />
                     </h3>
                   </div>
 
@@ -362,32 +361,20 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
                             <span
                               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black transition-colors ${
                                 opt.isCorrect
-                                  ? "bg-emerald-600 text-white shadow-xs"
-                                  : "border border-slate-200 bg-white text-slate-700 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "border border-slate-200 bg-white text-slate-700 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                               }`}
                             >
                               {opt.key}
                             </span>
-                            {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
-                              <span
-                                className={`rich-text-content flex-1 text-xs sm:text-sm leading-snug ${
-                                  opt.isCorrect
-                                    ? "font-bold text-emerald-950 dark:text-emerald-100"
-                                    : "font-medium text-slate-700 dark:text-slate-300"
-                                }`}
-                                dangerouslySetInnerHTML={{ __html: opt.text }}
-                              />
-                            ) : (
-                              <span
-                                className={`flex-1 text-xs sm:text-sm leading-snug ${
-                                  opt.isCorrect
-                                    ? "font-bold text-emerald-950 dark:text-emerald-100"
-                                    : "font-medium text-slate-700 dark:text-slate-300"
-                                }`}
-                              >
-                                {opt.text}
-                              </span>
-                            )}
+                            <span
+                              className={`rich-text-content katex-rendered flex-1 text-xs sm:text-sm leading-snug ${
+                                opt.isCorrect
+                                  ? "font-bold text-emerald-950 dark:text-emerald-100"
+                                  : "font-medium text-slate-700 dark:text-slate-300"
+                              }`}
+                              dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt.text || "") }}
+                            />
                             {opt.isCorrect && (
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-xs shrink-0">
                                 <Check className="h-3 w-3 stroke-[3]" />
@@ -408,16 +395,12 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
                             <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 block">
                               Explanation & Rationale
                             </span>
-                            {/<[a-z][\s\S]*>/i.test(question.explanation || "") ? (
-                              <div
-                                className="rich-text-content text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal"
-                                dangerouslySetInnerHTML={{ __html: question.explanation }}
-                              />
-                            ) : (
-                              <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                                {question.explanation}
-                              </p>
-                            )}
+                            <div
+                              className="rich-text-content katex-rendered text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal"
+                              dangerouslySetInnerHTML={{
+                                __html: renderMathInHtml(question.explanation || ""),
+                              }}
+                            />
                           </div>
                         </div>
                       )}

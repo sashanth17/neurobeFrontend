@@ -32,6 +32,7 @@ import PrivateRouter from "@/hook/privateRouter";
 import Models from "@/imports/models.import";
 import { getAuthUser } from "@/utils/function.utils";
 import VivaResultComponent from "@/components/viva_result_component";
+import { loadKatex, renderMathInHtml } from "@/components/common-components/katexLoader";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -207,6 +208,7 @@ const StudentReportPage = () => {
 
   useEffect(() => {
     dispatch(setPageTitle("Student Assessment Report"));
+    loadKatex();
   }, [dispatch]);
 
   const fetchReport = async () => {
@@ -787,9 +789,13 @@ const StudentReportPage = () => {
                             </div>
                           </div>
 
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-relaxed">
-                            {valOrDash(q.question_string)}
-                          </h3>
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white leading-relaxed rich-text-content katex-rendered">
+                            <div
+                              dangerouslySetInnerHTML={{
+                                __html: renderMathInHtml(q.question_string || "—"),
+                              }}
+                            />
+                          </div>
 
                           {/* Options Grid */}
                           <div className="space-y-2 pt-1">
@@ -816,14 +822,19 @@ const StudentReportPage = () => {
                                   key={oIdx}
                                   className={`flex items-center justify-between rounded-xl border p-3 text-xs ${optBorder}`}
                                 >
-                                  <span className="flex items-center gap-2.5">
-                                    <span className="font-mono text-gray-400 dark:text-gray-500">
+                                  <span className="flex items-center gap-2.5 flex-1 min-w-0">
+                                    <span className="font-mono text-gray-400 dark:text-gray-500 shrink-0">
                                       {String.fromCharCode(65 + oIdx)}.
                                     </span>
-                                    <span>{valOrDash(optText)}</span>
+                                    <span
+                                      className="rich-text-content katex-rendered flex-1 min-w-0"
+                                      dangerouslySetInnerHTML={{
+                                        __html: renderMathInHtml(optText || "—"),
+                                      }}
+                                    />
                                   </span>
 
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 shrink-0 ml-2">
                                     {isCorrectOpt && (
                                       <span className="rounded-lg bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-1">
                                         <Check className="h-3 w-3" /> Correct Answer
@@ -845,7 +856,12 @@ const StudentReportPage = () => {
                             <strong className="text-indigo-700 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] block mb-1">
                               Rationale & Explanation:
                             </strong>
-                            <span>{valOrDash(q.explanation)}</span>
+                            <div
+                              className="rich-text-content katex-rendered text-slate-800 dark:text-slate-200"
+                              dangerouslySetInnerHTML={{
+                                __html: renderMathInHtml(q.explanation || "—"),
+                              }}
+                            />
                           </div>
                         </div>
                       );

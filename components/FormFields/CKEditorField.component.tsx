@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, AlertCircle, Image as ImageIcon } from "lucide-react";
+import { Sparkles, AlertCircle, Image as ImageIcon, Sigma, Eye, EyeOff } from "lucide-react";
 
 export interface CKEditorFieldProps {
   value: string;
@@ -13,6 +13,12 @@ export interface CKEditorFieldProps {
   hideBadge?: boolean;
   compactToolbar?: boolean;
   showImageUploadButton?: boolean;
+  showMathFormulaButton?: boolean;
+  onFormulaClick?: () => void;
+  showPreviewButton?: boolean;
+  isPreviewOpen?: boolean;
+  onTogglePreview?: () => void;
+  previewHtml?: string;
   helperText?: string;
 }
 
@@ -28,6 +34,12 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
   hideBadge = false,
   compactToolbar = false,
   showImageUploadButton = true,
+  showMathFormulaButton = false,
+  onFormulaClick,
+  showPreviewButton = false,
+  isPreviewOpen = false,
+  onTogglePreview,
+  previewHtml,
   helperText,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -239,6 +251,43 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
               </>
             )}
 
+            {showMathFormulaButton && onFormulaClick && (
+              <button
+                type="button"
+                onClick={onFormulaClick}
+                className="inline-flex items-center gap-1 rounded-md border border-indigo-200/80 bg-indigo-50/80 px-2 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 transition cursor-pointer active:scale-95 shadow-2xs"
+                title="Insert mathematical equation or LaTeX formula"
+              >
+                <Sigma className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400" />
+                <span>+ LaTeX</span>
+              </button>
+            )}
+
+            {showPreviewButton && onTogglePreview && (
+              <button
+                type="button"
+                onClick={onTogglePreview}
+                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold transition cursor-pointer active:scale-95 shadow-2xs ${
+                  isPreviewOpen
+                    ? "border-purple-500 bg-purple-600 text-white font-bold"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                }`}
+                title="Toggle live rendered LaTeX preview"
+              >
+                {isPreviewOpen ? (
+                  <>
+                    <EyeOff className="h-2.5 w-2.5" />
+                    <span>Preview</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                    <span>Preview</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {!hideBadge && badgeLabel && (
               <span className="inline-flex items-center gap-1 rounded-md border border-purple-200/60 bg-purple-50/80 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:border-purple-800/50 dark:bg-purple-950/40 dark:text-purple-300">
                 <Sparkles className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
@@ -279,6 +328,37 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
           className={!isReady ? "hidden" : "block"}
         />
       </div>
+
+      {/* Live Preview Box if enabled */}
+      {showPreviewButton && isPreviewOpen && (
+        <div className="mt-2 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50/80 via-indigo-50/40 to-white p-3 text-xs shadow-2xs dark:border-purple-900/60 dark:bg-slate-900">
+          <div className="flex items-center justify-between mb-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+            <span className="flex items-center gap-1 font-bold">
+              <Sparkles className="h-3 w-3 text-purple-600" />
+              <span>Live Rendered Preview:</span>
+            </span>
+            {onTogglePreview && (
+              <button
+                type="button"
+                onClick={onTogglePreview}
+                className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-semibold cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            )}
+          </div>
+          <div className="min-h-[28px] py-1">
+            {previewHtml ? (
+              <div
+                className="rich-text-content katex-rendered text-sm font-semibold text-slate-900 dark:text-white leading-relaxed max-w-full overflow-x-auto"
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              />
+            ) : (
+              <span className="text-[11px] text-slate-400 italic">No content or formula entered yet</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Helper text or Error message */}
       {helperText && !error && (

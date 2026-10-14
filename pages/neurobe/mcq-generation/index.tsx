@@ -295,6 +295,13 @@ const MCQGenerationIndexPage = () => {
   /* ── 3. Fetch Questions Pool ───────────────────────────────────────── */
   const fetchQuestions = async (courseKey: string | number) => {
     try {
+      // Clean up any legacy manual questions key from localStorage
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`neurobe_manual_questions_${courseKey}`);
+        }
+      } catch {}
+
       const res: any = await Models.mcq.history_questions({ course_id: courseKey }).catch((err) => {
         console.error("fetchQuestions error:", err);
         return null;
@@ -308,25 +315,7 @@ const MCQGenerationIndexPage = () => {
       }
       const fetched: MCQQuestion[] = rawList.map((item, idx) => normalizeMCQ(item, idx));
 
-      // Merge local manual questions for this course
-      let manualQuestions: MCQQuestion[] = [];
-      try {
-        const rawManual = typeof window !== "undefined" ? localStorage.getItem(`neurobe_manual_questions_${courseKey}`) : null;
-        if (rawManual) {
-          const parsed = JSON.parse(rawManual);
-          if (Array.isArray(parsed)) {
-            manualQuestions = parsed.map((item, idx) => normalizeMCQ(item, idx));
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to load local manual questions:", e);
-      }
-
-      const existingIds = new Set(fetched.map((q) => q.id));
-      const filteredManual = manualQuestions.filter((q) => !existingIds.has(q.id));
-      const combined = [...filteredManual, ...fetched];
-
-      setState({ courseQuestions: { ...state.courseQuestions, [courseKey]: combined } });
+      setState({ courseQuestions: { ...state.courseQuestions, [courseKey]: fetched } });
     } catch (err) {
       console.error("Failed to fetch questions:", err);
     }
@@ -641,16 +630,6 @@ const MCQGenerationIndexPage = () => {
       await Models.mcq.delete_question(questionId);
       const updated = currentQuestions.filter((q) => q.id !== questionId);
       setState({ courseQuestions: { ...state.courseQuestions, [currentCourseKey]: updated } });
-
-      // Also clean up from localStorage if present
-      try {
-        const storageKey = `neurobe_manual_questions_${currentCourseKey}`;
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const existing = JSON.parse(raw);
-          localStorage.setItem(storageKey, JSON.stringify(existing.filter((q: any) => q.id !== questionId)));
-        }
-      } catch {}
       Success("Question deleted successfully.");
     } catch {
       showToast("error", "Failed to delete question.");
@@ -660,51 +639,58 @@ const MCQGenerationIndexPage = () => {
   const handleSaveManualQuestion = async (newQuestionData: any) => {
     if (!state.selectedCourse) return;
     const courseKey = state.selectedCourse.code || state.selectedCourse.id;
+    const authUser = getAuthUser();
 
-    // 1. Attempt to persist to backend
-    let savedFromBackend: any = null;
+    // Map options to match Option schema { text: string, is_correct: boolean }
+    const options = (newQuestionData.options || []).map((o: any) => ({
+      text: o.text || o.option || "",
+      is_correct: Boolean(o.is_correct || o.isCorrect),
+    }));
+
+    const apiPayload = {
+      course_id: String(courseKey),
+      question_code: newQuestionData.question_code || newQuestionData.code,
+      text: newQuestionData.question || newQuestionData.text,
+      options: options,
+      explanation: newQuestionData.explanation || undefined,
+      knowledge_level: newQuestionData.knowledge_level || newQuestionData.level || "K2",
+      difficulty: (newQuestionData.difficulty || "medium").toLowerCase(),
+      unit_number: Number(newQuestionData.unit_number || 1),
+      topic: newQuestionData.topic || undefined,
+      subtopic: newQuestionData.subtopic || undefined,
+      course_outcome: newQuestionData.course_outcome || newQuestionData.co || "CO1",
+      marks: Number(newQuestionData.marks || 2),
+      status: newQuestionData.status || "Approved",
+      user_id: authUser?.id ? Number(authUser.id) : undefined,
+    };
+
     try {
-      const apiPayload = {
-        course_id: String(courseKey),
-        ...newQuestionData,
-      };
-      savedFromBackend = await (Models.mcq as any).create_manual_question(apiPayload).catch(() => null);
-    } catch (e) {
-      console.warn("Backend manual question creation:", e);
+      // 1. Save directly to the database via API
+      const savedRes: any = await Models.mcq.create_manual_question(apiPayload);
+      const createdId = savedRes?.id;
+
+      // 2. Clean up any stale localStorage key for this course
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`neurobe_manual_questions_${courseKey}`);
+        }
+      } catch {}
+
+      // 3. Re-fetch fresh question pool from backend database
+      await fetchQuestions(courseKey);
+
+      setState({
+        selectedBannerFilter: "all",
+        isAuthorModalOpen: false,
+        recentQuestionIds: createdId ? [createdId, ...(state.recentQuestionIds || [])] : state.recentQuestionIds,
+      });
+
+      Success("✓ Question authored manually and saved to database successfully!");
+    } catch (err: any) {
+      console.error("[handleSaveManualQuestion] API Error:", err);
+      Failure(typeof err === "string" ? err : err?.message || "Failed to save question to server.");
+      throw err;
     }
-
-    const createdId = savedFromBackend?.id || `man-${Date.now()}`;
-    const questionObj = normalizeMCQ(
-      {
-        ...newQuestionData,
-        id: createdId,
-      },
-      currentQuestions.length || 0
-    );
-
-    // 2. Persist to localStorage
-    try {
-      const storageKey = `neurobe_manual_questions_${courseKey}`;
-      const raw = localStorage.getItem(storageKey);
-      const existing = raw ? JSON.parse(raw) : [];
-      const updated = [questionObj, ...existing.filter((q: any) => q.id !== createdId)];
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    } catch (e) {
-      console.warn("Failed to persist manual question to localStorage:", e);
-    }
-
-    // 3. Update state
-    const existingList = state.courseQuestions[courseKey] || [];
-    const updatedList = [questionObj, ...existingList.filter((q) => q.id !== createdId)];
-
-    setState({
-      courseQuestions: { ...state.courseQuestions, [courseKey]: updatedList },
-      recentQuestionIds: [createdId, ...(state.recentQuestionIds || [])],
-      selectedBannerFilter: "all",
-      isAuthorModalOpen: false,
-    });
-
-    Success("✓ Question authored manually and added to question pool!");
   };
 
   const handleToggleExpandOne = (id: string) => {
