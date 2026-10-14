@@ -37,13 +37,14 @@ export const ExamPaperPreviewModal: React.FC<ExamPaperPreviewModalProps> = ({
     window.print();
   };
 
+  const [printImageSize, setPrintImageSize] = React.useState<"compact" | "standard" | "large">("standard");
   const sections = previewData?.sections || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:p-0 print:bg-white">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-gray-900 print:max-h-none print:w-full print:shadow-none print:rounded-none">
         {/* Modal Top Bar (Hidden during printing) */}
-        <div className="flex items-center justify-between border-b border-gray-100 p-4 dark:border-gray-800 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-4 dark:border-gray-800 print:hidden">
           <div className="flex items-center gap-2">
             <FileCheck className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             <h2 className="text-sm font-bold text-gray-900 dark:text-white">
@@ -54,7 +55,49 @@ export const ExamPaperPreviewModal: React.FC<ExamPaperPreviewModalProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {/* Diagram Print Size Selector */}
+            <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800 text-xs">
+              <ImageIcon className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 ml-1.5" />
+              <span className="text-[11px] font-semibold text-gray-500 mr-1 hidden sm:inline">Diagram Size:</span>
+              <button
+                type="button"
+                onClick={() => setPrintImageSize("compact")}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all ${
+                  printImageSize === "compact"
+                    ? "bg-white text-purple-700 shadow-xs dark:bg-gray-700 dark:text-purple-300"
+                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                }`}
+                title="Compact diagrams (100px) - ideal for saving paper"
+              >
+                Compact (100px)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintImageSize("standard")}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all ${
+                  printImageSize === "standard"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                }`}
+                title="Standard exam diagram size (140px) - Recommended"
+              >
+                Standard (140px) ★
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintImageSize("large")}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all ${
+                  printImageSize === "large"
+                    ? "bg-white text-purple-700 shadow-xs dark:bg-gray-700 dark:text-purple-300"
+                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                }`}
+                title="Large diagram size (190px)"
+              >
+                Large (190px)
+              </button>
+            </div>
+
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-purple-700 transition-colors"
@@ -79,7 +122,7 @@ export const ExamPaperPreviewModal: React.FC<ExamPaperPreviewModalProps> = ({
               Generating university exam paper blueprint preview...
             </div>
           ) : (
-            <div className="mx-auto max-w-3xl border border-gray-300 bg-white p-8 text-black shadow-sm print:border-none print:p-0 print:shadow-none font-serif">
+            <div className={`mx-auto max-w-3xl border border-gray-300 bg-white p-8 text-black shadow-sm print:border-none print:p-0 print:shadow-none font-serif printable-exam-paper exam-img-${printImageSize}`}>
               {/* College / Institution Exam Header */}
               <div className="border-b-2 border-black pb-4 text-center">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">

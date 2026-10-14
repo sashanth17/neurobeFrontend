@@ -3,16 +3,14 @@ import {
   X,
   Plus,
   Trash2,
-  Upload,
   AlertCircle,
-  CheckCircle2,
-  Image as ImageIcon,
   Loader2,
-  Layers,
-  Compass,
 } from "lucide-react";
 import { CandidateQuestion, SubQuestionItem } from "@/types/cia-test.types";
 import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
+import CKEditorField from "@/components/FormFields/CKEditorField.component";
+import LatexFormulaModal from "@/components/common-components/LatexFormulaModal";
+import { renderMathInHtml } from "@/components/common-components/katexLoader";
 
 interface ManualQuestionModalProps {
   isOpen: boolean;
@@ -23,6 +21,13 @@ interface ManualQuestionModalProps {
   onClose: () => void;
   onSave: (payload: any) => Promise<boolean>;
 }
+
+const isHtmlEmpty = (html: string) => {
+  if (!html) return true;
+  const stripped = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  if (!stripped && !/<img\s/i.test(html)) return true;
+  return false;
+};
 
 export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   isOpen,
@@ -52,6 +57,29 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
   const [optionAText, setOptionAText] = useState<string>("");
   const [optionBText, setOptionBText] = useState<string>("");
 
+  // Preview states
+  const [questionPreview, setQuestionPreview] = useState(false);
+  const [optionAPreview, setOptionAPreview] = useState(false);
+  const [optionBPreview, setOptionBPreview] = useState(false);
+  const [subQuestionPreviews, setSubQuestionPreviews] = useState<Record<number, boolean>>({});
+
+  const toggleSubQuestionPreview = (idx: number) => {
+    setSubQuestionPreviews((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  // LaTeX Formula Modal State
+  const [formulaModalState, setFormulaModalState] = useState<{
+    open: boolean;
+    target: string;
+    targetLabel: string;
+    initialFormula?: string;
+  }>({
+    open: false,
+    target: "questionText",
+    targetLabel: "Question Text",
+    initialFormula: "",
+  });
+
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
@@ -60,7 +88,7 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
     if (questionToEdit) {
       setQuestionText(questionToEdit.question_text || "");
       setTotalMarks(questionToEdit.max_marks || 10);
-      setCourseOutcome(questionToEdit.co_level || questionToEdit.course_outcome || "CO1");
+      setCourseOutcome(questionToEdit.co_level || questionToEdit.course_outcome || (activeCos[0] || "CO1"));
       setBloomLevel(questionToEdit.knowledge_level || questionToEdit.bloom_level || "K3");
       setTopicName(
         (questionToEdit as any).primary_topic_name ||
@@ -81,7 +109,7 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
     } else {
       setQuestionText("");
       setTotalMarks(defaultMarks || 10);
-      setCourseOutcome("CO1");
+      setCourseOutcome(activeCos[0] || "CO1");
       setBloomLevel("K3");
       setQuestionType("DIRECT");
       setSubQuestions([
@@ -91,8 +119,72 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
       setOptionAText("");
       setOptionBText("");
     }
+    setQuestionPreview(false);
+    setOptionAPreview(false);
+    setOptionBPreview(false);
+    setSubQuestionPreviews({});
     setErrorBanner(null);
-  }, [questionToEdit, isOpen, defaultMarks]);
+  }, [questionToEdit, isOpen, defaultMarks, activeCos]);
+
+  const handleOpenFormula = (target: string, label: string) => {
+    let currentText = "";
+    if (target === "questionText") {
+      currentText = questionText;
+    } else if (target === "optionA") {
+      currentText = optionAText;
+    } else if (target === "optionB") {
+      currentText = optionBText;
+    } else if (target.startsWith("sub_")) {
+      const idx = parseInt(target.replace("sub_", ""), 10);
+      currentText = subQuestions[idx]?.text || "";
+    }
+    const match = currentText.match(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g);
+    const lastFormula = match ? match[match.length - 1] : "";
+
+    setFormulaModalState({
+      open: true,
+      target,
+      targetLabel: label,
+      initialFormula: lastFormula,
+    });
+  };
+
+  const appendFormulaToHtml = (html: string, formula: string): string => {
+    if (!html) return `<p>${formula}</p>`;
+    const trimmed = html.trim();
+    if (trimmed.endsWith("</p>")) {
+      return trimmed.replace(/<\/p>$/, ` ${formula}</p>`);
+    }
+    return `${trimmed}<p>${formula}</p>`;
+  };
+
+  const handleFormulaInserted = (latexFormula: string) => {
+    const { target } = formulaModalState;
+    if (target === "questionText") {
+      setQuestionText((prev) => appendFormulaToHtml(prev, latexFormula));
+      setQuestionPreview(true);
+    } else if (target === "optionA") {
+      setOptionAText((prev) => appendFormulaToHtml(prev, latexFormula));
+      setOptionAPreview(true);
+    } else if (target === "optionB") {
+      setOptionBText((prev) => appendFormulaToHtml(prev, latexFormula));
+      setOptionBPreview(true);
+    } else if (target.startsWith("sub_")) {
+      const idx = parseInt(target.replace("sub_", ""), 10);
+      setSubQuestions((prev) => {
+        const updated = [...prev];
+        if (updated[idx]) {
+          const cur = updated[idx].text || "";
+          updated[idx] = {
+            ...updated[idx],
+            text: appendFormulaToHtml(cur, latexFormula),
+          };
+        }
+        return updated;
+      });
+      setSubQuestionPreviews((prev) => ({ ...prev, [idx]: true }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -106,12 +198,12 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
     }
 
     if (questionType === "DIRECT") {
-      if (!questionText.trim()) {
+      if (isHtmlEmpty(questionText)) {
         setErrorBanner("Please enter the question text.");
         return false;
       }
     } else if (questionType === "SUB_QUESTIONS") {
-      if (!questionText.trim()) {
+      if (isHtmlEmpty(questionText)) {
         setErrorBanner("Please enter the main question stem / problem description.");
         return false;
       }
@@ -123,13 +215,13 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
         return false;
       }
       for (const sq of subQuestions) {
-        if (!sq.text.trim()) {
+        if (isHtmlEmpty(sq.text)) {
           setErrorBanner("All sub-questions must have valid descriptive text.");
           return false;
         }
       }
     } else if (questionType === "EITHER_OR") {
-      if (!optionAText.trim() || !optionBText.trim()) {
+      if (isHtmlEmpty(optionAText) || isHtmlEmpty(optionBText)) {
         setErrorBanner("Both Option A and Option B must be populated for an Either/Or question.");
         return false;
       }
@@ -168,6 +260,10 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
       } else if (questionType === "EITHER_OR") {
         payload.option_a = { text: optionAText, marks: Number(totalMarks) };
         payload.option_b = { text: optionBText, marks: Number(totalMarks) };
+        payload.either_or_content = {
+          option_a: { text: optionAText, marks: Number(totalMarks) },
+          option_b: { text: optionBText, marks: Number(totalMarks) },
+        };
       }
 
       const success = await onSave(payload);
@@ -191,7 +287,7 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-700">
           <div>
@@ -330,31 +426,45 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
           {/* Question Text Fields based on Type */}
           {questionType === "DIRECT" && (
             <div>
-              <label className="block font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Question Text *
-              </label>
-              <textarea
-                rows={4}
+              <CKEditorField
+                title="Question Text *"
                 placeholder="Enter complete question statement..."
                 value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                onChange={(val) => setQuestionText(val)}
+                required
+                minHeight="140px"
+                badgeLabel="CKEditor"
+                showImageUploadButton={true}
+                showMathFormulaButton={true}
+                onFormulaClick={() => handleOpenFormula("questionText", "Question Text")}
+                showPreviewButton={true}
+                isPreviewOpen={questionPreview}
+                onTogglePreview={() => setQuestionPreview((prev) => !prev)}
+                previewHtml={renderMathInHtml(questionText)}
+                helperText="Supports rich text formatting, bullet points, numbered lists, blockquotes, tables, images, and LaTeX math formulas ($...$ or $$...$$)."
               />
             </div>
           )}
 
           {questionType === "SUB_QUESTIONS" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <label className="block font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Main Problem Description / Stem *
-                </label>
-                <textarea
-                  rows={2}
+                <CKEditorField
+                  title="Main Problem Description / Stem *"
                   placeholder="e.g. Consider a binary search tree with keys [15, 20, 25, 30]..."
                   value={questionText}
-                  onChange={(e) => setQuestionText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                  onChange={(val) => setQuestionText(val)}
+                  required
+                  minHeight="110px"
+                  badgeLabel="CKEditor"
+                  showImageUploadButton={true}
+                  showMathFormulaButton={true}
+                  onFormulaClick={() => handleOpenFormula("questionText", "Main Problem Description")}
+                  showPreviewButton={true}
+                  isPreviewOpen={questionPreview}
+                  onTogglePreview={() => setQuestionPreview((prev) => !prev)}
+                  previewHtml={renderMathInHtml(questionText)}
+                  helperText="Main question stem or context preceding sub-questions."
                 />
               </div>
 
@@ -372,55 +482,71 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {subQuestions.map((sq, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-900"
+                      className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2 dark:border-gray-700 dark:bg-gray-900/60"
                     >
-                      <input
-                        type="text"
-                        value={sq.sub_label}
-                        onChange={(e) => {
-                          const updated = [...subQuestions];
-                          updated[idx].sub_label = e.target.value;
-                          setSubQuestions(updated);
-                        }}
-                        className="w-10 rounded-lg border border-gray-300 bg-white p-1.5 text-center font-bold dark:border-gray-600 dark:bg-gray-800"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Sub-question description..."
-                        value={sq.text}
-                        onChange={(e) => {
-                          const updated = [...subQuestions];
-                          updated[idx].text = e.target.value;
-                          setSubQuestions(updated);
-                        }}
-                        className="flex-1 rounded-lg border border-gray-300 bg-white p-1.5 font-medium dark:border-gray-600 dark:bg-gray-800"
-                      />
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min="1"
-                          value={sq.marks}
-                          onChange={(e) => {
-                            const updated = [...subQuestions];
-                            updated[idx].marks = Number(e.target.value);
-                            setSubQuestions(updated);
-                          }}
-                          className="w-16 rounded-lg border border-gray-300 bg-white p-1.5 text-center font-bold text-purple-700 dark:border-gray-600 dark:bg-gray-800 dark:text-purple-300"
-                        />
-                        <span className="font-bold text-gray-500">M</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase">Sub-part</span>
+                          <input
+                            type="text"
+                            value={sq.sub_label}
+                            onChange={(e) => {
+                              const updated = [...subQuestions];
+                              updated[idx].sub_label = e.target.value;
+                              setSubQuestions(updated);
+                            }}
+                            className="w-10 rounded-lg border border-gray-300 bg-white p-1 text-center font-bold text-xs dark:border-gray-600 dark:bg-gray-800"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="1"
+                              value={sq.marks}
+                              onChange={(e) => {
+                                const updated = [...subQuestions];
+                                updated[idx].marks = Number(e.target.value);
+                                setSubQuestions(updated);
+                              }}
+                              className="w-16 rounded-lg border border-gray-300 bg-white p-1 text-center font-bold text-xs text-purple-700 dark:border-gray-600 dark:bg-gray-800 dark:text-purple-300"
+                            />
+                            <span className="font-bold text-gray-500 text-xs">Marks</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSubQuestion(idx)}
+                            disabled={subQuestions.length <= 1}
+                            className="p-1 text-gray-400 hover:text-red-600 disabled:opacity-30 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                            title="Remove Sub-part"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeSubQuestion(idx)}
-                        disabled={subQuestions.length <= 1}
-                        className="p-1 text-gray-400 hover:text-red-600 disabled:opacity-30"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+
+                      <CKEditorField
+                        placeholder={`Enter Sub-question (${sq.sub_label}) description...`}
+                        value={sq.text}
+                        onChange={(content) => {
+                          const updated = [...subQuestions];
+                          updated[idx].text = content;
+                          setSubQuestions(updated);
+                        }}
+                        minHeight="70px"
+                        compactToolbar={true}
+                        showImageUploadButton={true}
+                        showMathFormulaButton={true}
+                        onFormulaClick={() => handleOpenFormula(`sub_${idx}`, `Sub-question (${sq.sub_label})`)}
+                        showPreviewButton={true}
+                        isPreviewOpen={!!subQuestionPreviews[idx]}
+                        onTogglePreview={() => toggleSubQuestionPreview(idx)}
+                        previewHtml={renderMathInHtml(sq.text)}
+                      />
                     </div>
                   ))}
                 </div>
@@ -431,32 +557,46 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
           {questionType === "EITHER_OR" && (
             <div className="space-y-3">
               <div>
-                <label className="block font-bold text-purple-700 dark:text-purple-300 mb-1">
-                  Option A Statement ({totalMarks} Marks) *
-                </label>
-                <textarea
-                  rows={3}
+                <CKEditorField
+                  title={`Option A Statement (${totalMarks} Marks) *`}
                   placeholder="Enter complete Option A problem..."
                   value={optionAText}
-                  onChange={(e) => setOptionAText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                  onChange={(val) => setOptionAText(val)}
+                  required
+                  minHeight="110px"
+                  badgeLabel="Option A"
+                  showImageUploadButton={true}
+                  showMathFormulaButton={true}
+                  onFormulaClick={() => handleOpenFormula("optionA", "Option A Statement")}
+                  showPreviewButton={true}
+                  isPreviewOpen={optionAPreview}
+                  onTogglePreview={() => setOptionAPreview((prev) => !prev)}
+                  previewHtml={renderMathInHtml(optionAText)}
+                  helperText="Primary question choice for Option A."
                 />
               </div>
 
-              <div className="text-center font-black text-purple-600 dark:text-purple-400">
+              <div className="text-center font-black text-purple-600 dark:text-purple-400 my-1">
                 — OR —
               </div>
 
               <div>
-                <label className="block font-bold text-purple-700 dark:text-purple-300 mb-1">
-                  Option B Statement ({totalMarks} Marks) *
-                </label>
-                <textarea
-                  rows={3}
+                <CKEditorField
+                  title={`Option B Statement (${totalMarks} Marks) *`}
                   placeholder="Enter complete Option B problem..."
                   value={optionBText}
-                  onChange={(e) => setOptionBText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                  onChange={(val) => setOptionBText(val)}
+                  required
+                  minHeight="110px"
+                  badgeLabel="Option B"
+                  showImageUploadButton={true}
+                  showMathFormulaButton={true}
+                  onFormulaClick={() => handleOpenFormula("optionB", "Option B Statement")}
+                  showPreviewButton={true}
+                  isPreviewOpen={optionBPreview}
+                  onTogglePreview={() => setOptionBPreview((prev) => !prev)}
+                  previewHtml={renderMathInHtml(optionBText)}
+                  helperText="Alternative question choice for Option B."
                 />
               </div>
             </div>
@@ -488,6 +628,14 @@ export const ManualQuestionModal: React.FC<ManualQuestionModalProps> = ({
             </button>
           </div>
         </form>
+
+        <LatexFormulaModal
+          open={formulaModalState.open}
+          onClose={() => setFormulaModalState((prev) => ({ ...prev, open: false }))}
+          onInsert={handleFormulaInserted}
+          initialFormula={formulaModalState.initialFormula}
+          targetLabel={formulaModalState.targetLabel}
+        />
       </div>
     </div>
   );

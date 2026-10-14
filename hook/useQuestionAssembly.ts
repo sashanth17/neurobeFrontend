@@ -411,8 +411,68 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
       await fetchCandidates();
       return true;
     } catch (err: any) {
-      console.error("Failed to update question:", err);
-      toast.error(err.response?.data?.detail || "Failed to update question");
+      if (err.response?.status === 409) {
+        // Question is assigned to a blueprint slot - attempt auto unassign -> update -> reassign
+        let assignedSlotId: number | null = null;
+        let assignedSubId: string | null = null;
+        if (template?.sections) {
+          for (const sec of template.sections) {
+            for (const slot of sec.questions || []) {
+              if (slot.actual_question_id === questionId) {
+                assignedSlotId = slot.id;
+                break;
+              }
+              const sub = (slot as any).sub_questions?.find(
+                (sq: any) => sq.assigned_question_id === questionId
+              );
+              if (sub) {
+                assignedSlotId = slot.id;
+                assignedSubId = sub.sub_id;
+                break;
+              }
+              const subA = (slot as any).either_or_structure?.option_a?.sub_questions?.find(
+                (sq: any) => sq.assigned_question_id === questionId
+              );
+              if (subA) {
+                assignedSlotId = slot.id;
+                assignedSubId = subA.sub_id;
+                break;
+              }
+              const subB = (slot as any).either_or_structure?.option_b?.sub_questions?.find(
+                (sq: any) => sq.assigned_question_id === questionId
+              );
+              if (subB) {
+                assignedSlotId = slot.id;
+                assignedSubId = subB.sub_id;
+                break;
+              }
+            }
+            if (assignedSlotId) break;
+          }
+        }
+
+        if (assignedSlotId) {
+          try {
+            await ciaAssessmentService.unassignSlot(validTemplateId, assignedSlotId, assignedSubId);
+            await ciaAssessmentService.updateQuestion(questionId, payload);
+            try {
+              await ciaAssessmentService.assignQuestionToSlot(validTemplateId, assignedSlotId, questionId, assignedSubId);
+            } catch (reassignErr) {
+              console.warn("Reassign after edit failed (marks or CO may have changed):", reassignErr);
+            }
+            toast.success("Question updated successfully!");
+            await Promise.all([fetchTemplate(), fetchCandidates()]);
+            return true;
+          } catch (nestedErr: any) {
+            console.warn("Auto unassign/update failed:", nestedErr);
+          }
+        }
+      }
+
+      const errMsg = err.response?.data?.detail || (err.response?.status === 409
+        ? "This question is assigned to a slot. Please unassign it first to edit."
+        : "Failed to update question");
+      toast.error(errMsg);
       return false;
     } finally {
       setActionLoadingId(null);

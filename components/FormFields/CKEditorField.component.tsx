@@ -1,5 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, AlertCircle, Image as ImageIcon, Sigma, Eye, EyeOff } from "lucide-react";
+import {
+  Sparkles,
+  AlertCircle,
+  Image as ImageIcon,
+  Sigma,
+  Eye,
+  EyeOff,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Trash2,
+} from "lucide-react";
 
 export interface CKEditorFieldProps {
   value: string;
@@ -48,7 +59,206 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  // Helper to detect initial size & alignment from HTML content
+  const detectImageProperties = (html?: string | null): { size: number; align: "left" | "center" | "right" } => {
+    let size = 160;
+    let align: "left" | "center" | "right" = "center";
+    if (!html) return { size, align };
+
+    if (html.includes("image-size-80") || /width=["']?80["']?/i.test(html) || /max-height:\s*80px/i.test(html)) {
+      size = 80;
+    } else if (html.includes("image-size-120") || /width=["']?120["']?/i.test(html) || /max-height:\s*120px/i.test(html)) {
+      size = 120;
+    } else if (html.includes("image-size-240") || /width=["']?240["']?/i.test(html) || /max-height:\s*240px/i.test(html)) {
+      size = 240;
+    } else if (html.includes("image-size-160") || /width=["']?160["']?/i.test(html) || /max-height:\s*160px/i.test(html)) {
+      size = 160;
+    }
+
+    if (
+      html.includes("image-align-left") ||
+      /text-align:\s*left/i.test(html) ||
+      /margin-left:\s*0/i.test(html) ||
+      /margin:\s*[^;]*\s0px\b/i.test(html) ||
+      /align=["']?left["']?/i.test(html)
+    ) {
+      align = "left";
+    } else if (
+      html.includes("image-align-right") ||
+      /text-align:\s*right/i.test(html) ||
+      /margin-right:\s*0/i.test(html) ||
+      /align=["']?right["']?/i.test(html) ||
+      html.includes("image-style-side")
+    ) {
+      align = "right";
+    } else if (
+      html.includes("image-align-center") ||
+      /text-align:\s*center/i.test(html) ||
+      /align=["']?center["']?/i.test(html)
+    ) {
+      align = "center";
+    }
+
+    return { size, align };
+  };
+
+  const initialProps = detectImageProperties(value);
   const [isReady, setIsReady] = useState(false);
+  const [currentImageSize, setCurrentImageSize] = useState<number>(initialProps.size);
+  const [currentImageAlign, setCurrentImageAlign] = useState<"left" | "center" | "right">(initialProps.align);
+
+  const imageFormatRef = useRef<{ size: number; align: "left" | "center" | "right" }>(initialProps);
+  imageFormatRef.current = { size: currentImageSize, align: currentImageAlign };
+  const isInternalChangeRef = useRef(false);
+
+  const hasImagesInContent = Boolean(value && /<img\s/i.test(value));
+
+  // Helper to directly enforce image sizing and alignment on the live CKEditor DOM
+  const applyDiagramStylesToDom = (size: number, align: "left" | "center" | "right") => {
+    if (!containerRef.current) return;
+
+    const alignLeft = align === "right" ? "auto" : align === "center" ? "auto" : "0px";
+    const alignRight = align === "left" ? "auto" : align === "center" ? "auto" : "0px";
+
+    // 1. All image wrapper containers / figures in the editor
+    const figures = containerRef.current.querySelectorAll<HTMLElement>(
+      "figure.image, .ck-widget.image, .ck-content figure, .ck-content .image, .ck-widget"
+    );
+    figures.forEach((fig) => {
+      if (fig.querySelector("img") || fig.classList.contains("image")) {
+        fig.style.setProperty("max-width", `${size}px`, "important");
+        fig.style.setProperty("width", "auto", "important");
+        fig.style.setProperty("margin-left", alignLeft, "important");
+        fig.style.setProperty("margin-right", alignRight, "important");
+        fig.style.setProperty("text-align", align, "important");
+        fig.style.setProperty("display", "block", "important");
+      }
+    });
+
+    // 2. All <img> elements in the editor
+    const images = containerRef.current.querySelectorAll<HTMLImageElement>(
+      ".ck-content img, .ck-editor img, img"
+    );
+    images.forEach((img) => {
+      img.style.setProperty("max-height", `${size}px`, "important");
+      img.style.setProperty("max-width", `${size}px`, "important");
+      img.style.setProperty("width", "auto", "important");
+      img.style.setProperty("min-width", "0px", "important");
+      img.style.setProperty("height", "auto", "important");
+      img.style.setProperty("object-fit", "contain", "important");
+      img.style.setProperty("display", "block", "important");
+      img.style.setProperty("margin-left", alignLeft, "important");
+      img.style.setProperty("margin-right", alignRight, "important");
+    });
+  };
+
+  // Helper using DOMParser to cleanly format HTML for storage and previews
+  const updateHtmlImageFormatting = (html: string, size: number, align: "left" | "center" | "right"): string => {
+    if (!html || typeof window === "undefined") return html;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const images = doc.querySelectorAll("img");
+      if (images.length === 0) return html;
+
+      const alignLeft = align === "right" ? "auto" : align === "center" ? "auto" : "0px";
+      const alignRight = align === "left" ? "auto" : align === "center" ? "auto" : "0px";
+      const margin = `6px ${alignRight} 6px ${alignLeft}`;
+      const textAlign = align;
+      const alignClass = `image-align-${align}`;
+      const sizeClass = `image-size-${size}`;
+      const styleStr = `max-height: ${size}px !important; max-width: ${size}px !important; width: auto !important; height: auto !important; object-fit: contain !important; display: block !important; margin: ${margin} !important;`;
+
+      images.forEach((img) => {
+        img.setAttribute("width", String(size));
+        img.setAttribute("style", styleStr);
+        const curImgClass = (img.getAttribute("class") || "")
+          .replace(/image-size-\d+/g, "")
+          .replace(/image-align-[a-z]+/g, "")
+          .trim();
+        img.setAttribute("class", `${curImgClass} ${sizeClass}`.trim());
+
+        const figure = img.closest("figure");
+        if (figure) {
+          figure.setAttribute(
+            "style",
+            `max-width: ${size}px !important; width: auto !important; text-align: ${textAlign} !important; margin: ${margin} !important; display: block !important;`
+          );
+          const curFigClass = (figure.getAttribute("class") || "")
+            .replace(/image-size-\d+/g, "")
+            .replace(/image-align-[a-z]+/g, "")
+            .trim();
+          figure.setAttribute("class", `${curFigClass} ${alignClass} ${sizeClass}`.trim());
+        } else {
+          const parentP = img.parentElement;
+          if (parentP && parentP.tagName.toLowerCase() === "p" && parentP.children.length === 1) {
+            parentP.setAttribute("style", `text-align: ${textAlign} !important; margin: ${margin} !important;`);
+            const curPClass = (parentP.getAttribute("class") || "")
+              .replace(/image-size-\d+/g, "")
+              .replace(/image-align-[a-z]+/g, "")
+              .trim();
+            parentP.setAttribute("class", `${curPClass} ${alignClass} ${sizeClass}`.trim());
+          }
+        }
+      });
+
+      return doc.body.innerHTML;
+    } catch (e) {
+      console.error("Error updating image formatting:", e);
+      return html;
+    }
+  };
+
+  const handleUpdateImageFormat = (opts: { size?: number; align?: "left" | "center" | "right" }) => {
+    const newSize = opts.size ?? imageFormatRef.current.size;
+    const newAlign = opts.align ?? imageFormatRef.current.align;
+
+    imageFormatRef.current = { size: newSize, align: newAlign };
+    if (opts.size) setCurrentImageSize(newSize);
+    if (opts.align) setCurrentImageAlign(newAlign);
+
+    // 1. Immediately apply to live editor DOM
+    applyDiagramStylesToDom(newSize, newAlign);
+
+    let content = "";
+    if (editorInstanceRef.current) {
+      content = editorInstanceRef.current.getData() || "";
+    } else {
+      content = value || "";
+    }
+    if (!content) return;
+
+    // 2. Format HTML cleanly with the updated size & alignment
+    const updated = updateHtmlImageFormatting(content, newSize, newAlign);
+
+    // 3. Mark internal change so external value sync does not reset it
+    isInternalChangeRef.current = true;
+    onChangeRef.current(updated);
+    setTimeout(() => {
+      isInternalChangeRef.current = false;
+      applyDiagramStylesToDom(newSize, newAlign);
+    }, 60);
+  };
+
+  const handleRemoveAllImages = () => {
+    let content = "";
+    if (editorInstanceRef.current) {
+      content = editorInstanceRef.current.getData() || "";
+    } else {
+      content = value || "";
+    }
+    if (!content) return;
+
+    const updated = content
+      .replace(/<p[^>]*>\s*<img[^>]*>\s*<\/p>/gi, "")
+      .replace(/<figure[^>]*>\s*<img[^>]*>\s*<\/figure>/gi, "")
+      .replace(/<img[^>]*>/gi, "");
+
+    if (editorInstanceRef.current) {
+      editorInstanceRef.current.setData(updated);
+    }
+    onChangeRef.current(updated);
+  };
 
   const handleDirectImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,12 +267,22 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = reader.result as string;
-      const imgHtml = `<p><img src="${base64}" alt="Option Image" /></p>`;
+      const alignLeft = currentImageAlign === "right" ? "auto" : currentImageAlign === "center" ? "auto" : "0px";
+      const alignRight = currentImageAlign === "left" ? "auto" : currentImageAlign === "center" ? "auto" : "0px";
+      const margin = `6px ${alignRight} 6px ${alignLeft}`;
+      const textAlign = currentImageAlign;
+      const alignClass = `image-align-${currentImageAlign}`;
+      const sizeClass = `image-size-${currentImageSize}`;
+      const styleStr = `max-height: ${currentImageSize}px !important; max-width: ${currentImageSize}px !important; width: auto !important; height: auto !important; object-fit: contain !important; display: block !important; margin: ${margin} !important;`;
+      const imgHtml = `<p class="${alignClass} ${sizeClass}" style="text-align: ${textAlign}; margin: ${margin};"><img src="${base64}" alt="Diagram" width="${currentImageSize}" class="${sizeClass}" style="${styleStr}" /></p>`;
       if (editorInstanceRef.current) {
         const currentData = editorInstanceRef.current.getData() || "";
         const newData = currentData ? `${currentData}${imgHtml}` : imgHtml;
         editorInstanceRef.current.setData(newData);
         onChangeRef.current(newData);
+        setTimeout(() => {
+          applyDiagramStylesToDom(currentImageSize, currentImageAlign);
+        }, 50);
       } else {
         onChangeRef.current(value ? `${value}${imgHtml}` : imgHtml);
       }
@@ -179,14 +399,28 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
           // Populate initial value if present
           if (value) {
             editor.setData(value);
+            setTimeout(() => {
+              applyDiagramStylesToDom(initialProps.size, initialProps.align);
+            }, 60);
           }
 
           setIsReady(true);
 
           // Listen for content changes
           editor.model.document.on("change:data", () => {
-            const data = editor.getData();
-            onChangeRef.current(data);
+            const rawData = editor.getData();
+            // Automatically preserve currently selected diagram size & alignment on any image in content
+            const formatted = updateHtmlImageFormatting(
+              rawData,
+              imageFormatRef.current.size,
+              imageFormatRef.current.align
+            );
+            isInternalChangeRef.current = true;
+            onChangeRef.current(formatted);
+            setTimeout(() => {
+              isInternalChangeRef.current = false;
+              applyDiagramStylesToDom(imageFormatRef.current.size, imageFormatRef.current.align);
+            }, 40);
           });
         });
       })
@@ -206,12 +440,37 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
     };
   }, []);
 
+  // Keep live DOM in sync whenever size, align, or ready state updates
+  useEffect(() => {
+    if (isReady) {
+      applyDiagramStylesToDom(currentImageSize, currentImageAlign);
+    }
+  }, [currentImageSize, currentImageAlign, isReady]);
+
   // Sync external changes (e.g. form reset or prefilled value)
   useEffect(() => {
+    if (isInternalChangeRef.current) {
+      isInternalChangeRef.current = false;
+      return;
+    }
+
     if (editorInstanceRef.current && isReady) {
       const currentData = editorInstanceRef.current.getData();
-      if (value !== currentData) {
+      const stripFormat = (h: string) =>
+        h ? h.replace(/class="[^"]*image-[^"]*"/g, "").replace(/style="[^"]*"/g, "").trim() : "";
+
+      if (stripFormat(value) !== stripFormat(currentData)) {
         editorInstanceRef.current.setData(value || "");
+      }
+
+      if (value && /<img\s/i.test(value)) {
+        const props = detectImageProperties(value);
+        imageFormatRef.current = props;
+        setCurrentImageSize(props.size);
+        setCurrentImageAlign(props.align);
+        setTimeout(() => {
+          applyDiagramStylesToDom(props.size, props.align);
+        }, 50);
       }
     }
   }, [value, isReady]);
@@ -298,10 +557,134 @@ export const CKEditorField: React.FC<CKEditorFieldProps> = ({
         </div>
       )}
 
+      {/* Diagram Size & Alignment Controls Bar (when question content has images) */}
+      {hasImagesInContent && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 via-indigo-50/40 to-white p-2 text-xs shadow-2xs dark:border-purple-900/60 dark:bg-gray-800 mb-1.5 animate-in fade-in">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-200">
+              <ImageIcon className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+              <span className="text-[11px]">Diagram:</span>
+            </div>
+
+            {/* Size Presets */}
+            <div className="flex items-center gap-1 border-l border-purple-200/80 dark:border-purple-800 pl-2">
+              <span className="text-[10px] font-bold text-gray-500 uppercase">Size:</span>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ size: 80 })}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageSize === 80
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-gray-200 bg-white hover:bg-purple-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+                title="Extra Small (80px)"
+              >
+                XS (80px)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ size: 120 })}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageSize === 120
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-gray-200 bg-white hover:bg-purple-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+                title="Small (120px)"
+              >
+                Small (120px)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ size: 160 })}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageSize === 160
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-purple-300 bg-purple-100/60 hover:bg-purple-200/60 text-purple-800 dark:border-purple-700 dark:bg-purple-950/40 dark:text-purple-300"
+                }`}
+                title="Standard Exam Fit (160px) - Recommended for printed question papers"
+              >
+                Exam Fit (160px) ★
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ size: 240 })}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageSize === 240
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-gray-200 bg-white hover:bg-purple-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+                title="Medium (240px)"
+              >
+                Medium (240px)
+              </button>
+            </div>
+
+            {/* Alignment Options */}
+            <div className="flex items-center gap-1 border-l border-purple-200/80 dark:border-purple-800 pl-2">
+              <span className="text-[10px] font-bold text-gray-500 uppercase">Align:</span>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ align: "left" })}
+                className={`p-1 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageAlign === "left"
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-gray-200 bg-white hover:bg-purple-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+                title="Align Diagram Left"
+              >
+                <AlignLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ align: "center" })}
+                className={`p-1 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageAlign === "center"
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-gray-200 bg-white hover:bg-purple-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+                title="Align Diagram Center"
+              >
+                <AlignCenter className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdateImageFormat({ align: "right" })}
+                className={`p-1 rounded text-[10px] font-bold transition border cursor-pointer ${
+                  currentImageAlign === "right"
+                    ? "border-purple-600 bg-purple-600 text-white shadow-2xs"
+                    : "border-gray-200 bg-white hover:bg-purple-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+                title="Align Diagram Right"
+              >
+                <AlignRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRemoveAllImages}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            title="Remove diagram from question"
+          >
+            <Trash2 className="h-3 w-3" />
+            <span>Remove</span>
+          </button>
+        </div>
+      )}
+
       {/* CKEditor Container */}
       <div
         className={`ck-editor-wrapper ${compactToolbar ? "ck-editor-compact" : ""} relative transition-all`}
-        style={{ ["--editor-min-height" as any]: minHeight }}
+        style={{
+          ["--editor-min-height" as any]: minHeight,
+          ["--diagram-max-height" as any]: `${currentImageSize}px`,
+          ["--diagram-max-width" as any]: `${currentImageSize}px`,
+          ["--diagram-align-margin-left" as any]:
+            currentImageAlign === "right" ? "auto" : currentImageAlign === "center" ? "auto" : "0px",
+          ["--diagram-align-margin-right" as any]:
+            currentImageAlign === "left" ? "auto" : currentImageAlign === "center" ? "auto" : "0px",
+        }}
       >
         {/* Loading skeleton placeholder */}
         {!isReady && (
