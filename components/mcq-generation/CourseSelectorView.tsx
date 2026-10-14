@@ -45,7 +45,7 @@ export const CourseSelectorView: React.FC<CourseSelectorViewProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-            MCQ Question Generation
+            MCQ Management
           </h1>
           <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
             {courses.length} Courses

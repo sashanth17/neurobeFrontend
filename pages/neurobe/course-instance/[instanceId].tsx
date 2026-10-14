@@ -176,7 +176,7 @@ function InstanceDashboardPage() {
         {/* MCQ Test Execution — renders independently for this course instance */}
         {activeTab === "mcq-test-execution" && (
           <div className="w-full pb-16">
-            <MCQTestExecution/>
+            <MCQTestExecution courseId={courseId as string} instanceId={instanceId as string} />
           </div>
         )}
 

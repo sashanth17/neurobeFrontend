@@ -56,6 +56,7 @@ export interface MCQTestExecutionItem {
   rawEndTime?: string;
   testWindowStart?: string;
   testWindowEnd?: string;
+  course_instance_id?: string | number;
 }
 
 export interface MCQTestExecutionCardProps {

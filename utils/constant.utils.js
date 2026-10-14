@@ -179,10 +179,6 @@ OwnmenuConfig.FACULTY = [
         label: "Classrooms",
         href: "/neurobe/course-offering",
       },
-      {
-        label: "Live test monitoring",
-        href: "/neurobe/ins-mcq-live-monitor",
-      },
     ],
   },
 ];

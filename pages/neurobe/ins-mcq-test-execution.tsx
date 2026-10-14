@@ -64,9 +64,18 @@ const DURATION_OPTIONS = [
   { value: "120 Minutes", label: "120 Minutes" },
 ];
 
-const MCQTestExecution = () => {
+interface MCQTestExecutionProps {
+  courseId?: string | number;
+  instanceId?: string | number;
+}
+
+const MCQTestExecution = ({ courseId: propCourseId, instanceId: propInstanceId }: MCQTestExecutionProps = {}) => {
   const dispatch = useDispatch();
   const router = useRouter();
+
+  const effectiveCourseId = propCourseId || (router.isReady ? (router.query.courseId || router.query.course_id) : undefined);
+  const effectiveInstanceId = propInstanceId || (router.isReady ? (router.query.instanceId || router.query.instance_id) : undefined);
+  const isFixedInstance = Boolean(effectiveInstanceId);
 
   const [state, setState] = useSetState({
     courses: [] as any[],
@@ -156,10 +165,18 @@ const MCQTestExecution = () => {
     dispatch(setPageTitle("MCQ Test Execution"));
   }, [dispatch]);
 
+  const fixedInstanceObj = useMemo(() => {
+    if (!effectiveInstanceId) return null;
+    return (
+      (state.courseInstances || []).find((ci: any) => String(ci.id) === String(effectiveInstanceId)) ||
+      null
+    );
+  }, [effectiveInstanceId, state.courseInstances]);
+
   // 1. Fetch assigned courses for current user
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [effectiveCourseId, effectiveInstanceId]);
 
   const fetchCourses = async () => {
     try {
@@ -183,13 +200,40 @@ const MCQTestExecution = () => {
       let selectedOpt = null;
 
       if (courseList.length > 0) {
-        const queryCourseId = router.query.course_id;
+        const queryCourseId = effectiveCourseId;
         if (queryCourseId) {
           selected = courseList.find(
             (c: any) =>
               String(c.id) === String(queryCourseId) ||
+              String(c.course_id) === String(queryCourseId) ||
               String(c.course_code || c.code).toLowerCase() === String(queryCourseId).toLowerCase()
           );
+        }
+        if (!selected && effectiveInstanceId) {
+          try {
+            const instData: any = await Models.course_instance.get(effectiveInstanceId);
+            if (instData?.course_id) {
+              selected = courseList.find(
+                (c: any) =>
+                  String(c.id) === String(instData.course_id) ||
+                  String(c.course_id) === String(instData.course_id)
+              );
+              if (!selected) {
+                selected = {
+                  id: instData.course_id,
+                  course_code: instData.course_code || `COURSE-${instData.course_id}`,
+                  course_title: instData.course_title || "Course",
+                };
+                courseList.unshift(selected);
+                formattedOptions.unshift({
+                  value: String(selected.id),
+                  label: `${selected.course_code} — ${selected.course_title}`,
+                });
+              }
+            }
+          } catch (e) {
+            console.warn("Instance fetch fallback failed:", e);
+          }
         }
         if (!selected) {
           selected = courseList[0];
@@ -288,7 +332,11 @@ const MCQTestExecution = () => {
       }
 
       // 2d. Fetch tests from backend API
-      const testsRes: any = await Models.mcq.list_tests({ course_id: courseId }).catch(() => null);
+      const testFetchParams: any = { course_id: courseId };
+      if (effectiveInstanceId) {
+        testFetchParams.course_instance_id = effectiveInstanceId;
+      }
+      const testsRes: any = await Models.mcq.list_tests(testFetchParams).catch(() => null);
       let backendTests: MCQTestExecutionItem[] = [];
 
       if (testsRes && Array.isArray(testsRes) && testsRes.length > 0) {
@@ -364,6 +412,7 @@ const MCQTestExecution = () => {
             rawEndTime: rawEndTimeStr,
             testWindowStart: t.test_window_start,
             testWindowEnd: t.test_window_end,
+            course_instance_id: t.course_instance_id || t.instance_id,
           };
         });
       }
@@ -384,6 +433,17 @@ const MCQTestExecution = () => {
         if (Array.isArray(instRes)) instanceList = instRes;
         else if (instRes.data && Array.isArray(instRes.data)) instanceList = instRes.data;
         else if (instRes.results && Array.isArray(instRes.results)) instanceList = instRes.results;
+      }
+
+      if (effectiveInstanceId && !instanceList.some((ci: any) => String(ci.id) === String(effectiveInstanceId))) {
+        try {
+          const directInst: any = await Models.course_instance.get(effectiveInstanceId);
+          if (directInst) {
+            instanceList.unshift(directInst);
+          }
+        } catch (e) {
+          console.warn("Direct instance get fallback failed:", e);
+        }
       }
 
       setState({
@@ -435,7 +495,11 @@ const MCQTestExecution = () => {
       return `${hh.toString().padStart(2, "0")}:${mm} ${period}`;
     };
 
-    const defaultInstanceId = state.courseInstances?.[0]?.id ? String(state.courseInstances[0].id) : "";
+    const defaultInstanceId = effectiveInstanceId
+      ? String(effectiveInstanceId)
+      : state.courseInstances?.[0]?.id
+      ? String(state.courseInstances[0].id)
+      : "";
 
     setCreateModal({
       open: true,
@@ -465,7 +529,11 @@ const MCQTestExecution = () => {
       Failure("Please enter a valid assessment title.");
       return;
     }
-    if (!createModal.courseInstanceId) {
+    const targetInstanceId = effectiveInstanceId
+      ? String(effectiveInstanceId)
+      : createModal.courseInstanceId;
+
+    if (!targetInstanceId) {
       Failure("Please select a Course Classroom / Section to host this assessment.");
       return;
     }
@@ -526,7 +594,7 @@ const MCQTestExecution = () => {
     const payload = {
       question_set_id: createModal.questionSetId,
       course_id: Number(state.selectedCourse.id),
-      course_instance_id: Number(createModal.courseInstanceId),
+      course_instance_id: Number(targetInstanceId),
       title: createModal.title.trim(),
       test_code: createModal.testCode.trim(),
       unit_name: createModal.unitLabel,
@@ -710,9 +778,13 @@ const MCQTestExecution = () => {
           return false;
         }
       }
+      // Instance Scope filter
+      if (effectiveInstanceId && t.course_instance_id && String(t.course_instance_id) !== String(effectiveInstanceId)) {
+        return false;
+      }
       return true;
     });
-  }, [state.tests, state.activeTab, state.statusFilter, state.unitFilter, state.search]);
+  }, [state.tests, state.activeTab, state.statusFilter, state.unitFilter, state.search, effectiveInstanceId]);
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -1006,24 +1078,59 @@ const MCQTestExecution = () => {
                 />
               </div>
 
-              {/* Course Instance / Section Selector */}
-              <div className="space-y-1">
-                <label className="font-bold text-gray-900 dark:text-white">
-                  Course Classroom / Section <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={createModal.courseInstanceId}
-                  onChange={(e) => setCreateModal((p) => ({ ...p, courseInstanceId: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer"
-                >
-                  <option value="">-- Select Course Instance / Section --</option>
-                  {(state.courseInstances || []).map((ci: any) => (
-                    <option key={ci.id} value={ci.id}>
-                      {ci.course_instance_name || ci.name || `Section #${ci.id}`} {ci.semester ? `(Semester ${ci.semester})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {state.courseInstances && state.courseInstances.length === 0 && (
+              {/* Course Instance / Section Selector (Fixed or Dropdown) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-900 dark:text-white">
+                    Course Classroom / Section <span className="text-red-500">*</span>
+                  </label>
+                  {isFixedInstance && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      <Lock className="h-2.5 w-2.5" />
+                      <span>Fixed to Classroom</span>
+                    </span>
+                  )}
+                </div>
+
+                {isFixedInstance ? (
+                  <div className="flex items-center justify-between rounded-xl border border-purple-200/90 bg-purple-50/70 p-3 text-xs dark:border-purple-800/80 dark:bg-purple-950/30">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-200/80 text-purple-800 dark:bg-purple-900 dark:text-purple-200 font-bold">
+                        <Layers className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-white text-xs">
+                          {fixedInstanceObj?.course_instance_name ||
+                            fixedInstanceObj?.name ||
+                            `Classroom #${effectiveInstanceId}`}
+                        </p>
+                        <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                          {fixedInstanceObj?.course_code ? `${fixedInstanceObj.course_code} • ` : ""}
+                          {fixedInstanceObj?.semester
+                            ? `Semester ${fixedInstanceObj.semester}`
+                            : `Instance ID: ${effectiveInstanceId}`}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-md bg-white/90 dark:bg-gray-800 px-2.5 py-1 text-[10px] font-semibold text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 shadow-xs">
+                      Target Section
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    value={createModal.courseInstanceId}
+                    onChange={(e) => setCreateModal((p) => ({ ...p, courseInstanceId: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer"
+                  >
+                    <option value="">-- Select Course Instance / Section --</option>
+                    {(state.courseInstances || []).map((ci: any) => (
+                      <option key={ci.id} value={ci.id}>
+                        {ci.course_instance_name || ci.name || `Section #${ci.id}`} {ci.semester ? `(Semester ${ci.semester})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!isFixedInstance && state.courseInstances && state.courseInstances.length === 0 && (
                   <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
                     ⚠️ No Classrooms found for this course. Please create an Classroom first.
                   </p>
