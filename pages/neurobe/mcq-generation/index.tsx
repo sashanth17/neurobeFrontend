@@ -840,41 +840,7 @@ const MCQGenerationIndexPage = () => {
         />
       ) : (
         /* VIEW 2: MCQ WORKSPACE */
-        <div>
-          {/* Top navigation */}
-          <div className="mb-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleBackToCourses}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Assigned Courses</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Current Course:</span>
-              <div className="relative">
-                <select
-                  value={state.selectedCourse.code || state.selectedCourse.id}
-                  onChange={(e) => {
-                    const found = state.courses.find(
-                      (c) => String(c.code) === e.target.value || String(c.id) === e.target.value
-                    );
-                    if (found) setState({ selectedCourse: found });
-                  }}
-                  className="h-9 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-xs font-semibold text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  {state.courses.map((c) => (
-                    <option key={c.id} value={c.code || c.id}>
-                      {c.code} — {c.title}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-gray-400" />
-              </div>
-            </div>
-          </div>
-
+        <div className="space-y-3">
           {/* Course Banner */}
           <CourseBanner
             courseCode={state.selectedCourse.code || state.selectedCourse.course_code || "CS309"}
@@ -899,9 +865,9 @@ const MCQGenerationIndexPage = () => {
             onBack={handleBackToCourses}
           />
 
-          {/* Unified 4-Step Lifecycle Workspace Tabs */}
-          <div className="mb-6 flex flex-wrap items-center justify-between border-b border-gray-200 dark:border-gray-800 gap-3">
-            <div className="flex flex-wrap gap-1 sm:gap-2">
+          {/* Compact Workspace Tabs */}
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-200/80 pb-1.5 dark:border-slate-800">
+            <div className="flex items-center gap-1.5">
               {[
                 {
                   id: "questions",
@@ -909,7 +875,7 @@ const MCQGenerationIndexPage = () => {
                   icon: Eye,
                   badge: currentQuestions.length,
                 },
-                { id: "bank", label: "Question Banks", icon: FileCheck2, badge: null }
+                { id: "bank", label: "Question Banks", icon: FileCheck2, badge: null },
               ].map((tab) => {
                 const IconComp = tab.icon;
                 const isActive = state.activeTab === tab.id;
@@ -928,19 +894,21 @@ const MCQGenerationIndexPage = () => {
                         { shallow: true }
                       );
                     }}
-                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors cursor-pointer ${isActive
-                      ? "border-color1 text-color1 dark:border-indigo-400 dark:text-indigo-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                      isActive
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    }`}
                   >
-                    <IconComp className="h-4 w-4" />
+                    <IconComp className="h-3.5 w-3.5" />
                     <span>{tab.label}</span>
                     {tab.badge !== null && (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${isActive
-                          ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300"
-                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                          }`}
+                        className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        }`}
                       >
                         {tab.badge}
                       </span>
@@ -955,7 +923,7 @@ const MCQGenerationIndexPage = () => {
               TAB 2: GENERATED QUESTIONS & REVIEW POOL
               ══════════════════════════════════════════════════════════════ */}
           {state.activeTab === "questions" && (
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* Filter Pills Banner */}
               <MCQStatsBanner
                 questions={currentQuestions}
@@ -964,7 +932,7 @@ const MCQGenerationIndexPage = () => {
               />
 
               {/* Questions Pool */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+              <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
                 <QuestionReviewPool
                   currentQuestions={currentQuestions}
                   displayedQuestions={displayedQuestions}
