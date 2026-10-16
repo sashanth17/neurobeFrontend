@@ -439,6 +439,7 @@ const AcademicSetup = () => {
 
   const handleSaveBatch = async (formData: {
     name: string;
+    programme_id?: number | null;
     start_year: number;
     end_year: number;
     status: string;
@@ -447,9 +448,10 @@ const AcademicSetup = () => {
     try {
       setState({ submitting: true });
 
-      const body = {
+      const body: any = {
         name: formData.name,
         organization_id: getOrganizationId(),
+        programme_id: formData.programme_id ? Number(formData.programme_id) : null,
         start_year: formData.start_year,
         end_year: formData.end_year,
         status: formData.status,
@@ -667,6 +669,8 @@ const AcademicSetup = () => {
             "code",
             "name",
             "batch",
+            "programme_name",
+            "programme",
           ]) && byStatus(r)
       ),
       columns: makeBatchColumns(openEdit, handleDeleteBatch),
@@ -710,17 +714,6 @@ const AcademicSetup = () => {
         imageUrl="/assets/images/neurobe/Rectangle.png"
       />
 
-      {/* Add button */}
-      <div className="mb-5 flex justify-end">
-        <button
-          onClick={openCreate}
-          className="create-btn"
-        >
-          <IconPlus className="h-4 w-4" />
-          {ADD_LABELS[state.activeTab]}
-        </button>
-      </div>
-
       {/* Modals — open for create (editRow=null) or edit (editRow=row) */}
       <CreateCourseModal
         open={state.showModal && state.activeTab === "courses"}
@@ -750,6 +743,7 @@ const AcademicSetup = () => {
         initialData={state.editRow}
         onSubmit={handleSaveBatch}
         submitting={state.submitting}
+        programmeOptions={programmeOptions}
       />
       <CreatePSOModal
         open={state.showModal && state.activeTab === "psos"}
@@ -810,6 +804,17 @@ const AcademicSetup = () => {
             />
           );
         })}
+      </div>
+
+      {/* Add button — positioned above All Statuses */}
+      <div className="mb-4 flex justify-end">
+        <button
+          onClick={openCreate}
+          className="create-btn"
+        >
+          <IconPlus className="h-4 w-4" />
+          {ADD_LABELS[state.activeTab]}
+        </button>
       </div>
 
       {/* Filters */}

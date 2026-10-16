@@ -1198,6 +1198,7 @@ export const CreateProgrammeModal = ({
 // ─── CREATE / EDIT BATCH MODAL ────────────────────────────────────────────────
 export interface BatchFormData {
   name: string;
+  programme_id?: number | null;
   start_year: number;
   end_year: number;
   status: string;
@@ -1219,38 +1220,91 @@ export const CreateBatchModal = ({
   initialData,
   onSubmit,
   submitting = false,
+  programmeOptions = [],
 }: BatchModalProps) => {
   const isEdit = !!initialData;
 
   const [state, setState] = useSetState({
     name: "",
+    programme: null as any,
+    localProgrammeOptions: [] as { value: number | string; label: string }[],
     start_year: "",
     end_year: "",
-    status: null as any,
+    status: { value: "Active", label: "Active" } as any,
   });
 
   useEffect(() => {
+    if (open) {
+      if (programmeOptions && programmeOptions.length > 0) {
+        setState({ localProgrammeOptions: programmeOptions });
+      } else {
+        Models.programme
+          .list({ organization_id: getOrganizationId() }, 1)
+          .then((res: any) => {
+            const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+            const opts = list.map((p: any) => ({
+              value: p.id,
+              label: p.programme_name || p.name || p.short_name || p.code || `Programme ${p.id}`,
+            }));
+            setState({ localProgrammeOptions: opts });
+          })
+          .catch((err: any) => console.error("Failed to load programmes for batch modal", err));
+      }
+    }
+  }, [open, programmeOptions]);
+
+  useEffect(() => {
     if (initialData) {
+      const progVal = initialData.programme_id ?? initialData.programme?.id ?? (typeof initialData.programme === "number" ? initialData.programme : null);
+      const progName = initialData.programme_name ?? initialData.programme?.programme_name ?? initialData.programme?.name ?? (typeof initialData.programme === "string" ? initialData.programme : "");
+      const opts = (programmeOptions && programmeOptions.length > 0) ? programmeOptions : state.localProgrammeOptions;
+      const matchedProg = opts.find((p) => (progVal && String(p.value) === String(progVal)) || (progName && String(p.label).toLowerCase().includes(String(progName).toLowerCase())));
+
+      let initialProg = null;
+      if (matchedProg) {
+        initialProg = matchedProg;
+      } else if (progVal) {
+        initialProg = { value: progVal, label: progName || `Programme #${progVal}` };
+      } else if (progName) {
+        initialProg = { value: progName, label: progName };
+      }
+
       setState({
         name: initialData.name ?? initialData.batch ?? "",
+        programme: initialProg,
         start_year: String(initialData.start_year ?? initialData.startYear ?? ""),
         end_year: String(initialData.end_year ?? initialData.endYear ?? ""),
-        status: toOpt(initialData.status),
+        status: initialData.status ? toOpt(initialData.status) : { value: "Active", label: "Active" },
       });
     } else {
       setState({
         name: "",
+        programme: null,
         start_year: "",
         end_year: "",
-        status: null,
+        status: { value: "Active", label: "Active" },
       });
     }
   }, [initialData, open]);
+
+  useEffect(() => {
+    const opts = (programmeOptions && programmeOptions.length > 0) ? programmeOptions : state.localProgrammeOptions;
+    if (state.programme?.value && opts.length > 0) {
+      const matched = opts.find((p) => String(p.value) === String(state.programme.value));
+      if (matched && matched.label !== state.programme.label) {
+        setState({ programme: matched });
+      }
+    }
+  }, [state.localProgrammeOptions, programmeOptions]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!state.name.trim()) {
       Failure("Please enter batch name");
+      return;
+    }
+    if (!state.programme?.value) {
+      Failure("Please select programme name");
       return;
     }
     if (!state.start_year) {
@@ -1262,14 +1316,24 @@ export const CreateBatchModal = ({
       return;
     }
 
+    const start = Number(state.start_year) || 0;
+    const end = Number(state.end_year) || 0;
+    if (start > 0 && end > 0 && start >= end) {
+      Failure("End year must be greater than start year");
+      return;
+    }
+
     onSubmit({
       name: state.name.trim(),
-      start_year: Number(state.start_year) || 0,
-      end_year: Number(state.end_year) || 0,
-      status: state.status?.value || "Draft",
-      is_active: (state.status?.value || "Draft").toLowerCase() === "active",
+      programme_id: state.programme?.value ? Number(state.programme.value) : null,
+      start_year: start,
+      end_year: end,
+      status: state.status?.value || "Active",
+      is_active: (state.status?.value || "Active").toLowerCase() === "active",
     });
   };
+
+  const activeProgOptions = (programmeOptions && programmeOptions.length > 0) ? programmeOptions : state.localProgrammeOptions;
 
   return (
     <ModalShell
@@ -1292,6 +1356,15 @@ export const CreateBatchModal = ({
             placeholder="e.g. Batch 2024-2028"
             value={state.name}
             onChange={(e) => setState({ name: e.target.value })}
+          />
+          <CustomSelect
+            title="Programme Name"
+            required
+            placeholder="Select Programme"
+            options={activeProgOptions}
+            value={state.programme}
+            onChange={(v) => setState({ programme: v })}
+            isClearable
           />
           <div className="grid grid-cols-2 gap-4">
             <TextInput
