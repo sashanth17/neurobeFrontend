@@ -8,6 +8,7 @@ import IconSearch from "@/components/Icon/IconSearch";
 import IconPlus from "@/components/Icon/IconPlus";
 import PageBanner from "@/components/common-components/PageBanner";
 import StatTabCard from "@/components/academic-setup/StatTabCard";
+
 import {
   MOCK_DEPARTMENTS,
   makeDepartmentColumns,
@@ -503,8 +504,8 @@ const AcademicSetup = () => {
         const coordId = formData.coordinator_id ? Number(formData.coordinator_id) : null;
         const instructorIds = Array.isArray(formData.instructor_ids)
           ? formData.instructor_ids
-              .map((id: any) => Number(id))
-              .filter((id: number) => Boolean(id) && (!coordId || id !== coordId))
+            .map((id: any) => Number(id))
+            .filter((id: number) => Boolean(id) && (!coordId || id !== coordId))
           : [];
 
         try {
