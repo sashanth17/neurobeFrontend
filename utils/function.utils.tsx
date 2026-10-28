@@ -270,25 +270,52 @@ export const getErrorMessage = (
   }
   if (!error) return fallback;
   if (typeof error === "string") return error;
-  if (error?.response?.data?.detail) {
-    const d = error.response.data.detail;
-    return typeof d === "string" ? d : JSON.stringify(d);
+
+  const data = error?.response?.data;
+  if (data) {
+    if (typeof data === "string") return data;
+    if (typeof data.detail === "string") return data.detail;
+    if (Array.isArray(data.detail)) {
+      return data.detail.map((d: any) => d?.msg || JSON.stringify(d)).join(", ");
+    }
+    if (data.detail && typeof data.detail === "object") {
+      return data.detail.message || data.detail.detail || JSON.stringify(data.detail);
+    }
+    if (typeof data.message === "string") return data.message;
+    if (typeof data.error === "string") return data.error;
   }
-  if (error?.response?.data?.message) return String(error.response.data.message);
+
+  if (error?.detail) {
+    const d = error.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) return d.map((x: any) => x?.msg || JSON.stringify(x)).join(", ");
+    return typeof d === "object" ? (d.message || d.detail || JSON.stringify(d)) : String(d);
+  }
+
   if (error?.message) return String(error.message);
-  if (error?.detail) return String(error.detail);
+  if (error?.error) return String(error.error);
   return fallback;
 };
 
-export const Failure = (message: string, error?: any) => {
+export const Failure = (message: any, error?: any) => {
   const isLimit = isLimitExhaustion(error || message);
-  const finalMessage = isLimit ? LIMIT_EXHAUSTED_MESSAGE : message;
+  let finalMessage: string;
+
+  if (isLimit) {
+    finalMessage = LIMIT_EXHAUSTED_MESSAGE;
+  } else if (error) {
+    finalMessage = getErrorMessage(error, typeof message === "string" ? message : "Operation failed");
+  } else if (typeof message === "string") {
+    finalMessage = message;
+  } else {
+    finalMessage = getErrorMessage(message, "Operation failed");
+  }
 
   const toast = Swal.mixin({
     toast: true,
     position: "top-end",
     showConfirmButton: false,
-    timer: isLimit ? 6000 : 3000,
+    timer: isLimit ? 6000 : 4000,
     timerProgressBar: true,
   });
 

@@ -2,28 +2,21 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import {
-  ArrowLeft,
-  ArrowRight,
   BookOpen,
   Users,
   ShieldCheck,
   UserCheck,
   RefreshCw,
-  AlertCircle,
-  HelpCircle,
-  Award,
-  Calendar,
   Layers,
-  Sparkles,
-  Info,
+  Filter,
+  X,
+  Plus,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, getAuthUser } from "@/utils/function.utils";
+import { Success, Failure, getAuthUser } from "@/utils/function.utils";
 import IconSearch from "@/components/Icon/IconSearch";
 import IconPlus from "@/components/Icon/IconPlus";
 import AcademicTable from "@/components/common-components/TableComponent";
-import PageBanner from "@/components/common-components/PageBanner";
-import PageHeader from "@/components/common-components/PageHeader";
 import TextInput from "@/components/FormFields/TextInput.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import { makeCourseOfferingColumns } from "@/components/course-offering/courseOfferingColumns";
@@ -48,19 +41,14 @@ export interface AssignedCourseItem {
   students_count?: number;
 }
 
-const STATUS_OPTIONS = [
-  { value: "all", label: "All Statuses" },
+const ACTIVE_FILTER_OPTIONS = [
   { value: "active", label: "Active" },
+  { value: "archived", label: "Archived" },
   { value: "inactive", label: "Inactive" },
+  { value: "all", label: "All Status" },
 ];
 
-const ARCHIVE_OPTIONS = [
-  { value: "all", label: "All Classrooms" },
-  { value: "active", label: "Active Classrooms" },
-  { value: "archived", label: "Archived Classrooms" },
-];
-
-const semesterOptions = [
+const SEMESTER_OPTIONS = [
   { label: "All Semesters", value: "all" },
   { label: "Semester 1", value: "1" },
   { label: "Semester 2", value: "2" },
@@ -75,48 +63,67 @@ const semesterOptions = [
 const CourseOfferingPage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-
-  // ── Global Course Selection State ──────────────────────────────────────────
-  const [assignedCourses, setAssignedCourses] = useState<AssignedCourseItem[]>([]);
-  const [loadingCourses, setLoadingCourses] = useState<boolean>(true);
-  const [errorCourses, setErrorCourses] = useState<string | null>(null);
-
-  // Filters for Step 1 (Course Selection View)
-  const [courseSearch, setCourseSearch] = useState<string>("");
-  const [courseRoleFilter, setCourseRoleFilter] = useState<"all" | "coordinator" | "instructor">("all");
-  const [courseSemesterFilter, setCourseSemesterFilter] = useState<string>("all");
-
-  // Selected Course for Step 2 (Instance Management View)
-  const [selectedCourse, setSelectedCourse] = useState<AssignedCourseItem | null>(null);
-
-  // Instance Table State for Step 2
-  const [instanceState, setInstanceState] = useSetState({
-    search: "",
-    statusFilter: "all",
-    archiveFilter: "active",
-    ownershipFilter: "my_creations" as "my_creations" | "others",
-    loadingInstances: false,
-    showModal: false,
-    editRow: null as any,
-    instanceList: [] as any[],
-  });
-
   const authUser = getAuthUser();
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [assignedCourses, setAssignedCourses] = useState<AssignedCourseItem[]>([]);
+  const [allInstances, setAllInstances] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  // Filters
+  const [search, setSearch] = useState<string>("");
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>("all");
+  const [semesterFilter, setSemesterFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<string>("active");
+  const [ownershipFilter, setOwnershipFilter] = useState<"all" | "my_creations" | "others">("all");
+
+  // Modal State
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [editRow, setEditRow] = useState<any>(null);
 
   useEffect(() => {
     dispatch(setPageTitle("Classrooms"));
   }, [dispatch]);
 
-  // ── Fetch Only Assigned Courses (Coordinator & Instructor) ─────────────────
-  const fetchAssignedCourses = useCallback(async () => {
+  // Sync URL query with course filter if provided
+  useEffect(() => {
+    if (!router.isReady) return;
+    const cid = router.query.course_id;
+    if (cid && typeof cid === "string") {
+      setSelectedCourseFilter(cid);
+    }
+  }, [router.isReady, router.query.course_id]);
+
+  // ── Helper: User Ownership Check ──────────────────────────────────────────
+  const authId = authUser?.id !== undefined && authUser?.id !== null ? String(authUser.id) : null;
+  const authReg = authUser?.register_number ? String(authUser.register_number).toLowerCase().trim() : null;
+  const authEmail = authUser?.email ? String(authUser.email).toLowerCase().trim() : null;
+
+  const isSelfCreation = useCallback(
+    (r: any): boolean => {
+      if (r.created_by_id !== undefined && r.created_by_id !== null && authId) {
+        if (String(r.created_by_id) === authId) return true;
+      }
+      if (r.created_by_register_number && authReg) {
+        if (String(r.created_by_register_number).toLowerCase().trim() === authReg) return true;
+      }
+      if (r.created_by_email && authEmail) {
+        if (String(r.created_by_email).toLowerCase().trim() === authEmail) return true;
+      }
+      return false;
+    },
+    [authId, authReg, authEmail]
+  );
+
+  // ── Fetch Assigned Courses & All User Instances ────────────────────────────
+  const fetchAllData = useCallback(async () => {
     try {
-      setLoadingCourses(true);
-      setErrorCourses(null);
-
+      setLoading(true);
       const userId = authUser?.id || 1;
-      let rawCourses: any[] = [];
 
-      // 1. Try my_assigned_courses endpoint
+      // 1. Fetch Assigned Courses
+      let rawCourses: any[] = [];
       try {
         const res: any = await Models.course.my_assigned_courses({ faculty_id: userId });
         if (res?.courses && Array.isArray(res.courses)) {
@@ -128,7 +135,6 @@ const CourseOfferingPage = () => {
         console.warn("my_assigned_courses failed, trying faculty_dashboard_overview:", e);
       }
 
-      // 2. Fallback to faculty_dashboard_overview
       if (rawCourses.length === 0) {
         try {
           const res2: any = await Models.course.faculty_dashboard_overview({
@@ -141,18 +147,17 @@ const CourseOfferingPage = () => {
             rawCourses = res2;
           }
         } catch (e2) {
-          console.warn("faculty_dashboard_overview failed:", e2);
+          console.warn("faculty_dashboard_overview fallback failed:", e2);
         }
       }
 
-      // 3. Deduplicate and normalize
-      const seen = new Set<number>();
-      const normalized: AssignedCourseItem[] = [];
+      const seenCourseIds = new Set<number>();
+      const normalizedCourses: AssignedCourseItem[] = [];
 
       for (const c of rawCourses) {
         const cid = Number(c.course_id || c.id);
-        if (!cid || seen.has(cid)) continue;
-        seen.add(cid);
+        if (!cid || seenCourseIds.has(cid)) continue;
+        seenCourseIds.add(cid);
 
         const roleStr = c.assigned_role || c.faculty_role || c.role || "Course Instructor";
         const isCoord =
@@ -162,9 +167,9 @@ const CourseOfferingPage = () => {
         const isInst =
           roleStr.toLowerCase().includes("instructor") ||
           c.role_type === "instructor" ||
-          isCoord; // Coordinators automatically possess instructor permissions
+          isCoord;
 
-        normalized.push({
+        normalizedCourses.push({
           id: cid,
           course_code: c.course_code || c.code || `COURSE-${cid}`,
           course_title: c.course_title || c.title || c.name || "Academic Course",
@@ -182,101 +187,122 @@ const CourseOfferingPage = () => {
         });
       }
 
-      setAssignedCourses(normalized);
+      setAssignedCourses(normalizedCourses);
+
+      // Build course lookup map for enrichment
+      const courseMap = new Map<number, AssignedCourseItem>();
+      normalizedCourses.forEach((c) => courseMap.set(c.id, c));
+
+      // 2. Fetch Instances: Global list + assigned courses fallback
+      let rawInstances: any[] = [];
+      try {
+        const globalRes: any = await Models.course_instance.list({ limit: 500 });
+        const list = Array.isArray(globalRes) ? globalRes : globalRes?.data ?? globalRes?.results ?? [];
+        if (list.length > 0) {
+          rawInstances = list;
+        }
+      } catch (e) {
+        console.warn("Global course_instance.list failed, fetching per assigned course:", e);
+      }
+
+      // If global list is empty or returned no instances, fetch per assigned course in parallel
+      if (rawInstances.length === 0 && normalizedCourses.length > 0) {
+        const perCourseResults = await Promise.all(
+          normalizedCourses.map((c) =>
+            Models.course_instance.list({ course_id: c.id }).catch(() => [])
+          )
+        );
+        const collected: any[] = [];
+        perCourseResults.forEach((res: any, idx) => {
+          const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+          list.forEach((item: any) => {
+            collected.push({
+              ...item,
+              course_id: item.course_id || normalizedCourses[idx]?.id,
+              course_code: item.course_code || normalizedCourses[idx]?.course_code,
+              course_title: item.course_title || normalizedCourses[idx]?.course_title,
+              programme_name: item.programme_name || normalizedCourses[idx]?.programme_name,
+              department_name: item.department_name || normalizedCourses[idx]?.department_name,
+            });
+          });
+        });
+        rawInstances = collected;
+      }
+
+      // 3. Deduplicate and normalize instances
+      const seenInstanceIds = new Set<any>();
+      const normalizedInstances: any[] = [];
+
+      for (const inst of rawInstances) {
+        const iid = inst.id || inst.course_instance_id;
+        if (!iid || seenInstanceIds.has(iid)) continue;
+        seenInstanceIds.add(iid);
+
+        const matchedCourse = inst.course_id ? courseMap.get(Number(inst.course_id)) : null;
+
+        normalizedInstances.push({
+          ...inst,
+          id: iid,
+          course_id: inst.course_id ?? matchedCourse?.id,
+          course_code: inst.course_code || matchedCourse?.course_code || `CRS-${inst.course_id || ""}`,
+          course_title:
+            inst.course_title ||
+            matchedCourse?.course_title ||
+            inst.course_instance_name ||
+            "Course Delivery",
+          programme_name:
+            inst.programme_name ||
+            matchedCourse?.programme_name ||
+            inst.programme ||
+            "B.Tech",
+          department_name:
+            inst.department_name ||
+            matchedCourse?.department_name ||
+            inst.department ||
+            "Department",
+          semester: inst.semester ?? matchedCourse?.semester ?? 1,
+        });
+      }
+
+      setAllInstances(normalizedInstances);
+      setLastRefreshed(new Date());
     } catch (err: any) {
-      console.error("Failed to fetch assigned courses:", err);
-      setErrorCourses(typeof err === "string" ? err : err?.message || "Failed to load assigned courses.");
+      console.error("Failed to load classrooms data:", err);
+      Failure(typeof err === "string" ? err : err?.message || "Failed to load classrooms.");
     } finally {
-      setLoadingCourses(false);
+      setLoading(false);
     }
   }, [authUser?.id]);
 
   useEffect(() => {
-    fetchAssignedCourses();
-  }, [fetchAssignedCourses]);
+    fetchAllData();
+  }, [fetchAllData]);
 
-  // ── Sync URL Query with Selected Course ────────────────────────────────────
-  useEffect(() => {
-    if (!router.isReady) return;
-    const cid = router.query.course_id;
-    if (cid) {
-      const targetId = Number(cid);
-      const found = assignedCourses.find((c) => c.id === targetId);
-      if (found) {
-        setSelectedCourse(found);
-        loadInstancesForCourse(found.id);
-      } else if (!loadingCourses && assignedCourses.length > 0) {
-        // If not found in loaded assigned courses, keep or attempt fallback
-        const titleStr = (Array.isArray(router.query.title) ? router.query.title[0] : router.query.title) || "";
-        const codeStr = (Array.isArray(router.query.code) ? router.query.code[0] : router.query.code) || "";
-        const fallbackCourse: AssignedCourseItem = {
-          id: targetId,
-          course_code: codeStr || `COURSE-${targetId}`,
-          course_title: titleStr || "Assigned Course",
-          role: "Course Instructor",
-          is_coordinator: false,
-          is_instructor: true,
-          role_type: "instructor",
-        };
-        setSelectedCourse(fallbackCourse);
-        loadInstancesForCourse(targetId);
-      }
-    } else {
-      setSelectedCourse(null);
-      setInstanceState({ instanceList: [] });
-    }
-  }, [router.isReady, router.query.course_id, assignedCourses, loadingCourses]);
-
-  // ── Fetch Instances for the Selected Course ────────────────────────────────
-  const loadInstancesForCourse = async (courseId: number) => {
-    if (!courseId) return;
-    setInstanceState({ loadingInstances: true });
-    try {
-      const res: any = await Models.course_instance.list({ course_id: courseId });
-      const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
-      setInstanceState({ instanceList: list, loadingInstances: false });
-    } catch (err) {
-      console.error("Failed to load instances for course:", err);
-      setInstanceState({ instanceList: [], loadingInstances: false });
-    }
+  // ── Actions ────────────────────────────────────────────────────────────────
+  const openCreate = () => {
+    setEditRow(null);
+    setModalOpen(true);
   };
 
-  // ── Course Selection Handler (Transitions to Instance Management) ──────────
-  const handleSelectCourse = (course: AssignedCourseItem) => {
-    setSelectedCourse(course);
-    loadInstancesForCourse(course.id);
-    router.push(
-      {
-        pathname: "/neurobe/course-offering",
-        query: {
-          course_id: course.id,
-          code: course.course_code,
-          title: course.course_title,
-        },
-      },
-      undefined,
-      { shallow: true }
-    );
+  const openEdit = (row: any) => {
+    setEditRow(row);
+    setModalOpen(true);
   };
 
-  const handleBackToCourses = () => {
-    setSelectedCourse(null);
-    router.push("/neurobe/course-offering", undefined, { shallow: true });
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditRow(null);
   };
-
-  // ── Instance Actions ───────────────────────────────────────────────────────
-  const openCreate = () => setInstanceState({ showModal: true, editRow: null });
-  const openEdit = (row: any) => setInstanceState({ showModal: true, editRow: row });
-  const closeModal = () => setInstanceState({ showModal: false, editRow: null });
 
   const handleManageStudents = (row: any) => {
-    router.push(`/neurobe/student-enrollment?instance_id=${row.id}&course_id=${row.course_id || selectedCourse?.id || ""}`);
+    const courseId = row.course_id || "";
+    router.push(`/neurobe/student-enrollment?instance_id=${row.id}&course_id=${courseId}`);
   };
 
   const handleRowClick = (arg: any) => {
     const row = arg && typeof arg === "object" && "record" in arg ? arg.record : arg;
     if (!row) return;
-    const courseId = row.course_id ?? selectedCourse?.id ?? 1;
+    const courseId = row.course_id ?? 1;
     const instanceId = row.id ?? row.course_instance_id;
     if (instanceId) {
       router.push(`/neurobe/course-instance/${instanceId}?courseId=${courseId}`);
@@ -285,451 +311,236 @@ const CourseOfferingPage = () => {
 
   const handleToggleArchive = async (row: any) => {
     try {
-      setInstanceState({ loadingInstances: true });
+      setLoading(true);
       const nextArchived = !row.is_archived;
       await Models.course_instance.update(row.id, {
         ...row,
         is_archived: nextArchived,
       });
-      Success(nextArchived ? "Course Classrooms archived" : "Course Classrooms unarchived");
-      if (selectedCourse) {
-        loadInstancesForCourse(selectedCourse.id);
-      }
+      Success(nextArchived ? "Course Classroom archived" : "Course Classroom unarchived");
+      await fetchAllData();
     } catch (error: any) {
       Failure(typeof error === "string" ? error : error?.message || "Failed to update archive status");
-      setInstanceState({ loadingInstances: false });
+      setLoading(false);
     }
   };
 
-  // ── Self-Creation Filtering ────────────────────────────────────────────────
-  const authId = authUser?.id !== undefined && authUser?.id !== null ? String(authUser.id) : null;
-  const authReg = authUser?.register_number ? String(authUser.register_number).toLowerCase().trim() : null;
-  const authEmail = authUser?.email ? String(authUser.email).toLowerCase().trim() : null;
+  // ── Metrics & Counts ───────────────────────────────────────────────────────
+  const myCreationsCount = useMemo(
+    () => allInstances.filter((r) => isSelfCreation(r)).length,
+    [allInstances, isSelfCreation]
+  );
+  const othersCount = useMemo(
+    () => allInstances.filter((r) => !isSelfCreation(r)).length,
+    [allInstances, isSelfCreation]
+  );
+  const totalCount = allInstances.length;
 
-  const isSelfCreation = (r: any): boolean => {
-    if (r.created_by_id !== undefined && r.created_by_id !== null && authId) {
-      if (String(r.created_by_id) === authId) return true;
-    }
-    if (r.created_by_register_number && authReg) {
-      if (String(r.created_by_register_number).toLowerCase().trim() === authReg) return true;
-    }
-    if (r.created_by_email && authEmail) {
-      if (String(r.created_by_email).toLowerCase().trim() === authEmail) return true;
-    }
-    return false;
-  };
+  // ── Filter Options ─────────────────────────────────────────────────────────
+  const courseFilterOptions = useMemo(() => {
+    const options = [{ value: "all", label: `All Assigned Courses (${assignedCourses.length})` }];
+    assignedCourses.forEach((c) => {
+      options.push({
+        value: String(c.id),
+        label: `${c.course_code} - ${c.course_title}`,
+      });
+    });
+    return options;
+  }, [assignedCourses]);
 
-  const rawInstances = instanceState.instanceList || [];
-  const myCreationsCount = rawInstances.filter((r: any) => isSelfCreation(r)).length;
-  const othersCount = rawInstances.filter((r: any) => !isSelfCreation(r)).length;
+  const activeSelectedCourse = useMemo(() => {
+    if (selectedCourseFilter === "all") return null;
+    return assignedCourses.find((c) => String(c.id) === String(selectedCourseFilter)) || null;
+  }, [assignedCourses, selectedCourseFilter]);
 
-  const filteredInstances = rawInstances.filter((r: any) => {
-    if (instanceState.ownershipFilter === "my_creations") {
-      if (!isSelfCreation(r)) return false;
-    } else if (instanceState.ownershipFilter === "others") {
-      if (isSelfCreation(r)) return false;
-    }
+  // ── Filtered Instances ────────────────────────────────────────────────────
+  const filteredInstances = useMemo(() => {
+    return allInstances.filter((r: any) => {
+      // 1. Ownership Scope filter
+      if (ownershipFilter === "my_creations" && !isSelfCreation(r)) {
+        return false;
+      }
+      if (ownershipFilter === "others" && isSelfCreation(r)) {
+        return false;
+      }
 
-    const s = instanceState.search.toLowerCase();
-    const courseTitle = r.course_instance_name || r.course || r.course_title || "";
-    const courseCode = r.course_code || r.code || "";
-    const createdBy = r.created_by_name || r.created_by || "";
-    const matchSearch =
-      !s ||
-      courseTitle.toLowerCase().includes(s) ||
-      courseCode.toLowerCase().includes(s) ||
-      createdBy.toLowerCase().includes(s);
-    const matchStatus =
-      !instanceState.statusFilter ||
-      instanceState.statusFilter === "all" ||
-      String(r.status || (r.is_active ? "active" : "inactive")).toLowerCase() === instanceState.statusFilter.toLowerCase();
-    const matchArchive =
-      !instanceState.archiveFilter ||
-      instanceState.archiveFilter === "all" ||
-      (instanceState.archiveFilter === "archived" ? Boolean(r.is_archived) : !r.is_archived);
-
-    return matchSearch && matchStatus && matchArchive;
-  });
-
-  // ── Filtered Courses for Step 1 ───────────────────────────────────────────
-  const filteredAssignedCourses = useMemo(() => {
-    return assignedCourses.filter((c) => {
-      const q = courseSearch.trim().toLowerCase();
-      if (q) {
-        const matchCode = c.course_code.toLowerCase().includes(q);
-        const matchTitle = c.course_title.toLowerCase().includes(q);
-        const matchDept = (c.department_name || "").toLowerCase().includes(q);
-        const matchProg = (c.programme_name || "").toLowerCase().includes(q);
-        if (!matchCode && !matchTitle && !matchDept && !matchProg) {
+      // 2. Course filter
+      if (selectedCourseFilter !== "all") {
+        if (String(r.course_id) !== String(selectedCourseFilter)) {
           return false;
         }
       }
 
-      if (courseRoleFilter === "coordinator" && !c.is_coordinator) {
-        return false;
-      }
-      if (courseRoleFilter === "instructor" && c.is_coordinator && !c.is_instructor) {
-        return false;
+      // 3. Semester filter
+      if (semesterFilter !== "all") {
+        if (String(r.semester) !== String(semesterFilter)) {
+          return false;
+        }
       }
 
-      if (courseSemesterFilter !== "all" && String(c.semester) !== courseSemesterFilter) {
-        return false;
+      // 4. Single Active Filter
+      if (activeFilter === "active") {
+        if (r.is_archived || r.status === "Inactive" || r.is_active === false) {
+          return false;
+        }
+      } else if (activeFilter === "archived") {
+        if (!r.is_archived) {
+          return false;
+        }
+      } else if (activeFilter === "inactive") {
+        if (r.is_active !== false && r.status !== "Inactive" && !r.is_archived) {
+          return false;
+        }
+      }
+
+      // 5. Search query
+      const s = search.trim().toLowerCase();
+      if (s) {
+        const courseTitle = (r.course_title || "").toLowerCase();
+        const instanceName = (r.course_instance_name || r.course || "").toLowerCase();
+        const courseCode = (r.course_code || r.code || "").toLowerCase();
+        const createdBy = (r.created_by_name || r.created_by || "").toLowerCase();
+        const prog = (r.programme_name || "").toLowerCase();
+        const sec = (r.section || "").toLowerCase();
+
+        const matches =
+          courseTitle.includes(s) ||
+          instanceName.includes(s) ||
+          courseCode.includes(s) ||
+          createdBy.includes(s) ||
+          prog.includes(s) ||
+          sec.includes(s);
+
+        if (!matches) return false;
       }
 
       return true;
     });
-  }, [assignedCourses, courseSearch, courseRoleFilter, courseSemesterFilter]);
+  }, [
+    allInstances,
+    ownershipFilter,
+    selectedCourseFilter,
+    semesterFilter,
+    activeFilter,
+    search,
+    isSelfCreation,
+  ]);
 
-  const coordinatorCount = assignedCourses.filter((c) => c.is_coordinator).length;
-  const instructorCount = assignedCourses.filter((c) => c.is_instructor).length;
+  const hasActiveFilters =
+    search.trim() !== "" ||
+    selectedCourseFilter !== "all" ||
+    semesterFilter !== "all" ||
+    activeFilter !== "active" ||
+    ownershipFilter !== "all";
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // VIEW 1: Course Selection Grid (Like CIA Question Bank)
-  // ══════════════════════════════════════════════════════════════════════════
-  if (!selectedCourse) {
-    return (
-      <div className="min-h-screen pb-16">
-        {/* Top Banner */}
-        <PageBanner
-          title="Classrooms"
-          description="Course Coordinator & Instructor Workspace — Select one of your assigned courses to view instances, configure section deliveries, allocate faculty, and manage student enrollments."
-          icon={<BookOpen className="h-6 w-6 text-white" />}
-        />
+  const clearAllFilters = () => {
+    setSearch("");
+    setSelectedCourseFilter("all");
+    setSemesterFilter("all");
+    setActiveFilter("active");
+    setOwnershipFilter("all");
+  };
 
-        <div className="pt-6">
-          {/* Filter & Search Bar */}
-          <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            {/* Search Box */}
-            <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
-                <IconSearch className="h-4 w-4" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search by course code, title, or programme..."
-                value={courseSearch}
-                onChange={(e) => setCourseSearch(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50/70 py-2.5 pl-10 pr-4 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-100"
-              />
-              {courseSearch && (
-                <button
-                  onClick={() => setCourseSearch("")}
-                  className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Role Filter Tabs */}
-            <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-700/60 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setCourseRoleFilter("all")}
-                className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
-                  courseRoleFilter === "all"
-                    ? "bg-white text-purple-700 shadow-xs dark:bg-slate-800 dark:text-purple-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300"
-                }`}
-              >
-                All Assigned ({assignedCourses.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setCourseRoleFilter("coordinator")}
-                className={`rounded-lg px-3 py-1.5 transition cursor-pointer flex items-center gap-1 ${
-                  courseRoleFilter === "coordinator"
-                    ? "bg-white text-purple-700 shadow-xs dark:bg-slate-800 dark:text-purple-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300"
-                }`}
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />
-                <span>Coordinator ({coordinatorCount})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCourseRoleFilter("instructor")}
-                className={`rounded-lg px-3 py-1.5 transition cursor-pointer flex items-center gap-1 ${
-                  courseRoleFilter === "instructor"
-                    ? "bg-white text-purple-700 shadow-xs dark:bg-slate-800 dark:text-purple-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300"
-                }`}
-              >
-                <UserCheck className="h-3.5 w-3.5 text-blue-600" />
-                <span>Instructor ({instructorCount})</span>
-              </button>
-            </div>
-
-            {/* Semester Selector & Refresh */}
-            <div className="flex items-center gap-3">
-              <select
-                value={courseSemesterFilter}
-                onChange={(e) => setCourseSemesterFilter(e.target.value)}
-                className="rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-gray-700 transition-colors focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-              >
-                {semesterOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={fetchAssignedCourses}
-                disabled={loadingCourses}
-                title="Refresh assigned courses"
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors cursor-pointer"
-              >
-                <RefreshCw className={`h-4 w-4 ${loadingCourses ? "animate-spin text-purple-600" : ""}`} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Error Banner */}
-          {errorCourses && (
-            <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400">
-              <AlertCircle className="h-5 w-5 flex-shrink-0" />
-              <span>{errorCourses}</span>
-            </div>
-          )}
-
-          {/* Loading Skeleton */}
-          {loadingCourses ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div
-                  key={i}
-                  className="animate-pulse rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-                >
-                  <div className="flex justify-between mb-4">
-                    <div className="h-5 w-24 rounded bg-gray-200 dark:bg-gray-700" />
-                    <div className="h-5 w-20 rounded bg-gray-200 dark:bg-gray-700" />
-                  </div>
-                  <div className="h-6 w-3/4 rounded bg-gray-200 dark:bg-gray-700 mb-2" />
-                  <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700 mb-6" />
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="h-12 rounded-xl bg-gray-100 dark:bg-gray-700/60" />
-                    <div className="h-12 rounded-xl bg-gray-100 dark:bg-gray-700/60" />
-                  </div>
-                  <div className="h-4 w-full rounded bg-gray-100 dark:bg-gray-700" />
-                </div>
-              ))}
-            </div>
-          ) : filteredAssignedCourses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center dark:border-gray-700 dark:bg-gray-800/50">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 mb-4">
-                <HelpCircle className="h-8 w-8" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                No Assigned Courses Found
-              </h3>
-              <p className="max-w-md text-sm text-gray-500 dark:text-gray-400 mb-6">
-                {courseSearch
-                  ? `No courses match your search "${courseSearch}". Try clearing your search or choosing a different role or semester.`
-                  : "Only courses where you are assigned as a Course Coordinator or Course Instructor appear here. No matching courses were found for your user account."}
-              </p>
-              {courseSearch && (
-                <button
-                  onClick={() => setCourseSearch("")}
-                  className="rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-purple-700 transition-colors"
-                >
-                  Clear Search
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredAssignedCourses.map((course) => (
-                <div
-                  key={course.id}
-                  onClick={() => handleSelectCourse(course)}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-xl dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-500 cursor-pointer"
-                >
-                  {/* Top Accent Gradient Bar */}
-                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 opacity-80 group-hover:opacity-100 transition-opacity" />
-
-                  <div>
-                    {/* Header Badges */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700 font-mono">
-                        {course.course_code}
-                      </span>
-
-                      {/* Explicit Role Badge */}
-                      {course.is_coordinator ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300">
-                          <ShieldCheck className="h-3 w-3" />
-                          <span>Coordinator</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/50 dark:text-blue-300">
-                          <UserCheck className="h-3 w-3" />
-                          <span>Instructor</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Title */}
-                    <h3 className="text-lg font-bold text-gray-900 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400 transition-colors line-clamp-2 mb-1.5">
-                      {course.course_title}
-                    </h3>
-
-                    {/* Department & Programme */}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 flex items-center gap-1.5 truncate">
-                      <Award className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
-                      <span className="truncate">
-                        {course.programme_name || course.department_name}
-                        {course.semester ? ` • Semester ${course.semester}` : ""}
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Footer CTA */}
-                  <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-xs font-semibold text-purple-600 dark:text-purple-400 group-hover:translate-x-0.5 transition-transform">
-                    <span className="flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5" />
-                      Manage Classrooms
-                    </span>
-                    <ArrowRight className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // VIEW 2: Course Instance Management Workspace for the Selected Course
-  // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen pb-16">
-      {/* Top Navigation & Breadcrumbs (Matching CIA Question Bank) */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <button
-          onClick={handleBackToCourses}
-          className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to All Assigned Courses</span>
-        </button>
-
-        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-          <span>Classrooms Management</span>
-          <span>/</span>
-          <span className="font-bold text-gray-800 dark:text-gray-200">
-            {selectedCourse.course_code}
-          </span>
-        </div>
-      </div>
-
-      {/* Resolved Course Header Banner */}
-      <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-              <BookOpen className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="font-mono text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/40 dark:text-purple-300">
-                  {selectedCourse.course_code}
+    <div className="min-h-screen space-y-3 pb-8">
+      {/* ── Compact Header & Action Toolbar ──────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200/70 pb-3 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 shadow-xs dark:bg-purple-950/60 dark:text-purple-300">
+            <Layers className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                Classrooms
+              </h1>
+              <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
+                {totalCount} Total
+              </span>
+              {lastRefreshed && (
+                <span className="hidden text-xs text-slate-400 dark:text-slate-500 sm:inline">
+                  • Synced {lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {selectedCourse.course_title}
-                </h1>
-                {selectedCourse.is_coordinator ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                    <ShieldCheck className="h-3 w-3" />
-                    <span>Course Coordinator</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                    <UserCheck className="h-3 w-3" />
-                    <span>Course Instructor</span>
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {selectedCourse.programme_name || selectedCourse.department_name}
-                {selectedCourse.semester ? ` • Term: Semester ${selectedCourse.semester}` : ""}
-                {selectedCourse.academic_year ? ` • Academic Year ${selectedCourse.academic_year}` : ""}
-              </p>
+              )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => loadInstancesForCourse(selectedCourse.id)}
-              disabled={instanceState.loadingInstances}
-              className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${instanceState.loadingInstances ? "animate-spin text-purple-600" : ""}`} />
-              <span>Refresh</span>
-            </button>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Manage section deliveries, monitor student rosters, and assign faculty.
+            </p>
           </div>
         </div>
 
-        {/* Auto-instructor note */}
-        <div className="mt-4 flex items-center gap-2 rounded-xl bg-purple-50/70 px-4 py-2 text-xs text-purple-800 dark:bg-purple-950/30 dark:text-purple-300 border border-purple-100 dark:border-purple-900/40">
-          <UserCheck className="h-4 w-4 shrink-0 text-purple-600" />
-          <span>
-            <strong>Co-delivery Mode: </strong>Course Coordinators possess full Course Instructor permissions for this course Classrooms delivery.
-          </span>
+        {/* Action CTAs */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/neurobe/student-enrollment")}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/70 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 transition shadow-xs dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-300 dark:hover:bg-purple-900/40"
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Enroll Students</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+          >
+            <IconPlus className="h-3.5 w-3.5" />
+            <span>Create Classroom</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={fetchAllData}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            title="Refresh Classrooms"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-purple-600" : ""}`} />
+          </button>
         </div>
       </div>
 
-      {/* Main Action Header */}
-      <PageHeader
-        title="Classrooms Deliveries & Sections"
-        subtitle={`Managing active and archived Classrooms sections for ${selectedCourse.course_code}.`}
-        icon={<Layers className="h-5 w-5 text-purple-600" />}
-        records={`${filteredInstances.length} Classrooms`}
-        actionBtn2={{
-          label: "Enroll Students",
-          icon: <Users className="h-4 w-4" />,
-          onClick: () => router.push(`/neurobe/student-enrollment?course_id=${selectedCourse.id}`),
-          outline: true,
-        }}
-        actionBtn1={{
-          label: "Create Classroom",
-          icon: <IconPlus className="h-4 w-4" />,
-          onClick: openCreate,
-          view: false,
-        }}
-      />
-
-      {/* Instance Creation & Edit Modal */}
-      <CourseOfferingModal
-        open={instanceState.showModal}
-        onClose={closeModal}
-        onSuccess={() => loadInstancesForCourse(selectedCourse.id)}
-        initialData={instanceState.editRow}
-        defaultCourseId={selectedCourse.id}
-        defaultCourseName={`${selectedCourse.course_code} - ${selectedCourse.course_title}`}
-      />
-
-      {/* Filters Toolbar (NO TOP-LEVEL COURSE DROPDOWN) */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 py-2">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[320px]">
-          {/* Sliding Filter: My Creations | Others */}
-          <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800 text-xs font-semibold">
+      {/* ── Unified Compact Filter Bar (Search, Course Dropdown, Tabs & Filters) ── */}
+      <div className="flex flex-col gap-2 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Ownership Filter Pills */}
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800 text-xs font-semibold">
             <button
               type="button"
-              onClick={() => setInstanceState({ ownershipFilter: "my_creations" })}
-              className={`rounded-lg px-3 py-1.5 transition cursor-pointer flex items-center gap-1.5 ${
-                instanceState.ownershipFilter === "my_creations"
+              onClick={() => setOwnershipFilter("all")}
+              className={`rounded-md px-2.5 py-1 transition flex items-center gap-1.5 ${
+                ownershipFilter === "all"
                   ? "bg-white text-purple-700 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               }`}
             >
-              <span>My Creations</span>
+              <span>All Classrooms</span>
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                  instanceState.ownershipFilter === "my_creations"
+                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                  ownershipFilter === "all"
+                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
+                    : "bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-400"
+                }`}
+              >
+                {totalCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setOwnershipFilter("my_creations")}
+              className={`rounded-md px-2.5 py-1 transition flex items-center gap-1.5 ${
+                ownershipFilter === "my_creations"
+                  ? "bg-white text-purple-700 shadow-xs dark:bg-slate-700 dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              }`}
+            >
+              <UserCheck className="h-3 w-3" />
+              <span>My Created</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                  ownershipFilter === "my_creations"
                     ? "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
                     : "bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-400"
                 }`}
@@ -737,19 +548,21 @@ const CourseOfferingPage = () => {
                 {myCreationsCount}
               </span>
             </button>
+
             <button
               type="button"
-              onClick={() => setInstanceState({ ownershipFilter: "others" })}
-              className={`rounded-lg px-3 py-1.5 transition cursor-pointer flex items-center gap-1.5 ${
-                instanceState.ownershipFilter === "others"
+              onClick={() => setOwnershipFilter("others")}
+              className={`rounded-md px-2.5 py-1 transition flex items-center gap-1.5 ${
+                ownershipFilter === "others"
                   ? "bg-white text-purple-700 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               }`}
             >
-              <span>Others</span>
+              <ShieldCheck className="h-3 w-3" />
+              <span>Other Instructors</span>
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                  instanceState.ownershipFilter === "others"
+                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                  ownershipFilter === "others"
                     ? "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
                     : "bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-400"
                 }`}
@@ -759,54 +572,115 @@ const CourseOfferingPage = () => {
             </button>
           </div>
 
-          {/* Search */}
-          <div className="relative max-w-[280px] flex-1 min-w-[200px]">
+          {/* Search Box */}
+          <div className="relative min-w-[220px] flex-1 max-w-[340px]">
             <TextInput
-              placeholder="Search by Classrooms, faculty..."
+              placeholder="Search classrooms, course, faculty..."
               type="text"
-              value={instanceState.search}
-              onChange={(e) => setInstanceState({ search: e.target.value })}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               icon={<IconSearch className="h-4 w-4" />}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <CustomSelect
-            options={STATUS_OPTIONS}
-            value={STATUS_OPTIONS.find((o) => o.value === instanceState.statusFilter) ?? null}
-            onChange={(e) => setInstanceState({ statusFilter: e?.value ?? "all" })}
-            placeholder="All Statuses"
-            className="filter-input"
-            isClearable
-          />
+        {/* Second Row: Course Selector + Semester + Status + Archive + Clear */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+          {/* Course Selector Dropdown */}
+          <div className="min-w-[240px] flex-1 max-w-[360px]">
+            <CustomSelect
+              options={courseFilterOptions}
+              value={courseFilterOptions.find((o) => o.value === selectedCourseFilter) ?? courseFilterOptions[0]}
+              onChange={(e) => setSelectedCourseFilter(String(e?.value ?? "all"))}
+              placeholder="Filter by Course"
+              isClearable={false}
+              className="text-xs"
+            />
+          </div>
 
-          <CustomSelect
-            options={ARCHIVE_OPTIONS}
-            value={ARCHIVE_OPTIONS.find((o) => o.value === instanceState.archiveFilter) ?? null}
-            onChange={(e) => setInstanceState({ archiveFilter: e?.value ?? "all" })}
-            placeholder="Active Classrooms"
-            className="filter-input"
-            isClearable={false}
-          />
+          {/* Semester Selector */}
+          <div className="w-[140px]">
+            <CustomSelect
+              options={SEMESTER_OPTIONS}
+              value={SEMESTER_OPTIONS.find((o) => o.value === semesterFilter) ?? SEMESTER_OPTIONS[0]}
+              onChange={(e) => setSemesterFilter(String(e?.value ?? "all"))}
+              placeholder="All Semesters"
+              isClearable={false}
+              className="text-xs"
+            />
+          </div>
+
+          {/* Single Active Filter */}
+          <div className="w-[140px]">
+            <CustomSelect
+              options={ACTIVE_FILTER_OPTIONS}
+              value={ACTIVE_FILTER_OPTIONS.find((o) => o.value === activeFilter) ?? ACTIVE_FILTER_OPTIONS[0]}
+              onChange={(e) => setActiveFilter(String(e?.value ?? "active"))}
+              placeholder="Active Status"
+              isClearable={false}
+              className="text-xs"
+            />
+          </div>
+
+          {/* Clear Filters CTA */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+
+          <div className="ml-auto text-xs text-slate-500 dark:text-slate-400 font-medium">
+            Showing <strong className="text-slate-800 dark:text-slate-200">{filteredInstances.length}</strong> of {totalCount}
+          </div>
         </div>
       </div>
 
-      {/* Instances Table */}
-      <div className="panel">
+      {/* ── Classrooms Table ──────────────────────────────────────────────── */}
+      <div className="panel p-0 overflow-hidden border border-slate-200/80 rounded-xl dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <AcademicTable
           records={filteredInstances}
           columns={makeCourseOfferingColumns(openEdit, handleManageStudents, handleToggleArchive)}
-          loading={instanceState.loadingInstances}
+          loading={loading}
           noRecordsText={
-            instanceState.ownershipFilter === "my_creations"
-              ? `No Classrooms created by you for ${selectedCourse.course_code}. Click "+ Create Classroom" to add one.`
-              : `No Classrooms created by other instructors for ${selectedCourse.course_code}.`
+            hasActiveFilters
+              ? "No course classrooms match your current filters. Try resetting the filter criteria."
+              : "No classrooms found for your assigned courses. Click '+ Create Classroom' to start one."
           }
           onRowClick={handleRowClick}
-          rowClassName={() => "cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors"}
+          rowClassName={() => "cursor-pointer hover:bg-purple-50/40 dark:hover:bg-slate-800/60 transition-colors"}
         />
       </div>
+
+      {/* ── Course Offering Modal ─────────────────────────────────────────── */}
+      <CourseOfferingModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSuccess={() => {
+          closeModal();
+          fetchAllData();
+        }}
+        initialData={editRow}
+        defaultCourseId={activeSelectedCourse?.id}
+        defaultCourseName={
+          activeSelectedCourse
+            ? `${activeSelectedCourse.course_code} - ${activeSelectedCourse.course_title}`
+            : undefined
+        }
+      />
     </div>
   );
 };

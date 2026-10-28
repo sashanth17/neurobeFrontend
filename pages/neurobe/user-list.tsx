@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { Upload, Users } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import { useSetState, Success, Failure, showDeleteAlert, getOrganizationId, Dropdown } from "@/utils/function.utils";
+import { useSetState, Success, Failure, showDeleteAlert, getOrganizationId, Dropdown, getErrorMessage } from "@/utils/function.utils";
 import IconSearch from "@/components/Icon/IconSearch";
 import IconPlus from "@/components/Icon/IconPlus";
 import {
@@ -110,7 +110,16 @@ const UserList = () => {
   // ── Dynamic Options via Dropdown helper ────────────────────────────────────
   const modalDepartmentOptions = Dropdown(state.departmentList, "department_name");
   const modalProgrammeOptions = Dropdown(state.programmeList, "programme_name");
-  const modalBatchOptions = Dropdown(state.batchList, "name");
+  const modalBatchOptions = (state.batchList || []).filter(Boolean).map((b: any) => ({
+    value: b?.id,
+    label:
+      b?.name ||
+      (b?.start_year && b?.end_year ? `${b.start_year} - ${b.end_year}` : "") ||
+      `Batch ${b?.id}`,
+    programme_id: b?.programme_id ?? b?.programme?.id,
+    programme_name: b?.programme_name ?? b?.programme?.programme_name ?? b?.programme?.name,
+    department_id: b?.department_id,
+  }));
 
   const departmentOptions = [
     { value: "All Departments", label: "All Departments" },
@@ -126,6 +135,24 @@ const UserList = () => {
     { value: "All Batches", label: "All Batches" },
     ...modalBatchOptions,
   ];
+
+  const filterBatchOptions = useMemo(() => {
+    if (!state.progFilter?.value || state.progFilter.value === "All Programmes") {
+      return batchOptions;
+    }
+    const filtered = modalBatchOptions.filter((b: any) => {
+      const progId = b.programme_id ?? b.programme?.id;
+      if (progId) return String(progId) === String(state.progFilter.value);
+      if (b.programme_name && state.progFilter.label) {
+        return b.programme_name.toLowerCase() === String(state.progFilter.label).toLowerCase();
+      }
+      return false;
+    });
+    return [
+      { value: "All Batches", label: "All Batches" },
+      ...filtered,
+    ];
+  }, [batchOptions, modalBatchOptions, state.progFilter]);
 
   // ── Body Params for List API ───────────────────────────────────────────────
   const bodyData = (searchVal = debouncedSearch) => {
@@ -239,7 +266,7 @@ const UserList = () => {
       closeModal();
       getUserList();
     } catch (error: any) {
-      Failure(typeof error === "string" ? error : error?.message || "Failed to save user");
+      Failure(getErrorMessage(error, "Failed to save user"));
     } finally {
       setState({ submitting: false });
     }
@@ -255,7 +282,7 @@ const UserList = () => {
           Success("User deleted successfully");
           getUserList();
         } catch (error: any) {
-          Failure(typeof error === "string" ? error : error?.message || "Failed to delete user");
+          Failure(getErrorMessage(error, "Failed to delete user"));
           setState({ loading: false });
         }
       },
@@ -370,13 +397,13 @@ const UserList = () => {
         <CustomSelect
           options={programmeOptions}
           value={state.progFilter}
-          onChange={(v) => setState({ progFilter: v })}
+          onChange={(v) => setState({ progFilter: v, batchFilter: null })}
           placeholder="All Programmes"
           className="filter-input"
           isClearable
         />
         <CustomSelect
-          options={batchOptions}
+          options={filterBatchOptions}
           value={state.batchFilter}
           onChange={(v) => setState({ batchFilter: v })}
           placeholder="All Batches"

@@ -41,7 +41,7 @@ const TERM_OPTS: DropdownOption[] = [
 ];
 
 const schema = Yup.object({
-  course_instance_name: Yup.string().trim().required("Course instance name is required"),
+  course_instance_name: Yup.string().trim().required("Classroom name is required"),
   programme_id: Yup.mixed().required("Academic programme is required"),
   department_id: Yup.mixed().required("Department is required"),
   semester: Yup.mixed().required("Academic term is required"),
@@ -309,9 +309,9 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess, defaultCou
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <TextInput
-              title="Course Instance Name"
+              title="Classroom Name"
               required
-              placeholder="Enter course instance name"
+              placeholder="Enter Classroom name"
               value={state.course_instance_name}
               onChange={(e) => setState({ course_instance_name: e.target.value })}
               error={state.errors?.course_instance_name}

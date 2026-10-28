@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Models from "@/imports/models.import";
 import { Success, Failure } from "@/utils/function.utils";
-import { Check, RefreshCw, Lock, Image as ImageIcon } from "lucide-react";
+import { Check, RefreshCw, Lock, Image as ImageIcon, Sigma, Eye, EyeOff } from "lucide-react";
 import { ModalShell } from "@/components/academic-setup/AddModals";
 import TextInput from "@/components/FormFields/TextInput.component";
 import TextArea from "@/components/FormFields/TextArea.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
 import CKEditorField from "@/components/FormFields/CKEditorField.component";
+import LatexFormulaModal from "@/components/common-components/LatexFormulaModal";
+import { renderMathInHtml } from "@/components/common-components/katexLoader";
 import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
 const UNIT_OPTIONS = [
@@ -152,6 +154,72 @@ export const EditQuestionModal = ({
 
   const set = (key: string, val: any) => setForm((p) => ({ ...p, [key]: val }));
 
+  // LaTeX Formula Modal State
+  const [formulaModalState, setFormulaModalState] = useState<{
+    open: boolean;
+    target: "question" | "optionA" | "optionB" | "optionC" | "optionD";
+    targetLabel: string;
+    initialFormula?: string;
+  }>({
+    open: false,
+    target: "question",
+    targetLabel: "Question Statement",
+    initialFormula: "",
+  });
+
+  const [optionPreviews, setOptionPreviews] = useState<Record<string, boolean>>({
+    A: false,
+    B: false,
+    C: false,
+    D: false,
+  });
+  const [questionPreview, setQuestionPreview] = useState(false);
+
+  const toggleOptionPreview = (key: string) => {
+    setOptionPreviews((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleOpenFormula = (
+    target: "question" | "optionA" | "optionB" | "optionC" | "optionD",
+    label: string
+  ) => {
+    let currentText = "";
+    if (target === "question") {
+      currentText = form.question;
+    } else {
+      currentText = (form as any)[target] || "";
+    }
+    const match = currentText.match(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g);
+    const lastFormula = match ? match[match.length - 1] : "";
+
+    setFormulaModalState({
+      open: true,
+      target,
+      targetLabel: label,
+      initialFormula: lastFormula,
+    });
+  };
+
+  const handleFormulaInserted = (latexFormula: string) => {
+    const { target } = formulaModalState;
+    if (target === "question") {
+      const cur = form.question || "";
+      set("question", cur ? `${cur} ${latexFormula}` : `<p>${latexFormula}</p>`);
+      setQuestionPreview(true);
+    } else {
+      const cur = (form as any)[target] || "";
+      set(target, cur ? `${cur} ${latexFormula}` : latexFormula);
+      const key = target.replace("option", "");
+      setOptionPreviews((prev) => ({ ...prev, [key]: true }));
+    }
+  };
+
+  // Check if any field contains LaTeX delimiters
+  const hasMathContent = useMemo(() => {
+    const fullContent = `${form.question} ${form.optionA} ${form.optionB} ${form.optionC} ${form.optionD}`;
+    return /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^$\n]+?\$|\\\([\s\S]*?\\\))/g.test(fullContent);
+  }, [form.question, form.optionA, form.optionB, form.optionC, form.optionD]);
+
   return (
     <ModalShell
       title="Edit Question"
@@ -160,7 +228,7 @@ export const EditQuestionModal = ({
       open={open}
       onClose={onClose}
       code={code}
-      maxWidth="max-w-3xl"
+      maxWidth="max-w-4xl"
     >
       <form
         onSubmit={async (e) => {
@@ -307,6 +375,13 @@ export const EditQuestionModal = ({
             required
             minHeight="140px"
             badgeLabel="CKEditor"
+            showMathFormulaButton={true}
+            onFormulaClick={() => handleOpenFormula("question", "Question Statement")}
+            showPreviewButton={true}
+            isPreviewOpen={questionPreview}
+            onTogglePreview={() => setQuestionPreview((prev) => !prev)}
+            previewHtml={renderMathInHtml(form.question)}
+            helperText="Supports rich text formatting, bullet points, numbered lists, blockquotes, tables, and LaTeX math formulas ($...$ or $$...$$)."
           />
         </div>
 
@@ -342,8 +417,9 @@ export const EditQuestionModal = ({
                       : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                  <div className="flex items-center justify-between gap-1.5 mb-2.5">
+                    {/* Left: Option Identifier Badge */}
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-900 text-[11px] font-bold text-white shadow-2xs dark:bg-slate-100 dark:text-slate-900">
                         {key}
                       </span>
@@ -352,42 +428,79 @@ export const EditQuestionModal = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                      {/* Direct Option Image Attachment */}
-                      <label
-                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50/90 px-2 py-0.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 hover:text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300 transition cursor-pointer active:scale-95 shadow-2xs shrink-0 whitespace-nowrap"
-                        title={`Attach image or diagram to Option ${key}`}
-                      >
-                        <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                        <span>Image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              const base64 = reader.result as string;
-                              const currentVal = (form as any)[setter] || "";
-                              const imgHtml = `<p><img src="${base64}" alt="Option ${key}" /></p>`;
-                              set(setter, currentVal ? `${currentVal}${imgHtml}` : imgHtml);
-                            };
-                            reader.readAsDataURL(file);
-                            e.target.value = "";
-                          }}
-                        />
-                      </label>
+                    {/* Right: Quick Toolbar + Correct Answer Selector */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Compact Option Quick Actions (Image, Math, Preview) */}
+                      <div className="flex items-center rounded-md border border-slate-200 bg-slate-50/90 p-0.5 dark:border-slate-700 dark:bg-slate-800/90 shadow-2xs">
+                        {/* Direct Option Image Attachment */}
+                        <label
+                          className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-purple-600 hover:shadow-2xs dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-purple-300 transition cursor-pointer active:scale-95"
+                          title={`Attach image or diagram to Option ${key}`}
+                        >
+                          <ImageIcon className="h-3.5 w-3.5" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const base64 = reader.result as string;
+                                const currentVal = (form as any)[setter] || "";
+                                const imgHtml = `<p><img src="${base64}" alt="Option ${key}" /></p>`;
+                                set(setter, currentVal ? `${currentVal}${imgHtml}` : imgHtml);
+                              };
+                              reader.readAsDataURL(file);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
 
+                        {/* Direct Option LaTeX Formula Attachment */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenFormula(setter as any, `Option ${key}`)}
+                          className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-indigo-600 hover:shadow-2xs dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-300 transition cursor-pointer active:scale-95"
+                          title={`Insert LaTeX math formula into Option ${key}`}
+                        >
+                          <Sigma className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* Direct Option Preview Toggle (Eye Icon) */}
+                        <button
+                          type="button"
+                          onClick={() => toggleOptionPreview(key)}
+                          className={`flex h-6 w-6 items-center justify-center rounded transition cursor-pointer active:scale-95 ${
+                            optionPreviews[key]
+                              ? "bg-purple-600 text-white shadow-2xs font-bold"
+                              : "text-slate-500 hover:bg-white hover:text-purple-600 hover:shadow-2xs dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-purple-300"
+                          }`}
+                          title={
+                            optionPreviews[key]
+                              ? `Hide rendered preview for Option ${key}`
+                              : `Preview rendered math & formatting for Option ${key}`
+                          }
+                        >
+                          {optionPreviews[key] ? (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Correct / Mark Correct Button */}
                       <button
                         type="button"
                         onClick={() => set("correctAnswer", key)}
-                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                        className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs ${
                           isSelected
-                            ? "bg-emerald-600 text-white shadow-xs font-bold"
-                            : "border border-slate-200 bg-slate-100/90 text-slate-600 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                            ? "bg-emerald-600 text-white font-bold ring-1 ring-emerald-500/50"
+                            : "border border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-emerald-950/30"
                         }`}
+                        title={isSelected ? `Option ${key} is the designated correct answer` : `Mark Option ${key} as correct`}
                       >
                         {isSelected ? (
                           <>
@@ -411,6 +524,35 @@ export const EditQuestionModal = ({
                     hideBadge
                     showImageUploadButton={false}
                   />
+
+                  {/* Live Rendered Preview for this Option */}
+                  {optionPreviews[key] && (
+                    <div className="mt-2 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50/90 via-indigo-50/50 to-white p-2.5 text-xs text-slate-900 shadow-2xs dark:border-purple-900/60 dark:bg-slate-900 dark:text-slate-100">
+                      <div className="flex items-center justify-between mb-1 text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                        <span className="flex items-center gap-1 font-bold">
+                          <Sigma className="h-3 w-3 text-purple-600" />
+                          <span>Option {key} Live Rendered Preview:</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleOptionPreview(key)}
+                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-semibold cursor-pointer"
+                        >
+                          ✕ Close
+                        </button>
+                      </div>
+                      <div className="min-h-[28px] flex items-center py-1">
+                        {val ? (
+                          <div
+                            className="rich-text-content katex-rendered text-sm font-semibold text-slate-900 dark:text-white leading-relaxed max-w-full overflow-x-auto"
+                            dangerouslySetInnerHTML={{ __html: renderMathInHtml(val) }}
+                          />
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">No text or formula entered yet</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {val && val.includes("<img") && (
                     <div className="mt-2 flex items-center justify-between gap-1 rounded-md border border-purple-200/60 bg-purple-50/60 px-2 py-1 text-[11px] text-purple-700 dark:border-purple-800/40 dark:bg-purple-950/30 dark:text-purple-300">
@@ -457,6 +599,14 @@ export const EditQuestionModal = ({
           </button>
         </div>
       </form>
+
+      <LatexFormulaModal
+        open={formulaModalState.open}
+        onClose={() => setFormulaModalState((prev) => ({ ...prev, open: false }))}
+        onInsert={handleFormulaInserted}
+        initialFormula={formulaModalState.initialFormula}
+        targetLabel={formulaModalState.targetLabel}
+      />
     </ModalShell>
   );
 };

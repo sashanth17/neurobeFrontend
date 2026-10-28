@@ -95,13 +95,13 @@ export const OwnmenuConfig = {
       href: "/neurobe/user-list",
     },
 
-    {
-      type: "link",
-      icon: "IconMenuTables",
-      label: "Roles & Permissions",
-      href: "/neurobe/roles-permissions",
-      notifyKey: "new_application_count",
-    },
+    // {
+    //   type: "link",
+    //   icon: "IconMenuTables",
+    //   label: "Roles & Permissions",
+    //   href: "/neurobe/roles-permissions",
+    //   notifyKey: "new_application_count",
+    // },
     {
       type: "link",
       icon: "IconMenuNotes",
@@ -109,37 +109,37 @@ export const OwnmenuConfig = {
       href: "/neurobe/bulk-import",
     },
 
-    {
-      type: "link",
-      icon: "IconMenuNotes",
-      label: "Audit Trial",
-      href: "/neurobe/audit-trial",
-    },
+    // {
+    //   type: "link",
+    //   icon: "IconMenuNotes",
+    //   label: "Audit Trial",
+    //   href: "/neurobe/audit-trial",
+    // },
 
-    {
-      type: "submenu",
-      icon: "IconMenuCharts",
-      label: "Masters",
-      key: "master",
-      children: [
-        {
-          label: "Degree Level",
-          href: "/faculty/master/hr_panel",
-        },
-        {
-          label: "Batch",
-          href: "/faculty/master/additional_academic_responsibilities",
-        },
-        {
-          label: "Academic Term / Semester",
-          href: "/faculty/master/additional_academic_responsibilities",
-        },
-        {
-          label: "Entity",
-          href: "/faculty/master/additional_academic_responsibilities",
-        },
-      ],
-    },
+    // {
+    //   type: "submenu",
+    //   icon: "IconMenuCharts",
+    //   label: "Masters",
+    //   key: "master",
+    //   children: [
+    //     {
+    //       label: "Degree Level",
+    //       href: "/faculty/master/hr_panel",
+    //     },
+    //     {
+    //       label: "Batch",
+    //       href: "/faculty/master/additional_academic_responsibilities",
+    //     },
+    //     {
+    //       label: "Academic Term / Semester",
+    //       href: "/faculty/master/additional_academic_responsibilities",
+    //     },
+    //     {
+    //       label: "Entity",
+    //       href: "/faculty/master/additional_academic_responsibilities",
+    //     },
+    //   ],
+    // },
   ],
 };
 
@@ -183,10 +183,6 @@ OwnmenuConfig.FACULTY = [
       {
         label: "Classrooms",
         href: "/neurobe/course-offering",
-      },
-      {
-        label: "Live test monitoring",
-        href: "/neurobe/ins-mcq-live-monitor",
       },
     ],
   },

@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Edit, Info, PlusIcon, X, Eye, EyeOff } from "lucide-react";
 import TextInput from "@/components/FormFields/TextInput.component";
 import CustomSelect from "@/components/FormFields/CustomSelect.component";
-import { Failure } from "@/utils/function.utils";
+import { Failure, getOrganizationId } from "@/utils/function.utils";
+import Models from "@/imports/models.import";
 
 const toOpts = (arr: string[]) => arr.map((v) => ({ value: v, label: v }));
 const toOpt  = (v: string | null | undefined) => v ? { value: v, label: v } : null;
@@ -83,6 +84,71 @@ const AddUserModal = ({
     status: { value: "Active", label: "Active" } as any,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [programBatches, setProgramBatches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (form.programme?.value) {
+      Models.batch
+        .list({ organization_id: getOrganizationId(), programme_id: form.programme.value }, 1)
+        .then((res: any) => {
+          const list = Array.isArray(res) ? res : res?.data ?? res?.results ?? [];
+          const opts = list.map((b: any) => ({
+            value: b.id,
+            label: b.name || (b.start_year && b.end_year ? `${b.start_year} - ${b.end_year}` : "") || `Batch ${b.id}`,
+            programme_id: b.programme_id ?? b.programme?.id,
+            programme_name: b.programme_name ?? b.programme?.programme_name ?? b.programme?.name,
+          }));
+          setProgramBatches(opts);
+        })
+        .catch((err: any) => console.error("Error loading batches for programme", err));
+    } else {
+      setProgramBatches([]);
+    }
+  }, [form.programme?.value]);
+
+  const filteredBatchOpts = useMemo(() => {
+    if (!form.programme?.value) {
+      return [];
+    }
+    const selectedProgId = String(form.programme.value);
+    const selectedProgLabel = String(form.programme.label || "").trim().toLowerCase();
+
+    const fromProps = batchOpts.filter((b: any) => {
+      const bProgId = b.programme_id ?? b.programme?.id;
+      if (bProgId !== undefined && bProgId !== null) {
+        return String(bProgId) === selectedProgId;
+      }
+      const bProgName = String(b.programme_name ?? b.programme?.programme_name ?? b.programme?.name ?? "").trim().toLowerCase();
+      if (bProgName && selectedProgLabel) {
+        return bProgName === selectedProgLabel;
+      }
+      return false;
+    });
+
+    const map = new Map<string, any>();
+    fromProps.forEach((b: any) => map.set(String(b.value), b));
+    programBatches.forEach((b: any) => map.set(String(b.value), b));
+    return Array.from(map.values());
+  }, [batchOpts, programBatches, form.programme]);
+
+  const handleProgrammeChange = (selectedProg: any) => {
+    setForm((prev) => {
+      let nextBatch = prev.batch;
+      if (selectedProg?.value) {
+        const bProgId = prev.batch?.programme_id ?? prev.batch?.programme?.id;
+        if (bProgId && String(bProgId) !== String(selectedProg.value)) {
+          nextBatch = null;
+        }
+      } else {
+        nextBatch = null;
+      }
+      return {
+        ...prev,
+        programme: selectedProg,
+        batch: nextBatch,
+      };
+    });
+  };
 
   useEffect(() => {
     if (open) {
@@ -302,9 +368,17 @@ const AddUserModal = ({
                 value={form.regNo}
                 onChange={(e) => set("regNo", e.target.value)}
               />
-              <CustomSelect title="Department" options={deptOpts}   value={form.department} onChange={(v) => set("department", v)} placeholder="Select department..." />
-              <CustomSelect title="Programme"  options={progOpts}   value={form.programme}  onChange={(v) => set("programme",  v)} placeholder="Select programme..." />
-              <CustomSelect title="Batch"      options={batchOpts}  value={form.batch}      onChange={(v) => set("batch",      v)} placeholder="Select batch..." />
+              <CustomSelect title="Department" options={deptOpts}   value={form.department} onChange={(v) => set("department", v)} placeholder="Select department..." isClearable />
+              <CustomSelect title="Programme"  options={progOpts}   value={form.programme}  onChange={handleProgrammeChange} placeholder="Select programme..." isClearable />
+              <CustomSelect
+                title="Batch"
+                options={filteredBatchOpts}
+                value={form.batch}
+                onChange={(v) => set("batch", v)}
+                placeholder={form.programme ? "Select batch..." : "Select programme first..."}
+                disabled={!form.programme}
+                isClearable
+              />
               <CustomSelect title="Status"     options={statusOpts} value={form.status}     onChange={(v) => set("status",     v)} placeholder="Active" />
 
               {/* Info notice */}

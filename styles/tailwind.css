@@ -1459,25 +1459,24 @@ pre.hljs {
     size: auto;
   }
 
-  body * {
-    visibility: hidden !important;
-  }
-
   #printable-question-paper,
-  #printable-question-paper * {
-    visibility: visible !important;
-  }
-
-  #printable-question-paper {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+  .printable-exam-paper {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
-    margin: 0 !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     box-shadow: none !important;
     border: none !important;
-    background: transparent !important;
+    background: #ffffff !important;
+    visibility: visible !important;
+  }
+
+  #printable-question-paper *,
+  .printable-exam-paper * {
+    visibility: visible !important;
   }
 
   #printable-question-paper .print-row-1,

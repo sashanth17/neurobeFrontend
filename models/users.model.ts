@@ -1,6 +1,22 @@
 import instance from '@/utils/axios.utils';
 import { getOrganizationId } from '@/utils/function.utils';
 
+const getApiError = (error: any) => {
+    const data = error?.response?.data;
+    if (!data) return error?.message || error || "Request failed";
+    if (typeof data === "string") return data;
+    if (typeof data.detail === "string") return data.detail;
+    if (Array.isArray(data.detail)) {
+        return data.detail.map((d: any) => d?.msg || JSON.stringify(d)).join(", ");
+    }
+    if (data.detail && typeof data.detail === "object") {
+        return data.detail.message || data.detail.detail || JSON.stringify(data.detail);
+    }
+    if (typeof data.message === "string") return data.message;
+    if (typeof data.error === "string") return data.error;
+    return data;
+};
+
 const users = {
     list: (body?: any, page?: any) => {
         let promise = new Promise((resolve, reject) => {
@@ -44,11 +60,7 @@ const users = {
                     resolve(res.data);
                 })
                 .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
+                    reject(getApiError(error));
                 });
         });
         return promise;
@@ -63,11 +75,7 @@ const users = {
                     resolve(res.data);
                 })
                 .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
+                    reject(getApiError(error));
                 });
         });
         return promise;
@@ -82,11 +90,7 @@ const users = {
                     resolve(res.data);
                 })
                 .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
+                    reject(getApiError(error));
                 });
         });
         return promise;
@@ -101,11 +105,7 @@ const users = {
                     resolve(res.data);
                 })
                 .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
+                    reject(getApiError(error));
                 });
         });
         return promise;
@@ -120,11 +120,7 @@ const users = {
                     resolve(res.data);
                 })
                 .catch((error) => {
-                    if (error.response) {
-                        reject(error.response.data?.message || error.response.data);
-                    } else {
-                        reject(error);
-                    }
+                    reject(getApiError(error));
                 });
         });
         return promise;

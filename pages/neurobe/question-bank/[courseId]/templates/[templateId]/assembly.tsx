@@ -17,16 +17,24 @@ import { Loader2, Sparkles, XCircle } from "lucide-react";
 
 import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
+import ciaAssessmentService from "@/services/ciaAssessment.service";
+import { getOrganizationId } from "@/utils/function.utils";
+import instance from "@/utils/axios.utils";
+
 const QuestionAssemblyStudioPage = () => {
   const router = useRouter();
   const dispatch = useDispatch();
-  const { courseId, templateId, code, title } = router.query;
+  const { courseId, templateId, code, title, testName: qTestName, test_name: qTestName2 } = router.query;
 
   const validCourseId = Array.isArray(courseId) ? courseId[0] : courseId || "";
   const validTemplateId = Array.isArray(templateId) ? templateId[0] : templateId || "";
 
   const { coCodes } = useCourseOutcomes(validCourseId);
 
+  const initialTestName = (Array.isArray(qTestName) ? qTestName[0] : qTestName) ||
+    (Array.isArray(qTestName2) ? qTestName2[0] : qTestName2) || "";
+  const [testName, setTestName] = useState<string>(initialTestName);
+  const [organizationName, setOrganizationName] = useState<string>("");
 
   // Course Details State
   const [courseInfo, setCourseInfo] = useState<{
@@ -88,7 +96,7 @@ const QuestionAssemblyStudioPage = () => {
     refreshCandidates,
   } = useQuestionAssembly(validCourseId, validTemplateId);
 
-  // Load Course Details if needed
+  // Load Course & Organization Details
   useEffect(() => {
     if (!validCourseId) return;
     const fetchCourseDetails = async () => {
@@ -101,13 +109,53 @@ const QuestionAssemblyStudioPage = () => {
             code: res.course_code || res.code || prev.code,
             title: res.course_title || res.title || res.name || prev.title,
           }));
+          if (res.organization_name || res.organization?.name || res.institution_name) {
+            setOrganizationName(res.organization_name || res.organization?.name || res.institution_name);
+          }
         }
       } catch (e) {
         console.error("Failed to load course details:", e);
       }
     };
     fetchCourseDetails();
+
+    // Also try resolving organization from user storage or organization API
+    try {
+      const uStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      if (uStr) {
+        const u = JSON.parse(uStr);
+        const name = u?.organization_name || u?.organization?.organization_name || u?.organization?.name || u?.institution_name;
+        if (name) setOrganizationName((prev) => prev || name);
+      }
+    } catch {}
+
+    const orgId = getOrganizationId();
+    if (orgId) {
+      instance()
+        .get(`organizations/${orgId}`)
+        .then((res) => {
+          const name = res.data?.organization_name || res.data?.name;
+          if (name) setOrganizationName((prev) => prev || name);
+        })
+        .catch(() => {});
+    }
   }, [validCourseId]);
+
+  // Load Assigned Test Name if not supplied via URL query
+  useEffect(() => {
+    if (!validTemplateId || testName) return;
+    const fetchAssigned = async () => {
+      try {
+        const tests: any = await ciaAssessmentService.getTemplateAssignedCiaTests(validTemplateId);
+        if (Array.isArray(tests) && tests.length > 0 && tests[0]?.test_name) {
+          setTestName(tests[0].test_name);
+        }
+      } catch (e) {
+        console.warn("Could not fetch assigned test for template:", e);
+      }
+    };
+    fetchAssigned();
+  }, [validTemplateId, testName]);
 
   useEffect(() => {
     const tmplName = template?.template_name || "Assembly Studio";
@@ -296,6 +344,8 @@ const QuestionAssemblyStudioPage = () => {
         template={template}
         courseCode={courseInfo.code}
         courseTitle={courseInfo.title}
+        organizationName={organizationName}
+        testName={testName}
         loading={previewLoading}
         onClose={() => setIsPreviewModalOpen(false)}
       />

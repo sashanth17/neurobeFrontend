@@ -6,17 +6,25 @@ import PrivateRouter from '@/hook/privateRouter';
 import Models from '@/imports/models.import';
 
 // Icons
-import IconCalendar from '@/components/Icon/IconCalendar';
-import IconClock from '@/components/Icon/IconClock';
-import IconBook from '@/components/Icon/IconBook';
-import IconClipboardText from '@/components/Icon/IconClipboardText';
-import IconSearch from '@/components/Icon/IconSearch';
-import IconCircleCheck from '@/components/Icon/IconCircleCheck';
-import IconAward from '@/components/Icon/IconAward';
-import IconBolt from '@/components/Icon/IconBolt';
-import IconEye from '@/components/Icon/IconEye';
-import IconInfoCircle from '@/components/Icon/IconInfoCircle';
-import IconX from '@/components/Icon/IconX';
+import {
+  Calendar,
+  Clock,
+  BookOpen,
+  CheckCircle2,
+  Award,
+  Zap,
+  Eye,
+  X,
+  Search,
+  RefreshCw,
+  AlertCircle,
+  FileText,
+  Layers,
+  ArrowRight,
+  Filter,
+  GraduationCap,
+  Sparkles,
+} from 'lucide-react';
 
 interface StudentInfo {
   id: string;
@@ -85,13 +93,7 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
   const [scheduledTests, setScheduledTests] = useState<ScheduledTest[]>([]);
-  const [stats, setStats] = useState({
-    total_tests: 0,
-    upcoming_tests: 0,
-    live_tests: 0,
-    completed_tests: 0,
-    enrolled_courses_count: 0,
-  });
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
   useEffect(() => {
@@ -116,7 +118,7 @@ const StudentDashboard = () => {
   } | null>(null);
 
   useEffect(() => {
-    dispatch(setPageTitle('Student Dashboard | Scheduled Tests'));
+    dispatch(setPageTitle('Student Academic Dashboard'));
   }, [dispatch]);
 
   // Handle redirect from completed assessment without viva
@@ -131,7 +133,7 @@ const StudentDashboard = () => {
         switches: (router.query.switches as string) || '0',
       });
       router.replace('/neurobe/student-dashboard', undefined, { shallow: true });
-      fetchDashboardData();
+      fetchDashboardData(true);
     }
   }, [router.query.submitted]);
 
@@ -152,9 +154,7 @@ const StudentDashboard = () => {
         setStudent(res.student);
         setEnrolledCourses(res.enrolled_courses || []);
         setScheduledTests(res.scheduled_tests || []);
-        if (res.stats) {
-          setStats(res.stats);
-        }
+        setLastRefreshed(new Date());
       }
     } catch (err) {
       console.error('Failed to load student dashboard:', err);
@@ -231,9 +231,11 @@ const StudentDashboard = () => {
       // 3. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesTitle = test.title.toLowerCase().includes(q);
+        const matchesTitle = (test.title || '').toLowerCase().includes(q);
         const matchesCode = (test.test_code || '').toLowerCase().includes(q);
-        const matchesCourse = (test.course_name || '').toLowerCase().includes(q) || (test.course_code || '').toLowerCase().includes(q);
+        const matchesCourse =
+          (test.course_name || '').toLowerCase().includes(q) ||
+          (test.course_code || '').toLowerCase().includes(q);
         const matchesType = (test.test_type || '').toLowerCase().includes(q);
         const matchesTopic = (test.topics || []).some((t) => t.toLowerCase().includes(q));
         if (!matchesTitle && !matchesCode && !matchesCourse && !matchesType && !matchesTopic) {
@@ -245,467 +247,607 @@ const StudentDashboard = () => {
     });
   }, [resolvedTests, statusFilter, selectedCourseFilter, searchQuery]);
 
+  // Filtered Courses for Courses Tab
+  const filteredCourses = useMemo(() => {
+    if (!searchQuery.trim()) return enrolledCourses;
+    const q = searchQuery.toLowerCase().trim();
+    return enrolledCourses.filter((c) => {
+      return (
+        (c.course_name || '').toLowerCase().includes(q) ||
+        (c.course_code || '').toLowerCase().includes(q) ||
+        (c.instance_name || '').toLowerCase().includes(q)
+      );
+    });
+  }, [enrolledCourses, searchQuery]);
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' || statusFilter !== 'ALL' || selectedCourseFilter !== 'ALL';
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('ALL');
+    setSelectedCourseFilter('ALL');
+  };
+
   const handleStartTest = (test: ScheduledTest) => {
     if (test.source === 'online_mcq') {
       const codeQuery = test.secure_code ? `&code=${encodeURIComponent(test.secure_code)}` : '';
       const emailQuery = student?.email ? `&email=${encodeURIComponent(student.email)}` : '';
-      router.push(`/neurobe/student-mcq-test?test_id=${test.raw_id}${codeQuery}&student_id=${student?.id || ''}${emailQuery}`);
+      router.push(
+        `/neurobe/student-mcq-test?test_id=${test.raw_id}${codeQuery}&student_id=${student?.id || ''}${emailQuery}`
+      );
     } else {
       alert(`Test "${test.title}" is currently live. Please follow the instructions from your course instructor.`);
     }
   };
 
+  const handleViewReport = (test: ScheduledTest) => {
+    router.push(
+      `/neurobe/student-report?test_id=${test.raw_id}&student_id=${student?.id || ''}&source=${test.source || 'online_mcq'}`
+    );
+  };
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* ── Unified Hero Banner & Profile Card ─────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 bg-color1 to-slate-900 p-8 text-white shadow-2xl border border-white/10">
-        {/* Background decorations */}
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl pointer-events-none"></div>
-        <div className="absolute -bottom-20 right-40 h-56 w-56 rounded-full bg-purple-500/20 blur-3xl pointer-events-none"></div>
-
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-            {/* Avatar */}
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-3xl font-bold shadow-inner backdrop-blur-md border border-white/20">
-              {student?.first_name ? student.first_name.charAt(0).toUpperCase() : 'S'}
+    <div className="min-h-screen space-y-3 pb-8">
+      {/* ── Header Row: Space-optimized Single-line Identity Bar ────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200/60 pb-2.5 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white shadow-xs">
+              <GraduationCap className="h-4.5 w-4.5" />
             </div>
-
-            {/* User Info & Page Description */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-blue-300">
-                  Student Academic Dashboard
-                </span>
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                Welcome back, {student?.full_name || student?.first_name || 'Student'}
-              </h1>
-              <p className="text-sm text-indigo-200 max-w-xl">
-                View your scheduled continuous internal assessments, online MCQ exams, and actively enrolled courses.
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 backdrop-blur-md border border-white/10">
-                  <span className="text-indigo-300 text-xs uppercase tracking-wider font-semibold">Reg No:</span>
-                  <span className="font-mono font-bold text-white">{student?.register_number || student?.id || '—'}</span>
-                </span>
-                {student?.department_name && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 backdrop-blur-md border border-white/10 text-white font-medium">
-                    {student.department_name}
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white sm:text-xl">
+                  {student?.full_name || student?.first_name || 'Student Dashboard'}
+                </h1>
+                {dynamicStats.live_tests > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                    </span>
+                    {dynamicStats.live_tests} Live Assessment{dynamicStats.live_tests > 1 ? 's' : ''}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Right side stats/tags inside banner */}
-          <div className="flex flex-wrap items-center gap-3 lg:flex-col lg:items-end">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-300 border border-emerald-500/30">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Enrolled & Active
-            </span>
-            <div className="flex gap-2">
-              {student?.batch_name && (
-                <div className="rounded-xl bg-black/20 px-4 py-2 backdrop-blur-md border border-white/5 text-right">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Batch</span>
-                  <span className="text-sm font-bold text-white">{student.batch_name}</span>
-                </div>
-              )}
-              <div className="rounded-xl bg-black/20 px-4 py-2 backdrop-blur-md border border-white/5 text-right">
-                <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Semester</span>
-                <span className="text-sm font-bold text-white">Sem {student?.semester || 1}</span>
-              </div>
-            </div>
+          {/* Student Metadata Badges */}
+          <div className="hidden items-center gap-1.5 text-xs sm:flex">
+            {student?.register_number && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <span className="text-slate-400 dark:text-slate-500">Reg:</span>
+                {student.register_number}
+              </span>
+            )}
+            {student?.department_name && (
+              <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {student.department_name}
+              </span>
+            )}
+            {student?.semester && (
+              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                Sem {student.semester}
+              </span>
+            )}
+            {student?.batch_name && (
+              <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-0.5 font-medium text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                {student.batch_name}
+              </span>
+            )}
           </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {lastRefreshed && (
+            <span className="hidden text-xs text-slate-400 dark:text-slate-500 md:inline">
+              Sync: {lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => fetchDashboardData()}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Metric Statistic Cards ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Scheduled Tests */}
-        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
+      {/* ── Metric Strip: 4 Interactive KPI Cards ────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:gap-3">
+        {/* Live Assessments */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('tests');
+            setStatusFilter('LIVE');
+          }}
+          className={`flex items-center justify-between rounded-xl border p-2.5 text-left transition hover:shadow-xs active:scale-[0.99] ${
+            activeTab === 'tests' && statusFilter === 'LIVE'
+              ? 'border-emerald-500/80 bg-emerald-50/70 ring-1 ring-emerald-500/40 dark:border-emerald-700/80 dark:bg-emerald-950/30'
+              : 'border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900'
+          }`}
+        >
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Total Tests Scheduled
-              </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 transition-transform group-hover:scale-110">
-                <IconCalendar className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-                {dynamicStats.total_tests}
-              </span>
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Exams</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-400">
-            Continuous & online assessments
-          </div>
-        </div>
-
-        {/* Upcoming Tests */}
-        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                Upcoming Exams
-              </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 transition-transform group-hover:scale-110">
-                <IconClock className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
-                {dynamicStats.upcoming_tests}
-              </span>
-              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Scheduled</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-400">
-            Prepare before start time
-          </div>
-        </div>
-
-        {/* Live / Active Tests */}
-        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-emerald-900/40 dark:bg-emerald-900/20">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span className="relative flex h-1.5 w-1.5">
+                {dynamicStats.live_tests > 0 && (
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-                </span>
-                Live Assessments
+                )}
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
               </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300 transition-transform group-hover:scale-110">
-                <IconBolt className="h-5 w-5" />
-              </div>
+              <span>Live Now</span>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100">
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">
                 {dynamicStats.live_tests}
               </span>
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                Ready to take
-              </span>
+              <span className="text-[10px] font-medium text-slate-400">active</span>
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-emerald-200/50 dark:border-emerald-900/40 text-xs text-emerald-600 dark:text-emerald-400">
-            {dynamicStats.live_tests > 0 ? 'Active window open now' : 'No tests currently in session'}
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
+            <Zap className="h-4 w-4" />
           </div>
-        </div>
+        </button>
+
+        {/* Upcoming Exams */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('tests');
+            setStatusFilter('UPCOMING');
+          }}
+          className={`flex items-center justify-between rounded-xl border p-2.5 text-left transition hover:shadow-xs active:scale-[0.99] ${
+            activeTab === 'tests' && statusFilter === 'UPCOMING'
+              ? 'border-indigo-500/80 bg-indigo-50/70 ring-1 ring-indigo-500/40 dark:border-indigo-700/80 dark:bg-indigo-950/30'
+              : 'border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900'
+          }`}
+        >
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Upcoming
+            </div>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">
+                {dynamicStats.upcoming_tests}
+              </span>
+              <span className="text-[10px] font-medium text-slate-400">scheduled</span>
+            </div>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400">
+            <Calendar className="h-4 w-4" />
+          </div>
+        </button>
+
+        {/* Completed Tests */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('tests');
+            setStatusFilter('COMPLETED');
+          }}
+          className={`flex items-center justify-between rounded-xl border p-2.5 text-left transition hover:shadow-xs active:scale-[0.99] ${
+            activeTab === 'tests' && statusFilter === 'COMPLETED'
+              ? 'border-purple-500/80 bg-purple-50/70 ring-1 ring-purple-500/40 dark:border-purple-700/80 dark:bg-purple-950/30'
+              : 'border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900'
+          }`}
+        >
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Completed
+            </div>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">
+                {dynamicStats.completed_tests}
+              </span>
+              <span className="text-[10px] font-medium text-slate-400">finished</span>
+            </div>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100/70 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400">
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+        </button>
 
         {/* Enrolled Courses */}
-        <div className="group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 dark:border-gray-800 dark:bg-gray-900">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('courses');
+            setStatusFilter('ALL');
+          }}
+          className={`flex items-center justify-between rounded-xl border p-2.5 text-left transition hover:shadow-xs active:scale-[0.99] ${
+            activeTab === 'courses'
+              ? 'border-sky-500/80 bg-sky-50/70 ring-1 ring-sky-500/40 dark:border-sky-700/80 dark:bg-sky-950/30'
+              : 'border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900'
+          }`}
+        >
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                Enrolled Courses
-              </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 transition-transform group-hover:scale-110">
-                <IconBook className="h-5 w-5" />
-              </div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              My Courses
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">
                 {dynamicStats.enrolled_courses_count}
               </span>
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Courses</span>
+              <span className="text-[10px] font-medium text-slate-400">enrolled</span>
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-400">
-            Current academic term
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100/70 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400">
+            <BookOpen className="h-4 w-4" />
           </div>
-        </div>
+        </button>
       </div>
 
-      {/* ── Main Tab Navigation ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
-        <div className="flex gap-6">
+      {/* ── Unified Compact Control Bar ────────────────────────────────────── */}
+      <div className="flex flex-col gap-2 rounded-xl border border-slate-200/90 bg-white p-2 shadow-xs dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
+        {/* Left: Filter Pills */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0">
           <button
-            onClick={() => setActiveTab('tests')}
-            className={`flex items-center gap-2 border-b-2 pb-3 pt-2 text-sm font-semibold transition-colors ${activeTab === 'tests'
-              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
+            type="button"
+            onClick={() => {
+              setActiveTab('tests');
+              setStatusFilter('ALL');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+              activeTab === 'tests' && statusFilter === 'ALL'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
           >
-            <IconClipboardText className="h-4 w-4" />
-            Scheduled Tests
-            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${activeTab === 'tests' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}>
-              {resolvedTests.length}
+            <FileText className="h-3.5 w-3.5" />
+            <span>All Tests</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                activeTab === 'tests' && statusFilter === 'ALL'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+              }`}
+            >
+              {dynamicStats.total_tests}
             </span>
           </button>
 
           <button
-            onClick={() => setActiveTab('courses')}
-            className={`flex items-center gap-2 border-b-2 pb-3 pt-2 text-sm font-semibold transition-colors ${activeTab === 'courses'
-              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
+            type="button"
+            onClick={() => {
+              setActiveTab('tests');
+              setStatusFilter('LIVE');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+              activeTab === 'tests' && statusFilter === 'LIVE'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
           >
-            <IconBook className="h-4 w-4" />
-            My Enrolled Courses
-            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${activeTab === 'courses' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}>
-              {enrolledCourses.length}
+            <Zap className="h-3.5 w-3.5" />
+            <span>Live Now</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                activeTab === 'tests' && statusFilter === 'LIVE'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+              }`}
+            >
+              {dynamicStats.live_tests}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('tests');
+              setStatusFilter('UPCOMING');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+              activeTab === 'tests' && statusFilter === 'UPCOMING'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            <span>Upcoming</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                activeTab === 'tests' && statusFilter === 'UPCOMING'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+              }`}
+            >
+              {dynamicStats.upcoming_tests}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('tests');
+              setStatusFilter('COMPLETED');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+              activeTab === 'tests' && statusFilter === 'COMPLETED'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Completed</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                activeTab === 'tests' && statusFilter === 'COMPLETED'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300'
+              }`}
+            >
+              {dynamicStats.completed_tests}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('courses');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+              activeTab === 'courses'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>Courses</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                activeTab === 'courses'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+              }`}
+            >
+              {dynamicStats.enrolled_courses_count}
             </span>
           </button>
         </div>
+
+        {/* Right: Course Filter & Search */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {activeTab === 'tests' && (
+            <div className="flex items-center gap-1">
+              <Filter className="h-3.5 w-3.5 text-slate-400" />
+              <select
+                aria-label="Filter by course"
+                value={selectedCourseFilter}
+                onChange={(e) => setSelectedCourseFilter(e.target.value)}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="ALL">All Courses ({enrolledCourses.length})</option>
+                {enrolledCourses.map((c) => (
+                  <option key={c.course_id} value={String(c.course_id)}>
+                    {c.course_code} - {c.course_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Search Box */}
+          <div className="relative flex-1 sm:w-56 sm:flex-initial">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={activeTab === 'tests' ? 'Search tests, topics...' : 'Search courses...'}
+              className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-7 text-xs text-slate-800 placeholder-slate-400 shadow-2xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              <X className="h-3 w-3" />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Tab Content: Scheduled Tests ──────────────────────────────────── */}
+      {/* ── Content View: Tests Grid ───────────────────────────────────────── */}
       {activeTab === 'tests' && (
-        <div className="space-y-6">
-          {/* Filter & Search Toolbar */}
-          <div className="flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm border border-gray-200 dark:bg-gray-900 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
-            {/* Status Tabs */}
-            <div className="flex flex-wrap items-center gap-2">
-              {(
-                [
-                  { key: 'ALL', label: 'All Tests' },
-                  { key: 'LIVE', label: 'Live Now' },
-                  { key: 'UPCOMING', label: 'Upcoming' },
-                  { key: 'COMPLETED', label: 'Completed' },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setStatusFilter(tab.key)}
-                  className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-all ${statusFilter === tab.key
-                    ? 'bg-blue-600 text-white shadow-md dark:bg-blue-500'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                    }`}
-                >
-                  {tab.label}
-                  {tab.key === 'LIVE' && dynamicStats.live_tests > 0 && (
-                    <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Course Dropdown & Search Input */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {enrolledCourses.length > 0 && (
-                <select
-                  value={selectedCourseFilter}
-                  onChange={(e) => setSelectedCourseFilter(e.target.value)}
-                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                >
-                  <option value="ALL">All Courses</option>
-                  {enrolledCourses.map((c) => (
-                    <option key={c.course_id} value={String(c.course_id)}>
-                      {c.course_code} - {c.course_name}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <div className="relative min-w-[260px]">
-                <input
-                  type="text"
-                  placeholder="Search tests, topics, courses..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 bg-white py-2 pl-10 pr-4 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-                <IconSearch className="absolute left-3.5 top-2.5 h-4 w-4 text-gray-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Tests List */}
-          {loading ? (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-60 animate-pulse rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-800/50"
-                ></div>
-              ))}
+        <>
+          {loading && scheduledTests.length === 0 ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white dark:border-slate-800 dark:bg-slate-900">
+              <RefreshCw className="h-6 w-6 animate-spin text-indigo-500" />
+              <span className="mt-2 text-xs font-medium text-slate-500">Loading your assessments...</span>
             </div>
           ) : filteredTests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                <IconClipboardText className="h-8 w-8" />
-              </div>
-              <h3 className="mt-4 text-base font-bold text-gray-900 dark:text-white">
-                No Tests Scheduled At This Time
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+              <AlertCircle className="h-8 w-8 text-slate-400" />
+              <h3 className="mt-2 text-sm font-bold text-slate-800 dark:text-slate-200">
+                No assessments found
               </h3>
-              <p className="mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
-                {searchQuery || statusFilter !== 'ALL' || selectedCourseFilter !== 'ALL'
-                  ? 'No scheduled examinations match your current filters. Try resetting search filters.'
-                  : 'Your course instructors will schedule examinations and online assessments here. Check back periodically for updates.'}
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+                {hasActiveFilters
+                  ? 'No tests match your current filter and search criteria. Try resetting filters.'
+                  : 'You do not have any scheduled continuous assessments or MCQ exams right now.'}
               </p>
-              {(searchQuery || statusFilter !== 'ALL' || selectedCourseFilter !== 'ALL') && (
+              {hasActiveFilters && (
                 <button
-                  onClick={() => {
-                    setStatusFilter('ALL');
-                    setSelectedCourseFilter('ALL');
-                    setSearchQuery('');
-                  }}
-                  className="mt-6 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="mt-3 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700"
                 >
-                  Clear All Filters
+                  Clear Filters
                 </button>
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filteredTests.map((test) => {
                 const isLive = test.status === 'Live';
-                const isCompleted = test.status === 'Completed' || (test.raw_status || '').toLowerCase() === 'completed';
-                const isCancelled = test.status === 'Cancelled' || (test.raw_status || '').toLowerCase() === 'cancelled' || (test.raw_status || '').toLowerCase() === 'canceled';
+                const isUpcoming = test.status === 'Upcoming';
+                const isCompleted = test.status === 'Completed';
+                const isCancelled = test.status === 'Cancelled';
 
                 return (
                   <div
                     key={test.id}
-                    className={`group relative flex flex-col justify-between h-full overflow-hidden rounded-2xl border bg-white p-6 shadow-sm transition-all hover:shadow-lg dark:bg-gray-900 ${isLive
-                      ? 'border-emerald-300 ring-2 ring-emerald-500/20 dark:border-emerald-700'
-                      : 'border-gray-200 dark:border-gray-800'
-                      }`}
+                    className={`group flex flex-col justify-between rounded-xl border bg-white p-3.5 shadow-2xs transition-all hover:shadow-xs dark:bg-slate-900 ${
+                      isLive
+                        ? 'border-emerald-500/80 ring-1 ring-emerald-500/30'
+                        : 'border-slate-200/90 dark:border-slate-800'
+                    }`}
                   >
-                    <div className="flex-1 flex flex-col">
-                      {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                    <div>
+                      {/* Top Row: Course Code + Status Pill */}
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           {test.course_code || 'COURSE'}
                         </span>
 
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                            {test.test_type}
+                        {isLive && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Now
                           </span>
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${isLive
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
-                              : isCompleted
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
-                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
-                              }`}
-                          >
-                            {isLive && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                            )}
-                            {test.status}
+                        )}
+                        {isUpcoming && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                            <Calendar className="h-2.5 w-2.5" />
+                            Upcoming
                           </span>
-                        </div>
+                        )}
+                        {isCompleted && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                            Completed
+                          </span>
+                        )}
+                        {isCancelled && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                            Cancelled
+                          </span>
+                        )}
                       </div>
 
-                      {/* Title & Description with balanced height */}
-                      <div className="mt-4 mb-2">
-                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors dark:text-white dark:group-hover:text-blue-400 line-clamp-2 min-h-[3.25rem]">
+                      {/* Title & Course Name */}
+                      <div className="mt-2">
+                        <h3 className="line-clamp-1 text-sm font-bold text-slate-900 group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400">
                           {test.title}
                         </h3>
-                        <p className="mt-1 text-sm text-gray-500 line-clamp-1 dark:text-gray-400">
+                        <p className="mt-0.5 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
                           {test.course_name}
                         </p>
                       </div>
 
-                      {/* Optional Viva & Passcode Badges */}
-                      <div className="space-y-2 mt-auto pt-3">
-                        {test.have_viva && (
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-3 py-2 rounded-lg">
-                            <IconAward className="h-4 w-4 shrink-0" />
-                            <span>Includes AI Viva Voce Assessment</span>
-                          </div>
-                        )}
-
-                        {test.secure_code && (
-                          <div className="flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-2 border border-indigo-100 text-xs dark:bg-indigo-900/30 dark:border-indigo-800/50">
-                            <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">Passcode:</span>
-                            <span className="font-mono font-bold tracking-widest text-indigo-900 dark:text-indigo-100 bg-white dark:bg-indigo-950 px-2 py-0.5 rounded">{test.secure_code}</span>
-                          </div>
-                        )}
+                      {/* Type and Meta tags */}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          {test.test_type}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          <Clock className="h-3 w-3 text-slate-400" />
+                          {test.duration_minutes}m
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          <Award className="h-3 w-3 text-slate-400" />
+                          {test.total_marks} Marks
+                        </span>
                       </div>
 
-                      {/* Meta Grid */}
-                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 text-xs dark:bg-gray-800/60">
-                        <div className="col-span-2">
-                          <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Test Window</span>
-                          <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {(() => {
-                              if (test.test_window_start && test.test_window_end) {
-                                try {
-                                  const ws = new Date(test.test_window_start);
-                                  const we = new Date(test.test_window_end);
-                                  if (!isNaN(ws.getTime()) && !isNaN(we.getTime())) {
-                                    const dateStr = ws.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                                    const startStr = ws.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-                                    const endStr = we.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-                                    return `${dateStr}  ${startStr} – ${endStr}`;
-                                  }
-                                } catch { }
-                              }
-                              return test.test_date ? `${test.test_date}${test.start_time ? '  ' + test.start_time : ''}` : 'TBA';
-                            })()}
+                      {/* Timing schedule strip */}
+                      <div className="mt-2.5 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 dark:text-slate-500">Date:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {test.test_date || 'TBA'}
                           </span>
                         </div>
-                        <div>
-                          <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Duration</span>
-                          <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {(() => {
-                              const num = Number(test.duration_minutes);
-                              if (!num) return 'TBA';
-                              if (num >= 60) {
-                                const hrs = Math.floor(num / 60);
-                                const mins = num % 60;
-                                return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-                              }
-                              return `${num} Mins`;
-                            })()}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] uppercase font-semibold text-gray-400 mb-0.5">Total Marks</span>
-                          <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {test.total_marks ? `${test.total_marks} Marks` : 'N/A'}
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-slate-400 dark:text-slate-500">Window:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {test.start_time || 'TBA'} - {test.end_time || 'TBA'}
                           </span>
                         </div>
                       </div>
+
+                      {/* Topics pills if present */}
+                      {test.topics && test.topics.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1">
+                          {test.topics.slice(0, 2).map((topic, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-block max-w-[130px] truncate rounded-sm bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+                            >
+                              #{topic}
+                            </span>
+                          ))}
+                          {test.topics.length > 2 && (
+                            <span className="text-[10px] text-slate-400">
+                              +{test.topics.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="mt-5 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                    {/* Bottom Action Footer */}
+                    <div className="mt-3.5 flex items-center gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
                       <button
+                        type="button"
                         onClick={() => setSelectedTest(test)}
-                        className="flex-1 h-10 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 cursor-pointer"
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                       >
-                        Details
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>Details</span>
                       </button>
 
-                      {isCancelled ? (
-                        <div className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 select-none">
-                          Cancelled
-                        </div>
-                      ) : isCompleted ? (
+                      {isLive && (
                         <button
-                          onClick={() => router.push(`/neurobe/student-report?test_id=${test.raw_id}&student_email=${encodeURIComponent(student?.email || '')}`)}
-                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] cursor-pointer"
-                        >
-                          View Results →
-                        </button>
-                      ) : isLive ? (
-                        <button
+                          type="button"
                           onClick={() => handleStartTest(test)}
-                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow active:scale-[0.98] cursor-pointer"
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95"
                         >
-                          Start Test Now
+                          <Zap className="h-3.5 w-3.5" />
+                          <span>Start Test</span>
                         </button>
-                      ) : test.source === 'online_mcq' ? (
+                      )}
+
+                      {isUpcoming && test.source === 'online_mcq' && (
                         <button
+                          type="button"
                           onClick={() => handleStartTest(test)}
-                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow active:scale-[0.98] cursor-pointer"
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-600 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95"
                         >
-                          Join Screen →
+                          <span>Join Screen</span>
+                          <ArrowRight className="h-3 w-3" />
                         </button>
-                      ) : (
+                      )}
+
+                      {isCompleted && (
                         <button
-                          onClick={() => setSelectedTest(test)}
-                          className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-blue-50 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 cursor-pointer"
+                          type="button"
+                          onClick={() => handleViewReport(test)}
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-purple-600 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-purple-700 active:scale-95"
                         >
-                          Upcoming
+                          <span>View Result</span>
+                          <ArrowRight className="h-3 w-3" />
                         </button>
                       )}
                     </div>
@@ -714,141 +856,180 @@ const StudentDashboard = () => {
               })}
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* ── Tab Content: Enrolled Courses ─────────────────────────────────── */}
+      {/* ── Content View: Courses Grid ──────────────────────────────────────── */}
       {activeTab === 'courses' && (
-        <div className="space-y-4">
-          {enrolledCourses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-16 text-center dark:border-gray-800 dark:bg-gray-900">
-              <IconBook className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-base font-bold text-gray-900 dark:text-white">
-                No Enrolled Courses Found
+        <>
+          {filteredCourses.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+              <BookOpen className="h-8 w-8 text-slate-400" />
+              <h3 className="mt-2 text-sm font-bold text-slate-800 dark:text-slate-200">
+                No courses found
               </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                You have not been assigned to any Classrooms yet.
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {searchQuery
+                  ? 'No enrolled courses match your search query.'
+                  : 'You are not enrolled in any active courses.'}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {enrolledCourses.map((c) => (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredCourses.map((c) => (
                 <div
                   key={c.course_id}
-                  className="group flex flex-col justify-between h-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+                  className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-slate-900"
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
                         {c.course_code}
                       </span>
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50">
-                        {c.enrollment_status || 'Active'}
-                      </span>
+                      {c.credits !== undefined && (
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          {c.credits} Credits
+                        </span>
+                      )}
                     </div>
 
-                    <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-2 min-h-[3rem]">
+                    <h3 className="mt-2 line-clamp-2 text-sm font-bold text-slate-900 dark:text-white">
                       {c.course_name}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5 line-clamp-1">
-                      Classroom: {c.instance_name || 'Standard Curriculum'}
-                    </p>
+
+                    {c.instance_name && (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Instance: <span className="font-medium text-slate-700 dark:text-slate-300">{c.instance_name}</span>
+                      </p>
+                    )}
+
+                    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      {c.semester && <span>Semester {c.semester}</span>}
+                      {c.enrollment_status && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          {c.enrollment_status}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="mt-auto pt-5 flex items-center justify-between border-t border-gray-100 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                    <span className="font-medium text-gray-600 dark:text-gray-300">Semester {c.semester || 1}</span>
-                    <span className="font-semibold text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 px-3 py-1 rounded-lg">
-                      {c.credits || 3} Credits
-                    </span>
+                  <div className="mt-3.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCourseFilter(String(c.course_id));
+                        setActiveTab('tests');
+                        setStatusFilter('ALL');
+                      }}
+                      className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      <Layers className="h-3 w-3" />
+                      <span>View Course Tests</span>
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* ── Test Details Modal ────────────────────────────────────────────── */}
+      {/* ── Test Details Modal ──────────────────────────────────────────────── */}
       {selectedTest && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm transition-opacity">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transform transition-all">
-            <button
-              onClick={() => setSelectedTest(null)}
-              className="absolute right-5 top-5 rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors"
-            >
-              <IconX className="h-5 w-5" />
-            </button>
-
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                <IconClipboardText className="h-6 w-6" />
-              </div>
-              <div className="pt-1 pr-8">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <div>
+                <span className="inline-block rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                  {selectedTest.course_code}
+                </span>
+                <h3 className="mt-1 text-base font-bold text-slate-900 dark:text-white">
                   {selectedTest.title}
                 </h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {selectedTest.course_code} - {selectedTest.course_name}
-                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTest(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <div className="mt-6 space-y-4">
-              <div className="rounded-2xl bg-gray-50 p-5 dark:bg-gray-800/50">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
-                  Examination Details
-                </h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="block text-gray-500 dark:text-gray-400">Type</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedTest.test_type}</span>
-                  </div>
-                  <div>
-                    <span className="block text-gray-500 dark:text-gray-400">Status</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedTest.status}</span>
-                  </div>
-                  <div>
-                    <span className="block text-gray-500 dark:text-gray-400">Date</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedTest.test_date || 'TBA'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-gray-500 dark:text-gray-400">Time</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedTest.start_time || 'TBA'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-gray-500 dark:text-gray-400">Duration</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedTest.duration_minutes} Mins</span>
-                  </div>
-                  <div>
-                    <span className="block text-gray-500 dark:text-gray-400">Total Marks</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedTest.total_marks} Marks</span>
-                  </div>
+            <div className="mt-3 space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                <div>
+                  <span className="text-slate-400">Course</span>
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedTest.course_name}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Test Type</span>
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedTest.test_type}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Date & Window</span>
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedTest.test_date || 'TBA'} ({selectedTest.start_time || 'TBA'} - {selectedTest.end_time || 'TBA'})
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Duration & Marks</span>
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedTest.duration_minutes} Mins • {selectedTest.total_marks} Marks
+                  </p>
                 </div>
               </div>
 
               {selectedTest.description && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Instructions</h4>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 bg-white border border-gray-100 rounded-xl p-3 dark:bg-gray-900 dark:border-gray-800">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Instructions:</span>
+                  <p className="mt-1 rounded-lg border border-slate-200 bg-white p-2.5 text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
                     {selectedTest.description}
                   </p>
                 </div>
               )}
+
+              {selectedTest.topics && selectedTest.topics.length > 0 && (
+                <div>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Syllabus / Topics:</span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {selectedTest.topics.map((t, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="mt-8 flex justify-end gap-3">
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
               <button
+                type="button"
                 onClick={() => setSelectedTest(null)}
-                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               >
                 Close
               </button>
               {selectedTest.status === 'Live' && (
                 <button
-                  onClick={() => handleStartTest(selectedTest)}
-                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-emerald-700 transition-colors"
+                  type="button"
+                  onClick={() => {
+                    const testToStart = selectedTest;
+                    setSelectedTest(null);
+                    handleStartTest(testToStart);
+                  }}
+                  className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700"
                 >
-                  Start Exam Now
+                  Start Assessment Now
                 </button>
               )}
             </div>
@@ -856,105 +1037,100 @@ const StudentDashboard = () => {
         </div>
       )}
 
-      {/* Completion Report Modal (When returned from test without viva) */}
+      {/* ── Completion Report Modal ─────────────────────────────────────────── */}
       {completionReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900 border border-emerald-100 dark:border-emerald-950/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-5 shadow-2xl dark:border-emerald-950/60 dark:bg-slate-900">
             <div className="flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 mb-4 shadow-sm">
-                <IconCircleCheck className="h-10 w-10" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/80 dark:text-emerald-400">
+                <CheckCircle2 className="h-7 w-7" />
               </div>
-              <span className="text-xs font-bold tracking-wider text-emerald-600 uppercase bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-200/50 dark:border-emerald-800/40">
+              <span className="mt-2.5 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                 Assessment Submitted
               </span>
-              <h3 className="mt-3 text-xl font-bold text-gray-900 dark:text-white">
+              <h3 className="mt-1 text-base font-bold text-slate-900 dark:text-white">
                 {completionReport.title}
               </h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Your responses have been successfully submitted and recorded.
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Your test submission has been recorded successfully.
               </p>
             </div>
 
-            {/* Score summary */}
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/30 p-4 text-center">
-                <span className="block text-[10px] uppercase font-bold tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Correct</span>
-                <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
-                  {completionReport.correct}
-                  <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-500"> / {completionReport.total}</span>
+            {/* Score Grid */}
+            <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  Correct
                 </span>
+                <p className="mt-0.5 text-lg font-black text-emerald-700 dark:text-emerald-300">
+                  {completionReport.correct}{' '}
+                  <span className="text-xs font-medium text-emerald-600/70">/ {completionReport.total}</span>
+                </p>
               </div>
-              <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-4 text-center">
-                <span className="block text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">Score</span>
-                <span className={`text-2xl font-black ${
-                  Number(completionReport.total) > 0
-                    ? Math.round((Number(completionReport.correct) / Number(completionReport.total)) * 100) >= 40
-                      ? 'text-emerald-700 dark:text-emerald-300'
-                      : 'text-red-600 dark:text-red-400'
-                    : 'text-gray-500'
-                }`}>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Score %
+                </span>
+                <p
+                  className={`mt-0.5 text-lg font-black ${
+                    Number(completionReport.total) > 0
+                      ? Math.round((Number(completionReport.correct) / Number(completionReport.total)) * 100) >= 40
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-rose-600 dark:text-rose-400'
+                      : 'text-slate-500'
+                  }`}
+                >
                   {Number(completionReport.total) > 0
                     ? `${Math.round((Number(completionReport.correct) / Number(completionReport.total)) * 100)}%`
                     : '—'}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Time Taken
                 </span>
+                <p className="mt-0.5 text-sm font-bold text-slate-800 dark:text-slate-200">
+                  {completionReport.time}
+                </p>
               </div>
-              <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-800/30 p-4 text-center">
-                <span className="block text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-400 mb-1">Unanswered</span>
-                <span className="text-2xl font-black text-amber-700 dark:text-amber-300">
-                  {Math.max(0, Number(completionReport.total) - Number(completionReport.answered))}
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Tab Switches
                 </span>
-              </div>
-              <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/30 p-4 text-center">
-                <span className="block text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Incorrect</span>
-                <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">
-                  {Math.max(0, Number(completionReport.answered) - Number(completionReport.correct))}
-                </span>
-              </div>
-            </div>
-            {/* Time + Tab Switches row */}
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-4 text-center">
-                <span className="block text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">Time Taken</span>
-                <span className="text-lg font-black text-gray-700 dark:text-gray-200">{completionReport.time}</span>
-              </div>
-              <div className="rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/30 p-4 text-center">
-                <span className="block text-[10px] uppercase font-bold tracking-wider text-rose-600 dark:text-rose-400 mb-1">Tab Switches</span>
-                <span className={`text-2xl font-black ${
-                  Number(completionReport.switches) === 0
-                    ? 'text-emerald-700 dark:text-emerald-300'
-                    : Number(completionReport.switches) >= 2
-                      ? 'text-red-600 dark:text-red-400'
+                <p
+                  className={`mt-0.5 text-lg font-black ${
+                    Number(completionReport.switches) === 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
                       : 'text-amber-600 dark:text-amber-400'
-                }`}>
+                  }`}
+                >
                   {completionReport.switches}
-                </span>
+                </p>
               </div>
             </div>
 
-            {/* Detailed results locked notice */}
-            <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/30 p-3 text-xs text-indigo-700 dark:text-indigo-300">
-              <IconEye className="h-4 w-4 mt-0.5 shrink-0 text-indigo-500" />
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-indigo-50 p-2.5 text-[11px] text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+              <Eye className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Detailed question-level results (which questions were correct) will be available after the test window closes.
-                You can access them via the <strong>View Results</strong> button on your dashboard.
+                Detailed question-level results will be available once the test window closes.
               </span>
             </div>
 
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setCompletionReport(null)}
-                className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md hover:bg-emerald-700 transition-colors"
-              >
-                Back to Dashboard
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setCompletionReport(null)}
+              className="mt-4 w-full rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700"
+            >
+              Back to Dashboard
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 };
-
 
 export default PrivateRouter(StudentDashboard);
