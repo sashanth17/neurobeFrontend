@@ -1,283 +1,157 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { setPageTitle } from "@/store/themeConfigSlice";
-import {
-  academicAdminService,
-  AcademicFiltersResponse,
-  AcademicKpiSummary,
-  BloomDistributionResponse,
-  PassPercentagesResponse,
-  DepartmentBloomComparisonResponse,
-  CoursesMatrixResponse,
-  McqAnalyticsResponse,
-  MOCK_FILTERS,
-  MOCK_KPI_SUMMARY,
-  MOCK_BLOOM_DISTRIBUTION,
-  MOCK_PASS_PERCENTAGES,
-  MOCK_DEPARTMENT_BLOOM_COMPARISON,
-  MOCK_COURSES_BY_DEPT,
-  MOCK_MCQ_ANALYTICS_BY_DEPT,
-} from "@/services/academicAdminAnalytics.service";
-import AcademicAdminHeader from "@/components/academic-admin/AcademicAdminHeader";
-import CollegeOverviewView from "@/components/academic-admin/CollegeOverviewView";
-import DepartmentDrilldownView from "@/components/academic-admin/DepartmentDrilldownView";
-import CourseMcqPerformanceView from "@/components/academic-admin/CourseMcqPerformanceView";
+import TeachingLearningEffectivenessView from "@/components/academic-admin/TeachingLearningEffectivenessView";
+import AcademicAdminAttainmentView from "@/components/academic-admin/AcademicAdminAttainmentView";
+
+type AcademicTab = "mcq" | "cia" | "attainment";
 
 const AcademicAdminPage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  // Navigation State
-  const [level, setLevel] = useState<1 | 2 | 3>(1);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number>(1);
-  const [selectedDepartmentName, setSelectedDepartmentName] = useState<string>("Computer Science and Engineering");
+  // Active tab state: "mcq" | "cia" | "attainment"
+  const [activeTab, setActiveTab] = useState<AcademicTab>("cia");
 
-  // Filters State
-  const [filters, setFilters] = useState<AcademicFiltersResponse>(MOCK_FILTERS);
-  const [selectedYear, setSelectedYear] = useState<string>("2025-2026");
-  const [selectedScope, setSelectedScope] = useState<string>("COMBINED");
-  const [selectedDepartmentIdsForLevel2, setSelectedDepartmentIdsForLevel2] = useState<number[]>([]);
+  // Cross-tab drilldown hints
+  const [attainmentDept, setAttainmentDept] = useState<string>("CSE");
+  const [attainmentCourse, setAttainmentCourse] = useState<string | undefined>(undefined);
 
-  // Analytics Data State
-  const [kpiSummary, setKpiSummary] = useState<AcademicKpiSummary>(MOCK_KPI_SUMMARY);
-  const [bloomDistribution, setBloomDistribution] = useState<BloomDistributionResponse>(MOCK_BLOOM_DISTRIBUTION);
-  const [passPercentages, setPassPercentages] = useState<PassPercentagesResponse>(MOCK_PASS_PERCENTAGES);
-  const [deptBloomComparison, setDeptBloomComparison] = useState<DepartmentBloomComparisonResponse>(MOCK_DEPARTMENT_BLOOM_COMPARISON);
-  const [coursesData, setCoursesData] = useState<CoursesMatrixResponse>(MOCK_COURSES_BY_DEPT[1]);
-  const [mcqData, setMcqData] = useState<McqAnalyticsResponse>(MOCK_MCQ_ANALYTICS_BY_DEPT[1]);
-
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Sync title
+  // Set page title
   useEffect(() => {
-    dispatch(setPageTitle("Academic Administrator Analytics"));
+    dispatch(setPageTitle("Academic Administrator Dashboard | Neurobe"));
   }, [dispatch]);
 
-  // Load initial filters
-  useEffect(() => {
-    const loadFilters = async () => {
-      const data = await academicAdminService.getFilters();
-      setFilters(data);
-      const latest = data.academic_years.find((y) => y.is_latest)?.year || data.academic_years[0]?.year;
-      if (latest && !router.query.year) {
-        setSelectedYear(latest);
-      }
-    };
-    loadFilters();
-  }, [router.query.year]);
-
-  // Sync state from URL query parameters
+  // Synchronize active tab from URL query
   useEffect(() => {
     if (!router.isReady) return;
-
-    const queryLevel = Number(router.query.level);
-    if (queryLevel === 1 || queryLevel === 2 || queryLevel === 3) {
-      setLevel(queryLevel);
+    const tabParam = router.query.tab as string;
+    if (tabParam === "mcq" || tabParam === "cia" || tabParam === "attainment") {
+      setActiveTab(tabParam);
     }
+  }, [router.isReady, router.query.tab]);
 
-    if (router.query.dept) {
-      const deptId = Number(router.query.dept);
-      if (!isNaN(deptId)) {
-        setSelectedDepartmentId(deptId);
-        const match = filters.departments.find((d) => d.id === deptId);
-        if (match) setSelectedDepartmentName(match.name);
-      }
-    }
-
-    if (router.query.year && typeof router.query.year === "string") {
-      setSelectedYear(router.query.year);
-    }
-
-    if (router.query.scope && typeof router.query.scope === "string") {
-      setSelectedScope(router.query.scope);
-    }
-  }, [router.isReady, router.query, filters.departments]);
-
-  // Fetch Level 1 data
-  const loadLevel1Data = useCallback(async (year: string) => {
-    setIsLoading(true);
-    try {
-      const [kpi, bloom, passes] = await Promise.all([
-        academicAdminService.getKpiSummary(1, year),
-        academicAdminService.getBloomDistribution(1, year),
-        academicAdminService.getPassPercentages(1, year),
-      ]);
-      setKpiSummary(kpi);
-      setBloomDistribution(bloom);
-      setPassPercentages(passes);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Fetch Level 2 data
-  const loadLevel2Data = useCallback(async (year: string, deptIds?: number[], scope = "COMBINED") => {
-    setIsLoading(true);
-    try {
-      const data = await academicAdminService.getDepartmentBloomComparison(1, year, deptIds, scope);
-      setDeptBloomComparison(data);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Fetch Level 3 data
-  const loadLevel3Data = useCallback(async (deptId: number, year: string) => {
-    setIsLoading(true);
-    try {
-      const [courses, mcq] = await Promise.all([
-        academicAdminService.getCoursesMatrix(deptId, year),
-        academicAdminService.getMcqAnalytics(deptId, year),
-      ]);
-      setCoursesData(courses);
-      setMcqData(mcq);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Trigger loads based on active level and filters
-  useEffect(() => {
-    if (level === 1) {
-      loadLevel1Data(selectedYear);
-    } else if (level === 2) {
-      loadLevel2Data(selectedYear, selectedDepartmentIdsForLevel2, selectedScope);
-    } else if (level === 3) {
-      loadLevel3Data(selectedDepartmentId, selectedYear);
-    }
-  }, [
-    level,
-    selectedYear,
-    selectedScope,
-    selectedDepartmentIdsForLevel2,
-    selectedDepartmentId,
-    loadLevel1Data,
-    loadLevel2Data,
-    loadLevel3Data,
-  ]);
-
-  // Navigate level handler with URL sync
-  const handleNavigateLevel = (targetLevel: 1 | 2 | 3, deptId?: number) => {
-    setLevel(targetLevel);
-    const query: Record<string, any> = {
-      level: targetLevel,
-      year: selectedYear,
-    };
-
-    if (deptId !== undefined) {
-      setSelectedDepartmentId(deptId);
-      query.dept = deptId;
-      const deptMatch = filters.departments.find((d) => d.id === deptId);
-      if (deptMatch) setSelectedDepartmentName(deptMatch.name);
-    }
-
-    if (selectedScope) {
-      query.scope = selectedScope;
-    }
-
-    router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
+  // Handle Tab Switch
+  const handleTabChange = (newTab: AcademicTab) => {
+    setActiveTab(newTab);
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: newTab },
+      },
+      undefined,
+      { shallow: true }
+    );
   };
 
-  // Level 1 -> Level 2 transition
-  const handleDrilldownToLevel2 = (options?: { departmentId?: number; focus?: "bloom" | "exams" }) => {
-    if (options?.departmentId) {
-      setSelectedDepartmentIdsForLevel2([options.departmentId]);
-    } else {
-      setSelectedDepartmentIdsForLevel2([]);
-    }
-    handleNavigateLevel(2);
-  };
-
-  // Level 1 or 2 -> Level 3 transition
-  const handleDrilldownToLevel3 = (deptId: number, deptName: string) => {
-    setSelectedDepartmentId(deptId);
-    setSelectedDepartmentName(deptName);
-    handleNavigateLevel(3, deptId);
-  };
-
-  // Toggle department chip in Level 2
-  const handleToggleDepartment = (deptId: number) => {
-    setSelectedDepartmentIdsForLevel2((prev) => {
-      if (prev.includes(deptId)) {
-        return prev.filter((id) => id !== deptId);
-      } else {
-        return [...prev, deptId];
-      }
-    });
+  // Callback from Teaching-Learning to jump to Attainment for a specific department/course
+  const handleDrilldownToAttainment = (deptCode: string, courseCode?: string) => {
+    setAttainmentDept(deptCode);
+    setAttainmentCourse(courseCode);
+    handleTabChange("attainment");
   };
 
   return (
     <>
       <Head>
-        <title>Academic Administrator Analytics | Neurobe</title>
+        <title>Academic Administrator Dashboard | Neurobe</title>
       </Head>
 
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        {/* Top Header & Breadcrumbs & Global Filters */}
-        <AcademicAdminHeader
-          level={level}
-          onNavigateLevel={handleNavigateLevel}
-          selectedDepartmentName={selectedDepartmentName}
-          selectedDepartmentId={selectedDepartmentId}
-          academicYears={filters.academic_years}
-          selectedYear={selectedYear}
-          onYearChange={(year) => {
-            setSelectedYear(year);
-            router.push(
-              { pathname: router.pathname, query: { ...router.query, year } },
-              undefined,
-              { shallow: true }
-            );
-          }}
-          examScopes={filters.exam_scopes}
-          selectedScope={selectedScope}
-          onScopeChange={(scope) => {
-            setSelectedScope(scope);
-            router.push(
-              { pathname: router.pathname, query: { ...router.query, scope } },
-              undefined,
-              { shallow: true }
-            );
-          }}
-          onRefresh={() => {
-            if (level === 1) loadLevel1Data(selectedYear);
-            else if (level === 2) loadLevel2Data(selectedYear, selectedDepartmentIdsForLevel2, selectedScope);
-            else if (level === 3) loadLevel3Data(selectedDepartmentId, selectedYear);
-          }}
-          isLoading={isLoading}
-        />
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        {/* ── Top Navigation Bar: 3 Main Buttons ── */}
+        <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-primary block">
+              Academic Administrator Workspace
+            </span>
+            <h1 className="text-xl lg:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight mt-0.5">
+              {activeTab === "mcq" && "MCQ Teaching Learning Effectiveness"}
+              {activeTab === "cia" && "CIA Teaching Learning Effectiveness"}
+              {activeTab === "attainment" && "CO-PO Attainment Analysis"}
+            </h1>
+          </div>
 
-        {/* Level Views with Animated Transitions */}
+          {/* 3 Nav Buttons */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 flex-wrap gap-1">
+            {/* 1. MCQ Teaching Learning Effectiveness */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("mcq")}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm ${
+                activeTab === "mcq"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-md scale-105"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15l2 2 4-4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 2v4M21 4h-4" />
+              </svg>
+              <span>MCQ Teaching Learning Effectiveness</span>
+            </button>
+
+            {/* 2. CIA Teaching Learning Effectiveness */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("cia")}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm ${
+                activeTab === "cia"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-md scale-105"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 20V10M12 20V4M6 20v-6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 20h18" />
+              </svg>
+              <span>CIA Teaching Learning Effectiveness</span>
+            </button>
+
+            {/* 3. Attainment */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("attainment")}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm ${
+                activeTab === "attainment"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-md scale-105"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15l-2 5l9-11h-7l2-5l-9 11h7z" />
+              </svg>
+              <span>Attainment</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Active View Rendering ── */}
         <div className="transition-opacity duration-300">
-          {level === 1 && (
-            <CollegeOverviewView
-              kpi={kpiSummary}
-              bloom={bloomDistribution}
-              passPercentages={passPercentages}
-              onDrilldownToLevel2={handleDrilldownToLevel2}
-              onDrilldownToLevel3={handleDrilldownToLevel3}
+          {activeTab === "mcq" && (
+            <TeachingLearningEffectivenessView
+              key="mcq-view"
+              type="mcq"
+              onDrilldownToAttainment={handleDrilldownToAttainment}
             />
           )}
 
-          {level === 2 && (
-            <DepartmentDrilldownView
-              data={deptBloomComparison}
-              allDepartments={filters.departments}
-              selectedDepartmentIds={selectedDepartmentIdsForLevel2}
-              onToggleDepartment={handleToggleDepartment}
-              onSelectAllDepartments={() => setSelectedDepartmentIdsForLevel2([])}
-              onDrilldownToLevel3={handleDrilldownToLevel3}
-              onBackToLevel1={() => handleNavigateLevel(1)}
+          {activeTab === "cia" && (
+            <TeachingLearningEffectivenessView
+              key="cia-view"
+              type="cia"
+              onDrilldownToAttainment={handleDrilldownToAttainment}
             />
           )}
 
-          {level === 3 && (
-            <CourseMcqPerformanceView
-              coursesData={coursesData}
-              mcqData={mcqData}
-              onBackToLevel2={() => handleNavigateLevel(2)}
+          {activeTab === "attainment" && (
+            <AcademicAdminAttainmentView
+              key={`attainment-${attainmentDept}-${attainmentCourse || "all"}`}
+              initialDepartmentCode={attainmentDept}
+              initialCourseCode={attainmentCourse}
             />
           )}
         </div>

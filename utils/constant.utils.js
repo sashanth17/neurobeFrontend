@@ -218,26 +218,26 @@ OwnmenuConfig.STUDENT = [
 OwnmenuConfig.ACADEMIC_ADMIN = [
   {
     type: "heading",
-    label: "EXECUTIVE ANALYTICS",
+    label: "ACADEMIC EFFECTIVENESS",
     className: "pb-2",
   },
   {
     type: "link",
-    icon: "IconMenuDashboard",
-    label: "College Overview",
-    href: "/neurobe/academic-admin",
+    icon: "IconMenuNotes",
+    label: "MCQ Teaching Learning Effectiveness",
+    href: "/neurobe/academic-admin?tab=mcq",
   },
   {
     type: "link",
     icon: "IconMenuCharts",
-    label: "Department Bloom Analytics",
-    href: "/neurobe/academic-admin?level=2",
+    label: "CIA Teaching Learning Effectiveness",
+    href: "/neurobe/academic-admin?tab=cia",
   },
   {
     type: "link",
-    icon: "IconMenuNotes",
-    label: "Courses & MCQ Performance",
-    href: "/neurobe/academic-admin?level=3",
+    icon: "IconMenuDashboard",
+    label: "Attainment",
+    href: "/neurobe/academic-admin?tab=attainment",
   },
 ];
 
