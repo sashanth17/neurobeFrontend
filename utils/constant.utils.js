@@ -18,6 +18,7 @@ export const CAPTCHA_SITE_KEY = "6LeEe9gsAAAAAKddSPmwNUF4J-v7zaz8CgeKZ7n3";
 export const ROLES = {
   SUPER_ADMIN: "Super Admin",
   ERP_ADMIN: "ERP Admin",
+  ACADEMIC_ADMIN: "Academic Administrator",
   COURSE_COORDINATOR: "Course Coordinator",
   COURSE_INSTRUCTOR: "Course Instructor",
   STUDENT: "Student",
@@ -25,6 +26,10 @@ export const ROLES = {
 };
 
 export const DROPDOWN_ROLES = [
+  {
+    value: ROLES.ACADEMIC_ADMIN,
+    label: "Academic Administrator",
+  },
   {
     value: ROLES.ERP_ADMIN,
     label: "ERP Admin",
@@ -214,13 +219,41 @@ OwnmenuConfig.STUDENT = [
   },
 ];
 
+OwnmenuConfig.ACADEMIC_ADMIN = [
+  {
+    type: "heading",
+    label: "EXECUTIVE ANALYTICS",
+    className: "pb-2",
+  },
+  {
+    type: "link",
+    icon: "IconMenuDashboard",
+    label: "College Overview",
+    href: "/neurobe/academic-admin",
+  },
+  {
+    type: "link",
+    icon: "IconMenuCharts",
+    label: "Department Bloom Analytics",
+    href: "/neurobe/academic-admin?level=2",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Courses & MCQ Performance",
+    href: "/neurobe/academic-admin?level=3",
+  },
+];
+
 // Aliases for role lookup consistency
 OwnmenuConfig["ERP Admin"] = OwnmenuConfig.ERP_ADMIN;
+OwnmenuConfig["Academic Administrator"] = OwnmenuConfig.ACADEMIC_ADMIN;
 OwnmenuConfig["Course Coordinator"] = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig["Course Instructor"] = OwnmenuConfig.COURSE_INSTRUCTOR;
 OwnmenuConfig["Faculty"] = OwnmenuConfig.FACULTY;
 OwnmenuConfig["Student"] = OwnmenuConfig.STUDENT;
 OwnmenuConfig["Super Admin"] = OwnmenuConfig.ERP_ADMIN;
+OwnmenuConfig.academic_admin = OwnmenuConfig.ACADEMIC_ADMIN;
 OwnmenuConfig.erp = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig.hr = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig.instructor = OwnmenuConfig.COURSE_INSTRUCTOR;
@@ -234,6 +267,12 @@ export const getMenuByRole = (role) => {
   if (!role) return OwnmenuConfig.ERP_ADMIN;
   const normalized = String(role).trim().toUpperCase().replace(/\s+/g, "_");
 
+  if (
+    normalized === "ACADEMIC_ADMIN" ||
+    normalized === "ACADEMIC_ADMINISTRATOR"
+  ) {
+    return OwnmenuConfig.ACADEMIC_ADMIN;
+  }
   if (
     normalized === "ERP_ADMIN" ||
     normalized === "SUPER_ADMIN" ||
@@ -275,6 +314,13 @@ export const getDefaultRouteByRole = (role) => {
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
+
+  if (
+    normalized === "ACADEMIC_ADMIN" ||
+    normalized === "ACADEMIC_ADMINISTRATOR"
+  ) {
+    return "/neurobe/academic-admin";
+  }
 
   if (normalized === "STUDENT") {
     return "/neurobe/student-dashboard";
