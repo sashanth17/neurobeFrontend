@@ -216,29 +216,29 @@ OwnmenuConfig.STUDENT = [
 ];
 
 OwnmenuConfig.ACADEMIC_ADMIN = [
-  {
-    type: "heading",
-    label: "ACADEMIC EFFECTIVENESS",
-    className: "pb-2",
-  },
-  {
-    type: "link",
-    icon: "IconMenuNotes",
-    label: "MCQ Teaching Learning Effectiveness",
-    href: "/neurobe/academic-admin?tab=mcq",
-  },
-  {
-    type: "link",
-    icon: "IconMenuCharts",
-    label: "CIA Teaching Learning Effectiveness",
-    href: "/neurobe/academic-admin?tab=cia",
-  },
-  {
-    type: "link",
-    icon: "IconMenuDashboard",
-    label: "Attainment",
-    href: "/neurobe/academic-admin?tab=attainment",
-  },
+  // {
+  //   type: "heading",
+  //   label: "ACADEMIC EFFECTIVENESS",
+  //   className: "pb-2",
+  // },
+  // {
+  //   type: "link",
+  //   icon: "IconMenuNotes",
+  //   label: "MCQ Teaching Learning Effectiveness",
+  //   href: "/neurobe/academic-admin?tab=mcq",
+  // },
+  // {
+  //   type: "link",
+  //   icon: "IconMenuCharts",
+  //   label: "CIA Teaching Learning Effectiveness",
+  //   href: "/neurobe/academic-admin?tab=cia",
+  // },
+  // {
+  //   type: "link",
+  //   icon: "IconMenuDashboard",
+  //   label: "Attainment",
+  //   href: "/neurobe/academic-admin?tab=attainment",
+  // },
 ];
 
 // Aliases for role lookup consistency
