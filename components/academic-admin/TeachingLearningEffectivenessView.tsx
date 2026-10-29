@@ -237,7 +237,7 @@ export const TeachingLearningEffectivenessView: React.FC<
     };
   }, [data]);
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="p-12 text-center bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -247,7 +247,7 @@ export const TeachingLearningEffectivenessView: React.FC<
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={loading}>
       {/* -- Top Header / Filters Bar -- */}
       <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-800">
@@ -422,10 +422,11 @@ export const TeachingLearningEffectivenessView: React.FC<
               </span>
             </div>
             <p className="text-[11px] text-gray-400 mb-2">
-              Attainment % across active K-level filters against 50% target.
+              Attainment % across active K-level filters against {targetBenchmark}% target.
             </p>
             <div className="min-h-[250px]">
               <ReactApexChart
+                key={`benchmark-${targetBenchmark}`}
                 options={barOptions}
                 series={barSeries}
                 type="bar"
@@ -435,7 +436,7 @@ export const TeachingLearningEffectivenessView: React.FC<
           </div>
 
           <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500">
-            <span>Red dashed line = Target (50%)</span>
+            <span>Red dashed line = Target ({targetBenchmark}%)</span>
             <span>Active Levels: {activeKLevels.join(", ")}</span>
           </div>
         </div>
