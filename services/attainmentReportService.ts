@@ -1388,7 +1388,7 @@ export const calculatePSOAttainment = (
 
   const entries = copsoMatrix.matrix_entries;
   const coAttainmentMap = new Map<string, number>();
-  weightedCOs.forEach((w) => coAttainmentMap.set(w.co, w.total_attainment));
+  weightedCOs.forEach((w) => coAttainmentMap.set(normalizeCOCode(w.co), w.total_attainment));
 
   const psoGroupMap = new Map<string, { pso_code: string; entries: any[] }>();
   entries.forEach((e: any) => {
@@ -1401,18 +1401,18 @@ export const calculatePSOAttainment = (
 
   const results: POAttainmentResult[] = [];
   const sortedPSOs = Array.from(psoGroupMap.entries()).sort((a, b) => {
-    const numA = parseInt(a[0].replace(/\D/g, "")) || 0;
-    const numB = parseInt(b[0].replace(/\D/g, "")) || 0;
+    const numA = parseInt(a[0].replace(/\D/g, '')) || 0;
+    const numB = parseInt(b[0].replace(/\D/g, '')) || 0;
     return numA - numB;
   });
 
   sortedPSOs.forEach(([psoKey, group]) => {
-    const contributing: POAttainmentResult["contributing_cos"] = [];
+    const contributing: POAttainmentResult['contributing_cos'] = [];
     let weightedSum = 0;
     let totalWeight = 0;
 
     group.entries.forEach((entry: any) => {
-      const mappingVal = entry.matrix_value || 0;
+      const mappingVal = Number(entry.matrix_value) || 0;
       if (mappingVal === 0) return;
 
       const coCode = normalizeCOCode(entry.co_code || `CO${entry.course_outcome_id}`);
@@ -1442,6 +1442,210 @@ export const calculatePSOAttainment = (
 };
 
 /**
+ * Exports PSO Attainment calculations to formatted Excel sheet matching Institutional standard
+ */
+export const exportPSOAttainmentToExcel = async (
+  data: NormalizedAttainmentData,
+  psoAttainment: POAttainmentResult[],
+  copsoMatrix: any,
+  weightedCOs: WeightedCOAttainment[],
+  fileName?: string
+) => {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet('PSO Attainment');
+
+  const setBorder = (cell: ExcelJS.Cell) => {
+    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+  };
+  const header = (cell: ExcelJS.Cell, value: string, bg = 'FFE2EFDA', color = 'FF000000') => {
+    cell.value = value;
+    cell.font = { bold: true, name: 'Times New Roman', size: 11, color: { argb: color } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+    setBorder(cell);
+  };
+  const dataCell = (cell: ExcelJS.Cell, value: any, color = 'FF000000', bold = false) => {
+    cell.value = value;
+    cell.font = { name: 'Times New Roman', size: 11, color: { argb: color }, bold };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    setBorder(cell);
+  };
+
+  // Collect sorted PSOs
+  const psoCodesSet = new Set<string>();
+  (copsoMatrix?.matrix_entries || []).forEach((e: any) => {
+    const pso = e.pso_code || `PSO${e.pso_id}`;
+    if (pso) psoCodesSet.add(pso);
+  });
+  const allPSOs = Array.from(psoCodesSet).sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, '')) || 0;
+    const numB = parseInt(b.replace(/\D/g, '')) || 0;
+    return numA - numB;
+  });
+  const allCos = data.cos;
+
+  // Build lookups
+  const copsoLookup: Record<string, Record<string, number>> = {};
+  allCos.forEach((co) => { copsoLookup[co] = {}; });
+  (copsoMatrix?.matrix_entries || []).forEach((e: any) => {
+    const co = normalizeCOCode(e.co_code || `CO${e.course_outcome_id}`);
+    const pso = e.pso_code || `PSO${e.pso_id}`;
+    if (!copsoLookup[co]) copsoLookup[co] = {};
+    copsoLookup[co][pso] = Number(e.matrix_value) || 0;
+  });
+
+  const psoAttLookup: Record<string, number> = {};
+  psoAttainment.forEach((p) => { psoAttLookup[p.po_code] = p.attainment_value; });
+  const weightedCOLookup: Record<string, number> = {};
+  weightedCOs.forEach((w) => { weightedCOLookup[normalizeCOCode(w.co)] = w.total_attainment; });
+
+  ws.getColumn(1).width = 18;
+  allPSOs.forEach((_, i) => { ws.getColumn(i + 2).width = 10; });
+
+  let row = 1;
+  const totalCols = Math.max(2, 1 + allPSOs.length);
+  const endCol = String.fromCharCode(64 + Math.min(26, totalCols));
+
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const h1 = ws.getCell(`A${row}`);
+  h1.value = 'KARPAGAM INSTITUTE OF TECHNOLOGY, COIMBATORE - 641105';
+  h1.font = { bold: true, size: 14, name: 'Times New Roman' };
+  h1.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(row).height = 20;
+  row++;
+
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const h2 = ws.getCell(`A${row}`);
+  h2.value = (copsoMatrix?.department_name || data.department_name || 'DEPARTMENT').toUpperCase();
+  h2.font = { bold: true, size: 12, name: 'Times New Roman' };
+  h2.alignment = { horizontal: 'center', vertical: 'middle' };
+  row++;
+
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const h3 = ws.getCell(`A${row}`);
+  h3.value = (data.academic_year || '').toUpperCase();
+  h3.font = { bold: true, size: 12, name: 'Times New Roman' };
+  h3.alignment = { horizontal: 'center', vertical: 'middle' };
+  row += 2;
+
+  // TABLE 1: CO PSO Mapping
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const t1Title = ws.getCell(`A${row}`);
+  t1Title.value = 'CO PSO Mapping';
+  t1Title.font = { bold: true, size: 11, name: 'Times New Roman' };
+  t1Title.alignment = { horizontal: 'left', vertical: 'middle' };
+  row++;
+
+  header(ws.getCell(row, 1), 'Course', 'FFD9E1F2');
+  allPSOs.forEach((pso, i) => { header(ws.getCell(row, i + 2), pso, 'FFD9E1F2'); });
+  ws.getRow(row).height = 18;
+  row++;
+
+  allCos.forEach((co) => {
+    dataCell(ws.getCell(row, 1), co, 'FFFF0000', true);
+    ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+    allPSOs.forEach((pso, i) => {
+      const val = copsoLookup[co]?.[pso] ?? 0;
+      dataCell(ws.getCell(row, i + 2), val === 0 ? '-' : val.toFixed(2));
+    });
+    row++;
+  });
+
+  // Average row
+  dataCell(ws.getCell(row, 1), data.course_code, 'FF000000', true);
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  allPSOs.forEach((pso, i) => {
+    const vals = allCos.map((co) => copsoLookup[co]?.[pso] ?? 0).filter((v) => v > 0);
+    const avg = vals.length > 0 ? (vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, avg > 0 ? Number(avg.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  });
+  row += 2;
+
+  // TABLE 2: PSO Attainment Level
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const t2Title = ws.getCell(`A${row}`);
+  t2Title.value = 'PSO Attainment Level';
+  t2Title.font = { bold: true, size: 11, name: 'Times New Roman' };
+  t2Title.alignment = { horizontal: 'left', vertical: 'middle' };
+  row++;
+
+  header(ws.getCell(row, 1), 'Course', 'FFE2EFDA');
+  allPSOs.forEach((pso, i) => { header(ws.getCell(row, i + 2), pso, 'FFE2EFDA'); });
+  ws.getRow(row).height = 18;
+  row++;
+
+  allCos.forEach((co) => {
+    const normCo = normalizeCOCode(co);
+    const coAtt = weightedCOLookup[normCo] ?? 0;
+    dataCell(ws.getCell(row, 1), co, 'FFFF0000', true);
+    ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+    allPSOs.forEach((pso, i) => {
+      const mappingVal = copsoLookup[co]?.[pso] ?? 0;
+      const cellVal = mappingVal > 0 ? (coAtt * mappingVal) / 3 : 0;
+      dataCell(ws.getCell(row, i + 2), mappingVal === 0 ? '-' : Number(cellVal.toFixed(2)));
+    });
+    row++;
+  });
+
+  // Attainment row
+  dataCell(ws.getCell(row, 1), data.course_code, 'FF000000', true);
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  allPSOs.forEach((pso, i) => {
+    const attVal = psoAttLookup[pso];
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, attVal != null && attVal > 0 ? Number(attVal.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  });
+  row += 2;
+
+  // TABLE 3: Attainment of PSOs
+  ws.mergeCells(`A${row}:${endCol}${row}`);
+  const t3Title = ws.getCell(`A${row}`);
+  t3Title.value = 'Attainment of PSOs';
+  t3Title.font = { bold: true, size: 11, name: 'Times New Roman' };
+  t3Title.alignment = { horizontal: 'left', vertical: 'middle' };
+  row++;
+
+  header(ws.getCell(row, 1), data.course_code, 'FFD9D9D9');
+  allPSOs.forEach((pso, i) => { header(ws.getCell(row, i + 2), pso, 'FFD9D9D9'); });
+  ws.getRow(row).height = 18;
+  row++;
+
+  // Mapping Average
+  dataCell(ws.getCell(row, 1), 'Mapping Average', 'FF1F3864', true);
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  allPSOs.forEach((pso, i) => {
+    const vals = allCos.map((co) => copsoLookup[co]?.[pso] ?? 0).filter((v) => v > 0);
+    const avg = vals.length > 0 ? (vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, avg > 0 ? Number(avg.toFixed(2)) : '-', 'FF000000', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
+  });
+  row++;
+
+  // Attained
+  dataCell(ws.getCell(row, 1), 'Attained', 'FF4A154B', true);
+  ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8D7F1' } };
+  ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+  allPSOs.forEach((pso, i) => {
+    const attVal = psoAttLookup[pso];
+    const c = ws.getCell(row, i + 2);
+    dataCell(c, attVal != null && attVal > 0 ? Number(attVal.toFixed(2)) : '-', 'FF4A154B', true);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8D7F1' } };
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const safeName = (fileName || `${data.course_code}_PSO_Attainment.xlsx`).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, safeName);
+};
+
+/**
  * Fetches active CO-PSO matrix for a course and optional department
  */
 export const fetchCopsoMatrixDirect = async (
@@ -1449,17 +1653,57 @@ export const fetchCopsoMatrixDirect = async (
   departmentId?: string | number | null
 ): Promise<any | null> => {
   try {
+    if (departmentId) {
+      try {
+        const activeRes = await commonInstance().get(
+          `course/copso/courses/${courseId}/departments/${departmentId}/active`
+        );
+        let activeData = activeRes.data;
+        if (activeData) {
+          if ((!activeData.matrix_entries || activeData.matrix_entries.length === 0) && activeData.copso_id) {
+            const detailRes = await commonInstance().get(`course/copso/${activeData.copso_id}`);
+            if (detailRes.data?.matrix_entries) activeData = detailRes.data;
+          }
+          if (activeData.matrix_entries && activeData.matrix_entries.length > 0) {
+            return activeData;
+          }
+        }
+      } catch {
+        // Fall back to query list
+      }
+    }
+
     const url = departmentId
       ? `course/copso?course_id=${courseId}&department_id=${departmentId}`
       : `course/copso?course_id=${courseId}`;
     const res = await commonInstance().get(url);
     const data = Array.isArray(res.data) ? res.data : [res.data];
-    const active = data.find((d: any) => d.is_active === true);
-    if (active && active.matrix_entries) return active;
-    const withEntries = data.find((d: any) => d.matrix_entries?.length > 0);
-    return withEntries || null;
+
+    const deptFiltered = departmentId
+      ? data.filter((d: any) => String(d.department_id) === String(departmentId))
+      : data;
+    const pool = deptFiltered.length > 0 ? deptFiltered : data;
+
+    let target =
+      pool.find((d: any) => d.is_active === true) ||
+      pool.find((d: any) => d.matrix_entries?.length > 0) ||
+      pool[0];
+
+    if (target) {
+      if ((!target.matrix_entries || target.matrix_entries.length === 0) && target.copso_id) {
+        try {
+          const detailRes = await commonInstance().get(`course/copso/${target.copso_id}`);
+          if (detailRes.data?.matrix_entries) {
+            target = detailRes.data;
+          }
+        } catch {}
+      }
+      return target;
+    }
+    return null;
   } catch (err) {
-    console.warn("[AttainmentService] Failed to fetch CO-PSO matrix:", err);
+    console.warn('[AttainmentService] Failed to fetch CO-PSO matrix:', err);
     return null;
   }
 };
+

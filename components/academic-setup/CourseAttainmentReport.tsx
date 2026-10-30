@@ -45,6 +45,7 @@ import {
   exportComprehensiveAttainmentToExcel,
   exportWeightedCOAttainmentToExcel,
   exportPOAttainmentToExcel,
+  exportPSOAttainmentToExcel,
 } from "@/services/attainmentReportService";
 
 interface CourseAttainmentReportProps {
@@ -91,6 +92,9 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [instances, setInstances] = useState<any[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | number | null>(offeringId);
   const [courseDetail, setCourseDetail] = useState<any>(null);
+  const [instanceDetail, setInstanceDetail] = useState<any>(null);
+  const [availableDepartments, setAvailableDepartments] = useState<any[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState<string | number | null>(null);
 
 
   // Fetch extraction results for the active course and selected instance
@@ -391,24 +395,47 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [copsoMatrix, setCopsoMatrix] = useState<any | null>(null);
   const [loadingCopso, setLoadingCopso] = useState<boolean>(false);
 
-  const loadCopsoMatrix = useCallback(async () => {
-    setLoadingCopso(true);
-    try {
-      const activeCourseId =
-        courseId ||
-        (router.query.courseId as string) ||
-        (router.query.course_id as string) ||
-        1;
-      const matchedInst = instances.find((i) => String(i.id) === String(selectedInstanceId || offeringId));
-      const deptId = matchedInst?.department_id || courseDetail?.department_id || courseMetadata?.department_id;
-      const matrix = await fetchCopsoMatrixDirect(activeCourseId, deptId);
-      if (matrix) setCopsoMatrix(matrix);
-    } catch (err) {
-      console.warn("Could not load CO-PSO matrix:", err);
-    } finally {
-      setLoadingCopso(false);
-    }
-  }, [courseId, instances, selectedInstanceId, offeringId, courseDetail, courseMetadata, router.query]);
+  const loadCopsoMatrix = useCallback(
+    async (overrideDeptId?: string | number | null) => {
+      setLoadingCopso(true);
+      try {
+        const activeCourseId =
+          courseId ||
+          (router.query.courseId as string) ||
+          (router.query.course_id as string) ||
+          1;
+        const matchedInst = instances.find(
+          (i) => String(i.id) === String(selectedInstanceId || offeringId)
+        );
+        const deptId =
+          overrideDeptId !== undefined
+            ? overrideDeptId
+            : selectedDeptId ||
+              instanceDetail?.department_id ||
+              matchedInst?.department_id ||
+              courseDetail?.department_id ||
+              courseMetadata?.department_id ||
+              null;
+        const matrix = await fetchCopsoMatrixDirect(activeCourseId, deptId);
+        setCopsoMatrix(matrix);
+      } catch (err) {
+        console.warn('Could not load CO-PSO matrix:', err);
+      } finally {
+        setLoadingCopso(false);
+      }
+    },
+    [
+      courseId,
+      selectedDeptId,
+      instanceDetail,
+      instances,
+      selectedInstanceId,
+      offeringId,
+      courseDetail,
+      courseMetadata,
+      router.query,
+    ]
+  );
 
   useEffect(() => {
     loadCopsoMatrix();
@@ -458,6 +485,32 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
   // Handle Excel Export
   const handleExportExcel = () => {
+    if (subTab === "pso-attainment") {
+      const activeData = filteredInternalData ?? attainmentData;
+      if (psoAttainment.length === 0 || !activeData || !copsoMatrix) {
+        Failure("PSO attainment data or CO-PSO matrix is not ready for export");
+        return;
+      }
+      try {
+        setExporting(true);
+        const filename = `${activeData.course_code}_PSO_Attainment.xlsx`;
+        exportPSOAttainmentToExcel(
+          activeData,
+          psoAttainment,
+          copsoMatrix,
+          weightedCOAttainment,
+          filename
+        );
+        Success("PSO Attainment exported successfully!");
+      } catch (err: any) {
+        console.error("Excel export error:", err);
+        Failure(getErrorMessage(err, "Failed to export Excel file"));
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
+
     if (subTab === "po-attainment") {
       const activeData = filteredInternalData ?? attainmentData;
       if (poAttainment.length === 0 || !activeData || !copoMatrix) {
@@ -1843,6 +1896,311 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
           )}
         </div>
       )}
+    
+
+      {/* ── Sub-tab 5: PSO Attainment ── */}
+      {subTab === "pso-attainment" && (
+        <div className="space-y-6">
+
+          {/* CO-PSO Matrix & Classroom Department Status */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                  <Target className="h-4 w-4 text-purple-600" />
+                  Program Specific Outcome (PSO) Attainment
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  PSO attainment is calculated by mapping weighted CO attainment through the active CO-PSO matrix for this classroom.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Classroom / Offering Badge */}
+                {(selectedInstanceId || offeringId) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400">
+                    <Users className="h-3.5 w-3.5" />
+                    Classroom #{selectedInstanceId || offeringId}
+                    {instanceDetail?.section ? ` (${instanceDetail.section})` : ""}
+                  </span>
+                )}
+
+                {/* Department Selector / Badge */}
+                {availableDepartments.length > 1 ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-slate-500">Dept:</span>
+                    <select
+                      value={selectedDeptId || ""}
+                      onChange={(e) => {
+                        const newId = e.target.value ? Number(e.target.value) : null;
+                        setSelectedDeptId(newId);
+                        loadCopsoMatrix(newId);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      {availableDepartments.map((dept: any) => (
+                        <option key={dept.department_id} value={dept.department_id}>
+                          {dept.department_name} ({dept.department_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <BookOpen className="h-3.5 w-3.5 text-purple-500" />
+                    {copsoMatrix?.department_name || instanceDetail?.department_name || (availableDepartments[0]?.department_name) || "Department PSO"}
+                  </span>
+                )}
+
+                {/* Matrix Status */}
+                {copsoMatrix ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    CO-PSO Matrix Loaded (ID: {copsoMatrix.copso_id || copsoMatrix.id})
+                  </span>
+                ) : loadingCopso ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Loading CO-PSO Matrix...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+                    <Info className="h-3.5 w-3.5" />
+                    No active CO-PSO matrix found
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => loadCopsoMatrix()}
+                  disabled={loadingCopso}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <RefreshCw className={`h-3 w-3 ${loadingCopso ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {psoAttainment.length > 0 && copsoMatrix ? (() => {
+            // Collect all PSO codes in sorted order
+            const psoCodesSet = new Set<string>();
+            (copsoMatrix.matrix_entries || []).forEach((e: any) => {
+              const pso = e.pso_code || `PSO${e.pso_id}`;
+              if (pso) psoCodesSet.add(pso);
+            });
+            const allPSOs = Array.from(psoCodesSet).sort((a, b) => {
+              const numA = parseInt(a.replace(/\D/g, "")) || 0;
+              const numB = parseInt(b.replace(/\D/g, "")) || 0;
+              return numA - numB;
+            });
+
+            // Build lookup: co -> pso_code -> mapping_value
+            const copsoLookup: Record<string, Record<string, number>> = {};
+            const allCos = attainmentData?.cos || [];
+            allCos.forEach((co) => { copsoLookup[co] = {}; });
+            (copsoMatrix.matrix_entries || []).forEach((e: any) => {
+              const co = normalizeCOCode(e.co_code || `CO${e.course_outcome_id}`);
+              const pso = e.pso_code || `PSO${e.pso_id}`;
+              if (!copsoLookup[co]) copsoLookup[co] = {};
+              copsoLookup[co][pso] = Number(e.matrix_value) || 0;
+            });
+
+            // pso attainment lookup
+            const psoAttLookup: Record<string, number> = {};
+            psoAttainment.forEach((p) => { psoAttLookup[p.po_code] = p.attainment_value; });
+            const weightedCOLookup: Record<string, number> = {};
+            weightedCOAttainment.forEach((w) => { weightedCOLookup[normalizeCOCode(w.co)] = w.total_attainment; });
+
+            const displayDeptName = copsoMatrix.department_name || instanceDetail?.department_name || attainmentData?.department_name || "Department";
+
+            return (
+              <>
+                {/* Institutional Header */}
+                <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="border-b border-slate-100 bg-slate-50/60 p-5 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                    <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-900 dark:text-white">
+                      Karpagam Institute of Technology, Coimbatore - 641105
+                    </h3>
+                    <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {displayDeptName}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {attainmentData?.academic_year || instanceDetail?.batch_name || ""} {attainmentData?.year_sem ? `• ${attainmentData.year_sem}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="p-6 space-y-8">
+
+                    {/* Table 1: CO PSO Mapping */}
+                    <div>
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        CO PSO Mapping
+                      </h4>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                        <table className="w-full border-collapse text-center text-xs">
+                          <thead className="bg-purple-50 dark:bg-purple-950/30">
+                            <tr className="border-b border-slate-200 font-bold text-slate-800 dark:border-slate-700 dark:text-slate-200">
+                              <th className="px-4 py-2.5 text-left border-r border-slate-200 dark:border-slate-700">Course</th>
+                              {allPSOs.map((pso) => (
+                                <th key={pso} className="min-w-[56px] px-2 py-2.5 border-r border-slate-200 dark:border-slate-700">{pso}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {allCos.map((co) => (
+                              <tr key={co} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                <td className="px-4 py-2 text-left font-bold text-rose-600 border-r border-slate-200 dark:border-slate-700">{co}</td>
+                                {allPSOs.map((pso) => {
+                                  const val = copsoLookup[co]?.[pso] ?? 0;
+                                  return (
+                                    <td key={pso} className={`px-2 py-2 font-semibold border-r border-slate-100 dark:border-slate-800 ${val === 0 ? "text-slate-400" : "text-slate-800 dark:text-slate-100"}`}>
+                                      {val === 0 ? "-" : val.toFixed(2)}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                            {/* Average row */}
+                            <tr className="bg-purple-50/80 border-t-2 border-purple-200 font-extrabold dark:bg-purple-950/30 dark:border-purple-800">
+                              <td className="px-4 py-2 text-left text-purple-800 border-r border-slate-200 dark:text-purple-200 dark:border-slate-700">{attainmentData?.course_code}</td>
+                              {allPSOs.map((pso) => {
+                                const vals = allCos.map((co) => copsoLookup[co]?.[pso] ?? 0).filter((v) => v > 0);
+                                const avg = vals.length > 0 ? (vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+                                return (
+                                  <td key={pso} className="px-2 py-2 text-purple-700 border-r border-slate-100 dark:text-purple-300 dark:border-slate-800">
+                                    {avg > 0 ? avg.toFixed(2) : "-"}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Table 2: PSO Attainment Level */}
+                    <div>
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        PSO Attainment Level
+                        <span className="ml-2 normal-case text-[10px] font-normal text-slate-400">
+                          = (CO Attainment × Mapping Value) / 3 per cell, averaged per PSO
+                        </span>
+                      </h4>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                        <table className="w-full border-collapse text-center text-xs">
+                          <thead className="bg-emerald-50 dark:bg-emerald-950/30">
+                            <tr className="border-b border-slate-200 font-bold text-slate-800 dark:border-slate-700 dark:text-slate-200">
+                              <th className="px-4 py-2.5 text-left border-r border-slate-200 dark:border-slate-700">Course</th>
+                              {allPSOs.map((pso) => (
+                                <th key={pso} className="min-w-[56px] px-2 py-2.5 border-r border-slate-200 dark:border-slate-700">{pso}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {allCos.map((co) => {
+                              const normCo = normalizeCOCode(co);
+                              const coAtt = weightedCOLookup[normCo] ?? 0;
+                              return (
+                                <tr key={co} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                  <td className="px-4 py-2 text-left font-bold text-rose-600 border-r border-slate-200 dark:border-slate-700">{co}</td>
+                                  {allPSOs.map((pso) => {
+                                    const mappingVal = copsoLookup[co]?.[pso] ?? 0;
+                                    const cellVal = mappingVal > 0 ? (coAtt * mappingVal) / 3 : 0;
+                                    return (
+                                      <td key={pso} className={`px-2 py-2 font-semibold border-r border-slate-100 dark:border-slate-800 ${mappingVal === 0 ? "text-slate-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                                        {mappingVal === 0 ? "-" : cellVal.toFixed(2)}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                            {/* Attainment row */}
+                            <tr className="bg-emerald-50/80 border-t-2 border-emerald-200 font-extrabold dark:bg-emerald-950/30 dark:border-emerald-800">
+                              <td className="px-4 py-2 text-left text-emerald-800 border-r border-slate-200 dark:text-emerald-200 dark:border-slate-700">{attainmentData?.course_code}</td>
+                              {allPSOs.map((pso) => (
+                                <td key={pso} className="px-2 py-2 text-emerald-700 border-r border-slate-100 dark:text-emerald-300 dark:border-slate-800">
+                                  {psoAttLookup[pso] != null ? (psoAttLookup[pso] > 0 ? psoAttLookup[pso].toFixed(2) : "-") : "-"}
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Table 3: Attainment of PSOs Summary */}
+                    <div>
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Attainment of PSOs
+                      </h4>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                        <table className="w-full border-collapse text-center text-xs">
+                          <thead className="bg-slate-100 dark:bg-slate-800">
+                            <tr className="border-b border-slate-200 font-bold text-slate-800 dark:border-slate-700 dark:text-slate-200">
+                              <th className="px-4 py-2.5 text-left border-r border-slate-200 dark:border-slate-700">{attainmentData?.course_code}</th>
+                              {allPSOs.map((pso) => (
+                                <th key={pso} className="min-w-[56px] px-2 py-2.5 border-r border-slate-200 dark:border-slate-700">{pso}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* Mapping Average row */}
+                            <tr className="border-b border-slate-200 bg-sky-50/50 dark:border-slate-700 dark:bg-sky-950/20">
+                              <td className="px-4 py-2.5 text-left font-bold text-sky-800 border-r border-slate-200 dark:border-slate-700 dark:text-sky-200">
+                                Mapping Average
+                              </td>
+                              {allPSOs.map((pso) => {
+                                const vals = allCos.map((co) => copsoLookup[co]?.[pso] ?? 0).filter((v) => v > 0);
+                                const avg = vals.length > 0 ? (vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+                                return (
+                                  <td key={pso} className="px-2 py-2.5 font-bold text-sky-700 border-r border-slate-100 dark:text-sky-300 dark:border-slate-800">
+                                    {avg > 0 ? avg.toFixed(2) : "-"}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                            {/* Attained row */}
+                            <tr className="bg-purple-50/50 dark:bg-purple-950/20">
+                              <td className="px-4 py-2.5 text-left font-extrabold text-purple-800 border-r border-slate-200 dark:border-slate-700 dark:text-purple-200">
+                                Attained
+                              </td>
+                              {allPSOs.map((pso) => {
+                                const attVal = psoAttLookup[pso];
+                                return (
+                                  <td key={pso} className={`px-2 py-2.5 font-extrabold text-purple-700 border-r border-slate-100 dark:text-purple-300 dark:border-slate-800`}>
+                                    {attVal != null && attVal > 0 ? attVal.toFixed(2) : "-"}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </>
+            );
+          })() : (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+              <Target className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" />
+              <h4 className="mt-3 text-sm font-bold text-slate-700 dark:text-slate-300">
+                PSO Attainment Not Available
+              </h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                {!copsoMatrix
+                  ? "No active CO-PSO matrix found for this classroom's department. Please ensure an active CO-PSO matrix is configured in the CO-PSO Mapping section."
+                  : "No weighted CO attainment data available. Ensure extraction results and assessment data are loaded."}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 };
