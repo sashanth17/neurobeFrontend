@@ -1374,3 +1374,92 @@ export const exportPOAttainmentToExcel = async (
   saveAs(blob2, safeName2);
 };
 
+
+/**
+ * Calculates Department PSO Attainment from Weighted CO Attainment & active CO-PSO Matrix
+ */
+export const calculatePSOAttainment = (
+  weightedCOs: WeightedCOAttainment[],
+  copsoMatrix: any | null
+): POAttainmentResult[] => {
+  if (!copsoMatrix || !copsoMatrix.matrix_entries || copsoMatrix.matrix_entries.length === 0) {
+    return [];
+  }
+
+  const entries = copsoMatrix.matrix_entries;
+  const coAttainmentMap = new Map<string, number>();
+  weightedCOs.forEach((w) => coAttainmentMap.set(w.co, w.total_attainment));
+
+  const psoGroupMap = new Map<string, { pso_code: string; entries: any[] }>();
+  entries.forEach((e: any) => {
+    const psoKey = e.pso_code || `PSO${e.pso_id}`;
+    if (!psoGroupMap.has(psoKey)) {
+      psoGroupMap.set(psoKey, { pso_code: psoKey, entries: [] });
+    }
+    psoGroupMap.get(psoKey)!.entries.push(e);
+  });
+
+  const results: POAttainmentResult[] = [];
+  const sortedPSOs = Array.from(psoGroupMap.entries()).sort((a, b) => {
+    const numA = parseInt(a[0].replace(/\D/g, "")) || 0;
+    const numB = parseInt(b[0].replace(/\D/g, "")) || 0;
+    return numA - numB;
+  });
+
+  sortedPSOs.forEach(([psoKey, group]) => {
+    const contributing: POAttainmentResult["contributing_cos"] = [];
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    group.entries.forEach((entry: any) => {
+      const mappingVal = entry.matrix_value || 0;
+      if (mappingVal === 0) return;
+
+      const coCode = normalizeCOCode(entry.co_code || `CO${entry.course_outcome_id}`);
+      const coAtt = coAttainmentMap.get(coCode) || 0;
+
+      contributing.push({
+        co: coCode,
+        co_attainment: coAtt,
+        mapping_value: mappingVal,
+      });
+
+      weightedSum += (coAtt * mappingVal) / 3;
+      totalWeight += 1;
+    });
+
+    const attainmentValue =
+      totalWeight > 0 ? Number((weightedSum / totalWeight).toFixed(2)) : 0;
+
+    results.push({
+      po_code: group.pso_code,
+      attainment_value: attainmentValue,
+      contributing_cos: contributing,
+    });
+  });
+
+  return results;
+};
+
+/**
+ * Fetches active CO-PSO matrix for a course and optional department
+ */
+export const fetchCopsoMatrixDirect = async (
+  courseId: string | number,
+  departmentId?: string | number | null
+): Promise<any | null> => {
+  try {
+    const url = departmentId
+      ? `course/copso?course_id=${courseId}&department_id=${departmentId}`
+      : `course/copso?course_id=${courseId}`;
+    const res = await commonInstance().get(url);
+    const data = Array.isArray(res.data) ? res.data : [res.data];
+    const active = data.find((d: any) => d.is_active === true);
+    if (active && active.matrix_entries) return active;
+    const withEntries = data.find((d: any) => d.matrix_entries?.length > 0);
+    return withEntries || null;
+  } catch (err) {
+    console.warn("[AttainmentService] Failed to fetch CO-PSO matrix:", err);
+    return null;
+  }
+};

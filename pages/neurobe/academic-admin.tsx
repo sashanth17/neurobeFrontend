@@ -59,7 +59,7 @@ const AcademicAdminPage = () => {
         <title>Academic Administrator Dashboard | Neurobe</title>
       </Head>
 
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 w-full space-y-6">
         {/* ── Top Navigation Bar: 3 Main Buttons ── */}
         <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div>

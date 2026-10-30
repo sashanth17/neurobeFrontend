@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+﻿import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import {
@@ -44,6 +44,7 @@ import Models from "@/imports/models.import";
 import { normalizeCoCode } from "@/hook/useCourseOutcomes";
 import PDFViewer from "@/components/academic-setup/PDFViewer";
 import CourseAttainmentReport from "@/components/academic-setup/CourseAttainmentReport";
+import CoPsoMappingSection from "@/components/academic-setup/CoPsoMappingSection";
 import CoursePortfolioReport from "@/components/academic-setup/CoursePortfolioReport";
 import CiaAnalyticsTab from "@/components/academic-setup/CiaAnalyticsTab";
 import McqVivaTab from "@/components/academic-setup/McqVivaTab";
@@ -115,6 +116,7 @@ const InsCourseArtifacts = () => {
   const [activeTab, setActiveTab] = useState<
     | "syllabus"
     | "copo"
+    | "copso"
     | "pedagogy"
     | "lesson_plan"
     | "mcq_generation"
@@ -393,6 +395,7 @@ const InsCourseArtifacts = () => {
     tab:
       | "syllabus"
       | "copo"
+      | "copso"
       | "pedagogy"
       | "lesson_plan"
       | "mcq_generation"
@@ -405,6 +408,7 @@ const InsCourseArtifacts = () => {
   ) => {
     if (!courseIdParam) return;
     if (
+      tab === "copso" ||
       tab === "co-attainment" ||
       tab === "report" ||
       tab === "cia_analytics" ||
@@ -1480,10 +1484,10 @@ const InsCourseArtifacts = () => {
               >
                 {versionsList.map((ver: any) => {
                   const itemId = ver[idKey];
-                  const tag = ver.is_active ? "★ Active" : ver.is_approved ? "✓ Approved" : "✎ Draft";
+                  const tag = ver.is_active ? "â˜… Active" : ver.is_approved ? "âœ“ Approved" : "âœŽ Draft";
                   return (
                     <option key={itemId} value={itemId}>
-                      v{ver.version_number} — {tag}
+                      v{ver.version_number} â€” {tag}
                     </option>
                   );
                 })}
@@ -1640,17 +1644,17 @@ const InsCourseArtifacts = () => {
                         <div className="flex items-center gap-1">
                           {isItemActive && (
                             <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                              ★ Active
+                              â˜… Active
                             </span>
                           )}
                           {isItemApproved && !isItemActive && (
                             <span className="rounded-full bg-sky-100 px-2 py-0.2 text-[9px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-                              ✓ Approved
+                              âœ“ Approved
                             </span>
                           )}
                           {!isItemApproved && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.2 text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              ✎ Draft
+                              âœŽ Draft
                             </span>
                           )}
                         </div>
@@ -1665,7 +1669,7 @@ const InsCourseArtifacts = () => {
                                 day: "numeric",
                                 year: "numeric",
                               })
-                            : "—"}
+                            : "â€”"}
                         </span>
                       </div>
 
@@ -2551,19 +2555,19 @@ const InsCourseArtifacts = () => {
             <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
             <span className="font-medium text-slate-700 dark:text-slate-300">{course.programme_name ?? "General"}</span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="text-slate-300 dark:text-slate-600">â€¢</span>
           <div className="flex items-center gap-1">
             <Layers className="h-3.5 w-3.5 text-slate-400" />
             <span>{course.semester ? `Sem ${course.semester}` : "All Terms"}</span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="text-slate-300 dark:text-slate-600">â€¢</span>
           <div className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5 text-slate-400" />
             <span>
               {course.credits ?? 0} Credits ({course.total_theory_hours ?? 0}h Theory / {course.total_lab_hours ?? 0}h Lab)
             </span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="text-slate-300 dark:text-slate-600">â€¢</span>
           <div className="flex items-center gap-1">
             <BookOpen className="h-3.5 w-3.5 text-slate-400" />
             <span>{course.department_name ?? "General"}</span>
@@ -2582,7 +2586,7 @@ const InsCourseArtifacts = () => {
             onClick={() => setJobNotice(null)}
             className="text-slate-400 hover:text-slate-600 shrink-0 px-1"
           >
-            ✕
+            âœ•
           </button>
         </div>
       )}
@@ -2617,6 +2621,17 @@ const InsCourseArtifacts = () => {
               }`}
           >
             <span>2. CO-PO</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("copso")}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copso"
+                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+          >
+            <span>2b. CO-PSO</span>
           </button>
 
           <button
@@ -3485,7 +3500,7 @@ const InsCourseArtifacts = () => {
                                   </p>
                                   <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                                     {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
-                                    {b.publisher ? `— ${b.publisher}` : ""}{" "}
+                                    {b.publisher ? `â€” ${b.publisher}` : ""}{" "}
                                     {b.publication_year ? `(${b.publication_year})` : ""}
                                   </p>
                                 </div>
@@ -3645,7 +3660,7 @@ const InsCourseArtifacts = () => {
                                   </p>
                                   <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                                     {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
-                                    {b.publisher ? `— ${b.publisher}` : ""}{" "}
+                                    {b.publisher ? `â€” ${b.publisher}` : ""}{" "}
                                     {b.publication_year ? `(${b.publication_year})` : ""}
                                   </p>
                                 </div>
@@ -3669,7 +3684,7 @@ const InsCourseArtifacts = () => {
                                 Curriculum Hierarchy (Units, Topics & Subtopics)
                               </h3>
                               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                {units.length} Units • Structured hierarchical teaching units
+                                {units.length} Units â€¢ Structured hierarchical teaching units
                               </p>
                             </div>
 
@@ -3710,7 +3725,7 @@ const InsCourseArtifacts = () => {
 
                                   <div className="flex items-center gap-1.5">
                                     <span className="rounded-md bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                      {u.theory_hours ?? 0} Th • {u.lab_hours ?? 0} Lab
+                                      {u.theory_hours ?? 0} Th â€¢ {u.lab_hours ?? 0} Lab
                                     </span>
 
                                     {canEdit && (
@@ -3815,7 +3830,7 @@ const InsCourseArtifacts = () => {
                                               </span>
                                               {st.subtopic_description && (
                                                 <span className="text-[10px] text-slate-400">
-                                                  — {st.subtopic_description}
+                                                  â€” {st.subtopic_description}
                                                 </span>
                                               )}
                                             </div>
@@ -4086,7 +4101,7 @@ const InsCourseArtifacts = () => {
                                 Course Outcome to Program Outcome (CO-PO) Correlation Matrix
                               </h3>
                               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                ({cosList.length} COs × {posList.length} POs)
+                                ({cosList.length} COs Ã— {posList.length} POs)
                               </span>
                               {currentCopo?.is_approved ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
@@ -4199,7 +4214,7 @@ const InsCourseArtifacts = () => {
                                   {co.co_code}
                                 </td>
                                 <td className="py-1.5 px-2.5 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
-                                  {co.description ?? "—"}
+                                  {co.description ?? "â€”"}
                                 </td>
                                 {posList.map((po) => {
                                   const entry = cellMap.get(
@@ -4211,7 +4226,7 @@ const InsCourseArtifacts = () => {
                                         key={po.po_id}
                                         className="py-1.5 px-1 text-center text-slate-300"
                                       >
-                                        —
+                                        â€”
                                       </td>
                                     );
                                   }
@@ -4254,8 +4269,8 @@ const InsCourseArtifacts = () => {
                                         }
                                         title={
                                           currentJust
-                                            ? `${co.co_code} → ${po.po_code}: ${currentJust}`
-                                            : `${co.co_code} → ${po.po_code} (${currentVal})`
+                                            ? `${co.co_code} â†’ ${po.po_code}: ${currentJust}`
+                                            : `${co.co_code} â†’ ${po.po_code} (${currentVal})`
                                         }
                                         className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs transition ${colorClass} ${canEditMatrix
                                             ? "cursor-pointer hover:scale-110 hover:shadow-sm"
@@ -4304,7 +4319,7 @@ const InsCourseArtifacts = () => {
                                 >
                                   <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
                                     <span>
-                                      {e.co_code ?? `CO${e.course_outcome_id}`} →{" "}
+                                      {e.co_code ?? `CO${e.course_outcome_id}`} â†’{" "}
                                       {e.po_code ?? `PO${e.po_id}`}
                                     </span>
                                     <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -4323,6 +4338,16 @@ const InsCourseArtifacts = () => {
                   );
                 })()}
               </div>
+            )}
+
+            {activeTab === "copso" && (
+              <CoPsoMappingSection
+                courseId={courseIdParam || 1}
+                courseTitle={course?.course_title}
+                courseCode={course?.course_code}
+                isCoord={isCoord}
+                approvedExtractionId={prioritizedExt?.extractions_id || currentExt?.extractions_id}
+              />
             )}
 
             {activeTab === "pedagogy" && (
@@ -4920,7 +4945,7 @@ const InsCourseArtifacts = () => {
                     onClick={() => setSplitScreenView(false)}
                     className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded-md hover:bg-slate-800 transition"
                   >
-                    Close Split View ✕
+                    Close Split View âœ•
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -5190,7 +5215,7 @@ const InsCourseArtifacts = () => {
                   .filter((e: any) => Boolean(e.is_approved))
                   .map((e: any) => (
                     <option key={e.extractions_id} value={e.extractions_id}>
-                      Version {e.version_number} — {e.is_active ? "Active" : "Approved"}
+                      Version {e.version_number} â€” {e.is_active ? "Active" : "Approved"}
                     </option>
                   ))}
               </select>
@@ -5248,7 +5273,7 @@ const InsCourseArtifacts = () => {
                   .filter((e: any) => Boolean(e.is_approved))
                   .map((e: any) => (
                     <option key={e.extractions_id} value={e.extractions_id}>
-                      Version {e.version_number} — {e.is_active ? "Active" : "Approved"}
+                      Version {e.version_number} â€” {e.is_active ? "Active" : "Approved"}
                     </option>
                   ))}
               </select>
@@ -5307,7 +5332,7 @@ const InsCourseArtifacts = () => {
                     .filter((e: any) => Boolean(e.is_approved))
                     .map((e: any) => (
                       <option key={e.extractions_id} value={e.extractions_id}>
-                        Extraction v{e.version_number} — {e.is_active ? "Active" : "Approved"}
+                        Extraction v{e.version_number} â€” {e.is_active ? "Active" : "Approved"}
                       </option>
                     ))}
                 </select>
@@ -5329,7 +5354,7 @@ const InsCourseArtifacts = () => {
                     .filter((p: any) => Boolean(p.is_approved))
                     .map((p: any) => (
                       <option key={p.pedagogy_id} value={p.pedagogy_id}>
-                        Pedagogy v{p.version_number} — {p.is_active ? "Active" : "Approved"}
+                        Pedagogy v{p.version_number} â€” {p.is_active ? "Active" : "Approved"}
                       </option>
                     ))}
                 </select>
@@ -5379,7 +5404,7 @@ const InsCourseArtifacts = () => {
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Edit2 className="h-4 w-4 text-indigo-500" />
                 <span>
-                  Edit Cell: {copoEditingCell.co_code} → {copoEditingCell.po_code}
+                  Edit Cell: {copoEditingCell.co_code} â†’ {copoEditingCell.po_code}
                 </span>
               </h3>
               <button
@@ -5473,3 +5498,5 @@ const InsCourseArtifacts = () => {
 };
 
 export default PrivateRouter(InsCourseArtifacts);
+
+

@@ -1,4 +1,4 @@
-import auth from "@/models/auth.model";
+﻿import auth from "@/models/auth.model";
 import department from "@/models/department.model";
 import programmes from "@/models/program.model";
 import batches from "@/models/batch.model";
@@ -15,6 +15,7 @@ import job from "@/models/job.model";
 import lession_plan from "@/models/lession_plan.model";
 import learning_material from "@/models/learning_material.model";
 import COPOMap from "@/models/copo_map.models";
+import COPSOMap from "@/models/copso_map.models";
 import topics from "@/models/topics.models";
 import pedagogy from "@/models/pedagogy.models";
 import course_enrollment from "@/models/course_enrollment.model";
@@ -54,6 +55,9 @@ export const Models: any = {
   COPOMap,
   copo: COPOMap,
   copo_map: COPOMap,
+  COPSOMap,
+  copso: COPSOMap,
+  copso_map: COPSOMap,
   topics,
   pedagogy,
   pso,
@@ -67,3 +71,4 @@ export const Models: any = {
 };
 
 export default Models;
+

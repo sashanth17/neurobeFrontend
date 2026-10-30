@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+﻿import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/router";
 import {
   FileSpreadsheet,
@@ -40,6 +40,8 @@ import {
   normalizeComprehensiveExtractionData,
   calculateComprehensiveAttainment,
   calculatePOAttainment,
+  calculatePSOAttainment,
+  fetchCopsoMatrixDirect,
   exportComprehensiveAttainmentToExcel,
   exportWeightedCOAttainmentToExcel,
   exportPOAttainmentToExcel,
@@ -68,7 +70,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [expandedStudentId, setExpandedStudentId] = useState<string | number | null>(null);
 
   // Sub-tab within CO Attainment: "internal" | "external" | "weighted" | "po-attainment"
-  const [subTab, setSubTab] = useState<"internal" | "external" | "weighted" | "po-attainment">("internal");
+  const [subTab, setSubTab] = useState<"internal" | "external" | "weighted" | "po-attainment" | "pso-attainment">("internal");
 
   // Weightage state
   const [weightInternal, setWeightInternal] = useState<number>(0.5);
@@ -82,7 +84,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [externalAttainmentData, setExternalAttainmentData] = useState<NormalizedAttainmentData | null>(null);
   const [loadingExternal, setLoadingExternal] = useState<boolean>(false);
 
-  // CIA test selection — Set of test_ids included in internal attainment calc
+  // CIA test selection â€” Set of test_ids included in internal attainment calc
   const [selectedTestIds, setSelectedTestIds] = useState<Set<number>>(new Set());
 
   // Classrooms state
@@ -220,6 +222,12 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   };
 
   useEffect(() => {
+    if (offeringId !== undefined && offeringId !== null) {
+      setSelectedInstanceId(offeringId);
+    }
+  }, [offeringId]);
+
+  useEffect(() => {
     if (selectedInstanceId !== null) {
       loadExtractionData(selectedInstanceId);
       loadExternalData(selectedInstanceId);
@@ -243,7 +251,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     );
   };
 
-  // ── Filtered internal data (only selected CIAs contribute to co_totals) ──────
+  // â”€â”€ Filtered internal data (only selected CIAs contribute to co_totals) â”€â”€â”€â”€â”€â”€
   const filteredInternalData = useMemo((): NormalizedAttainmentData | null => {
     if (!attainmentData) return null;
     // Which tests are selected for calculation (CIAs and/or assignments)
@@ -286,7 +294,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     return calculateComprehensiveAttainment(filteredInternalData, internalTargetPercentage);
   }, [filteredInternalData, internalTargetPercentage]);
 
-  // ── Filtered external data (only first assessment, no assignment 9999, single test marks) ──────
+  // â”€â”€ Filtered external data (only first assessment, no assignment 9999, single test marks) â”€â”€â”€â”€â”€â”€
   const filteredExternalData = useMemo((): NormalizedAttainmentData | null => {
     if (!externalAttainmentData) return null;
 
@@ -378,6 +386,37 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   useEffect(() => {
     loadCopoMatrix();
   }, [loadCopoMatrix]);
+
+  // CO-PSO matrix state & attainment
+  const [copsoMatrix, setCopsoMatrix] = useState<any | null>(null);
+  const [loadingCopso, setLoadingCopso] = useState<boolean>(false);
+
+  const loadCopsoMatrix = useCallback(async () => {
+    setLoadingCopso(true);
+    try {
+      const activeCourseId =
+        courseId ||
+        (router.query.courseId as string) ||
+        (router.query.course_id as string) ||
+        1;
+      const matchedInst = instances.find((i) => String(i.id) === String(selectedInstanceId || offeringId));
+      const deptId = matchedInst?.department_id || courseDetail?.department_id || courseMetadata?.department_id;
+      const matrix = await fetchCopsoMatrixDirect(activeCourseId, deptId);
+      if (matrix) setCopsoMatrix(matrix);
+    } catch (err) {
+      console.warn("Could not load CO-PSO matrix:", err);
+    } finally {
+      setLoadingCopso(false);
+    }
+  }, [courseId, instances, selectedInstanceId, offeringId, courseDetail, courseMetadata, router.query]);
+
+  useEffect(() => {
+    loadCopsoMatrix();
+  }, [loadCopsoMatrix]);
+
+  const psoAttainment = useMemo(() => {
+    return calculatePSOAttainment(weightedCOAttainment, copsoMatrix);
+  }, [weightedCOAttainment, copsoMatrix]);
 
   // Keep Wint + Wext = 1.0
   const handleWeightInternalChange = (val: number) => {
@@ -530,7 +569,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* ── Control & Action Toolbar (Aligned with Page UI) ── */}
+      {/* â”€â”€ Control & Action Toolbar (Aligned with Page UI) â”€â”€ */}
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -552,7 +591,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
             )}
           </div>
           <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            {attainmentData.course_name} — Outcome Attainment Report
+            {attainmentData.course_name} â€” Outcome Attainment Report
           </h2>
         </div>
 
@@ -617,7 +656,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                 }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
-                ✕
+                âœ•
               </button>
             )}
           </div>
@@ -647,7 +686,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
         </div>
       </div>
 
-      {/* ── Sub-Tab Navigation ── */}
+      {/* â”€â”€ Sub-Tab Navigation â”€â”€ */}
       <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <button
           type="button"
@@ -693,11 +732,23 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
           <Grid3X3 className="h-3.5 w-3.5" />
           PO Attainment
         </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab("pso-attainment")}
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${subTab === "pso-attainment"
+            ? "bg-indigo-600 text-white shadow-sm"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+        >
+          <Target className="h-3.5 w-3.5" />
+          PSO Attainment
+        </button>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* ── SUB-TAB: Internal & External Assessment ──────────── */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* â”€â”€ SUB-TAB: Internal & External Assessment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       {(subTab === "internal" || subTab === "external") && ((currentAttainmentData: any, currentSummary: any) => {
         const isExternal = subTab === "external";
 
@@ -739,12 +790,12 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
           : filteredStudents;
 
         const assessmentTitle = isExternal
-          ? "External Assessment — Attainment of Course Outcomes (Through End Semester)"
-          : "Internal Assessment — Attainment of Course Outcomes (Through Direct Assessment)";
+          ? "External Assessment â€” Attainment of Course Outcomes (Through End Semester)"
+          : "Internal Assessment â€” Attainment of Course Outcomes (Through Direct Assessment)";
 
         return (
           <>
-            {/* ── CO Attainment KPI Cards (Clean SaaS Design) ── */}
+            {/* â”€â”€ CO Attainment KPI Cards (Clean SaaS Design) â”€â”€ */}
             {summary && (
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                 {attainmentData.cos.map((co) => {
@@ -786,7 +837,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                             {data?.percentage_above_target || 0}%
                           </span>
                           <span className="ml-1.5 text-xs text-slate-500 dark:text-slate-400">
-                            students ≥ {currentTargetPercentage}%
+                            students â‰¥ {currentTargetPercentage}%
                           </span>
                         </div>
                         <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -821,7 +872,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
               </div>
             )}
 
-            {/* ── Main Sheet Container (Excel-Identical Structure, Modern SaaS Alignment) ── */}
+            {/* â”€â”€ Main Sheet Container (Excel-Identical Structure, Modern SaaS Alignment) â”€â”€ */}
             <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               {/* Institutional & Academic Header Strip */}
               <div className="border-b border-slate-100 bg-slate-50/60 p-6 text-center dark:border-slate-800 dark:bg-slate-800/40">
@@ -840,7 +891,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
               </div>
 
               <div className="p-6 space-y-6">
-                {/* ── Course Information & Attainment Level Scale Table (Unified Exact Excel Structure) ── */}
+                {/* â”€â”€ Course Information & Attainment Level Scale Table (Unified Exact Excel Structure) â”€â”€ */}
                 <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                   <table className="w-full border-collapse text-xs">
                     <tbody>
@@ -947,10 +998,10 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                   </table>
                 </div>
 
-                {/* ── Main Assessment Spreadsheet Matrix Table ── */}
+                {/* â”€â”€ Main Assessment Spreadsheet Matrix Table â”€â”€ */}
                 <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs dark:border-slate-700">
                   <table className="w-full border-collapse text-center text-xs">
-                    {/* ── Table Headers ── */}
+                    {/* â”€â”€ Table Headers â”€â”€ */}
                     <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800">
                       {/* Header Row 1 */}
                       <tr className="border-b border-slate-200 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
@@ -973,7 +1024,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                           NAME OF THE STUDENT
                         </th>
 
-                        {/* Dynamic Tests Header Spans — with checkbox for CIAs & assignments (internal only) */}
+                        {/* Dynamic Tests Header Spans â€” with checkbox for CIAs & assignments (internal only) */}
                         {attainmentData.tests.map((test) => {
                           const testIdNum = Number(test.test_id);
                           const isSelected = selectedTestIds.has(testIdNum);
@@ -1003,7 +1054,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                           );
                         })}
 
-                        {/* Cumulative CO Header Span — Internal only */}
+                        {/* Cumulative CO Header Span â€” Internal only */}
                         {!isExternal && (
                           <th colSpan={attainmentData.cos.length} className="p-2 text-center uppercase tracking-tight">
                             CO WISE MARKS SCORED
@@ -1024,7 +1075,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                             </th>
                           ))
                         )}
-                        {/* Total CO columns — Internal only */}
+                        {/* Total CO columns â€” Internal only */}
                         {!isExternal &&
                           attainmentData.cos.map((co, idx) => (
                             <th
@@ -1071,7 +1122,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       </tr>
                     </thead>
 
-                    {/* ── Student Rows ── */}
+                    {/* â”€â”€ Student Rows â”€â”€ */}
                     <tbody className="divide-y divide-slate-100 text-slate-800 dark:divide-slate-800 dark:text-slate-200">
                       {filteredStudentsForTab.map((st: any, idx: number) => {
                         const isExpanded = expandedStudentId === st.student_id;
@@ -1122,7 +1173,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                                 ))
                               )}
 
-                              {/* Cumulative CO Total Marks — Internal only */}
+                              {/* Cumulative CO Total Marks â€” Internal only */}
                               {!isExternal &&
                                 attainmentData.cos.map((co, cIdx) => {
                                   const score = st.co_totals[co] ?? 0;
@@ -1191,7 +1242,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       )}
                     </tbody>
 
-                    {/* ── Summary Calculation Rows (Exact Match) ── */}
+                    {/* â”€â”€ Summary Calculation Rows (Exact Match) â”€â”€ */}
                     {summary && (
                       <tfoot className="border-t-2 border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
                         {/* Row 1: CO's Target Value */}
@@ -1236,7 +1287,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                               colSpan={attainmentData.tests.reduce((acc: number, t: any) => acc + t.cos.length, 0)}
                               className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
                             >
-                              —
+                              â€”
                             </td>
                           )}
                           {attainmentData.cos.map((co: string, idx: number) => (
@@ -1265,7 +1316,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                               colSpan={attainmentData.tests.reduce((acc: number, t: any) => acc + t.cos.length, 0)}
                               className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
                             >
-                              —
+                              â€”
                             </td>
                           )}
                           {attainmentData.cos.map((co: string, idx: number) => (
@@ -1332,7 +1383,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                               colSpan={attainmentData.tests.reduce((acc: number, t: any) => acc + t.cos.length, 0)}
                               className="border-r border-slate-200 p-2 text-center text-slate-400 dark:border-slate-700"
                             >
-                              —
+                              â€”
                             </td>
                           )}
                           {attainmentData.cos.map((co: string, idx: number) => (
@@ -1352,7 +1403,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                   </table>
                 </div>
 
-                {/* ── Signatures Section ── */}
+                {/* â”€â”€ Signatures Section â”€â”€ */}
                 <div className="mt-8 flex items-center justify-between px-6 pt-4 text-xs font-bold text-slate-800 dark:text-slate-200">
                   <div>
                     <div className="h-0.5 w-40 bg-slate-400 dark:bg-slate-600 mb-2"></div>
@@ -1375,13 +1426,13 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
         subTab === "external" ? externalSummary : summary
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* ── SUB-TAB: Weighted CO Attainment ──────────────────────────── */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* â”€â”€ SUB-TAB: Weighted CO Attainment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       {subTab === "weighted" && (
         <div className="space-y-6">
 
-          {/* ── Weightage Controls ── */}
+          {/* â”€â”€ Weightage Controls â”€â”€ */}
           <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
@@ -1471,16 +1522,16 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
 
 
-          {/* ── Weighted CO Attainment Summary Table ── */}
+          {/* â”€â”€ Weighted CO Attainment Summary Table â”€â”€ */}
           <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
             <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 to-emerald-50/80 px-6 py-4 dark:border-slate-800 dark:from-indigo-950/30 dark:to-emerald-950/30">
               <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                 <Scale className="h-4 w-4 text-indigo-500" />
-                Total CO Attainment — Weighted Calculation
+                Total CO Attainment â€” Weighted Calculation
               </h3>
               <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                Formula: <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">W<sub>int</sub> × Internal + W<sub>ext</sub> × External</span>
-                {" "}= <span className="font-mono font-bold">{weightInternal} × Internal + {weightExternal} × External</span>
+                Formula: <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">W<sub>int</sub> Ã— Internal + W<sub>ext</sub> Ã— External</span>
+                {" "}= <span className="font-mono font-bold">{weightInternal} Ã— Internal + {weightExternal} Ã— External</span>
               </p>
             </div>
             <div className="p-6">
@@ -1493,7 +1544,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       <th className="py-3 px-3 bg-emerald-50/60 dark:bg-emerald-950/20">External Attainment<br /><span className="text-[10px] font-normal text-emerald-500">(Level 0-3)</span></th>
                       <th className="py-3 px-3 bg-violet-50/60 dark:bg-violet-950/20">
                         <span className="text-violet-700 dark:text-violet-300">Total Attainment</span>
-                        <br /><span className="text-[10px] font-normal text-violet-500">{weightInternal}×Int + {weightExternal}×Ext</span>
+                        <br /><span className="text-[10px] font-normal text-violet-500">{weightInternal}Ã—Int + {weightExternal}Ã—Ext</span>
                       </th>
                     </tr>
                   </thead>
@@ -1543,9 +1594,9 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* ── SUB-TAB: PO Attainment ───────────────────────────────────── */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* â”€â”€ SUB-TAB: PO Attainment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       {subTab === "po-attainment" && (
         <div className="space-y-6">
 
@@ -1612,7 +1663,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
             return (
               <>
-                {/* ── Institutional Header ── */}
+                {/* â”€â”€ Institutional Header â”€â”€ */}
                 <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div className="border-b border-slate-100 bg-slate-50/60 p-5 text-center dark:border-slate-800 dark:bg-slate-800/40">
                     <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-900 dark:text-white">
@@ -1624,7 +1675,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
                   <div className="p-6 space-y-8">
 
-                    {/* ── Table 1: CO PO Mapping ── */}
+                    {/* â”€â”€ Table 1: CO PO Mapping â”€â”€ */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                         CO PO Mapping
@@ -1672,12 +1723,12 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       </div>
                     </div>
 
-                    {/* ── Table 2: PO Attainment Level ── */}
+                    {/* â”€â”€ Table 2: PO Attainment Level â”€â”€ */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                         PO Attainment Level
                         <span className="ml-2 normal-case text-[10px] font-normal text-slate-400">
-                          = (CO Attainment × Mapping Value) / 3 per cell, averaged per PO
+                          = (CO Attainment Ã— Mapping Value) / 3 per cell, averaged per PO
                         </span>
                       </h4>
                       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
@@ -1723,7 +1774,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       </div>
                     </div>
 
-                    {/* ── Table 3: Attainment of POs and PSOs ── */}
+                    {/* â”€â”€ Table 3: Attainment of POs and PSOs â”€â”€ */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                         Attainment of POs and PSOs
@@ -1797,3 +1848,4 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 };
 
 export default CourseAttainmentReport;
+

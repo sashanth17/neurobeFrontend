@@ -187,6 +187,7 @@ export interface ClassroomPushPullItem {
   attainment_pct: number;
   student_count: number;
   faculty_name: string;
+  k_levels?: Record<KLevelKey, number>;
 }
 
 export interface CoursePushPullItem {
@@ -195,6 +196,33 @@ export interface CoursePushPullItem {
   department_code: string;
   attainment_pct: number;
   semester: number;
+  k_levels?: Record<KLevelKey, number>;
+}
+
+export interface CourseBreakdownInstance {
+  id: number | string;
+  instance_id: number | string;
+  name: string;
+  faculty_name: string;
+  student_count: number;
+  attainment_pct: number;
+  total_pct: number;
+  k_levels: Record<KLevelKey, number>;
+}
+
+export interface CourseBreakdownItem {
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  course_name: string;
+  department_code: string;
+  department_name?: string;
+  semester: number;
+  attainment_pct: number;
+  total_pct: number;
+  student_count: number;
+  k_levels: Record<KLevelKey, number>;
+  instances: CourseBreakdownInstance[];
 }
 
 export interface DeptBreakdownRow {
@@ -234,6 +262,7 @@ export interface TeachingLearningEffectivenessData {
   year_breakdown: YearBreakdownRow[];
   courses_pushing_up: CoursePushPullItem[];
   courses_pulling_down: CoursePushPullItem[];
+  course_breakdown: CourseBreakdownItem[];
 }
 
 // ==========================================
@@ -433,6 +462,7 @@ export const academicAdminService = {
         attainment_pct: Number(c.attainment_pct) || 0,
         student_count: Number(c.student_count) || 0,
         faculty_name: c.faculty_name || c.faculty || "Faculty Member",
+        k_levels: c.k_levels || undefined,
       })
     );
 
@@ -445,6 +475,7 @@ export const academicAdminService = {
         attainment_pct: Number(c.attainment_pct) || 0,
         student_count: Number(c.student_count) || 0,
         faculty_name: c.faculty_name || c.faculty || "Faculty Member",
+        k_levels: c.k_levels || undefined,
       })
     );
 
@@ -455,6 +486,7 @@ export const academicAdminService = {
       department_code: c.department_code || c.dept || "",
       attainment_pct: Number(c.attainment_pct) || 0,
       semester: Number(c.semester) || 1,
+      k_levels: c.k_levels || undefined,
     }));
 
     const courses_pulling_down: CoursePushPullItem[] = (d.courses_pulling_down || []).map((c: any) => ({
@@ -463,7 +495,65 @@ export const academicAdminService = {
       department_code: c.department_code || c.dept || "",
       attainment_pct: Number(c.attainment_pct) || 0,
       semester: Number(c.semester) || 1,
+      k_levels: c.k_levels || undefined,
     }));
+
+    // Transform Course breakdown with K-levels and instances
+    const course_breakdown: CourseBreakdownItem[] = (d.course_breakdown || []).map((cb: any) => ({
+      course_id: Number(cb.course_id || cb.id) || 0,
+      course_code: cb.course_code || "",
+      course_title: cb.course_title || cb.course_name || "",
+      course_name: cb.course_name || cb.course_title || "",
+      department_code: cb.department_code || "",
+      department_name: cb.department_name || cb.department_code || "",
+      semester: Number(cb.semester) || 1,
+      attainment_pct: Number(cb.attainment_pct ?? cb.total_pct ?? 0),
+      total_pct: Number(cb.total_pct ?? cb.attainment_pct ?? 0),
+      student_count: Number(cb.student_count) || 0,
+      k_levels: cb.k_levels || {},
+      instances: (cb.instances || []).map((inst: any) => ({
+        id: inst.id || inst.instance_id,
+        instance_id: inst.instance_id || inst.id,
+        name: inst.name || "Section",
+        faculty_name: inst.faculty_name || "Faculty Coordinator",
+        student_count: Number(inst.student_count) || 0,
+        attainment_pct: Number(inst.attainment_pct ?? inst.total_pct ?? 0),
+        total_pct: Number(inst.total_pct ?? inst.attainment_pct ?? 0),
+        k_levels: inst.k_levels || {},
+      })),
+    }));
+
+    // Fallback: If course_breakdown is empty from backend, build from pushing_up and pulling_down
+    if (course_breakdown.length === 0 && (courses_pushing_up.length > 0 || courses_pulling_down.length > 0)) {
+      const combined = [...courses_pushing_up, ...courses_pulling_down];
+      combined.forEach((c) => {
+        const matchingClassrooms = [...classrooms_pushing_up, ...classrooms_pulling_down].filter(
+          (cr) => cr.course_code === c.course_code
+        );
+        course_breakdown.push({
+          course_id: 1,
+          course_code: c.course_code,
+          course_title: c.course_name,
+          course_name: c.course_name,
+          department_code: c.department_code,
+          semester: c.semester,
+          attainment_pct: c.attainment_pct,
+          total_pct: c.attainment_pct,
+          student_count: matchingClassrooms.reduce((acc, cr) => acc + cr.student_count, 0),
+          k_levels: c.k_levels || kLevelPerformance,
+          instances: matchingClassrooms.map((cr) => ({
+            id: cr.id,
+            instance_id: cr.id,
+            name: cr.name,
+            faculty_name: cr.faculty_name,
+            student_count: cr.student_count,
+            attainment_pct: cr.attainment_pct,
+            total_pct: cr.attainment_pct,
+            k_levels: cr.k_levels || kLevelPerformance,
+          })),
+        });
+      });
+    }
 
     // Transform Department breakdown table
     const department_breakdown: DeptBreakdownRow[] = (d.department_breakdown || []).map((row: any) => ({
@@ -499,6 +589,7 @@ export const academicAdminService = {
       year_breakdown,
       courses_pushing_up,
       courses_pulling_down,
+      course_breakdown,
     };
   },
 
