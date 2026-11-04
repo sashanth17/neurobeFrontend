@@ -135,7 +135,6 @@ const AcademicAdminPage = () => {
             <TeachingLearningEffectivenessView
               key="mcq-view"
               type="mcq"
-              onDrilldownToAttainment={handleDrilldownToAttainment}
             />
           )}
 

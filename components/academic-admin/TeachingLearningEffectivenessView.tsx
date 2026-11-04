@@ -8,6 +8,9 @@ import {
   CoursePushPullItem,
   CourseBreakdownItem,
 } from "@/services/academicAdminAnalytics.service";
+import CoursePushPullFullscreenModal from "@/components/academic-admin/CoursePushPullFullscreenModal";
+import AiAcademicAnalyticsModal from "@/components/academic-admin/AiAcademicAnalyticsModal";
+import { GenerateSuggestionInput } from "@/services/academicAdminAiDb.service";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -96,6 +99,7 @@ export const TeachingLearningEffectivenessView: React.FC<
   // Modals for "Detail" clicks
   const [showClassroomModal, setShowClassroomModal] = useState<boolean>(false);
   const [showCourseModal, setShowCourseModal] = useState<boolean>(false);
+  const [showAiModal, setShowAiModal] = useState<boolean>(false);
 
   // Toggle a K-level in overview mode
   const toggleKLevel = (k: KLevelKey) => {
@@ -154,6 +158,39 @@ export const TeachingLearningEffectivenessView: React.FC<
       (c) => c.department_code === selectedDept || !c.department_code
     );
   }, [data?.course_breakdown, selectedDept]);
+
+  // Prepared current report metrics for the AI Task (injected with past memory)
+  const aiReportInput: GenerateSuggestionInput = useMemo(() => {
+    return {
+      type: type === "cia" ? "CIA" : "MCQ",
+      department: selectedDept,
+      batch: selectedBatch,
+      testFilter: selectedTest,
+      targetBenchmark,
+      totalAttainmentPct: data?.total_attainment_pct ?? 0,
+      participationPct: data?.participation?.participation_pct ?? 0,
+      kLevels: data?.k_level_performance ?? { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 },
+      coursesPushingUp: (data?.courses_pushing_up || []).map((c) => ({
+        course_code: c.course_code,
+        course_name: c.course_name,
+        department_code: c.department_code,
+        attainment_pct: c.attainment_pct,
+        semester: c.semester,
+      })),
+      coursesPullingDown: (data?.courses_pulling_down || []).map((c) => ({
+        course_code: c.course_code,
+        course_name: c.course_name,
+        department_code: c.department_code,
+        attainment_pct: c.attainment_pct,
+        semester: c.semester,
+      })),
+      departmentBreakdown: (data?.department_breakdown || []).map((d) => ({
+        department_code: d.department_code,
+        department_name: d.department_name,
+        total_pct: d.total_pct,
+      })),
+    };
+  }, [type, selectedDept, selectedBatch, selectedTest, targetBenchmark, data]);
 
   // ==========================================
   // Computed specifically for inspectKLevel when full-screen is active
@@ -454,25 +491,42 @@ export const TeachingLearningEffectivenessView: React.FC<
             </p>
           </div>
 
-          {/* Narrowing status indicator */}
-          {selectedDept !== "ALL" && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs">
-              <span className="text-primary font-semibold">
-                Narrowed down to: <strong>{selectedDept}</strong>
+          {/* AI Academic Intelligence Button & Narrowing indicator */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowAiModal(true)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-sm hover:shadow-md transition-all scale-100 hover:scale-105"
+              title="Open AI Academic Intelligence: 6 Improvement & Analytics Points"
+            >
+              <svg className="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span>AI Advisory & 6 Improvement Points</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-white/20 text-white">
+                AI Task
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDept("ALL");
-                  setSelectedDrilldownCourse(null);
-                }}
-                className="text-primary hover:text-primary-dark font-bold ml-1 text-sm leading-none"
-                title="Clear department filter"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+            </button>
+
+            {selectedDept !== "ALL" && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs">
+                <span className="text-primary font-semibold">
+                  Narrowed down to: <strong>{selectedDept}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDept("ALL");
+                    setSelectedDrilldownCourse(null);
+                  }}
+                  className="text-primary hover:text-primary-dark font-bold ml-1 text-sm leading-none"
+                  title="Clear department filter"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Cognitive Bloom Levels Row & Dropdown Filters (Identical & Unified in all screens) */}
@@ -1209,7 +1263,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                               </span>
                             </td>
                             <td className="py-3 px-3 text-right">
-                              {onDrilldownToAttainment && (
+                              {type === "cia" && onDrilldownToAttainment && (
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -1454,8 +1508,8 @@ export const TeachingLearningEffectivenessView: React.FC<
                     data.classrooms_pushing_up.map((c) => (
                     <div
                       key={c.id}
-                      onClick={() => onDrilldownToAttainment && onDrilldownToAttainment(c.department_code, c.course_code)}
-                      className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-white dark:bg-gray-800/80 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer transition-colors"
+                      onClick={() => type === "cia" && onDrilldownToAttainment && onDrilldownToAttainment(c.department_code, c.course_code)}
+                      className={`flex items-center justify-between text-xs p-1.5 rounded-lg bg-white dark:bg-gray-800/80 ${type === "cia" ? "hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer" : "cursor-default"} transition-colors`}
                     >
                       <div className="truncate pr-2">
                         <span className="font-bold text-gray-800 dark:text-gray-200">{c.name}</span>
@@ -1487,8 +1541,8 @@ export const TeachingLearningEffectivenessView: React.FC<
                     data.classrooms_pulling_down.map((c) => (
                     <div
                       key={c.id}
-                      onClick={() => onDrilldownToAttainment && onDrilldownToAttainment(c.department_code, c.course_code)}
-                      className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-white dark:bg-gray-800/80 hover:bg-rose-100/60 dark:hover:bg-rose-900/40 cursor-pointer transition-colors"
+                      onClick={() => type === "cia" && onDrilldownToAttainment && onDrilldownToAttainment(c.department_code, c.course_code)}
+                      className={`flex items-center justify-between text-xs p-1.5 rounded-lg bg-white dark:bg-gray-800/80 ${type === "cia" ? "hover:bg-rose-100/60 dark:hover:bg-rose-900/40 cursor-pointer" : "cursor-default"} transition-colors`}
                     >
                       <div className="truncate pr-2">
                         <span className="font-bold text-gray-800 dark:text-gray-200">{c.name}</span>
@@ -1678,12 +1732,27 @@ export const TeachingLearningEffectivenessView: React.FC<
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                 Courses Pushing Up / Pulling Down
               </h3>
-              <button
-                onClick={() => setShowCourseModal(true)}
-                className="text-xs font-bold text-primary hover:underline"
-              >
-                Detail
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAiModal(true)}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline"
+                  title="Run AI 6 Improvement & Analytics Diagnostics on these courses"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>AI Diagnostics</span>
+                </button>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <button
+                  onClick={() => setShowCourseModal(true)}
+                  className="text-xs font-bold text-primary hover:underline"
+                  title="Open full-screen cards view for courses pulling up and down"
+                >
+                  Detail
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -1705,7 +1774,8 @@ export const TeachingLearningEffectivenessView: React.FC<
                     data.courses_pushing_up.map((c) => (
                     <div
                       key={c.course_code}
-                      onClick={() => onDrilldownToAttainment && onDrilldownToAttainment(c.department_code, c.course_code)}
+                      onClick={() => setShowCourseModal(true)}
+                      title="Click to view cards full-screen"
                       className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-white dark:bg-gray-800/80 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer transition-colors"
                     >
                       <div className="truncate pr-2">
@@ -1738,7 +1808,8 @@ export const TeachingLearningEffectivenessView: React.FC<
                     data.courses_pulling_down.map((c) => (
                     <div
                       key={c.course_code}
-                      onClick={() => onDrilldownToAttainment && onDrilldownToAttainment(c.department_code, c.course_code)}
+                      onClick={() => setShowCourseModal(true)}
+                      title="Click to view cards full-screen"
                       className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-white dark:bg-gray-800/80 hover:bg-rose-100/60 dark:hover:bg-rose-900/40 cursor-pointer transition-colors"
                     >
                       <div className="truncate pr-2">
@@ -1931,18 +2002,19 @@ export const TeachingLearningEffectivenessView: React.FC<
                           {inst.attainment_pct.toFixed(1)}%
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <button
-                            onClick={() =>
-                              onDrilldownToAttainment &&
-                              onDrilldownToAttainment(
-                                selectedDrilldownCourse.department_code,
-                                selectedDrilldownCourse.course_code
-                              )
-                            }
-                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm"
-                          >
-                            View Attainment Matrix →
-                          </button>
+                          {type === "cia" && onDrilldownToAttainment && (
+                            <button
+                              onClick={() =>
+                                onDrilldownToAttainment(
+                                  selectedDrilldownCourse.department_code,
+                                  selectedDrilldownCourse.course_code
+                                )
+                              }
+                              className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm"
+                            >
+                              View Attainment Matrix →
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -2116,64 +2188,29 @@ export const TeachingLearningEffectivenessView: React.FC<
         </div>
       )}
 
-      {/* Detail Modal for Courses */}
+      {/* Full-Screen Detail Modal for Courses Pushing Up / Pulling Down (Cards Alone with Ordering & Sorting) */}
       {showCourseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-[#1a2234] w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 p-6 overflow-hidden max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                All Courses Performance Detail
-              </h3>
-              <button
-                onClick={() => setShowCourseModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg font-bold"
-              >
-                ×
-              </button>
-            </div>
-            <div className="py-4 overflow-y-auto space-y-2">
-              {[...data.courses_pushing_up, ...data.courses_pulling_down].length === 0 ? (
-                <div className="py-8 text-center text-xs text-gray-400 font-medium">No records found</div>
-              ) : (
-                [...data.courses_pushing_up, ...data.courses_pulling_down].map((c) => (
-                  <div
-                    key={c.course_code}
-                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
-                  >
-                    <div>
-                      <span className="font-bold text-gray-900 dark:text-white text-sm">
-                        {c.course_code} - {c.course_name}
-                      </span>
-                      <span className="text-xs text-gray-400 block">
-                        {c.department_code} - Semester {c.semester}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span
-                        className={`text-sm font-extrabold ${
-                          c.attainment_pct >= targetBenchmark ? "text-emerald-600" : "text-rose-600"
-                        }`}
-                      >
-                        {c.attainment_pct}%
-                      </span>
-                      <span className="text-[10px] text-gray-400 block">
-                        {c.attainment_pct >= targetBenchmark ? "Above Target" : "Below Target"}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 text-right">
-              <button
-                onClick={() => setShowCourseModal(false)}
-                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <CoursePushPullFullscreenModal
+          isOpen={showCourseModal}
+          onClose={() => setShowCourseModal(false)}
+          type={type}
+          targetBenchmark={targetBenchmark}
+          coursesPushingUp={data.courses_pushing_up}
+          coursesPullingDown={data.courses_pulling_down}
+          activeKLevels={activeKLevels}
+          department={selectedDept}
+          batch={selectedBatch}
+          scope={selectedTest}
+        />
+      )}
+
+      {/* AI Academic Advisory & 6 Key Improvement Points Modal */}
+      {data && (
+        <AiAcademicAnalyticsModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          reportInput={aiReportInput}
+        />
       )}
     </div>
   );
