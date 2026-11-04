@@ -631,12 +631,12 @@ export const academicAdminService = {
     const classrooms_pushing_up: ClassroomPushPullItem[] = (d.classrooms_pushing_up || []).map(
       (c: any) => ({
         id: c.id,
-        name: c.name || "Classroom",
+        name: c.name || "",
         department_code: c.department_code || c.dept || "",
         course_code: c.course_code || "",
         attainment_pct: Number(c.attainment_pct) || 0,
         student_count: Number(c.student_count) || 0,
-        faculty_name: c.faculty_name || c.faculty || "Faculty Member",
+        faculty_name: c.faculty_name || c.faculty || "",
         k_levels: c.k_levels || undefined,
       })
     );
@@ -644,12 +644,12 @@ export const academicAdminService = {
     const classrooms_pulling_down: ClassroomPushPullItem[] = (d.classrooms_pulling_down || []).map(
       (c: any) => ({
         id: c.id,
-        name: c.name || "Classroom",
+        name: c.name || "",
         department_code: c.department_code || c.dept || "",
         course_code: c.course_code || "",
         attainment_pct: Number(c.attainment_pct) || 0,
         student_count: Number(c.student_count) || 0,
-        faculty_name: c.faculty_name || c.faculty || "Faculty Member",
+        faculty_name: c.faculty_name || c.faculty || "",
         k_levels: c.k_levels || undefined,
       })
     );
@@ -690,7 +690,7 @@ export const academicAdminService = {
         id: inst.id || inst.instance_id,
         instance_id: inst.instance_id || inst.id,
         name: inst.name || "Section",
-        faculty_name: inst.faculty_name || "Faculty Coordinator",
+        faculty_name: inst.faculty_name || "",
         student_count: Number(inst.student_count) || 0,
         attainment_pct: Number(inst.attainment_pct ?? inst.total_pct ?? 0),
         total_pct: Number(inst.total_pct ?? inst.attainment_pct ?? 0),
@@ -788,7 +788,7 @@ export const academicAdminService = {
       const instances: ClassInstanceAttainmentItem[] = (c.instances || []).map((inst: any) => ({
         instance_id: inst.instance_id,
         instance_name: inst.instance_name || "Section",
-        instructor_name: inst.instructor_name || "Faculty Member",
+        instructor_name: inst.instructor_name || "",
         student_count: Number(inst.student_count) || 0,
         average_attainment_pct: Math.round(((Number(inst.average_attainment) || 0) / 3.0) * 100),
       }));
@@ -827,7 +827,7 @@ export const academicAdminService = {
     return (response?.data || []).map((inst: any) => ({
       instance_id: inst.instance_id,
       instance_name: inst.instance_name || "Section",
-      instructor_name: inst.instructor_name || "Faculty Member",
+      instructor_name: inst.instructor_name || "",
       student_count: Number(inst.student_count) || 0,
       average_attainment_pct: Math.round(((Number(inst.average_attainment) || 0) / 3.0) * 100),
     }));

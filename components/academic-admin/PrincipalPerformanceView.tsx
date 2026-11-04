@@ -61,16 +61,16 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
       attainment_pct: c.baseline_attainment_pct,
       total_pct: c.baseline_attainment_pct,
       student_count: c.total_students || 0,
-      k_levels: { K1: 75, K2: 70, K3: 65, K4: 60, K5: 55, K6: 50 },
+      k_levels: { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 },
       instances: (c.classroom_comparisons || []).map((cl) => ({
         id: cl.instance_id,
         instance_id: cl.instance_id,
-        name: cl.instance_name,
-        faculty_name: cl.faculty_name,
-        student_count: cl.student_count,
-        attainment_pct: cl.attainment_pct,
-        total_pct: cl.attainment_pct,
-        k_levels: cl.k_levels || { K1: 75, K2: 70, K3: 65, K4: 60, K5: 55, K6: 50 },
+        name: cl.instance_name || "—",
+        faculty_name: cl.faculty_name || "—",
+        student_count: cl.student_count || 0,
+        attainment_pct: cl.attainment_pct || 0,
+        total_pct: cl.attainment_pct || 0,
+        k_levels: (cl.k_levels as any) || { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 },
       })),
     }));
   }, [courses]);
@@ -84,8 +84,8 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
       testFilter: 'ALL',
       targetBenchmark: 60,
       totalAttainmentPct: summary?.average_faculty_attainment ?? 0,
-      participationPct: 92,
-      kLevels: { K1: 75, K2: 70, K3: 65, K4: 60, K5: 55, K6: 50 },
+      participationPct: summary?.average_faculty_attainment ? Math.min(Math.round(summary.average_faculty_attainment), 100) : 0,
+      kLevels: { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 },
       coursesPushingUp: courses
         .filter((c) => c.baseline_attainment_pct >= 60)
         .map((c) => ({
@@ -241,7 +241,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                 #1 Top Faculty
               </span>
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white mt-1 truncate">
-                {summary?.top_faculty?.name || faculties[0]?.faculty_name || "—"}
+                {summary?.top_faculty?.name || faculties[0]?.faculty_name || "No faculty data"}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {summary?.top_faculty?.department || faculties[0]?.department_code || "—"}
@@ -275,7 +275,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                 Top Academic Class
               </span>
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white mt-1 truncate">
-                {summary?.top_class?.name || (topClasses[0] ? `${topClasses[0].class_name} (${topClasses[0].section_name})` : "—")}
+                {summary?.top_class?.name || (topClasses[0] ? `${topClasses[0].class_name} (${topClasses[0].section_name})` : "No class data")}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {summary?.top_class?.total_courses ?? topClasses[0]?.total_courses_count ?? 0} courses accumulated
