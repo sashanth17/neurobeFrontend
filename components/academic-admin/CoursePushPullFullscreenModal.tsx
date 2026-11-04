@@ -337,7 +337,7 @@ export const CoursePushPullFullscreenModal: React.FC<CoursePushPullFullscreenMod
               onChange={(e) => setSortField(e.target.value as SortField)}
               className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
             >
-              <option value="score">Attainment Score</option>
+              <option value="score">{type === "cia" ? "Attainment Score" : "Test Score"}</option>
               <option value="diff">Difference vs Target</option>
               <option value="code">Course Code</option>
               <option value="name">Course Name</option>
@@ -467,7 +467,7 @@ export const CoursePushPullFullscreenModal: React.FC<CoursePushPullFullscreenMod
                     <div className="flex items-baseline justify-between">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">
-                          Attainment
+                          {type === "cia" ? "Attainment" : "Score"}
                         </span>
                         <span
                           className={`text-2xl font-black tracking-tight ${

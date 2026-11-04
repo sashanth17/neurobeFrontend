@@ -19,6 +19,7 @@ export const ROLES = {
   SUPER_ADMIN: "Super Admin",
   ERP_ADMIN: "ERP Admin",
   ACADEMIC_ADMIN: "Academic Administrator",
+  PRINCIPAL: "Principal",
   COURSE_COORDINATOR: "Course Coordinator",
   COURSE_INSTRUCTOR: "Course Instructor",
   STUDENT: "Student",
@@ -216,34 +217,36 @@ OwnmenuConfig.STUDENT = [
 ];
 
 OwnmenuConfig.ACADEMIC_ADMIN = [
-  // {
-  //   type: "heading",
-  //   label: "ACADEMIC EFFECTIVENESS",
-  //   className: "pb-2",
-  // },
-  // {
-  //   type: "link",
-  //   icon: "IconMenuNotes",
-  //   label: "MCQ Teaching Learning Effectiveness",
-  //   href: "/neurobe/academic-admin?tab=mcq",
-  // },
-  // {
-  //   type: "link",
-  //   icon: "IconMenuCharts",
-  //   label: "CIA Teaching Learning Effectiveness",
-  //   href: "/neurobe/academic-admin?tab=cia",
-  // },
-  // {
-  //   type: "link",
-  //   icon: "IconMenuDashboard",
-  //   label: "Attainment",
-  //   href: "/neurobe/academic-admin?tab=attainment",
-  // },
+  {
+    type: "heading",
+    label: "PRINCIPAL MANAGEMENT",
+    className: "pb-2",
+  },
+  {
+    type: "link",
+    icon: "IconMenuCharts",
+    label: "Teaching Learning Effectiveness",
+    href: "/neurobe/academic-admin?tab=cia",
+  },
+  {
+    type: "link",
+    icon: "IconMenuDashboard",
+    label: "Faculty & Class Performance",
+    href: "/neurobe/academic-admin?tab=performance",
+  },
+  {
+    type: "link",
+    icon: "IconMenuNotes",
+    label: "Attainment Analysis",
+    href: "/neurobe/academic-admin?tab=attainment",
+  },
 ];
 
 // Aliases for role lookup consistency
 OwnmenuConfig["ERP Admin"] = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig["Academic Administrator"] = OwnmenuConfig.ACADEMIC_ADMIN;
+OwnmenuConfig["Principal"] = OwnmenuConfig.ACADEMIC_ADMIN;
+OwnmenuConfig.principal = OwnmenuConfig.ACADEMIC_ADMIN;
 OwnmenuConfig["Course Coordinator"] = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig["Course Instructor"] = OwnmenuConfig.COURSE_INSTRUCTOR;
 OwnmenuConfig["Faculty"] = OwnmenuConfig.FACULTY;
@@ -265,7 +268,7 @@ export const getMenuByRole = (role) => {
 
   if (
     normalized === "ACADEMIC_ADMIN" ||
-    normalized === "ACADEMIC_ADMINISTRATOR"
+    normalized === "ACADEMIC_ADMINISTRATOR" || normalized === "PRINCIPAL"
   ) {
     return OwnmenuConfig.ACADEMIC_ADMIN;
   }
@@ -313,7 +316,7 @@ export const getDefaultRouteByRole = (role) => {
 
   if (
     normalized === "ACADEMIC_ADMIN" ||
-    normalized === "ACADEMIC_ADMINISTRATOR"
+    normalized === "ACADEMIC_ADMINISTRATOR" || normalized === "PRINCIPAL"
   ) {
     return "/neurobe/academic-admin";
   }

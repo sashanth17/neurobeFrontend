@@ -319,7 +319,7 @@ export const TeachingLearningEffectivenessView: React.FC<
     if (!data || !inspectKLevel) return [];
     return [
       {
-        name: `${inspectKLevel} Attainment %`,
+        name: `${inspectKLevel} ${type === "cia" ? "Attainment" : "Score"} %`,
         data: [Number(data.k_level_performance[inspectKLevel] || 0)],
       },
     ];
@@ -334,7 +334,7 @@ export const TeachingLearningEffectivenessView: React.FC<
     });
     return [
       {
-        name: "Attainment %",
+        name: type === "cia" ? "Attainment %" : "Score %",
         data: categoriesData,
       },
     ];
@@ -738,7 +738,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                 {inspectKLevel} — {K_LEVEL_LABELS[inspectKLevel]} Dedicated Analysis
               </h3>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                (Attainment: <strong>{kScore.toFixed(1)}%</strong> | Target: <strong>{targetBenchmark}%</strong>)
+                ({type === "cia" ? "Attainment" : "Score"}: <strong>{kScore.toFixed(1)}%</strong> | Target: <strong>{targetBenchmark}%</strong>)
               </span>
             </div>
           </div>
@@ -758,14 +758,14 @@ export const TeachingLearningEffectivenessView: React.FC<
             <div>
               <div className="flex items-center justify-between mb-1">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                  {inspectKLevel} Cognitive Attainment
+                  {inspectKLevel} Cognitive {type === "cia" ? "Attainment" : "Performance"}
                 </h3>
                 <span className="text-xs font-extrabold" style={{ color: K_LEVEL_COLORS[inspectKLevel] }}>
                   {kScore.toFixed(1)}%
                 </span>
               </div>
               <p className="text-[11px] text-gray-400 mb-2">
-                Evaluated attainment % for {inspectKLevel} against {targetBenchmark}% target benchmark.
+                Evaluated {type === "cia" ? "attainment" : "score"} % for {inspectKLevel} against {targetBenchmark}% target benchmark.
               </p>
               <div className="min-h-[250px]">
                 <ReactApexChart
@@ -1220,7 +1220,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                       <th className="py-2.5 px-3">Faculty Coordinator</th>
                       <th className="py-2.5 px-2 text-center">Students</th>
                       <th className="py-2.5 px-3 text-right" style={{ color: K_LEVEL_COLORS[inspectKLevel] }}>
-                        {inspectKLevel} Attainment %
+                        {inspectKLevel} {type === "cia" ? "Attainment" : "Score"} %
                       </th>
                       <th className="py-2.5 px-3 text-center">Status</th>
                       <th className="py-2.5 px-3 text-right">Action</th>
@@ -1296,7 +1296,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                     <th className="py-2.5 px-2 text-center">Dept</th>
                     <th className="py-2.5 px-2 text-center">Sem</th>
                     <th className="py-2.5 px-3 text-right" style={{ color: K_LEVEL_COLORS[inspectKLevel] }}>
-                      {inspectKLevel} Attainment %
+                      {inspectKLevel} {type === "cia" ? "Attainment" : "Score"} %
                     </th>
                     <th className="py-2.5 px-3 text-center">Status</th>
                     <th className="py-2.5 px-3 text-right">Classrooms</th>
@@ -1386,7 +1386,7 @@ export const TeachingLearningEffectivenessView: React.FC<
               </div>
             </div>
             <p className="text-[11px] text-gray-400 mb-2">
-              Attainment % across active K-level filters against {targetBenchmark}% target. Click any bar or level below for full screen.
+              {type === "cia" ? "Attainment %" : "Score %"} across active K-level filters against {targetBenchmark}% target. Click any bar or level below for full screen.
             </p>
             {!hasEvaluatedMarks ? (
               <div className="h-[250px] flex flex-col items-center justify-center text-center p-4">
@@ -1499,7 +1499,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                     </svg>
                     Classrooms Pushing UP
                   </span>
-                  <span>Attainment</span>
+                  <span>{type === "cia" ? "Attainment" : "Score"}</span>
                 </div>
                 <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                   {data.classrooms_pushing_up.length === 0 ? (
@@ -1532,7 +1532,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                     </svg>
                     Classroom Pulling Down
                   </span>
-                  <span>Attainment</span>
+                  <span>{type === "cia" ? "Attainment" : "Score"}</span>
                 </div>
                 <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                   {data.classrooms_pulling_down.length === 0 ? (
@@ -1668,7 +1668,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                 Year-Wise Cohort Breakdown
               </h3>
               <p className="text-[11px] text-gray-400">
-                Attainment across active K-levels.
+                {type === "cia" ? "Attainment" : "Performance score"} across active K-levels.
               </p>
             </div>
           </div>
@@ -1765,7 +1765,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                     </svg>
                     Courses Pushing Up
                   </span>
-                  <span>Attainment</span>
+                  <span>{type === "cia" ? "Attainment" : "Score"}</span>
                 </div>
                 <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                   {data.courses_pushing_up.length === 0 ? (
@@ -1799,7 +1799,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                     </svg>
                     Courses Pulling Down
                   </span>
-                  <span>Attainment</span>
+                  <span>{type === "cia" ? "Attainment" : "Score"}</span>
                 </div>
                 <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                   {data.courses_pulling_down.length === 0 ? (
@@ -1930,7 +1930,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                   {selectedDrilldownCourse.course_code} - {selectedDrilldownCourse.course_title}
                 </h4>
                 <span className="text-xs text-gray-500">
-                  {selectedDrilldownCourse.department_code} • Semester {selectedDrilldownCourse.semester} • Overall Attainment:{" "}
+                  {selectedDrilldownCourse.department_code} • Semester {selectedDrilldownCourse.semester} • Overall {type === "cia" ? "Attainment" : "Score"}:{" "}
                   <strong>{selectedDrilldownCourse.attainment_pct}%</strong>
                 </span>
               </div>
@@ -1958,7 +1958,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                         {k}
                       </th>
                     ))}
-                    <th className="py-2.5 px-3 text-right">Attainment %</th>
+                    <th className="py-2.5 px-3 text-right">{type === "cia" ? "Attainment %" : "Score %"}</th>
                     <th className="py-2.5 px-3 text-right">Action</th>
                   </tr>
                 </thead>
@@ -2042,7 +2042,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                       {k}
                     </th>
                   ))}
-                  <th className="py-2.5 px-3 text-right">Total Attainment %</th>
+                  <th className="py-2.5 px-3 text-right">{type === "cia" ? "Total Attainment %" : "Total Score %"}</th>
                   <th className="py-2.5 px-3 text-center">OBE Status</th>
                   <th className="py-2.5 px-3 text-right">Classrooms</th>
                 </tr>
@@ -2210,6 +2210,9 @@ export const TeachingLearningEffectivenessView: React.FC<
           isOpen={showAiModal}
           onClose={() => setShowAiModal(false)}
           reportInput={aiReportInput}
+          courseBreakdown={data.course_breakdown}
+          departmentBreakdown={data.department_breakdown}
+          departments={departments.map((d) => d.code)}
         />
       )}
     </div>

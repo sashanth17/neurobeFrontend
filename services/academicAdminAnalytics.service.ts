@@ -302,6 +302,181 @@ export interface DepartmentAttainmentSummary {
 // Pure Live Service API Methods (Zero Mock Data)
 // ==========================================
 
+
+// ==========================================
+// Performance Module Contracts
+// ==========================================
+
+export interface FacultyHandledCourse {
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  instance_count: number;
+  student_count: number;
+  attainment_pct: number;
+  pass_pct: number;
+}
+
+export interface FacultyLeaderboardItem {
+  faculty_id: number;
+  faculty_name: string;
+  email: string;
+  role_name: string;
+  department_code: string;
+  department_name: string;
+  total_courses: number;
+  total_classrooms: number;
+  total_students: number;
+  average_attainment_pct: number;
+  overall_pass_pct: number;
+  composite_score: number;
+  tier_badge: "Elite Performer" | "High Achiever" | "Consistent Performer" | "Needs Intervention" | string;
+  badge_color: "emerald" | "blue" | "amber" | "rose" | string;
+  rank?: number;
+  courses_handled: FacultyHandledCourse[];
+}
+
+export interface FacultyLeaderboardResponse {
+  academic_year: string;
+  department_code: string;
+  total_faculties: number;
+  top_podium: FacultyLeaderboardItem[];
+  leaderboard: FacultyLeaderboardItem[];
+}
+
+export interface CourseTeacherLeaderboardItem {
+  faculty_id: number;
+  faculty_name: string;
+  classrooms_handled: number;
+  sections_handled: string[];
+  total_students: number;
+  attainment_pct: number;
+  pass_pct: number;
+  delta_from_baseline: number;
+  is_star_performer: boolean;
+  badge: string;
+  rank?: number;
+}
+
+export interface MistakeKLevelComparison {
+  class_pct: number;
+  course_baseline_pct: number;
+  gap: number;
+}
+
+export interface MistakeAnalysisData {
+  primary_concern: string;
+  weakest_cognitive_level: string;
+  absenteeism_rate_pct: number;
+  attainment_deficit_pct: number;
+  k_level_comparison: Record<string, MistakeKLevelComparison>;
+  root_causes: string[];
+  recommended_interventions: string[];
+}
+
+export interface ClassroomComparativeItem {
+  instance_id: number;
+  instance_name: string;
+  faculty_name: string;
+  student_count: number;
+  attainment_pct: number;
+  pass_pct: number;
+  delta_from_baseline: number;
+  pass_delta_from_baseline: number;
+  status: "STAR_PERFORMER" | "ON_PAR" | "AT_RISK";
+  divergence_type: "POSITIVE_OUTLIER" | "NORMAL" | "NEGATIVE_OUTLIER";
+  mistake_analysis?: MistakeAnalysisData | null;
+  k_levels: Record<string, number>;
+}
+
+export interface CourseComparativeData {
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  department_code: string;
+  department_name: string;
+  baseline_attainment_pct: number;
+  baseline_pass_pct: number;
+  total_students: number;
+  total_classrooms: number;
+  star_teachers_count: number;
+  at_risk_classrooms_count: number;
+  teacher_leaderboard: CourseTeacherLeaderboardItem[];
+  classroom_comparisons: ClassroomComparativeItem[];
+}
+
+export interface CourseComparativeResponse {
+  academic_year: string;
+  department_code: string;
+  total_courses_analyzed: number;
+  courses: CourseComparativeData[];
+}
+
+export interface ClassCourseBreakdownItem {
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  instructor_name: string;
+  student_count: number;
+  attainment_pct: number;
+  pass_pct: number;
+}
+
+export interface TopClassCohortItem {
+  rank: number;
+  cohort_key: string;
+  class_name: string;
+  section_name: string;
+  department_code: string;
+  department_name: string;
+  semester: number;
+  total_courses_count: number;
+  total_students: number;
+  holistic_attainment_pct: number;
+  holistic_pass_pct: number;
+  consistency_index: number;
+  award_badge: string;
+  strongest_subject?: {
+    code: string;
+    title: string;
+    attainment_pct: number;
+  } | null;
+  weakest_subject?: {
+    code: string;
+    title: string;
+    attainment_pct: number;
+  } | null;
+  courses_breakdown: ClassCourseBreakdownItem[];
+}
+
+export interface TopClassesResponse {
+  academic_year: string;
+  department_code: string;
+  total_classes_evaluated: number;
+  top_classes: TopClassCohortItem[];
+}
+
+export interface PerformanceOverviewSummary {
+  academic_year: string;
+  total_faculties_evaluated: number;
+  total_classrooms_tracked: number;
+  top_faculty?: {
+    id?: number;
+    name?: string;
+    department?: string;
+    composite_score?: number;
+    tier_badge?: string;
+  } | null;
+  top_class?: {
+    name?: string;
+    department?: string;
+    holistic_score?: number;
+    total_courses?: number;
+  } | null;
+  divergence_alert_count: number;
+  average_faculty_attainment: number;
+}
+
 export const academicAdminService = {
   /**
    * Fetch filter options (Academic years, Departments, Exam scopes)
@@ -657,4 +832,86 @@ export const academicAdminService = {
       average_attainment_pct: Math.round(((Number(inst.average_attainment) || 0) / 3.0) * 100),
     }));
   },
+
+  /**
+   * Fetch executive KPI summary for Principal Performance Dashboard
+   */
+  async getPerformanceOverviewSummary(orgId = 1, academicYear?: string): Promise<PerformanceOverviewSummary> {
+    const response = await commonInstance().get(`${COURSE_API_BASE}/performance/overview-summary`, {
+      params: {
+        organization_id: orgId,
+        academic_year: academicYear && academicYear !== "ALL" ? academicYear : undefined,
+      },
+    });
+    return response?.data || {
+      academic_year: academicYear || "2025-2026",
+      total_faculties_evaluated: 0,
+      total_classrooms_tracked: 0,
+      divergence_alert_count: 0,
+      average_faculty_attainment: 0,
+    };
+  },
+
+  /**
+   * Section 1: Fetch General Faculty Performance Leaderboard across all courses
+   */
+  async getFacultyLeaderboard(
+    orgId = 1,
+    academicYear?: string,
+    departmentCode = "ALL",
+    mode = "COMBINED"
+  ): Promise<FacultyLeaderboardResponse> {
+    const response = await commonInstance().get(`${COURSE_API_BASE}/performance/faculty-leaderboard`, {
+      params: {
+        organization_id: orgId,
+        academic_year: academicYear && academicYear !== "ALL" ? academicYear : undefined,
+        department_code: departmentCode !== "ALL" ? departmentCode : undefined,
+        mode: mode,
+      },
+    });
+    return response?.data || { academic_year: "", department_code: departmentCode, total_faculties: 0, top_podium: [], leaderboard: [] };
+  },
+
+  /**
+   * Section 2 & 3: Fetch Course-Level Comparative Analysis & Mistake Diagnostics
+   */
+  async getCourseComparativeAnalysis(
+    orgId = 1,
+    academicYear?: string,
+    courseId?: number,
+    departmentCode = "ALL",
+    mode = "COMBINED"
+  ): Promise<CourseComparativeResponse> {
+    const response = await commonInstance().get(`${COURSE_API_BASE}/performance/course-comparative`, {
+      params: {
+        organization_id: orgId,
+        academic_year: academicYear && academicYear !== "ALL" ? academicYear : undefined,
+        course_id: courseId,
+        department_code: departmentCode !== "ALL" ? departmentCode : undefined,
+        mode: mode,
+      },
+    });
+    return response?.data || { academic_year: "", department_code: departmentCode, total_courses_analyzed: 0, courses: [] };
+  },
+
+  /**
+   * Section 4: Fetch Top Performing Classes accumulating all courses of that class
+   */
+  async getTopClassrooms(
+    orgId = 1,
+    academicYear?: string,
+    departmentCode = "ALL",
+    semester?: number
+  ): Promise<TopClassesResponse> {
+    const response = await commonInstance().get(`${COURSE_API_BASE}/performance/top-classes`, {
+      params: {
+        organization_id: orgId,
+        academic_year: academicYear && academicYear !== "ALL" ? academicYear : undefined,
+        department_code: departmentCode !== "ALL" ? departmentCode : undefined,
+        semester: semester,
+      },
+    });
+    return response?.data || { academic_year: "", department_code: departmentCode, total_classes_evaluated: 0, top_classes: [] };
+  },
+
 };

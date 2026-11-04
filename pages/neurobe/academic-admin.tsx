@@ -5,8 +5,9 @@ import Head from "next/head";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import TeachingLearningEffectivenessView from "@/components/academic-admin/TeachingLearningEffectivenessView";
 import AcademicAdminAttainmentView from "@/components/academic-admin/AcademicAdminAttainmentView";
+import PrincipalPerformanceView from "@/components/academic-admin/PrincipalPerformanceView";
 
-type AcademicTab = "mcq" | "cia" | "attainment";
+type AcademicTab = "mcq" | "cia" | "attainment" | "performance";
 
 const AcademicAdminPage = () => {
   const dispatch = useDispatch();
@@ -28,7 +29,7 @@ const AcademicAdminPage = () => {
   useEffect(() => {
     if (!router.isReady) return;
     const tabParam = router.query.tab as string;
-    if (tabParam === "mcq" || tabParam === "cia" || tabParam === "attainment") {
+    if (tabParam === "mcq" || tabParam === "cia" || tabParam === "attainment" || tabParam === "performance") {
       setActiveTab(tabParam);
     }
   }, [router.isReady, router.query.tab]);
@@ -70,6 +71,7 @@ const AcademicAdminPage = () => {
               {activeTab === "mcq" && "MCQ Teaching Learning Effectiveness"}
               {activeTab === "cia" && "CIA Teaching Learning Effectiveness"}
               {activeTab === "attainment" && "CO-PO Attainment Analysis"}
+              {activeTab === "performance" && "Faculty & Classroom Performance Analytics"}
             </h1>
           </div>
 
@@ -126,6 +128,22 @@ const AcademicAdminPage = () => {
               </svg>
               <span>Attainment</span>
             </button>
+
+            {/* 4. Faculty & Classroom Performance Analytics */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("performance")}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm ${
+                activeTab === "performance"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-md scale-105"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Faculty & Class Performance</span>
+            </button>
           </div>
         </div>
 
@@ -151,6 +169,12 @@ const AcademicAdminPage = () => {
               key={`attainment-${attainmentDept}-${attainmentCourse || "all"}`}
               initialDepartmentCode={attainmentDept}
               initialCourseCode={attainmentCourse}
+            />
+          )}
+
+          {activeTab === "performance" && (
+            <PrincipalPerformanceView
+              key="principal-performance-view"
             />
           )}
         </div>

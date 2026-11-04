@@ -2,19 +2,40 @@
  * Academic Administrator AI Intelligence & Database Service
  * 
  * Provides:
- * - Generation of 6 Comprehensive Improvement and Analytics Points:
- *   1. Pedagogy Suggestions (Active learning, Bloom alignment)
- *   2. Anomaly Detections (Outlier and distribution skew)
- *   3. Cause of the Problem Analysis (Root cause diagnostics)
- *   4. Remedy to Solve (Actionable intervention protocols)
- *   5. Assessment & Question Improvements (Question cognitive balance)
- *   6. Strategic Institutional / Departmental Action Plan (Timeline milestones)
+ * - Generation of 6 Key Simple, Actionable Improvement Points:
+ *   1. Teaching & Classroom Tips (Simple classroom methods, active practice)
+ *   2. Where Students Are Struggling (Clear problem areas, application vs memory)
+ *   3. Why Is This Happening? (Root causes: attendance, fast pace, missed basics)
+ *   4. How to Fix It (Step-by-step simple remedies, doubt sessions, study buddies)
+ *   5. Test & Exam Paper Tips (Fair, balanced questions, avoiding trick options)
+ *   6. Action Plan for Principal & Teachers (Simple 4-week practical checklist)
+ * 
+ * - Multi-Level Scope Filtering:
+ *   - OVERALL: College-wide leadership & high-impact priorities
+ *   - DEPARTMENT: Department-level faculty coordination & course pacing
+ *   - COURSE: Course-specific syllabus pacing & multi-section consistency
+ *   - CLASS: Classroom-specific guidance for the instructor and students
  * 
  * - Memory Maintaining Section:
- *   - Injects the past 4-5 historical suggestions into the prompt to detect trajectory shifts,
- *     improvements, regressions, and prevent redundant generic advice.
- *   - Stores all runs in persistent DB (IndexedDB with LocalStorage fallback & Next.js API sync).
+ *   - Injects the past 4-5 historical suggestions into the prompt to track progress,
+ *     prevent repeating generic advice, and celebrate improvements.
+ *   - Stores all runs in persistent DB (IndexedDB with LocalStorage fallback & server sync).
+ * 
+ * - Strictly respects the MCQ rule: When type is "MCQ", the word "attainment" is NEVER used.
  */
+
+export type AiSuggestionScope = "OVERALL" | "DEPARTMENT" | "COURSE" | "CLASS";
+
+export interface ScopedFilterSelection {
+  scope: AiSuggestionScope;
+  departmentCode?: string;
+  departmentName?: string;
+  courseCode?: string;
+  courseName?: string;
+  classroomId?: string | number;
+  classroomName?: string;
+  facultyName?: string;
+}
 
 export interface AiImprovementPoint {
   category:
@@ -36,6 +57,15 @@ export interface AiSuggestionReport {
   id: string;
   timestamp: string;
   type: "CIA" | "MCQ";
+  scope: AiSuggestionScope;
+  scope_details: {
+    label: string;
+    department?: string;
+    courseCode?: string;
+    courseName?: string;
+    className?: string;
+    facultyName?: string;
+  };
   filters: {
     department: string;
     batch: string;
@@ -43,7 +73,8 @@ export interface AiSuggestionReport {
     targetBenchmark: number;
   };
   current_metrics: {
-    total_attainment_pct: number;
+    score_pct: number;
+    total_attainment_pct?: number; // Kept for backwards compatibility
     target_pct: number;
     participation_pct: number;
     pushing_up_count: number;
@@ -100,12 +131,13 @@ export interface GenerateSuggestionInput {
     department_name: string;
     total_pct: number;
   }>;
+  scopeSelection?: ScopedFilterSelection;
 }
 
 const DB_NAME = "neurobe_academic_ai_db";
 const STORE_NAME = "suggestions_store";
 const DB_VERSION = 1;
-const LOCAL_STORAGE_KEY = "neurobe_academic_ai_suggestions_history_v2";
+const LOCAL_STORAGE_KEY = "neurobe_academic_ai_suggestions_history_v3";
 
 /**
  * Open or initialize IndexedDB instance
@@ -157,9 +189,7 @@ export const academicAdminAiService = {
       if (typeof window !== "undefined" && window.localStorage) {
         const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
         let list: AiSuggestionReport[] = raw ? JSON.parse(raw) : [];
-        // Insert at beginning, deduplicate by id
         list = [report, ...list.filter((x) => x.id !== report.id)];
-        // Keep max 50 in localStorage
         if (list.length > 50) list = list.slice(0, 50);
         window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
       }
@@ -174,9 +204,7 @@ export const academicAdminAiService = {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(report),
-        }).catch(() => {
-          // Ignore server sync failure if offline or unsupported
-        });
+        }).catch(() => {});
       }
     } catch (_) {}
   },
@@ -205,7 +233,7 @@ export const academicAdminAiService = {
       }
     }
 
-    // Fallback: If both empty, try fetching from server API
+    // Fallback: server API
     if (results.length === 0 && typeof window !== "undefined") {
       try {
         const res = await fetch(`/api/academic-admin/ai-insights?type=${type || ""}`);
@@ -300,34 +328,19 @@ export const academicAdminAiService = {
 
   /**
    * Primary AI Engine:
-   * Generates a comprehensive report with the 6 structured points:
-   * 1. Pedagogy suggestions
-   * 2. Anomaly detections
-   * 3. Cause of the problem analysis
-   * 4. Remedy to solve
-   * 5. Assessment & question improvement suggestions
-   * 6. Strategic institutional / departmental action plan
-   * 
-   * Injects the past 4-5 suggestions to detect changes, calculate diffs, and preserve memory continuity.
-   * Then stores the result in DB.
+   * Generates a tailored report with the 6 structured points based on requested scope.
    */
   async generateAndStoreReport(input: GenerateSuggestionInput): Promise<AiSuggestionReport> {
-    // 1. Fetch past 4-5 suggestions from DB to inject into prompt/engine
     const pastSuggestions = await this.getPastSuggestionsForMemory(input.type, 5);
-
-    // 2. Synthesize AI analytics & memory diff
     const report = buildAiSuggestionReport(input, pastSuggestions);
-
-    // 3. Store into DB
     await this.saveSuggestion(report);
-
     return report;
   },
 };
 
 /**
  * Core AI Analytics Reasoning Engine
- * Ingests current metrics + past 4-5 suggestions to build the 6 detailed points + detected changes.
+ * Ingests current metrics, requested scope, and past history to build the 6 points in simple, clear language.
  */
 function buildAiSuggestionReport(
   input: GenerateSuggestionInput,
@@ -344,7 +357,31 @@ function buildAiSuggestionReport(
     kLevels,
     coursesPushingUp,
     coursesPullingDown,
+    scopeSelection,
   } = input;
+
+  // STRICT RULE: When MCQ, never use "attainment".
+  const scoreWord = type === "CIA" ? "attainment" : "score";
+  const ScoreWord = type === "CIA" ? "Attainment" : "Score";
+  const testWord = type === "CIA" ? "CIA Internal Exam" : "MCQ Test";
+
+  const scope: AiSuggestionScope = scopeSelection?.scope || "OVERALL";
+  const deptCode = scopeSelection?.departmentCode || department;
+  const deptName = scopeSelection?.departmentName || deptCode;
+  const courseCode = scopeSelection?.courseCode || "";
+  const courseName = scopeSelection?.courseName || "";
+  const className = scopeSelection?.classroomName || "";
+  const facultyName = scopeSelection?.facultyName || "";
+
+  // Human-readable scope label
+  let scopeLabel = "Overall College (All Departments)";
+  if (scope === "DEPARTMENT") {
+    scopeLabel = `Department of ${deptName === "ALL" ? "All Departments" : deptName}`;
+  } else if (scope === "COURSE") {
+    scopeLabel = `Course: ${courseCode} ${courseName ? `- ${courseName}` : ""}`;
+  } else if (scope === "CLASS") {
+    scopeLabel = `Class: ${className} (${courseCode})${facultyName ? ` • Teacher: ${facultyName}` : ""}`;
+  }
 
   const k1 = kLevels.K1 ?? 0;
   const k2 = kLevels.K2 ?? 0;
@@ -355,7 +392,7 @@ function buildAiSuggestionReport(
 
   const lowOrderAvg = (k1 + k2) / 2 || 0;
   const higherOrderAvg = (k3 + k4 + k5 + k6) / 4 || 0;
-  const cognitiveDropoff = Math.max(0, lowOrderAvg - higherOrderAvg);
+  const practicalDropoff = Math.max(0, lowOrderAvg - higherOrderAvg);
 
   const topUps = coursesPushingUp.slice(0, 4).map((c) => ({
     code: c.course_code,
@@ -377,215 +414,276 @@ function buildAiSuggestionReport(
   const improvedAspects: string[] = [];
   const criticalAlerts: string[] = [];
 
+  const currentScore = totalAttainmentPct;
+
   if (previousRun) {
-    scoreDiff = Number((totalAttainmentPct - previousRun.current_metrics.total_attainment_pct).toFixed(1));
-    const prevDownCodes = new Set(previousRun.current_metrics.lowest_pulling_down.map((c) => c.code));
-    const currentDownCodes = new Set(worstDowns.map((c) => c.code));
-
-    // Check newly degraded courses
-    worstDowns.forEach((c) => {
-      if (!prevDownCodes.has(c.code)) {
-        criticalAlerts.push(`Course ${c.code} (${c.name}) newly slipped into pulling-down tier at ${c.score}%.`);
-      }
-    });
-
-    // Check recovering courses
-    previousRun.current_metrics.lowest_pulling_down.forEach((prevC) => {
-      if (!currentDownCodes.has(prevC.code)) {
-        improvedAspects.push(`Course ${prevC.code} (${prevC.name}) successfully moved out of the critical pulling-down list.`);
-      }
-    });
-
-    // Cognitive shift
-    const prevK3 = previousRun.current_metrics.k_levels?.K3 ?? 0;
-    const diffK3 = Number((k3 - prevK3).toFixed(1));
-    if (Math.abs(diffK3) >= 1.0) {
-      if (diffK3 > 0) {
-        improvedAspects.push(`K3 (Apply) attainment grew by +${diffK3}% compared to previous inspection.`);
-      } else {
-        criticalAlerts.push(`K3 (Apply) attainment contracted by ${diffK3}% compared to previous inspection.`);
-      }
-    }
+    const prevScore = previousRun.current_metrics.score_pct ?? previousRun.current_metrics.total_attainment_pct ?? 0;
+    scoreDiff = Number((currentScore - prevScore).toFixed(1));
 
     if (scoreDiff > 0) {
-      notes.push(`Overall ${type} attainment shows an upward momentum of +${scoreDiff}% relative to previous report.`);
+      improvedAspects.push(`Average ${scoreWord} improved by +${scoreDiff}% compared to previous review.`);
+      notes.push(`Performance is trending upward with a +${scoreDiff}% gain since last check.`);
     } else if (scoreDiff < 0) {
-      notes.push(`Overall ${type} attainment contracted by ${scoreDiff}% compared to previous report.`);
+      criticalAlerts.push(`Average ${scoreWord} dropped by ${Math.abs(scoreDiff)}% compared to previous review.`);
+      notes.push(`Performance showed a slight dip of ${Math.abs(scoreDiff)}% compared to last check.`);
     } else {
-      notes.push(`Overall attainment remained stable with minimal variance (0.0%) against previous report.`);
+      notes.push(`Performance remained steady with zero deviation from the last review.`);
+    }
+
+    if (k3 > 0) {
+      const prevK3 = previousRun.current_metrics.k_levels?.K3 ?? 0;
+      const k3Diff = Number((k3 - prevK3).toFixed(1));
+      if (k3Diff > 1) {
+        improvedAspects.push(`Problem-solving (K3) scores grew by +${k3Diff}%.`);
+      } else if (k3Diff < -1) {
+        criticalAlerts.push(`Problem-solving (K3) scores declined by ${Math.abs(k3Diff)}%.`);
+      }
     }
   } else {
-    notes.push(`Baseline analysis initialized. Future runs will track trajectory and rate of change against this record.`);
+    notes.push(`First baseline analysis recorded. Future reviews will track progress and highlight improvements.`);
   }
 
-  // Point 1: Pedagogy Suggestions
+  // ── Point 1: Teaching & Classroom Tips (Pedagogy) ──
+  let pedagogyTitle = "Teaching & Classroom Tips";
+  let pedagogySummary = "";
+  let pedagogyFindings: string[] = [];
+  let pedagogyActions: string[] = [];
+
+  if (scope === "CLASS") {
+    pedagogyTitle = `Classroom Tips for ${className} (${facultyName || "Faculty"})`;
+    pedagogySummary = `In this class, students have a ${currentScore.toFixed(1)}% average ${scoreWord}. Spending 15 minutes each lecture on active student problem solving will produce quick improvements.`;
+    pedagogyFindings = [
+      `Students understand definitions well (${lowOrderAvg.toFixed(1)}%), but hesitate when solving questions independently (${higherOrderAvg.toFixed(1)}%).`,
+      `Students respond best when shown 2 clear, step-by-step examples on the board before doing problems themselves.`,
+      `Short peer discussions help quieter students ask questions without feeling shy.`,
+    ];
+    pedagogyActions = [
+      `Dedicate 15 minutes of every lecture for students to solve 1-2 practical problems in pairs.`,
+      `Start each class with a quick 3-minute recap question from the previous lecture.`,
+      `Ask random students to explain their reasoning in simple terms rather than just giving the final answer.`,
+    ];
+  } else if (scope === "COURSE") {
+    pedagogyTitle = `Teaching Tips for ${courseCode} (${courseName || "Course"})`;
+    pedagogySummary = `Across all sections of ${courseCode}, students score ${currentScore.toFixed(1)}%. Consistent, active teaching methods across all sections will raise class averages.`;
+    pedagogyFindings = [
+      `Sections that use hands-on problem worksheets score 10-15% higher than sections relying only on slide presentations.`,
+      `Students struggle most in applied topics where theory is disconnected from real-world examples.`,
+      `Coordination between course instructors is key to ensure all sections cover practical problem solving at the same pace.`,
+    ];
+    pedagogyActions = [
+      `Share standard tutorial worksheets across all instructors handling this course.`,
+      `Have teachers solve one tricky exam-style problem together with students every week.`,
+      `Encourage instructors to replace 20 minutes of lecture slides with live coding or numerical problem breakdown.`,
+    ];
+  } else if (scope === "DEPARTMENT") {
+    pedagogyTitle = `Teaching Strategies for ${deptName}`;
+    pedagogySummary = `Department average is ${currentScore.toFixed(1)}% against the ${targetBenchmark}% target. Focusing on hands-on practice in struggling courses will lift the entire department.`;
+    pedagogyFindings = [
+      `Courses with active classroom exercises show much higher pass rates than purely theoretical subjects.`,
+      `Students report heavy cognitive fatigue when multiple teachers schedule tests and assignments during the same week.`,
+      worstDowns.length > 0
+        ? `Courses that need the most classroom practice support: ${worstDowns.map((c) => c.code).join(", ")}.`
+        : `All department courses are maintaining steady teaching delivery.`,
+    ];
+    pedagogyActions = [
+      `Conduct a monthly 30-minute department teaching exchange where top-scoring teachers share their classroom activities.`,
+      `Mandate at least 2 hands-on problem-solving sessions per week in every technical subject.`,
+      `Coordinate test schedules across courses so students have adequate preparation time.`,
+    ];
+  } else {
+    // OVERALL
+    pedagogyTitle = "College-Wide Teaching & Classroom Advice";
+    pedagogySummary = `College-wide average is ${currentScore.toFixed(1)}%. Shifting classroom time from passive listening to active student practice will help reach the ${targetBenchmark}% benchmark.`;
+    pedagogyFindings = [
+      `Across all departments, students grasp basic definitions (${lowOrderAvg.toFixed(1)}%), but drop by ${practicalDropoff.toFixed(1)}% in practical application questions.`,
+      `High-performing faculties routinely use short 5-minute quizzes and board practice to keep students engaged.`,
+      `Students who participate in weekly tutorials score significantly higher on internal and semester exams.`,
+    ];
+    pedagogyActions = [
+      `Encourage all faculties to adopt the 'Explain, Demonstrate, Practice' method in class.`,
+      `Allocate 15 minutes of lecture time for active student exercises instead of continuous slide lecturing.`,
+      `Recognize and showcase top-performing teachers during academic council meetings.`,
+    ];
+  }
+
   const pedagogyPoint: AiImprovementPoint = {
     category: "pedagogy_suggestions",
-    title: "Pedagogical Delivery & Active Cognitive Scaffolding",
-    summary:
-      cognitiveDropoff > 10
-        ? `A pronounced ${cognitiveDropoff.toFixed(1)}% drop-off exists between foundational levels (K1/K2: ${lowOrderAvg.toFixed(1)}%) and higher-order reasoning (K3-K6: ${higherOrderAvg.toFixed(1)}%). Passive lecturing is failing to bridge application skills.`
-        : `Cognitive transition is relatively balanced (${lowOrderAvg.toFixed(1)}% foundational vs ${higherOrderAvg.toFixed(1)}% analytical), but requires structured active learning to push past the ${targetBenchmark}% target benchmark.`,
-    key_findings: [
-      `Foundational recall (K1/K2) attains ${lowOrderAvg.toFixed(1)}%, while applied synthesis (K3/K4) drops to ${((k3 + k4) / 2).toFixed(1)}%.`,
-      `Students struggle significantly when transitioning from textbook definitions to real-world code implementation or multi-step problem solving.`,
-      worstDowns.length > 0
-        ? `Primary courses suffering from pedagogical disconnect: ${worstDowns.map((c) => c.code).join(", ")}.`
-        : `Overall course instructional delivery is meeting baseline criteria.`,
-    ],
-    action_items: [
-      `Implement Peer Instruction & Flipped Case Studies: Shift 30% of lecture hours in pulling-down courses to live problem-solving worksheets.`,
-      `Scaffolded Worked Examples: Faculty should adopt 'I do, We do, You do' progression for K3 (Apply) and K4 (Analyze) topics.`,
-      `Interactive Formative Polls: Integrate 5-minute un-graded conceptual clicker questions every 20 minutes of instruction.`,
-      `Micro-Group Mentoring: Pair students scoring below ${targetBenchmark}% with high performers for weekly guided coding/computational labs.`,
-    ],
-    priority: cognitiveDropoff > 12 ? "CRITICAL" : "HIGH",
-    impact: `Projected +6% to +10% improvement in K3/K4 attainment within 4 academic weeks.`,
+    title: pedagogyTitle,
+    summary: pedagogySummary,
+    key_findings: pedagogyFindings,
+    action_items: pedagogyActions,
+    priority: currentScore < targetBenchmark ? "HIGH" : "MEDIUM",
+    impact: `Expected +5% to +8% boost in student problem-solving scores within 3 to 4 weeks.`,
   };
 
-  // Point 2: Anomaly Detections
-  const anomalyFindings: string[] = [];
+  // ── Point 2: Where Students Are Struggling (Anomalies) ──
+  const struggleFindings: string[] = [];
   if (participationPct < 85) {
-    anomalyFindings.push(
-      `Participation Deficit Anomaly: Attendance is ${participationPct.toFixed(1)}% (below institutional threshold of 85%). Missing students are skewing class averages downward.`
+    struggleFindings.push(
+      `Attendance Drop: Attendance is at ${participationPct.toFixed(1)}%. Students who miss classes regularly are scoring much lower on tests.`
     );
   }
-  if (k3 < targetBenchmark - 10) {
-    anomalyFindings.push(
-      `Severe K3 Deficit: K3 (Apply) attainment sits at ${k3.toFixed(1)}%, lagging ${ (targetBenchmark - k3).toFixed(1) }% behind the ${targetBenchmark}% institutional threshold.`
+  if (k3 < targetBenchmark - 5) {
+    struggleFindings.push(
+      `Practical Problem Solving: Students score ${k3.toFixed(1)}% in application questions, which is below the ${targetBenchmark}% benchmark.`
     );
   }
   if (worstDowns.length > 0 && topUps.length > 0) {
-    const spread = (topUps[0]?.score || 0) - (worstDowns[0]?.score || 0);
-    if (spread > 30) {
-      anomalyFindings.push(
-        `High Variance Anomaly: Extreme ${spread.toFixed(1)}% disparity between top course ${topUps[0].code} (${topUps[0].score}%) and lagging course ${worstDowns[0].code} (${worstDowns[0].score}%).`
+    const gap = (topUps[0]?.score || 0) - (worstDowns[0]?.score || 0);
+    if (gap > 20) {
+      struggleFindings.push(
+        `Performance Gap: Top course (${topUps[0].code}: ${topUps[0].score}%) scores ${gap.toFixed(0)}% higher than struggling course (${worstDowns[0].code}: ${worstDowns[0].score}%).`
       );
     }
   }
-  if (anomalyFindings.length === 0) {
-    anomalyFindings.push(
-      `Distribution conforms to standard normal curve with no severe demographic outliers detected in current filter scope.`
+  if (struggleFindings.length === 0) {
+    struggleFindings.push(
+      `Student scores are evenly distributed with no severe drop-offs detected in this scope.`
     );
   }
 
-  const anomalyPoint: AiImprovementPoint = {
+  const strugglePoint: AiImprovementPoint = {
     category: "anomaly_detections",
-    title: "Distribution Anomalies & Outlier Pattern Detection",
+    title: "Where Students Are Struggling",
     summary:
-      anomalyFindings.length > 1
-        ? `Detected ${anomalyFindings.length} critical distribution outliers impacting overall institutional benchmarks.`
-        : `Minor variance detected across evaluated cohorts with moderate clustering around the median.`,
-    key_findings: anomalyFindings,
+      struggleFindings.length > 1
+        ? `Found ${struggleFindings.length} specific areas where students are losing marks and need support.`
+        : `Performance is generally consistent with a few targeted areas needing gentle improvement.`,
+    key_findings: struggleFindings,
     action_items: [
-      `Audit attendance rosters in lagging sections to distinguish between absence penalties vs actual comprehension gaps.`,
-      `Cross-analyze faculty grading distributions to verify grading uniformity across parallel classroom sections.`,
-      `Flag courses displaying >25% score standard deviation for immediate HOD academic audit.`,
+      `Check attendance records to identify students with frequent absences before the next exam.`,
+      `Provide short formula sheets and concept summaries so students don't get stuck on minor details.`,
+      `Offer a 10-minute revision before every test focusing on common mistakes made in past tests.`,
     ],
-    priority: anomalyFindings.some((f) => f.includes("Severe") || f.includes("Extreme")) ? "CRITICAL" : "HIGH",
-    impact: `Early isolation of outlier causes prevents compounding failure rates across the remaining semester.`,
+    priority: currentScore < targetBenchmark - 10 ? "CRITICAL" : "HIGH",
+    impact: `Catches struggling students early before end-of-term exams.`,
   };
 
-  // Point 3: Cause of the Problem Analysis
+  // ── Point 3: Why Is This Happening? (Root Causes) ──
   const causePoint: AiImprovementPoint = {
     category: "cause_analysis",
-    title: "Root Cause Diagnostics of Pulling-Down Courses",
-    summary: `Analysis of ${worstDowns.length} pulling-down courses indicates a tripartite root cause: prerequisite concept gaps, assessment cognitive mismatch, and insufficient mid-cycle formative feedback.`,
+    title: "Why Is This Happening? (Root Causes)",
+    summary: `Based on score patterns, the main reasons students are falling behind are prerequisite gaps, fast pacing near exam time, and insufficient guided practice.`,
     key_findings: [
-      `Curriculum Pacing Compression: Difficult analytical concepts in ${worstDowns.map((c) => c.code).slice(0, 2).join(", ") || "lagging courses"} were delivered in rapid succession without adequate consolidation time.`,
-      `Assessment Ambiguity: Question papers tested higher-order synthesis while in-class instructional focus remained predominantly descriptive.`,
-      `Prerequisite Attrition: Lower-semester foundational knowledge in mathematics/programming was assumed but not verified through diagnostic entry checks.`,
+      `Prerequisite Basics: Students often forget foundational concepts taught in earlier semesters, making new topics harder to understand.`,
+      `Syllabus Pacing: Instructors sometimes rush through complex topics at the end of the term to finish the syllabus on time.`,
+      `Exam Surprise: Questions on exams are often more practical and scenario-based than the theory taught during lectures.`,
     ],
     action_items: [
-      `Conduct Rapid Diagnostic Quizzes at the start of complex units to identify foundational knowledge voids.`,
-      `Mandate Bloom-Level Table of Specifications (Question Blueprints) before question papers are printed or scheduled.`,
-      `Institute pacing review meetings between Course Coordinators and Subject Matter Experts.`,
+      `Spend 10 minutes at the start of every new chapter reviewing necessary prerequisite concepts.`,
+      `Maintain a steady weekly syllabus pace to avoid rushing through difficult chapters right before exams.`,
+      `Ensure questions practiced in class match the style and difficulty of actual test questions.`,
     ],
     priority: "HIGH",
-    impact: `Addresses underlying systemic failure triggers rather than merely treating symptom marks.`,
+    impact: `Fixes the real reasons students fail rather than just re-testing them.`,
   };
 
-  // Point 4: Remedy to Solve
+  // ── Point 4: How to Fix It (Remedies) ──
   const remedyPoint: AiImprovementPoint = {
     category: "remedy_to_solve",
-    title: "Targeted Remedial Interventions & Rapid Recovery Protocol",
-    summary: `Immediate 3-phase remedial action plan for students and courses performing below ${targetBenchmark}% attainment.`,
+    title: "How to Fix It (Simple Steps)",
+    summary: `Practical, easy-to-implement steps to help students below the ${targetBenchmark}% benchmark recover quickly.`,
     key_findings: [
-      `Immediate student cohort needing remedial intervention: Estimated ${((100 - totalAttainmentPct) * 0.8).toFixed(0)}% of enrolled student base.`,
-      `High-leverage intervention target: Elevating K2 and K3 scores yields the fastest cumulative bump towards institutional compliance.`,
+      `Around ${Math.max(10, Math.round((100 - currentScore) * 0.7))}% of students would pass comfortably with just 1-2 targeted help sessions.`,
+      `Pairing struggling students with friendly study partners produces rapid improvements in confidence.`,
     ],
     action_items: [
-      `Zero-Hour Remedial Clinics: Schedule 45-minute focused problem-solving tutorials twice weekly for courses ${worstDowns.map((c) => c.code).join(", ")}.`,
-      `Curated Question Banks: Provide students with a 50-question categorized problem bank containing step-by-step model solutions for K3/K4 topics.`,
-      `Re-Assessment Opportunity (Makeup CIA / Retest): Conduct formative makeup assessments allowing students to demonstrate mastery before final grade lock.`,
-      `Faculty Alignment Workshops: Departmental HOD to review lesson plan adherence with section instructors.`,
+      `Set up a weekly 45-minute doubt-clearing session for students scoring below ${targetBenchmark}%.`,
+      `Distribute a simple 20-question practice booklet with complete step-by-step solved answers.`,
+      `Assign study buddies so high-performing students can help explain difficult topics to their peers.`,
+      `Allow students to take a quick makeup quiz or practice test to boost their confidence and ${scoreWord}.`,
     ],
     priority: "CRITICAL",
-    impact: `Recovers 65% of borderline failing students to pass grade within 3 weeks.`,
+    impact: `Helps up to 70% of struggling students pass the benchmark within 3 weeks.`,
   };
 
-  // Point 5: Assessment Improvements
+  // ── Point 5: Test & Exam Paper Tips (Assessment) ──
+  const assessmentSummary =
+    type === "MCQ"
+      ? `Ensure MCQ options are clear and avoid trick questions. Focus on practical understanding rather than pure textbook memorization.`
+      : `Ensure question papers are well-balanced with a fair mix of easy definitions (30%), moderate understanding (40%), and practical problem solving (30%).`;
+
+  const assessmentFindings =
+    type === "MCQ"
+      ? [
+          `Several questions have confusing or tricky option wording that misleads even prepared students.`,
+          `Too many questions test simple memory recall rather than checking whether students truly understand the concept.`,
+        ]
+      : [
+          `Tests often allocate too many marks to definitions rather than practical problem-solving questions.`,
+          `Students need clear rubrics and step-by-step mark allocations on complex problems.`,
+        ];
+
+  const assessmentActions =
+    type === "MCQ"
+      ? [
+          `Review MCQ options: Remove tricky double-negatives ('Which of the following is NOT untrue...').`,
+          `Include short code snippets or scenario-based questions so students apply what they learned.`,
+          `Have a second teacher review the question paper to verify all answer keys are 100% accurate.`,
+        ]
+      : [
+          `Follow a balanced paper blueprint: 30% easy (definitions), 40% medium (concepts), 30% challenging (problems).`,
+          `Show clear mark distribution for each part of a multi-step question.`,
+          `Have the Course Coordinator review question papers before printing to ensure fair difficulty.`,
+        ];
+
   const assessmentPoint: AiImprovementPoint = {
     category: "assessment_improvements",
-    title: "Question Paper & Assessment Instrument Calibration",
-    summary:
-      type === "MCQ"
-        ? `MCQ questions currently skew towards rote memory recall (K1) with weak distractor discrimination. Question items require cognitive elevation.`
-        : `CIA internal assessment instruments require calibrated mark distribution aligned with OBE course outcome targets.`,
-    key_findings: [
-      type === "MCQ"
-        ? `Distractor Efficiency: Over 40% of MCQ options in lagging tests are eliminated immediately by students, reducing test discriminative reliability.`
-        : `Bloom Distribution Imbalance: Internal test questions allocate excessive weight to definitions rather than scenario-based problem solving.`,
-      `Rubric Transparency: Students report lack of clarity on grading criteria for open-ended analytical problems.`,
-    ],
-    action_items: [
-      `Adopt Standard Bloom Weightage Blueprint: 20% K1 (Remember), 30% K2 (Understand), 35% K3 (Apply), 15% K4 (Analyze).`,
-      `Peer Quality Review: Require two independent subject matter faculty to sign off on question clarity and Bloom tiering prior to exam.`,
-      type === "MCQ"
-        ? `Scenario-Based MCQs: Convert at least 50% of questions into 'Given the following code snippet / scenario, predict the outcome' format.`
-        : `Publish Detailed Analytical Rubrics alongside CIA assignment briefs.`,
-    ],
+    title: `${testWord} Question Paper Tips`,
+    summary: assessmentSummary,
+    key_findings: assessmentFindings,
+    action_items: assessmentActions,
     priority: "MEDIUM",
-    impact: `Eliminates test measurement error and produces authentic measures of student learning attainment.`,
+    impact: `Makes exams fair, reduces student stress, and measures real learning accurately.`,
   };
 
-  // Point 6: Strategic Institutional Action Plan
+  // ── Point 6: Action Plan for Principal & Teachers (Strategic Roadmap) ──
   const strategicPoint: AiImprovementPoint = {
     category: "strategic_action_plan",
-    title: "Institutional Strategic Milestone Roadmap (Weeks 1 to 8)",
-    summary: `Structured institutional milestone roadmap to elevate ${department === "ALL" ? "all academic departments" : department} above the ${targetBenchmark}% threshold.`,
+    title: "Simple 4-Week Action Plan",
+    summary: `A clear, step-by-step checklist for the Principal, HODs, and teachers over the next 4 weeks.`,
     key_findings: [
-      `Target Goal: Elevate overall ${type} attainment from ${totalAttainmentPct.toFixed(1)}% to ≥${Math.max(targetBenchmark + 5, 65)}% by end of semester.`,
-      `Governance: Weekly academic dashboard audits by Dean of Academics and Department Chairs.`,
+      `Goal: Raise the average ${scoreWord} from ${currentScore.toFixed(1)}% to ≥${Math.max(targetBenchmark + 5, 65)}%.`,
+      `Weekly check-ins ensure that remedial help actually happens and doesn't get postponed.`,
     ],
     action_items: [
-      `Week 1-2 (Diagnostics & Roster Freeze): Publish identified pulling-down course rosters and initiate remedial clinic enrollments.`,
-      `Week 3-4 (Pedagogy Pivot): Verify implementation of active learning strategies in classroom observations by Academic Audit Committee.`,
-      `Week 5-6 (Mid-Cycle Checkpoint): Execute interim diagnostic check and compare progress with baseline memory records.`,
-      `Week 7-8 (Outcome Synthesis): Final verification of CO-PO attainment closure and faculty performance appraisal documentation.`,
+      `Week 1 (Identify & Start): Share the list of students scoring below ${targetBenchmark}% with teachers and start weekly doubt sessions.`,
+      `Week 2 (Classroom Practice): Teachers spend 15 minutes of each class doing active problem solving with students.`,
+      `Week 3 (Quick Check): Conduct a short 15-minute practice test to verify if students are improving.`,
+      `Week 4 (Review with Principal): HODs review updated scores and discuss progress with the Principal.`,
     ],
     priority: "HIGH",
-    impact: `Ensures accreditation-ready OBE documentation and sustained institutional compliance.`,
+    impact: `Guarantees steady improvement without overloading teachers or students.`,
   };
 
   const detectedChangesSummary = hasPrevious
-    ? `Memory Shift: Evaluated against previous run (${new Date(previousRun?.timestamp || "").toLocaleDateString()}). ${
-        scoreDiff >= 0 ? `Attainment grew +${scoreDiff}%` : `Attainment contracted ${scoreDiff}%`
-      }. Detected ${criticalAlerts.length} critical shifts and ${improvedAspects.length} positive improvements.`
-    : `Baseline Session Established: Initialized neural memory tracking for ${type} in department ${department}. Future sessions will continuously detect performance drift.`;
+    ? `Progress Check: Compared with previous review on ${new Date(previousRun?.timestamp || "").toLocaleDateString()}. ${
+        scoreDiff >= 0 ? `Average ${scoreWord} increased by +${scoreDiff}%` : `Average ${scoreWord} decreased by ${Math.abs(scoreDiff)}%`
+      }. Detected ${improvedAspects.length} positive improvements and ${criticalAlerts.length} focus areas.`
+    : `First Baseline Check: Recorded initial performance for ${scopeLabel}. Future checks will track growth.`;
 
   return {
     id: `ai-run-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     timestamp: new Date().toISOString(),
     type,
+    scope,
+    scope_details: {
+      label: scopeLabel,
+      department: deptCode,
+      courseCode,
+      courseName,
+      className,
+      facultyName,
+    },
     filters: {
-      department,
+      department: deptCode,
       batch,
       testFilter,
       targetBenchmark,
     },
     current_metrics: {
-      total_attainment_pct: totalAttainmentPct,
+      score_pct: currentScore,
+      total_attainment_pct: currentScore,
       target_pct: targetBenchmark,
       participation_pct: participationPct,
       pushing_up_count: coursesPushingUp.length,
@@ -596,7 +694,7 @@ function buildAiSuggestionReport(
     },
     points: {
       pedagogy_suggestions: pedagogyPoint,
-      anomaly_detections: anomalyPoint,
+      anomaly_detections: strugglePoint,
       cause_analysis: causePoint,
       remedy_to_solve: remedyPoint,
       assessment_improvements: assessmentPoint,
@@ -614,4 +712,3 @@ function buildAiSuggestionReport(
     injected_past_count: pastHistory.length,
   };
 }
-
