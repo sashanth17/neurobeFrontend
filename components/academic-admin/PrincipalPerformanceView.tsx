@@ -83,7 +83,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
       batch: selectedBatch,
       testFilter: 'ALL',
       targetBenchmark: 60,
-      totalAttainmentPct: summary?.average_faculty_attainment ?? 78.4,
+      totalAttainmentPct: summary?.average_faculty_attainment ?? 0,
       participationPct: 92,
       kLevels: { K1: 75, K2: 70, K3: 65, K4: 60, K5: 55, K6: 50 },
       coursesPushingUp: courses
@@ -113,6 +113,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
 
   // Loading & Error States
   const [loading, setLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Load Filter Options
   useEffect(() => {
@@ -127,8 +128,9 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
   }, []);
 
   // Fetch Performance Data
-  useEffect(() => {
+  const fetchData = () => {
     let isMounted = true;
+    setFetchError(null);
     setLoading(true);
 
     Promise.all([
@@ -153,7 +155,15 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
         setTopClasses(classRes?.top_classes || []);
       })
       .catch((err) => {
+        if (!isMounted) return;
         console.error("Error fetching principal performance data:", err);
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail || err?.message || "Failed to load performance data.";
+        if (status === 404) {
+          setFetchError("Backend endpoint not found (HTTP 404). Please ensure the backend course-management-service is deployed with the latest performance endpoints and restarted.");
+        } else {
+          setFetchError(`Server error (${status || "Network"}): ${detail}`);
+        }
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -162,6 +172,10 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
     return () => {
       isMounted = false;
     };
+  };
+
+  useEffect(() => {
+    return fetchData();
   }, [selectedBatch, selectedDept, selectedMode, selectedSemester]);
 
   // Filtered faculties
@@ -213,7 +227,9 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
             <span>{selectedMode === "MCQ" ? "Avg Score:" : "Avg Attainment:"}</span>
-            <span className="font-extrabold">{summary?.average_faculty_attainment ?? 78.4}%</span>
+            <span className="font-extrabold">
+              {summary?.average_faculty_attainment !== undefined ? `${summary.average_faculty_attainment}%` : "—"}
+            </span>
           </div>
         </div>
 
@@ -225,10 +241,10 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                 #1 Top Faculty
               </span>
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white mt-1 truncate">
-                {summary?.top_faculty?.name || faculties[0]?.faculty_name || "Dr. Rajesh Kumar"}
+                {summary?.top_faculty?.name || faculties[0]?.faculty_name || "—"}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {summary?.top_faculty?.department || faculties[0]?.department_code || "CSE"}
+                {summary?.top_faculty?.department || faculties[0]?.department_code || "—"}
               </p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
@@ -239,10 +255,14 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
           </div>
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 font-extrabold text-[10px]">
-              {summary?.top_faculty?.tier_badge || "Elite Performer"}
+              {summary?.top_faculty?.tier_badge || (faculties[0] ? "Top Ranked" : "—")}
             </span>
             <span className="font-black text-gray-900 dark:text-white">
-              Score: {summary?.top_faculty?.composite_score || faculties[0]?.composite_score || 94.2}%
+              {summary?.top_faculty?.composite_score !== undefined
+                ? `Score: ${summary.top_faculty.composite_score}%`
+                : faculties[0]?.composite_score !== undefined
+                ? `Score: ${faculties[0].composite_score}%`
+                : "—"}
             </span>
           </div>
         </div>
@@ -255,10 +275,10 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                 Top Academic Class
               </span>
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white mt-1 truncate">
-                {summary?.top_class?.name || topClasses[0]?.class_name || "CSE - Sem 4 (Sec A)"}
+                {summary?.top_class?.name || (topClasses[0] ? `${topClasses[0].class_name} (${topClasses[0].section_name})` : "—")}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {summary?.top_class?.total_courses || topClasses[0]?.total_courses_count || 5} courses accumulated
+                {summary?.top_class?.total_courses ?? topClasses[0]?.total_courses_count ?? 0} courses accumulated
               </p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
@@ -270,7 +290,11 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="text-gray-500">Holistic Score:</span>
             <span className="font-black text-purple-600 dark:text-purple-400">
-              {summary?.top_class?.holistic_score || topClasses[0]?.holistic_attainment_pct || 91.8}%
+              {summary?.top_class?.holistic_score !== undefined
+                ? `${summary.top_class.holistic_score}%`
+                : topClasses[0]?.holistic_attainment_pct !== undefined
+                ? `${topClasses[0].holistic_attainment_pct}%`
+                : "—"}
             </span>
           </div>
         </div>
@@ -283,7 +307,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                 Divergence Alerts
               </span>
               <h3 className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
-                {summary?.divergence_alert_count ?? 3}
+                {summary?.divergence_alert_count ?? 0}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Sections failing while course passes
@@ -416,6 +440,32 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Error Alert Banner */}
+      {fetchError && (
+        <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 text-xs flex items-center justify-between gap-3 text-rose-800 dark:text-rose-200 shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <span className="font-extrabold block text-rose-900 dark:text-rose-100 text-sm">
+                Error Loading Performance Data
+              </span>
+              <p className="mt-0.5 text-rose-700 dark:text-rose-300 font-medium">{fetchError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fetchData}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shrink-0 transition-colors shadow-xs"
+          >
+            Retry Request
+          </button>
+        </div>
+      )}
 
       {/* Loading Indicator */}
       {loading && (
@@ -552,6 +602,13 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-semibold">
+                      {filteredFaculties.length === 0 && (
+                        <tr>
+                          <td colSpan={11} className="py-12 text-center text-xs text-gray-400 font-medium">
+                            No faculty performance records found for the selected filter.
+                          </td>
+                        </tr>
+                      )}
                       {filteredFaculties.map((f) => {
                         const isExpanded = expandedFacultyId === f.faculty_id;
                         return (
@@ -685,7 +742,14 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
           {/* ========================================================================= */}
           {activeSubTab === "course_comparative" && (
             <div className="space-y-6">
-              {/* Course Selector Header */}
+              {courses.length === 0 ? (
+                <div className="bg-white dark:bg-[#1a2234] rounded-2xl p-12 text-center text-gray-400 border border-gray-100 dark:border-gray-800">
+                  <p className="text-sm font-bold text-gray-700 dark:text-gray-300">No Course Comparative Data</p>
+                  <p className="text-xs mt-1">No courses found matching the selected filter criteria.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Course Selector Header */}
               <div className="bg-white dark:bg-[#1a2234] rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
                 <div className="space-y-1">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
@@ -902,6 +966,8 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                   </div>
                 </div>
               </div>
+                </>
+              )}
             </div>
           )}
 
@@ -944,6 +1010,12 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
 
               {/* Top Classes Leaderboard Cards */}
               <div className="space-y-4">
+                {topClasses.length === 0 && (
+                  <div className="bg-white dark:bg-[#1a2234] rounded-2xl p-12 text-center text-gray-400 border border-gray-100 dark:border-gray-800">
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">No Top Performing Classes Found</p>
+                    <p className="text-xs mt-1">No classroom cohort data available for the selected department/semester.</p>
+                  </div>
+                )}
                 {topClasses.map((cl) => {
                   const isExpanded = expandedClassKey === cl.cohort_key;
 

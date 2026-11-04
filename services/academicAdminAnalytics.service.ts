@@ -843,13 +843,7 @@ export const academicAdminService = {
         academic_year: academicYear && academicYear !== "ALL" ? academicYear : undefined,
       },
     });
-    return response?.data || {
-      academic_year: academicYear || "2025-2026",
-      total_faculties_evaluated: 0,
-      total_classrooms_tracked: 0,
-      divergence_alert_count: 0,
-      average_faculty_attainment: 0,
-    };
+    return response?.data;
   },
 
   /**
@@ -869,7 +863,7 @@ export const academicAdminService = {
         mode: mode,
       },
     });
-    return response?.data || { academic_year: "", department_code: departmentCode, total_faculties: 0, top_podium: [], leaderboard: [] };
+    return response?.data;
   },
 
   /**
@@ -891,7 +885,7 @@ export const academicAdminService = {
         mode: mode,
       },
     });
-    return response?.data || { academic_year: "", department_code: departmentCode, total_courses_analyzed: 0, courses: [] };
+    return response?.data;
   },
 
   /**
@@ -911,7 +905,7 @@ export const academicAdminService = {
         semester: semester,
       },
     });
-    return response?.data || { academic_year: "", department_code: departmentCode, total_classes_evaluated: 0, top_classes: [] };
+    return response?.data;
   },
 
 };
