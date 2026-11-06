@@ -27,15 +27,16 @@ interface QuestionReviewPoolProps {
   expandedQuestionIds: string[];
   onToggleExpandOne: (id: string) => void;
   onToggleExpandAll: () => void;
-  onToggleApprove: (id: string) => void;
-  onToggleArchive: (id: string) => void;
-  onEditQuestion: (q: MCQQuestion) => void;
-  onViewQuestion: (q: MCQQuestion) => void;
-  onDeleteQuestion: (id: string) => void;
-  onApproveAll: () => void;
-  onCreateQuestionSet: () => void;
+  onToggleApprove?: (id: string) => void;
+  onToggleArchive?: (id: string) => void;
+  onEditQuestion?: (q: MCQQuestion) => void;
+  onViewQuestion?: (q: MCQQuestion) => void;
+  onDeleteQuestion?: (id: string) => void;
+  onApproveAll?: () => void;
+  onCreateQuestionSet?: () => void;
   onAuthorManually?: () => void;
-  isGeneratingAI: boolean;
+  onGenerateAI?: () => void;
+  isGeneratingAI?: boolean;
 }
 
 export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
@@ -55,6 +56,7 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
   onApproveAll,
   onCreateQuestionSet,
   onAuthorManually,
+  onGenerateAI,
   isGeneratingAI,
 }) => {
   const isAllExpanded =
@@ -121,6 +123,17 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
             </button>
           )}
 
+          {onGenerateAI && (
+            <button
+              type="button"
+              onClick={onGenerateAI}
+              className="flex items-center gap-1.5 rounded-lg border border-purple-300 bg-purple-600 px-3 py-1 text-xs font-bold text-white shadow-xs transition hover:bg-purple-700 active:scale-95 cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Generate with AI</span>
+            </button>
+          )}
+
           {onAuthorManually && (
             <button
               type="button"
@@ -159,6 +172,16 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
             No questions found matching "{selectedBannerFilter}".
           </p>
           <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+            {onGenerateAI && (
+              <button
+                type="button"
+                onClick={onGenerateAI}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition cursor-pointer"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Generate Questions using AI</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onSelectBannerFilter("all")}
@@ -170,7 +193,7 @@ export const QuestionReviewPool: React.FC<QuestionReviewPoolProps> = ({
               <button
                 type="button"
                 onClick={onAuthorManually}
-                className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               >
                 <Plus className="h-3 w-3" />
                 <span>Author Manually</span>

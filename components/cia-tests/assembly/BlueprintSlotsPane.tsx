@@ -6,20 +6,18 @@ import {
   PlusCircle,
   XCircle,
   HelpCircle,
-  ChevronRight,
-  Sparkles,
   Edit,
-  Settings2,
-  Split,
   Plus,
   Trash2,
-  Check,
-  X,
-  ShieldAlert,
   ArrowRightLeft,
-  Bookmark,
+  ShieldAlert,
+  Sparkles,
 } from "lucide-react";
-import { QuestionPaperTemplate, CandidateQuestion, BlueprintSlot, COSummaryItem } from "@/types/cia-test.types";
+import {
+  QuestionPaperTemplate,
+  CandidateQuestion,
+  COSummaryItem,
+} from "@/types/cia-test.types";
 import FormattedMathText from "@/components/common-components/FormattedMathText";
 import QuestionPaperStudioService from "@/services/questionPaperStudioService";
 import { toast } from "react-toastify";
@@ -32,20 +30,19 @@ interface BlueprintSlotsPaneProps {
   candidates: CandidateQuestion[];
   coCodes?: string[];
   activeSlotId: number | null;
+  activeSubId?: string | null;
   actionLoadingId: number | string | null;
-  onSelectSlot: (slotId: number) => void;
+  onSelectSlot: (slotId: number, subId?: string | null) => void;
   onUnassignSlot: (slotId: number, subId?: string | null) => void;
   onAssignSlot?: (slotId: number, questionId: number, subId?: string | null) => void;
   onEditQuestion?: (question: CandidateQuestion) => void;
   onUpdateSlotStructure?: (slotId: number, payload: any) => Promise<boolean>;
 }
 
-interface SubQuestionDraft {
-  sub_id: string;
-  label: string;
-  marks: number;
-  co_level?: string;
-}
+const toRoman = (num: number): string => {
+  const romans = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
+  return romans[num - 1] || `${num}`;
+};
 
 export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
   courseId,
@@ -54,6 +51,7 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
   candidates,
   coCodes: propCoCodes,
   activeSlotId,
+  activeSubId,
   actionLoadingId,
   onSelectSlot,
   onUnassignSlot,
@@ -65,17 +63,11 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
 
   // Real-time CO Summary State
   const [apiCoSummary, setApiCoSummary] = useState<COSummaryItem[]>([]);
-  const [apiIsBalanced, setApiIsBalanced] = useState<boolean>(false);
-  const [coLoading, setCoLoading] = useState<boolean>(false);
+  const [, setApiIsBalanced] = useState<boolean>(false);
+  const [, setCoLoading] = useState<boolean>(false);
 
-  // Sub-Question Structure Configuration Modal State
-  const [configuringSlot, setConfiguringSlot] = useState<any | null>(null);
-  const [configQuestionType, setConfigQuestionType] = useState<"direct" | "either_or">("either_or");
-  const [configTargetCo, setConfigTargetCo] = useState<string>("CO1");
-  const [optionASubs, setOptionASubs] = useState<SubQuestionDraft[]>([]);
-  const [optionBSubs, setOptionBSubs] = useState<SubQuestionDraft[]>([]);
-  const [directSubs, setDirectSubs] = useState<SubQuestionDraft[]>([]);
-  const [savingStructure, setSavingStructure] = useState<boolean>(false);
+  // Local draft marks to support smooth numerical inputs
+  const [editingMarks, setEditingMarks] = useState<Record<string, number>>({});
 
   const sections = template?.sections || [];
 
@@ -100,11 +92,10 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
     fetchCoSummary();
   }, [fetchCoSummary, template, candidates]);
 
-  // Fallback Live Calculation if API is loading
+  // Fallback Live Calculation if API summary is still loading
   const liveCoSummary = useMemo(() => {
     if (apiCoSummary.length > 0) return apiCoSummary;
 
-    // Parse template co_distribution
     const rawDist = template?.co_distribution || {};
     const budgetMap: Record<string, number> = {};
     if (Array.isArray(rawDist)) {
@@ -170,169 +161,426 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
   const { coCodes: fetchedCoCodes } = useCourseOutcomes(courseId);
   const activeCourseCoCodes = propCoCodes && propCoCodes.length > 0 ? propCoCodes : fetchedCoCodes;
 
-  // Open Sub-Question Configurator Modal
-  const handleOpenConfigModal = (slot: any) => {
-    setConfiguringSlot(slot);
-    const existing = slot.sub_question_structure;
-    const slotMarks = Number(slot.max_marks);
-    const defaultCo = activeCourseCoCodes[0] || liveCoSummary[0]?.co_code || "CO1";
-    const targetCo = slot.target_co || defaultCo;
-    setConfigTargetCo(targetCo);
+  // ── Helper: Resolve Slot Structure (Defaults Either/Or to 11.a and 11.b) ──
+  const getResolvedStructure = useCallback((slot: any) => {
+    const isEitherOr =
+      slot.question_type === "either_or" ||
+      slot.sub_question_structure?.type === "either_or";
 
-    if (existing) {
-      setConfigQuestionType(existing.type || slot.question_type || "either_or");
-      if (existing.type === "either_or") {
-        setOptionASubs(
-          (existing.option_a?.sub_questions || []).map((sq: any) => ({
-            sub_id: sq.sub_id,
-            label: sq.label,
-            marks: Number(sq.marks),
-            co_level: sq.co_level || targetCo,
-          }))
-        );
-        setOptionBSubs(
-          (existing.option_b?.sub_questions || []).map((sq: any) => ({
-            sub_id: sq.sub_id,
-            label: sq.label,
-            marks: Number(sq.marks),
-            co_level: sq.co_level || targetCo,
-          }))
-        );
-      } else {
-        setDirectSubs(
-          (existing.sub_questions || []).map((sq: any) => ({
-            sub_id: sq.sub_id,
-            label: sq.label,
-            marks: Number(sq.marks),
-            co_level: sq.co_level || targetCo,
-          }))
-        );
-      }
-    } else {
-      // Default Either/Or configuration matching slot marks
-      const isEitherOr = slot.question_type === "either_or" || slotMarks >= 12;
-      setConfigQuestionType(isEitherOr ? "either_or" : "direct");
+    if (isEitherOr) {
+      const existing = slot.sub_question_structure;
+      if (existing && existing.type === "either_or") {
+        const optASubs = (existing.option_a?.sub_questions || []).length > 0
+          ? existing.option_a.sub_questions
+          : [
+              {
+                sub_id: "a",
+                label: `${slot.question_number}.a`,
+                marks: Number(slot.max_marks),
+                co_level: existing.target_co || slot.target_co,
+                assigned_question_id: slot.actual_question_id || null,
+              },
+            ];
+        const optBSubs = (existing.option_b?.sub_questions || []).length > 0
+          ? existing.option_b.sub_questions
+          : [
+              {
+                sub_id: "b",
+                label: `${slot.question_number}.b`,
+                marks: Number(slot.max_marks),
+                co_level: existing.target_co || slot.target_co,
+                assigned_question_id: null,
+              },
+            ];
 
-      if (isEitherOr) {
-        const half = Math.floor(slotMarks / 2);
-        const rem = slotMarks - half;
-        setOptionASubs([
-          { sub_id: "a.i", label: "a) i)", marks: half, co_level: targetCo },
-          { sub_id: "a.ii", label: "a) ii)", marks: rem, co_level: targetCo },
-        ]);
-        setOptionBSubs([
-          { sub_id: "b.i", label: "b) i)", marks: slotMarks, co_level: targetCo },
-        ]);
-      } else {
-        setDirectSubs([
-          { sub_id: "a", label: "a)", marks: Math.floor(slotMarks / 2), co_level: targetCo },
-          { sub_id: "b", label: "b)", marks: slotMarks - Math.floor(slotMarks / 2), co_level: targetCo },
-        ]);
-      }
-    }
-  };
-
-  // Save Sub-Question Structure
-  const handleSaveStructure = async () => {
-    if (!configuringSlot || !onUpdateSlotStructure) return;
-    const slotMarks = Number(configuringSlot.max_marks);
-
-    if (configQuestionType === "either_or") {
-      const sumA = optionASubs.reduce((acc, curr) => acc + curr.marks, 0);
-      const sumB = optionBSubs.reduce((acc, curr) => acc + curr.marks, 0);
-
-      if (Math.abs(sumA - slotMarks) > 0.01) {
-        toast.error(`Option A sub-questions sum (${sumA}M) must equal Slot Marks (${slotMarks}M).`);
-        return;
-      }
-      if (Math.abs(sumB - slotMarks) > 0.01) {
-        toast.error(`Option B sub-questions sum (${sumB}M) must equal Slot Marks (${slotMarks}M).`);
-        return;
-      }
-
-      setSavingStructure(true);
-      const payload = {
-        question_type: "either_or",
-        target_co: configTargetCo,
-        sub_question_structure: {
+        return {
           type: "either_or",
-          target_co: configTargetCo,
+          target_co: existing.target_co || slot.target_co,
           option_a: {
             label: "a",
-            sub_questions: optionASubs.map((sq) => ({
-              sub_id: sq.sub_id,
-              label: sq.label,
-              marks: sq.marks,
-              co_level: configTargetCo,
-            })),
+            sub_questions: optASubs,
           },
           option_b: {
             label: "b",
-            sub_questions: optionBSubs.map((sq) => ({
-              sub_id: sq.sub_id,
-              label: sq.label,
-              marks: sq.marks,
-              co_level: configTargetCo,
-            })),
+            sub_questions: optBSubs,
+          },
+        };
+      }
+
+      // By default: Option A (11.a) and Option B (11.b)
+      return {
+        type: "either_or",
+        target_co: slot.target_co,
+        option_a: {
+          label: "a",
+          sub_questions: [
+            {
+              sub_id: "a",
+              label: `${slot.question_number}.a`,
+              marks: Number(slot.max_marks),
+              co_level: slot.target_co,
+              assigned_question_id: slot.actual_question_id || null,
+            },
+          ],
+        },
+        option_b: {
+          label: "b",
+          sub_questions: [
+            {
+              sub_id: "b",
+              label: `${slot.question_number}.b`,
+              marks: Number(slot.max_marks),
+              co_level: slot.target_co,
+              assigned_question_id: null,
+            },
+          ],
+        },
+      };
+    }
+
+    if (slot.sub_question_structure && slot.sub_question_structure.type === "direct") {
+      return slot.sub_question_structure;
+    }
+
+    return null;
+  }, []);
+
+  // ── Helper: Distribute Total Marks Evenly Across Sub-Questions ──
+  const distributeMarks = (totalMarks: number, count: number): number[] => {
+    if (count <= 0) return [];
+    const base = Math.floor(totalMarks / count);
+    const remainder = totalMarks % count;
+    return Array.from({ length: count }, (_, i) => base + (i >= count - remainder ? 1 : 0));
+  };
+
+  // ── Action: Add Sub-Question in-place ──
+  const handleAddSubQuestion = async (slot: any, branch: "option_a" | "option_b" | "direct") => {
+    if (!onUpdateSlotStructure) return;
+    const currentStruct = getResolvedStructure(slot);
+    const slotMarks = Number(slot.max_marks);
+    const targetCo = slot.target_co || activeCourseCoCodes[0] || "CO1";
+
+    if (branch === "option_a" || branch === "option_b") {
+      const isBranchA = branch === "option_a";
+      const branchKey = isBranchA ? "option_a" : "option_b";
+      const prefix = isBranchA ? "a" : "b";
+      const currentSubs = [...(currentStruct?.[branchKey]?.sub_questions || [])];
+
+      const newCount =
+        currentSubs.length <= 1 && (currentSubs.length === 0 || currentSubs[0].sub_id === prefix)
+          ? 2
+          : currentSubs.length + 1;
+
+      // Mathematically guaranteed to sum to slotMarks exactly
+      const marksList = distributeMarks(slotMarks, newCount);
+
+      const newSubs = marksList.map((m, idx) => {
+        const subId = `${prefix}.${idx + 1}`;
+        const existingSub = currentSubs[idx];
+        return {
+          sub_id: subId,
+          label: `${slot.question_number}.${prefix} (${toRoman(idx + 1)})`,
+          marks: m,
+          co_level: existingSub?.co_level || targetCo,
+          assigned_question_id: existingSub?.assigned_question_id || null,
+        };
+      });
+
+      const updatedPayload = {
+        question_type: "either_or",
+        target_co: currentStruct?.target_co || targetCo,
+        sub_question_structure: {
+          type: "either_or",
+          target_co: currentStruct?.target_co || targetCo,
+          option_a: {
+            label: "a",
+            sub_questions: isBranchA
+              ? newSubs
+              : (currentStruct?.option_a?.sub_questions || []),
+          },
+          option_b: {
+            label: "b",
+            sub_questions: !isBranchA
+              ? newSubs
+              : (currentStruct?.option_b?.sub_questions || []),
           },
         },
       };
 
-      const ok = await onUpdateSlotStructure(configuringSlot.id, payload);
-      setSavingStructure(false);
-      if (ok) {
-        setConfiguringSlot(null);
-        fetchCoSummary();
-      }
+      const ok = await onUpdateSlotStructure(slot.id, updatedPayload);
+      if (ok) fetchCoSummary();
     } else {
-      const sumDirect = directSubs.reduce((acc, curr) => acc + curr.marks, 0);
-      if (Math.abs(sumDirect - slotMarks) > 0.01) {
-        toast.error(`Direct sub-questions sum (${sumDirect}M) must equal Slot Marks (${slotMarks}M).`);
-        return;
-      }
+      // Direct compulsory question with subparts
+      const currentSubs = [...(currentStruct?.sub_questions || [])];
+      const newCount = currentSubs.length === 0 ? 2 : currentSubs.length + 1;
+      const marksList = distributeMarks(slotMarks, newCount);
 
-      setSavingStructure(true);
-      const payload = {
+      const newSubs = marksList.map((m, idx) => {
+        const char = String.fromCharCode(97 + idx); // a, b, c...
+        const existingSub = currentSubs[idx];
+        return {
+          sub_id: char,
+          label: `${slot.question_number}.${char}`,
+          marks: m,
+          co_level: existingSub?.co_level || targetCo,
+          assigned_question_id: existingSub?.assigned_question_id || null,
+        };
+      });
+
+      const updatedPayload = {
         question_type: "direct",
-        target_co: configTargetCo,
+        target_co: targetCo,
         sub_question_structure: {
           type: "direct",
-          target_co: configTargetCo,
-          sub_questions: directSubs.map((sq) => ({
-            sub_id: sq.sub_id,
-            label: sq.label,
-            marks: sq.marks,
-            co_level: sq.co_level || configTargetCo,
-          })),
+          target_co: targetCo,
+          sub_questions: newSubs,
         },
       };
 
-      const ok = await onUpdateSlotStructure(configuringSlot.id, payload);
-      setSavingStructure(false);
-      if (ok) {
-        setConfiguringSlot(null);
-        fetchCoSummary();
+      const ok = await onUpdateSlotStructure(slot.id, updatedPayload);
+      if (ok) fetchCoSummary();
+    }
+  };
+
+  // ── Action: Delete Sub-Question in-place ──
+  const handleDeleteSubQuestion = async (
+    slot: any,
+    branch: "option_a" | "option_b" | "direct",
+    subId: string
+  ) => {
+    if (!onUpdateSlotStructure) return;
+    const currentStruct = getResolvedStructure(slot);
+    const slotMarks = Number(slot.max_marks);
+    const targetCo = slot.target_co || activeCourseCoCodes[0] || "CO1";
+
+    if (branch === "option_a" || branch === "option_b") {
+      const isBranchA = branch === "option_a";
+      const branchKey = isBranchA ? "option_a" : "option_b";
+      const prefix = isBranchA ? "a" : "b";
+      const remaining = (currentStruct?.[branchKey]?.sub_questions || []).filter(
+        (sq: any) => sq.sub_id !== subId
+      );
+
+      let updatedSubs: any[] = [];
+      if (remaining.length <= 1) {
+        // Revert back to single default option (e.g. 11.a) with full slot marks
+        const remainingSub = remaining[0];
+        // If remaining subquestion had a question assigned, verify marks match the new full slotMarks
+        const canKeepAssigned =
+          remainingSub?.assigned_question_id &&
+          Number(remainingSub.marks) === slotMarks;
+
+        updatedSubs = [
+          {
+            sub_id: prefix,
+            label: `${slot.question_number}.${prefix}`,
+            marks: slotMarks,
+            co_level: targetCo,
+            assigned_question_id: canKeepAssigned ? remainingSub.assigned_question_id : null,
+            assigned_question: canKeepAssigned ? remainingSub.assigned_question : null,
+          },
+        ];
+      } else {
+        const marksList = distributeMarks(slotMarks, remaining.length);
+        updatedSubs = remaining.map((sq: any, idx: number) => {
+          const newMarks = marksList[idx];
+          const canKeep =
+            sq.assigned_question_id && Number(sq.marks) === newMarks;
+          return {
+            ...sq,
+            sub_id: `${prefix}.${idx + 1}`,
+            label: `${slot.question_number}.${prefix} (${toRoman(idx + 1)})`,
+            marks: newMarks,
+            assigned_question_id: canKeep ? sq.assigned_question_id : null,
+            assigned_question: canKeep ? sq.assigned_question : null,
+          };
+        });
+      }
+
+      const updatedPayload = {
+        question_type: "either_or",
+        target_co: currentStruct?.target_co || targetCo,
+        sub_question_structure: {
+          type: "either_or",
+          target_co: currentStruct?.target_co || targetCo,
+          option_a: {
+            label: "a",
+            sub_questions: isBranchA
+              ? updatedSubs
+              : (currentStruct?.option_a?.sub_questions || []),
+          },
+          option_b: {
+            label: "b",
+            sub_questions: !isBranchA
+              ? updatedSubs
+              : (currentStruct?.option_b?.sub_questions || []),
+          },
+        },
+      };
+
+      const ok = await onUpdateSlotStructure(slot.id, updatedPayload);
+      if (ok) fetchCoSummary();
+    } else {
+      // Direct slot deletion
+      const remaining = (currentStruct?.sub_questions || []).filter(
+        (sq: any) => sq.sub_id !== subId
+      );
+      if (remaining.length <= 1) {
+        const ok = await onUpdateSlotStructure(slot.id, {
+          question_type: "direct",
+          target_co: targetCo,
+          sub_question_structure: null,
+        });
+        if (ok) fetchCoSummary();
+      } else {
+        const marksList = distributeMarks(slotMarks, remaining.length);
+        const updatedSubs = remaining.map((sq: any, idx: number) => {
+          const char = String.fromCharCode(97 + idx);
+          const newMarks = marksList[idx];
+          const canKeep =
+            sq.assigned_question_id && Number(sq.marks) === newMarks;
+          return {
+            ...sq,
+            sub_id: char,
+            label: `${slot.question_number}.${char}`,
+            marks: newMarks,
+            assigned_question_id: canKeep ? sq.assigned_question_id : null,
+            assigned_question: canKeep ? sq.assigned_question : null,
+          };
+        });
+        const ok = await onUpdateSlotStructure(slot.id, {
+          question_type: "direct",
+          target_co: targetCo,
+          sub_question_structure: {
+            type: "direct",
+            target_co: targetCo,
+            sub_questions: updatedSubs,
+          },
+        });
+        if (ok) fetchCoSummary();
       }
     }
   };
 
-  // Reset Sub-Questions to Single Compulsory Slot
-  const handleClearStructure = async () => {
-    if (!configuringSlot || !onUpdateSlotStructure) return;
-    setSavingStructure(true);
-    const ok = await onUpdateSlotStructure(configuringSlot.id, {
-      question_type: "direct",
-      target_co: configTargetCo,
-      sub_question_structure: null,
-    });
-    setSavingStructure(false);
-    if (ok) {
-      setConfiguringSlot(null);
-      fetchCoSummary();
+  // ── Action: Update Sub-Question Marks in-place ──
+  const handleUpdateSubMarks = async (
+    slot: any,
+    branch: "option_a" | "option_b" | "direct",
+    subId: string,
+    newMarks: number
+  ) => {
+    if (!onUpdateSlotStructure) return;
+    const currentStruct = getResolvedStructure(slot);
+    const slotMarks = Number(slot.max_marks);
+    const targetCo = slot.target_co || activeCourseCoCodes[0] || "CO1";
+
+    if (branch === "option_a" || branch === "option_b") {
+      const isBranchA = branch === "option_a";
+      const branchKey = isBranchA ? "option_a" : "option_b";
+      const subs = currentStruct?.[branchKey]?.sub_questions || [];
+
+      let updatedSubs = subs.map((sq: any) => {
+        if (sq.sub_id === subId) {
+          return { ...sq, marks: Math.max(1, newMarks) };
+        }
+        return sq;
+      });
+
+      // If exactly 2 subparts, auto-balance the other subpart to guarantee exact sum
+      if (subs.length === 2) {
+        const clampedNew = Math.min(Math.max(1, newMarks), slotMarks - 1);
+        const otherMarks = slotMarks - clampedNew;
+        updatedSubs = subs.map((sq: any) => {
+          if (sq.sub_id === subId) {
+            return { ...sq, marks: clampedNew };
+          }
+          return { ...sq, marks: otherMarks };
+        });
+        setEditingMarks((prev) => {
+          const next = { ...prev };
+          subs.forEach((sq: any) => delete next[`${slot.id}-${sq.sub_id}`]);
+          return next;
+        });
+      }
+
+      const sum = updatedSubs.reduce((acc: number, sq: any) => acc + Number(sq.marks || 0), 0);
+      if (Math.abs(sum - slotMarks) > 0.01) {
+        toast.warning(
+          `Sub-questions sum (${sum}M) must equal slot marks (${slotMarks}M). Please balance the marks.`
+        );
+        return;
+      }
+
+      const updatedPayload = {
+        question_type: "either_or",
+        target_co: currentStruct?.target_co || targetCo,
+        sub_question_structure: {
+          type: "either_or",
+          target_co: currentStruct?.target_co || targetCo,
+          option_a: {
+            label: "a",
+            sub_questions: isBranchA
+              ? updatedSubs
+              : (currentStruct?.option_a?.sub_questions || []),
+          },
+          option_b: {
+            label: "b",
+            sub_questions: !isBranchA
+              ? updatedSubs
+              : (currentStruct?.option_b?.sub_questions || []),
+          },
+        },
+      };
+
+      const ok = await onUpdateSlotStructure(slot.id, updatedPayload);
+      if (ok) fetchCoSummary();
+    } else {
+      const subs = currentStruct?.sub_questions || [];
+      let updatedSubs = subs.map((sq: any) => {
+        if (sq.sub_id === subId) {
+          return { ...sq, marks: Math.max(1, newMarks) };
+        }
+        return sq;
+      });
+
+      if (subs.length === 2) {
+        const clampedNew = Math.min(Math.max(1, newMarks), slotMarks - 1);
+        const otherMarks = slotMarks - clampedNew;
+        updatedSubs = subs.map((sq: any) => {
+          if (sq.sub_id === subId) {
+            return { ...sq, marks: clampedNew };
+          }
+          return { ...sq, marks: otherMarks };
+        });
+        setEditingMarks((prev) => {
+          const next = { ...prev };
+          subs.forEach((sq: any) => delete next[`${slot.id}-${sq.sub_id}`]);
+          return next;
+        });
+      }
+
+      const sum = updatedSubs.reduce((acc: number, sq: any) => acc + Number(sq.marks || 0), 0);
+      if (Math.abs(sum - slotMarks) > 0.01) {
+        toast.warning(
+          `Sub-questions sum (${sum}M) must equal slot marks (${slotMarks}M). Please balance the marks.`
+        );
+        return;
+      }
+
+      const ok = await onUpdateSlotStructure(slot.id, {
+        question_type: "direct",
+        target_co: targetCo,
+        sub_question_structure: {
+          type: "direct",
+          target_co: targetCo,
+          sub_questions: updatedSubs,
+        },
+      });
+      if (ok) fetchCoSummary();
     }
   };
 
-  // Drop Guard & Assignment Validation
+  // ── Drop Guard & Assignment Validation ──
   const handleDropQuestion = (
     e: React.DragEvent,
     slot: any,
@@ -358,7 +606,7 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
         return;
       }
 
-      // 2. Strict CO Match Guard
+      // 2. CO Match Guard
       if (targetCo && qCo && qCo.toUpperCase() !== targetCo.toUpperCase()) {
         toast.error(
           `CO Mismatch: Slot requires ${targetCo}, but question is tagged with ${qCo}.`
@@ -372,6 +620,33 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
     } catch (err) {
       console.error("Drop handling failed:", err);
     }
+  };
+
+  // ── Render Mark Validation Badge ──
+  const renderMarkValidationBadge = (currentSum: number, slotMaxMarks: number) => {
+    const diff = slotMaxMarks - currentSum;
+    if (Math.abs(diff) < 0.01) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 border border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800">
+          <CheckCircle2 className="h-3 w-3" />
+          <span>{currentSum}/{slotMaxMarks}M (Balanced)</span>
+        </span>
+      );
+    }
+    if (diff > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+          <HelpCircle className="h-3 w-3" />
+          <span>{currentSum}/{slotMaxMarks}M ({diff}M remaining)</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800">
+        <ShieldAlert className="h-3 w-3" />
+        <span>{currentSum}/{slotMaxMarks}M (Exceeds by {Math.abs(diff)}M)</span>
+      </span>
+    );
   };
 
   return (
@@ -398,54 +673,48 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
               Course Outcome (CO) Marks Budget
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            {apiIsBalanced ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
-                <Check className="h-3 w-3" />
-                Budget Balanced
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-                <ShieldAlert className="h-3 w-3" />
-                Attainment in Progress
-              </span>
-            )}
-          </div>
+          <span className="text-[11px] font-semibold text-purple-800 dark:text-purple-300">
+            {liveCoSummary.filter((c) => c.is_fulfilled).length}/{liveCoSummary.length} COs Balanced
+          </span>
         </div>
 
-        {/* CO Badge Pills Row */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {liveCoSummary.map((item) => {
-            const isFull = item.is_fulfilled;
-            const isOver = item.assigned_marks > item.allocated_marks;
-            const isZero = item.assigned_marks === 0;
+            const isFulfilled = item.is_fulfilled;
+            const diff = item.allocated_marks - item.assigned_marks;
+            const isExceeded = diff < -0.01;
 
             return (
               <div
                 key={item.co_code}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-bold transition-all ${
-                  isFull
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 shadow-xs"
-                    : isOver
-                    ? "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
-                    : isZero
-                    ? "border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    : "border-indigo-200 bg-indigo-50/80 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+                className={`rounded-xl border p-2 text-xs transition-all ${
+                  isFulfilled
+                    ? "border-green-300 bg-green-50/80 text-green-950 dark:border-green-800 dark:bg-green-950/30 dark:text-green-200"
+                    : isExceeded
+                    ? "border-red-300 bg-red-50/80 text-red-950 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+                    : "border-purple-200 bg-white/80 text-gray-800 dark:border-purple-900/50 dark:bg-gray-800/80 dark:text-gray-200"
                 }`}
-                title={`Allocated: ${item.allocated_marks}M | Assigned: ${item.assigned_marks}M | Remaining: ${item.remaining_marks}M`}
               >
-                <span>{item.co_code}:</span>
-                <span className="font-extrabold">
-                  {item.assigned_marks}/{item.allocated_marks}M
-                </span>
-                {isFull ? (
-                  <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                ) : isOver ? (
-                  <span className="text-[10px] text-red-600 font-black">+{item.assigned_marks - item.allocated_marks}M</span>
-                ) : (
-                  <span className="text-[10px] opacity-75">({item.remaining_marks}M left)</span>
-                )}
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-[11px] uppercase tracking-wide">
+                    {item.co_code}
+                  </span>
+                  {isFulfilled ? (
+                    <span className="flex items-center text-[10px] font-bold text-green-700 dark:text-green-400">
+                      <CheckCircle2 className="mr-0.5 h-3 w-3" /> OK
+                    </span>
+                  ) : isExceeded ? (
+                    <span className="text-[10px] font-bold text-red-600">+{Math.abs(diff)}M</span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-600">-{diff}M</span>
+                  )}
+                </div>
+                <div className="mt-1 flex items-baseline justify-between text-[11px]">
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    {item.assigned_marks}M
+                  </span>
+                  <span className="text-[10px] text-gray-500">/ {item.allocated_marks}M</span>
+                </div>
               </div>
             );
           })}
@@ -462,17 +731,6 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
           {sections.map((sec, secIdx) => {
             const questions = sec.questions || [];
             const isSectionEitherOr = sec.section_type === "either_or";
-            const assignedCount = questions.filter((q: any) => {
-              if (q.actual_question_id) return true;
-              if (q.sub_question_structure) {
-                const st = q.sub_question_structure;
-                const hasA = (st.option_a?.sub_questions || []).some((sq: any) => sq.assigned_question_id);
-                const hasB = (st.option_b?.sub_questions || []).some((sq: any) => sq.assigned_question_id);
-                const hasDirect = (st.sub_questions || []).some((sq: any) => sq.assigned_question_id);
-                return hasA || hasB || hasDirect;
-              }
-              return false;
-            }).length;
 
             return (
               <div
@@ -506,53 +764,39 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                     <span className="rounded-lg bg-purple-100 px-2.5 py-0.5 font-bold text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
                       {sec.allocated_marks} Marks Total
                     </span>
-                    <span className="text-gray-500 dark:text-gray-400 text-xs">
-                      ({assignedCount}/{questions.length} Assigned)
-                    </span>
                   </div>
                 </div>
 
                 {/* Slots List */}
-                <div className="space-y-3.5">
+                <div className="space-y-4">
                   {questions.map((slot: any) => {
-                    const isSelected = activeSlotId === slot.id;
-                    const subStructure = slot.sub_question_structure;
-                    const hasSubStructure = Boolean(subStructure);
-                    const isEitherOrSlot = slot.question_type === "either_or" || subStructure?.type === "either_or";
-                    const targetCo = slot.target_co || subStructure?.target_co;
+                    const isEitherOrSlot =
+                      slot.question_type === "either_or" ||
+                      slot.sub_question_structure?.type === "either_or";
+                    const resolvedStruct = getResolvedStructure(slot);
+                    const targetCo = slot.target_co || resolvedStruct?.target_co;
 
-                    const assignedCandidate =
+                    // Direct whole slot assignment check
+                    const isWholeSlotAssigned = Boolean(
+                      slot.actual_question_id || (slot as any).assigned_question
+                    );
+                    const assignedCandidateWhole =
                       (slot as any).assigned_question ||
                       (slot.actual_question_id
                         ? candidates.find((c) => c.id === slot.actual_question_id)
                         : null);
-                    const isWholeSlotAssigned = !!slot.actual_question_id || !!(slot as any).assigned_question;
+
                     const slotKey = `slot-${slot.id}`;
-                    const isDragOverSlot = dragOverSlotKey === slotKey;
 
                     return (
                       <div
                         key={slot.id}
-                        className={`group relative rounded-2xl border p-4 transition-all duration-150 ${
-                          isSelected
-                            ? "border-purple-600 bg-purple-50/30 ring-2 ring-purple-500/30 dark:border-purple-500 dark:bg-purple-950/20"
-                            : isWholeSlotAssigned
-                            ? "border-green-200 bg-white dark:border-green-900/40 dark:bg-gray-800"
-                            : "border-gray-200/90 bg-white dark:border-gray-700/80 dark:bg-gray-800"
-                        }`}
+                        className="group relative rounded-2xl border border-gray-200/90 bg-white p-4 shadow-2xs dark:border-gray-700/80 dark:bg-gray-800 transition-all"
                       >
-                        {/* Slot Header: Question Number, Marks, Target CO, Actions */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-gray-100 dark:border-gray-750">
+                        {/* Slot Header: Question Number, Marks, Target CO, Type */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-100 dark:border-gray-750">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`flex h-7 w-7 items-center justify-center rounded-xl text-xs font-black ${
-                                isWholeSlotAssigned
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
-                                  : isSelected
-                                  ? "bg-purple-600 text-white"
-                                  : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                              }`}
-                            >
+                            <span className="flex h-7 w-7 items-center justify-center rounded-xl text-xs font-black bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
                               Q{slot.question_number}
                             </span>
 
@@ -566,82 +810,121 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                               </span>
                             )}
 
-                            {isEitherOrSlot && (
+                            {isEitherOrSlot ? (
                               <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
                                 Either / Or
+                              </span>
+                            ) : (
+                              <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                                Direct
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1.5">
-                            {/* Configure Sub-Questions Button */}
-                            {onUpdateSlotStructure && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenConfigModal(slot)}
-                                title="Configure Modular Sub-Questions and Either/Or Choices"
-                                className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-700 hover:bg-purple-50 hover:text-purple-700 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-purple-950/40 transition-colors"
-                              >
-                                <Settings2 className="h-3.5 w-3.5" />
-                                <span>{hasSubStructure ? "Edit Sub-Parts" : "+ Sub-Questions"}</span>
-                              </button>
-                            )}
+                          {/* Direct Question (Non-Either-Or) Slot Header Controls */}
+                          {!isEitherOrSlot && !resolvedStruct?.sub_questions && (
+                            <div className="flex items-center gap-2">
+                              {onUpdateSlotStructure && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSubQuestion(slot, "direct")}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-700 hover:bg-purple-50 hover:text-purple-700 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200 transition-colors"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  <span>+ Sub-Question</span>
+                                </button>
+                              )}
 
-                            {/* Standard Whole Slot Actions */}
-                            {!hasSubStructure && (
-                              <>
-                                {isWholeSlotAssigned ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => slot.id && onUnassignSlot(slot.id)}
-                                    disabled={actionLoadingId === `slot-unassign-${slot.id}`}
-                                    className="inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                  >
-                                    <XCircle className="h-3.5 w-3.5" />
-                                    <span>Unassign</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => slot.id && onSelectSlot(slot.id)}
-                                    className={`inline-flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-bold transition-all ${
-                                      isSelected
-                                        ? "bg-purple-600 text-white shadow-sm"
-                                        : "bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/40 dark:text-purple-300"
-                                    }`}
-                                  >
-                                    <PlusCircle className="h-3.5 w-3.5" />
-                                    <span>{isSelected ? "Active Target" : "Select Slot"}</span>
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
+                              {isWholeSlotAssigned ? (
+                                <button
+                                  type="button"
+                                  onClick={() => slot.id && onUnassignSlot(slot.id)}
+                                  disabled={actionLoadingId === `slot-unassign-${slot.id}`}
+                                  className="inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  <span>Unassign</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => slot.id && onSelectSlot(slot.id, null)}
+                                  className={`inline-flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-bold transition-all ${
+                                    activeSlotId === slot.id && !activeSubId
+                                      ? "bg-purple-600 text-white shadow-sm"
+                                      : "bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/40 dark:text-purple-300"
+                                  }`}
+                                >
+                                  <PlusCircle className="h-3.5 w-3.5" />
+                                  <span>{activeSlotId === slot.id && !activeSubId ? "Active Target" : "Select Slot"}</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
 
-                        {/* ── Slot Body Content ── */}
-                        {hasSubStructure ? (
-                          <div className="mt-3 space-y-3">
-                            {/* Either/Or Modular Sub-Questions Layout */}
-                            {subStructure.type === "either_or" ? (
-                              <div className="space-y-2.5">
-                                {/* Option A Container */}
-                                <div className="rounded-xl border border-purple-200 bg-purple-50/20 p-3 dark:border-purple-900/40 dark:bg-purple-950/10">
-                                  <div className="mb-2 flex items-center justify-between text-xs">
-                                    <span className="font-extrabold uppercase tracking-wider text-purple-900 dark:text-purple-200 flex items-center gap-1">
-                                      <span>Option A</span>
-                                      <span className="text-[11px] font-normal text-gray-500">
-                                        ({slot.max_marks}M • Target: {targetCo || "CO"})
+                        {/* ── Slot Body ── */}
+                        {isEitherOrSlot ? (
+                          /* ─────────────────────────────────────────────────────────────
+                             EITHER / OR QUESTION VIEW:
+                             11.a 1 [Assign Question] OR 11.b 2 [Assign Question] by default
+                             ───────────────────────────────────────────────────────────── */
+                          <div className="mt-3.5 space-y-3.5">
+                            {/* ─── OPTION A CONTAINER ─── */}
+                            {(() => {
+                              const optASubs = resolvedStruct?.option_a?.sub_questions || [];
+                              const isSingleChoice =
+                                optASubs.length === 1 &&
+                                (optASubs[0].sub_id === "a" || optASubs[0].sub_id === "a.1");
+                              const sumMarksA = optASubs.reduce(
+                                (acc: number, sq: any) =>
+                                  acc + (editingMarks[`${slot.id}-${sq.sub_id}`] ?? Number(sq.marks || 0)),
+                                0
+                              );
+
+                              return (
+                                <div className="rounded-2xl border border-purple-200/90 bg-purple-50/25 p-3.5 dark:border-purple-900/50 dark:bg-purple-950/15">
+                                  {/* Option A Sub-Header */}
+                                  <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-xs uppercase tracking-wider text-purple-900 dark:text-purple-200">
+                                        Option A
                                       </span>
-                                    </span>
+                                      {/* Real-time Comprehensive Mark Validation Badge */}
+                                      {renderMarkValidationBadge(sumMarksA, slot.max_marks)}
+                                    </div>
+
+                                    {/* Add Sub-Question Button */}
+                                    {onUpdateSlotStructure && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddSubQuestion(slot, "option_a")}
+                                        className="inline-flex items-center gap-1 rounded-xl border border-purple-200 bg-white px-2.5 py-1 text-xs font-bold text-purple-700 shadow-2xs hover:bg-purple-100 hover:text-purple-900 dark:border-purple-800 dark:bg-gray-800 dark:text-purple-300 dark:hover:bg-purple-900/50 transition-all"
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        <span>+ Sub-Question</span>
+                                      </button>
+                                    )}
                                   </div>
 
-                                  <div className="space-y-2">
-                                    {(subStructure.option_a?.sub_questions || []).map((sub: any) => {
-                                      const assignedQ = candidates.find((c) => c.id === sub.assigned_question_id);
-                                      const isSubAssigned = Boolean(sub.assigned_question_id);
+                                  {/* Sub-Questions inside Option A */}
+                                  <div className="space-y-2.5">
+                                    {optASubs.map((sub: any) => {
                                       const subKey = `slot-${slot.id}-${sub.sub_id}`;
+                                      const isTargetActive =
+                                        activeSlotId === slot.id && activeSubId === sub.sub_id;
+                                      const assignedQ =
+                                        candidates.find((c) => c.id === sub.assigned_question_id) ||
+                                        (sub.sub_id === "a" && slot.actual_question_id
+                                          ? candidates.find((c) => c.id === slot.actual_question_id)
+                                          : null);
+                                      const isSubAssigned = Boolean(
+                                        sub.assigned_question_id ||
+                                          (sub.sub_id === "a" && slot.actual_question_id)
+                                      );
                                       const isOverThisSub = dragOverSlotKey === subKey;
+                                      const currentSubMarks =
+                                        editingMarks[`${slot.id}-${sub.sub_id}`] ?? Number(sub.marks || 0);
 
                                       return (
                                         <div
@@ -659,52 +942,149 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                                             setDragOverSlotKey(null);
                                           }}
                                           onDrop={(e) =>
-                                            handleDropQuestion(e, slot, Number(sub.marks), sub.co_level || targetCo, sub.sub_id)
+                                            handleDropQuestion(
+                                              e,
+                                              slot,
+                                              currentSubMarks,
+                                              sub.co_level || targetCo,
+                                              sub.sub_id
+                                            )
                                           }
-                                          className={`rounded-xl border p-2.5 transition-all text-xs ${
+                                          className={`rounded-xl border p-3 transition-all duration-150 ${
                                             isOverThisSub
-                                              ? "border-purple-600 bg-purple-100 ring-2 ring-purple-500"
+                                              ? "border-purple-600 bg-purple-100/70 ring-2 ring-purple-500"
+                                              : isTargetActive
+                                              ? "border-purple-600 bg-purple-50/50 ring-2 ring-purple-500/30 dark:border-purple-500 dark:bg-purple-950/20"
                                               : isSubAssigned
                                               ? "border-green-200 bg-white dark:border-green-900/40 dark:bg-gray-800"
                                               : "border-dashed border-gray-300 bg-white hover:border-purple-400 dark:border-gray-700 dark:bg-gray-800"
                                           }`}
                                         >
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-1.5 font-bold">
-                                              <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">
-                                                {sub.label}
+                                          {/* Sub-question Header Row */}
+                                          <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5">
+                                            <div className="flex items-center gap-2">
+                                              <span className="flex items-center justify-center rounded-lg bg-purple-100 px-2 py-0.5 text-xs font-black text-purple-900 dark:bg-purple-900/60 dark:text-purple-200">
+                                                {sub.label || `${slot.question_number}.a`}
                                               </span>
-                                              <span className="text-gray-600 dark:text-gray-300">
-                                                {sub.marks} Marks
-                                              </span>
-                                              <span className="rounded bg-indigo-50 px-1 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+
+                                              {/* Marks input: show numerical input if multiple subquestions, otherwise static label */}
+                                              {!isSingleChoice ? (
+                                                <div className="flex items-center gap-1">
+                                                  <input
+                                                    type="number"
+                                                    min="1"
+                                                    max={slot.max_marks}
+                                                    value={currentSubMarks}
+                                                    onChange={(e) => {
+                                                      const val = Number(e.target.value) || 0;
+                                                      setEditingMarks((prev) => ({
+                                                        ...prev,
+                                                        [`${slot.id}-${sub.sub_id}`]: val,
+                                                      }));
+                                                    }}
+                                                    onBlur={() => {
+                                                      const val =
+                                                        editingMarks[`${slot.id}-${sub.sub_id}`] ??
+                                                        Number(sub.marks || 0);
+                                                      handleUpdateSubMarks(slot, "option_a", sub.sub_id, val);
+                                                    }}
+                                                    className="w-14 rounded-lg border border-gray-300 bg-white px-1.5 py-0.5 text-xs font-bold text-center text-gray-800 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                                                  />
+                                                  <span className="text-[11px] font-bold text-gray-500">M</span>
+                                                </div>
+                                              ) : (
+                                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                                  {sub.marks} Marks
+                                                </span>
+                                              )}
+
+                                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
                                                 {sub.co_level || targetCo}
                                               </span>
                                             </div>
 
-                                            {isSubAssigned ? (
-                                              <button
-                                                type="button"
-                                                onClick={() => onUnassignSlot(slot.id, sub.sub_id)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700"
-                                              >
-                                                <XCircle className="h-3 w-3" />
-                                                <span>Unassign</span>
-                                              </button>
-                                            ) : (
-                                              <span className="text-[10px] italic text-purple-600 dark:text-purple-400">
-                                                Drop {sub.marks}M ({sub.co_level || targetCo}) question here
-                                              </span>
-                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                              {/* Delete Sub-question option */}
+                                              {!isSingleChoice && onUpdateSlotStructure && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    handleDeleteSubQuestion(slot, "option_a", sub.sub_id)
+                                                  }
+                                                  title="Delete this sub-question"
+                                                  className="inline-flex items-center gap-1 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition-colors"
+                                                >
+                                                  <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                              )}
+
+                                              {/* Sub-Slot Unassign or Select Target Button */}
+                                              {isSubAssigned ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => onUnassignSlot(slot.id, sub.sub_id)}
+                                                  className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                                >
+                                                  <XCircle className="h-3.5 w-3.5" />
+                                                  <span>Unassign</span>
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => onSelectSlot(slot.id, sub.sub_id)}
+                                                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                                                    isTargetActive
+                                                      ? "bg-purple-600 text-white shadow-2xs"
+                                                      : "bg-purple-100 text-purple-800 hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300"
+                                                  }`}
+                                                >
+                                                  <PlusCircle className="h-3.5 w-3.5" />
+                                                  <span>{isTargetActive ? "Active Target" : "Assign Question"}</span>
+                                                </button>
+                                              )}
+                                            </div>
                                           </div>
 
-                                          {/* Sub-question Preview Text */}
-                                          {isSubAssigned && assignedQ && (
-                                            <div className="mt-1.5 text-xs text-gray-800 dark:text-gray-200">
+                                          {/* Sub-Question Body: Assigned Question Preview OR Drop Zone */}
+                                          {isSubAssigned && assignedQ ? (
+                                            <div className="mt-2 rounded-xl bg-gray-50 p-2.5 text-xs text-gray-800 dark:bg-gray-900/60 dark:text-gray-200">
+                                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+                                                <div className="flex items-center gap-1.5">
+                                                  {(assignedQ.course_outcome || assignedQ.co_level) && (
+                                                    <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                                      {assignedQ.course_outcome || assignedQ.co_level}
+                                                    </span>
+                                                  )}
+                                                  {(assignedQ.bloom_level || assignedQ.knowledge_level) && (
+                                                    <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-800 dark:bg-pink-900/40 dark:text-pink-300">
+                                                      {assignedQ.bloom_level || assignedQ.knowledge_level}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {onEditQuestion && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => onEditQuestion(assignedQ)}
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-purple-600"
+                                                  >
+                                                    <Edit className="h-3 w-3" />
+                                                    <span>Edit</span>
+                                                  </button>
+                                                )}
+                                              </div>
                                               <FormattedMathText
                                                 text={assignedQ.question_text}
-                                                className="line-clamp-2 block"
+                                                className="line-clamp-2 block text-xs font-medium"
                                               />
+                                            </div>
+                                          ) : isTargetActive ? (
+                                            <div className="mt-2 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-purple-400 bg-purple-50/70 p-2.5 text-xs font-semibold text-purple-700 dark:bg-purple-950/30 dark:text-purple-300 animate-pulse">
+                                              <Sparkles className="h-4 w-4" />
+                                              <span>Active Target — Drop {currentSubMarks}M question or click Assign in candidate pool</span>
+                                            </div>
+                                          ) : (
+                                            <div className="mt-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/40 p-2 text-center text-xs text-gray-400 dark:border-gray-700/60 dark:bg-gray-850/40">
+                                              Drop {currentSubMarks}M ({sub.co_level || targetCo}) question here
                                             </div>
                                           )}
                                         </div>
@@ -712,35 +1092,68 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                                     })}
                                   </div>
                                 </div>
+                              );
+                            })()}
 
-                                {/* Real-World Either / Or Divider */}
-                                <div className="relative flex items-center justify-center my-1">
-                                  <div className="absolute inset-0 flex items-center">
-                                    <div className="w-full border-t border-purple-200 dark:border-purple-800" />
-                                  </div>
-                                  <div className="relative rounded-full bg-white px-3 py-1 text-xs font-black text-purple-700 dark:bg-gray-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-xs flex items-center gap-1.5">
-                                    <ArrowRightLeft className="h-3.5 w-3.5" />
-                                    <span>— OR (Student chooses Option A or Option B • Slot counts {slot.max_marks}M towards {targetCo || "CO"}) —</span>
-                                  </div>
-                                </div>
+                            {/* ─── CENTRAL OR DIVIDER ─── */}
+                            <div className="relative flex items-center justify-center my-2">
+                              <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-purple-200 dark:border-purple-800" />
+                              </div>
+                              <div className="relative rounded-full bg-white px-3.5 py-1 text-xs font-black text-purple-700 dark:bg-gray-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-2xs flex items-center gap-1.5">
+                                <ArrowRightLeft className="h-3.5 w-3.5 text-purple-600" />
+                                <span>OR (Student chooses Option A or Option B • {slot.max_marks}M towards {targetCo})</span>
+                              </div>
+                            </div>
 
-                                {/* Option B Container */}
-                                <div className="rounded-xl border border-indigo-200 bg-indigo-50/20 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/10">
-                                  <div className="mb-2 flex items-center justify-between text-xs">
-                                    <span className="font-extrabold uppercase tracking-wider text-indigo-900 dark:text-indigo-200 flex items-center gap-1">
-                                      <span>Option B</span>
-                                      <span className="text-[11px] font-normal text-gray-500">
-                                        ({slot.max_marks}M • Target: {targetCo || "CO"})
+                            {/* ─── OPTION B CONTAINER ─── */}
+                            {(() => {
+                              const optBSubs = resolvedStruct?.option_b?.sub_questions || [];
+                              const isSingleChoice =
+                                optBSubs.length === 1 &&
+                                (optBSubs[0].sub_id === "b" || optBSubs[0].sub_id === "b.1");
+                              const sumMarksB = optBSubs.reduce(
+                                (acc: number, sq: any) =>
+                                  acc + (editingMarks[`${slot.id}-${sq.sub_id}`] ?? Number(sq.marks || 0)),
+                                0
+                              );
+
+                              return (
+                                <div className="rounded-2xl border border-indigo-200/90 bg-indigo-50/25 p-3.5 dark:border-indigo-900/50 dark:bg-indigo-950/15">
+                                  {/* Option B Sub-Header */}
+                                  <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-xs uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
+                                        Option B
                                       </span>
-                                    </span>
+                                      {/* Real-time Comprehensive Mark Validation Badge */}
+                                      {renderMarkValidationBadge(sumMarksB, slot.max_marks)}
+                                    </div>
+
+                                    {/* Add Sub-Question Button */}
+                                    {onUpdateSlotStructure && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddSubQuestion(slot, "option_b")}
+                                        className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-2xs hover:bg-indigo-100 hover:text-indigo-900 dark:border-indigo-800 dark:bg-gray-800 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition-all"
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        <span>+ Sub-Question</span>
+                                      </button>
+                                    )}
                                   </div>
 
-                                  <div className="space-y-2">
-                                    {(subStructure.option_b?.sub_questions || []).map((sub: any) => {
+                                  {/* Sub-Questions inside Option B */}
+                                  <div className="space-y-2.5">
+                                    {optBSubs.map((sub: any) => {
+                                      const subKey = `slot-${slot.id}-${sub.sub_id}`;
+                                      const isTargetActive =
+                                        activeSlotId === slot.id && activeSubId === sub.sub_id;
                                       const assignedQ = candidates.find((c) => c.id === sub.assigned_question_id);
                                       const isSubAssigned = Boolean(sub.assigned_question_id);
-                                      const subKey = `slot-${slot.id}-${sub.sub_id}`;
                                       const isOverThisSub = dragOverSlotKey === subKey;
+                                      const currentSubMarks =
+                                        editingMarks[`${slot.id}-${sub.sub_id}`] ?? Number(sub.marks || 0);
 
                                       return (
                                         <div
@@ -758,52 +1171,149 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                                             setDragOverSlotKey(null);
                                           }}
                                           onDrop={(e) =>
-                                            handleDropQuestion(e, slot, Number(sub.marks), sub.co_level || targetCo, sub.sub_id)
+                                            handleDropQuestion(
+                                              e,
+                                              slot,
+                                              currentSubMarks,
+                                              sub.co_level || targetCo,
+                                              sub.sub_id
+                                            )
                                           }
-                                          className={`rounded-xl border p-2.5 transition-all text-xs ${
+                                          className={`rounded-xl border p-3 transition-all duration-150 ${
                                             isOverThisSub
-                                              ? "border-indigo-600 bg-indigo-100 ring-2 ring-indigo-500"
+                                              ? "border-indigo-600 bg-indigo-100/70 ring-2 ring-indigo-500"
+                                              : isTargetActive
+                                              ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/30 dark:border-indigo-500 dark:bg-indigo-950/20"
                                               : isSubAssigned
                                               ? "border-green-200 bg-white dark:border-green-900/40 dark:bg-gray-800"
                                               : "border-dashed border-gray-300 bg-white hover:border-indigo-400 dark:border-gray-700 dark:bg-gray-800"
                                           }`}
                                         >
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-1.5 font-bold">
-                                              <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">
-                                                {sub.label}
+                                          {/* Sub-question Header Row */}
+                                          <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5">
+                                            <div className="flex items-center gap-2">
+                                              <span className="flex items-center justify-center rounded-lg bg-indigo-100 px-2 py-0.5 text-xs font-black text-indigo-900 dark:bg-indigo-900/60 dark:text-indigo-200">
+                                                {sub.label || `${slot.question_number}.b`}
                                               </span>
-                                              <span className="text-gray-600 dark:text-gray-300">
-                                                {sub.marks} Marks
-                                              </span>
-                                              <span className="rounded bg-indigo-50 px-1 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+
+                                              {/* Marks numerical input */}
+                                              {!isSingleChoice ? (
+                                                <div className="flex items-center gap-1">
+                                                  <input
+                                                    type="number"
+                                                    min="1"
+                                                    max={slot.max_marks}
+                                                    value={currentSubMarks}
+                                                    onChange={(e) => {
+                                                      const val = Number(e.target.value) || 0;
+                                                      setEditingMarks((prev) => ({
+                                                        ...prev,
+                                                        [`${slot.id}-${sub.sub_id}`]: val,
+                                                      }));
+                                                    }}
+                                                    onBlur={() => {
+                                                      const val =
+                                                        editingMarks[`${slot.id}-${sub.sub_id}`] ??
+                                                        Number(sub.marks || 0);
+                                                      handleUpdateSubMarks(slot, "option_b", sub.sub_id, val);
+                                                    }}
+                                                    className="w-14 rounded-lg border border-gray-300 bg-white px-1.5 py-0.5 text-xs font-bold text-center text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                                                  />
+                                                  <span className="text-[11px] font-bold text-gray-500">M</span>
+                                                </div>
+                                              ) : (
+                                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                                  {sub.marks} Marks
+                                                </span>
+                                              )}
+
+                                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
                                                 {sub.co_level || targetCo}
                                               </span>
                                             </div>
 
-                                            {isSubAssigned ? (
-                                              <button
-                                                type="button"
-                                                onClick={() => onUnassignSlot(slot.id, sub.sub_id)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700"
-                                              >
-                                                <XCircle className="h-3 w-3" />
-                                                <span>Unassign</span>
-                                              </button>
-                                            ) : (
-                                              <span className="text-[10px] italic text-indigo-600 dark:text-indigo-400">
-                                                Drop {sub.marks}M ({sub.co_level || targetCo}) question here
-                                              </span>
-                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                              {/* Delete Sub-question option */}
+                                              {!isSingleChoice && onUpdateSlotStructure && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    handleDeleteSubQuestion(slot, "option_b", sub.sub_id)
+                                                  }
+                                                  title="Delete this sub-question"
+                                                  className="inline-flex items-center gap-1 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition-colors"
+                                                >
+                                                  <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                              )}
+
+                                              {/* Sub-Slot Unassign or Select Target Button */}
+                                              {isSubAssigned ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => onUnassignSlot(slot.id, sub.sub_id)}
+                                                  className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                                >
+                                                  <XCircle className="h-3.5 w-3.5" />
+                                                  <span>Unassign</span>
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => onSelectSlot(slot.id, sub.sub_id)}
+                                                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                                                    isTargetActive
+                                                      ? "bg-indigo-600 text-white shadow-2xs"
+                                                      : "bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300"
+                                                  }`}
+                                                >
+                                                  <PlusCircle className="h-3.5 w-3.5" />
+                                                  <span>{isTargetActive ? "Active Target" : "Assign Question"}</span>
+                                                </button>
+                                              )}
+                                            </div>
                                           </div>
 
-                                          {/* Sub-question Preview Text */}
-                                          {isSubAssigned && assignedQ && (
-                                            <div className="mt-1.5 text-xs text-gray-800 dark:text-gray-200">
+                                          {/* Sub-Question Body: Assigned Question Preview OR Drop Zone */}
+                                          {isSubAssigned && assignedQ ? (
+                                            <div className="mt-2 rounded-xl bg-gray-50 p-2.5 text-xs text-gray-800 dark:bg-gray-900/60 dark:text-gray-200">
+                                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+                                                <div className="flex items-center gap-1.5">
+                                                  {(assignedQ.course_outcome || assignedQ.co_level) && (
+                                                    <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                                      {assignedQ.course_outcome || assignedQ.co_level}
+                                                    </span>
+                                                  )}
+                                                  {(assignedQ.bloom_level || assignedQ.knowledge_level) && (
+                                                    <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-800 dark:bg-pink-900/40 dark:text-pink-300">
+                                                      {assignedQ.bloom_level || assignedQ.knowledge_level}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {onEditQuestion && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => onEditQuestion(assignedQ)}
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-indigo-600"
+                                                  >
+                                                    <Edit className="h-3 w-3" />
+                                                    <span>Edit</span>
+                                                  </button>
+                                                )}
+                                              </div>
                                               <FormattedMathText
                                                 text={assignedQ.question_text}
-                                                className="line-clamp-2 block"
+                                                className="line-clamp-2 block text-xs font-medium"
                                               />
+                                            </div>
+                                          ) : isTargetActive ? (
+                                            <div className="mt-2 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-indigo-400 bg-indigo-50/70 p-2.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300 animate-pulse">
+                                              <Sparkles className="h-4 w-4" />
+                                              <span>Active Target — Drop {currentSubMarks}M question or click Assign in candidate pool</span>
+                                            </div>
+                                          ) : (
+                                            <div className="mt-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/40 p-2 text-center text-xs text-gray-400 dark:border-gray-700/60 dark:bg-gray-850/40">
+                                              Drop {currentSubMarks}M ({sub.co_level || targetCo}) question here
                                             </div>
                                           )}
                                         </div>
@@ -811,52 +1321,120 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                                     })}
                                   </div>
                                 </div>
-                              </div>
-                            ) : (
-                              /* Direct Sub-Questions Layout */
-                              <div className="space-y-2">
-                                {(subStructure.sub_questions || []).map((sub: any) => {
-                                  const assignedQ = candidates.find((c) => c.id === sub.assigned_question_id);
-                                  const isSubAssigned = Boolean(sub.assigned_question_id);
-                                  const subKey = `slot-${slot.id}-${sub.sub_id}`;
-                                  const isOverThisSub = dragOverSlotKey === subKey;
+                              );
+                            })()}
+                          </div>
+                        ) : resolvedStruct?.sub_questions ? (
+                          /* ─────────────────────────────────────────────────────────────
+                             DIRECT SUB-QUESTIONS VIEW
+                             ───────────────────────────────────────────────────────────── */
+                          <div className="mt-3.5 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                Sub-Questions
+                              </span>
+                              {onUpdateSlotStructure && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSubQuestion(slot, "direct")}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  <span>+ Sub-Question</span>
+                                </button>
+                              )}
+                            </div>
 
-                                  return (
-                                    <div
-                                      key={sub.sub_id}
-                                      onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.dataTransfer.dropEffect = "move";
-                                      }}
-                                      onDragEnter={(e) => {
-                                        e.preventDefault();
-                                        setDragOverSlotKey(subKey);
-                                      }}
-                                      onDragLeave={(e) => {
-                                        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                                        setDragOverSlotKey(null);
-                                      }}
-                                      onDrop={(e) =>
-                                        handleDropQuestion(e, slot, Number(sub.marks), sub.co_level || targetCo, sub.sub_id)
-                                      }
-                                      className={`rounded-xl border p-2.5 transition-all text-xs ${
-                                        isOverThisSub
-                                          ? "border-purple-600 bg-purple-100 ring-2 ring-purple-500"
-                                          : isSubAssigned
-                                          ? "border-green-200 bg-white dark:border-green-900/40 dark:bg-gray-800"
-                                          : "border-dashed border-gray-300 bg-white hover:border-purple-400 dark:border-gray-700 dark:bg-gray-800"
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-1.5 font-bold">
-                                          <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">
-                                            {sub.label}
-                                          </span>
-                                          <span>{sub.marks} Marks</span>
-                                          <span className="rounded bg-indigo-50 px-1 py-0.5 text-[10px] text-indigo-700">
-                                            {sub.co_level || targetCo}
-                                          </span>
+                            <div className="space-y-2">
+                              {resolvedStruct.sub_questions.map((sub: any) => {
+                                const subKey = `slot-${slot.id}-${sub.sub_id}`;
+                                const isTargetActive =
+                                  activeSlotId === slot.id && activeSubId === sub.sub_id;
+                                const assignedQ = candidates.find((c) => c.id === sub.assigned_question_id);
+                                const isSubAssigned = Boolean(sub.assigned_question_id);
+                                const isOverThisSub = dragOverSlotKey === subKey;
+                                const currentSubMarks =
+                                  editingMarks[`${slot.id}-${sub.sub_id}`] ?? Number(sub.marks || 0);
+
+                                return (
+                                  <div
+                                    key={sub.sub_id}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      e.dataTransfer.dropEffect = "move";
+                                    }}
+                                    onDragEnter={(e) => {
+                                      e.preventDefault();
+                                      setDragOverSlotKey(subKey);
+                                    }}
+                                    onDragLeave={(e) => {
+                                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                                      setDragOverSlotKey(null);
+                                    }}
+                                    onDrop={(e) =>
+                                      handleDropQuestion(
+                                        e,
+                                        slot,
+                                        currentSubMarks,
+                                        sub.co_level || targetCo,
+                                        sub.sub_id
+                                      )
+                                    }
+                                    className={`rounded-xl border p-2.5 transition-all text-xs ${
+                                      isOverThisSub
+                                        ? "border-purple-600 bg-purple-100 ring-2 ring-purple-500"
+                                        : isTargetActive
+                                        ? "border-purple-600 bg-purple-50 ring-2 ring-purple-500/30"
+                                        : isSubAssigned
+                                        ? "border-green-200 bg-white dark:border-green-900/40 dark:bg-gray-800"
+                                        : "border-dashed border-gray-300 bg-white hover:border-purple-400 dark:border-gray-700 dark:bg-gray-800"
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 font-bold">
+                                        <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">
+                                          {sub.label}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="number"
+                                            min="1"
+                                            max={slot.max_marks}
+                                            value={currentSubMarks}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value) || 0;
+                                              setEditingMarks((prev) => ({
+                                                ...prev,
+                                                [`${slot.id}-${sub.sub_id}`]: val,
+                                              }));
+                                            }}
+                                            onBlur={() => {
+                                              const val =
+                                                editingMarks[`${slot.id}-${sub.sub_id}`] ??
+                                                Number(sub.marks || 0);
+                                              handleUpdateSubMarks(slot, "direct", sub.sub_id, val);
+                                            }}
+                                            className="w-12 rounded border border-gray-300 p-0.5 text-center text-xs font-bold dark:border-gray-700 dark:bg-gray-700"
+                                          />
+                                          <span className="text-[11px] text-gray-500">M</span>
                                         </div>
+                                        <span className="rounded bg-indigo-50 px-1 py-0.5 text-[10px] text-indigo-700">
+                                          {sub.co_level || targetCo}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5">
+                                        {onUpdateSlotStructure && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleDeleteSubQuestion(slot, "direct", sub.sub_id)
+                                            }
+                                            className="p-1 text-gray-400 hover:text-red-600"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
 
                                         {isSubAssigned ? (
                                           <button
@@ -868,28 +1446,38 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                                             <span>Unassign</span>
                                           </button>
                                         ) : (
-                                          <span className="text-[10px] italic text-purple-600">
-                                            Drop {sub.marks}M question here
-                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => onSelectSlot(slot.id, sub.sub_id)}
+                                            className={`rounded-lg px-2 py-0.5 text-xs font-bold ${
+                                              isTargetActive
+                                                ? "bg-purple-600 text-white"
+                                                : "bg-purple-100 text-purple-700"
+                                            }`}
+                                          >
+                                            {isTargetActive ? "Active" : "Assign"}
+                                          </button>
                                         )}
                                       </div>
-
-                                      {isSubAssigned && assignedQ && (
-                                        <div className="mt-1.5 text-xs text-gray-800 dark:text-gray-200">
-                                          <FormattedMathText
-                                            text={assignedQ.question_text}
-                                            className="line-clamp-2 block"
-                                          />
-                                        </div>
-                                      )}
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+
+                                    {isSubAssigned && assignedQ && (
+                                      <div className="mt-1.5 text-xs text-gray-800 dark:text-gray-200">
+                                        <FormattedMathText
+                                          text={assignedQ.question_text}
+                                          className="line-clamp-2 block"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ) : (
-                          /* Standard Single Slot Drop Zone */
+                          /* ─────────────────────────────────────────────────────────────
+                             STANDARD SINGLE DIRECT SLOT DROP ZONE
+                             ───────────────────────────────────────────────────────────── */
                           <div
                             onDragOver={(e) => {
                               e.preventDefault();
@@ -907,30 +1495,34 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                               handleDropQuestion(e, slot, Number(slot.max_marks), targetCo, null)
                             }
                             className={`mt-2 rounded-xl transition-all ${
-                              isDragOverSlot
+                              dragOverSlotKey === slotKey
                                 ? "border border-purple-500 bg-purple-100/70 p-3 ring-2 ring-purple-500"
                                 : ""
                             }`}
                           >
-                            {isWholeSlotAssigned && assignedCandidate ? (
+                            {isWholeSlotAssigned && assignedCandidateWhole ? (
                               <div className="rounded-xl bg-gray-50 p-3 text-xs text-gray-800 dark:bg-gray-900/60 dark:text-gray-200">
                                 <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    {(assignedCandidate.course_outcome || assignedCandidate.co_level) && (
+                                    {(assignedCandidateWhole.course_outcome ||
+                                      assignedCandidateWhole.co_level) && (
                                       <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                        {assignedCandidate.course_outcome || assignedCandidate.co_level}
+                                        {assignedCandidateWhole.course_outcome ||
+                                          assignedCandidateWhole.co_level}
                                       </span>
                                     )}
-                                    {(assignedCandidate.bloom_level || assignedCandidate.knowledge_level) && (
+                                    {(assignedCandidateWhole.bloom_level ||
+                                      assignedCandidateWhole.knowledge_level) && (
                                       <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-800 dark:bg-pink-900/40 dark:text-pink-300">
-                                        {assignedCandidate.bloom_level || assignedCandidate.knowledge_level}
+                                        {assignedCandidateWhole.bloom_level ||
+                                          assignedCandidateWhole.knowledge_level}
                                       </span>
                                     )}
                                   </div>
                                   {onEditQuestion && (
                                     <button
                                       type="button"
-                                      onClick={() => onEditQuestion(assignedCandidate)}
+                                      onClick={() => onEditQuestion(assignedCandidateWhole)}
                                       className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-purple-600 transition-colors"
                                     >
                                       <Edit className="h-3 w-3" />
@@ -940,18 +1532,16 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
                                 </div>
 
                                 <FormattedMathText
-                                  text={assignedCandidate.question_text}
+                                  text={assignedCandidateWhole.question_text}
                                   className="line-clamp-2 text-xs font-medium block"
                                 />
                               </div>
-                            ) : isWholeSlotAssigned ? (
-                              <div className="rounded-xl bg-gray-50 p-2 text-xs text-gray-600 dark:bg-gray-900/50 dark:text-gray-400">
-                                Question #{slot.actual_question_id} assigned.
-                              </div>
-                            ) : isSelected ? (
+                            ) : activeSlotId === slot.id && !activeSubId ? (
                               <div className="flex items-center gap-1.5 rounded-xl border border-dashed border-purple-400 bg-purple-50/50 p-3 text-xs font-semibold text-purple-700 dark:text-purple-300 animate-pulse">
                                 <Sparkles className="h-4 w-4" />
-                                <span>Drop a matching {slot.max_marks}M {targetCo ? `(${targetCo})` : ""} question here</span>
+                                <span>
+                                  Active Target — Drop matching {slot.max_marks}M {targetCo ? `(${targetCo})` : ""} question here
+                                </span>
                               </div>
                             ) : (
                               <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/50 p-3 text-center text-xs text-gray-400 dark:border-gray-700 dark:bg-gray-800/40">
@@ -967,344 +1557,6 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* ── 4. Sub-Question Configuration Modal ─────────────────────────────── */}
-      {configuringSlot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-3xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
-              <div className="flex items-center gap-2">
-                <Settings2 className="h-5 w-5 text-purple-600" />
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                  Configure Slot Q{configuringSlot.question_number} ({configuringSlot.max_marks} Marks)
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setConfiguringSlot(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
-              {/* Target CO Selector */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Target Course Outcome (CO)
-                </label>
-                <select
-                  value={configTargetCo}
-                  onChange={(e) => setConfigTargetCo(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 p-2 text-xs font-bold text-purple-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-purple-300"
-                >
-                  {(activeCourseCoCodes.length > 0
-                    ? activeCourseCoCodes
-                    : liveCoSummary.map((c) => c.co_code).filter(Boolean)
-                  ).map((co) => (
-                    <option key={co} value={co}>
-                      {co}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-gray-400 mt-1">
-                  In university examinations, alternative pathways (Option A vs Option B) assess the same CO so student attainment remains unbiased.
-                </p>
-              </div>
-
-              {/* Choice Model Selector */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Slot Choice Model
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfigQuestionType("either_or")}
-                    className={`rounded-xl border p-2.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      configQuestionType === "either_or"
-                        ? "border-purple-600 bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
-                        : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    <ArrowRightLeft className="h-4 w-4" />
-                    <span>Either / Or Choice</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setConfigQuestionType("direct")}
-                    className={`rounded-xl border p-2.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      configQuestionType === "direct"
-                        ? "border-purple-600 bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
-                        : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    <Layers className="h-4 w-4" />
-                    <span>Direct Sub-parts</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Either/Or Sub-parts Builders */}
-              {configQuestionType === "either_or" ? (
-                <div className="space-y-4">
-                  {/* Option A Sub-parts */}
-                  <div className="rounded-2xl border border-purple-200 bg-purple-50/30 p-3.5 dark:border-purple-900/40 dark:bg-purple-950/20">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-black uppercase text-purple-900 dark:text-purple-200">
-                        Option A Sub-parts (Sum: {optionASubs.reduce((a, b) => a + b.marks, 0)}/{configuringSlot.max_marks}M)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOptionASubs([
-                            ...optionASubs,
-                            {
-                              sub_id: `a.${optionASubs.length + 1}`,
-                              label: `a) ${String.fromCharCode(105 + optionASubs.length)})`,
-                              marks: 4,
-                              co_level: configTargetCo,
-                            },
-                          ])
-                        }
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>Add Sub-part</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {optionASubs.map((sub, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={sub.label}
-                            onChange={(e) => {
-                              const copy = [...optionASubs];
-                              copy[idx].label = e.target.value;
-                              setOptionASubs(copy);
-                            }}
-                            className="w-24 rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                          />
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="1"
-                              max={configuringSlot.max_marks}
-                              value={sub.marks}
-                              onChange={(e) => {
-                                const copy = [...optionASubs];
-                                copy[idx].marks = Number(e.target.value) || 0;
-                                setOptionASubs(copy);
-                              }}
-                              className="w-20 rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                            />
-                            <span className="text-xs text-gray-500">Marks</span>
-                          </div>
-                          {optionASubs.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setOptionASubs(optionASubs.filter((_, i) => i !== idx))}
-                              className="text-red-500 hover:text-red-700 p-1"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Option B Sub-parts */}
-                  <div className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-3.5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-black uppercase text-indigo-900 dark:text-indigo-200">
-                        Option B Sub-parts (Sum: {optionBSubs.reduce((a, b) => a + b.marks, 0)}/{configuringSlot.max_marks}M)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOptionBSubs([
-                            ...optionBSubs,
-                            {
-                              sub_id: `b.${optionBSubs.length + 1}`,
-                              label: `b) ${String.fromCharCode(105 + optionBSubs.length)})`,
-                              marks: 4,
-                              co_level: configTargetCo,
-                            },
-                          ])
-                        }
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>Add Sub-part</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {optionBSubs.map((sub, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={sub.label}
-                            onChange={(e) => {
-                              const copy = [...optionBSubs];
-                              copy[idx].label = e.target.value;
-                              setOptionBSubs(copy);
-                            }}
-                            className="w-24 rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                          />
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="1"
-                              max={configuringSlot.max_marks}
-                              value={sub.marks}
-                              onChange={(e) => {
-                                const copy = [...optionBSubs];
-                                copy[idx].marks = Number(e.target.value) || 0;
-                                setOptionBSubs(copy);
-                              }}
-                              className="w-20 rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                            />
-                            <span className="text-xs text-gray-500">Marks</span>
-                          </div>
-                          {optionBSubs.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setOptionBSubs(optionBSubs.filter((_, i) => i !== idx))}
-                              className="text-red-500 hover:text-red-700 p-1"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Direct Sub-parts Builder */
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3.5 dark:border-gray-750 dark:bg-gray-800">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                      Sub-parts (Sum: {directSubs.reduce((a, b) => a + b.marks, 0)}/{configuringSlot.max_marks}M)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDirectSubs([
-                          ...directSubs,
-                          {
-                            sub_id: `sub_${directSubs.length + 1}`,
-                            label: `${String.fromCharCode(97 + directSubs.length)})`,
-                            marks: 2,
-                            co_level: configTargetCo,
-                          },
-                        ])
-                      }
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700"
-                    >
-                      <Plus className="h-3 w-3" />
-                      <span>Add Sub-part</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {directSubs.map((sub, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={sub.label}
-                          onChange={(e) => {
-                            const copy = [...directSubs];
-                            copy[idx].label = e.target.value;
-                            setDirectSubs(copy);
-                          }}
-                          className="w-20 rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                        />
-                        <input
-                          type="number"
-                          min="1"
-                          max={configuringSlot.max_marks}
-                          value={sub.marks}
-                          onChange={(e) => {
-                            const copy = [...directSubs];
-                            copy[idx].marks = Number(e.target.value) || 0;
-                            setDirectSubs(copy);
-                          }}
-                          className="w-20 rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                        />
-                        <span className="text-xs text-gray-500">Marks</span>
-                        <select
-                          value={sub.co_level || configTargetCo}
-                          onChange={(e) => {
-                            const copy = [...directSubs];
-                            copy[idx].co_level = e.target.value;
-                            setDirectSubs(copy);
-                          }}
-                          className="rounded-lg border border-gray-300 p-1.5 text-xs font-bold dark:border-gray-700 dark:bg-gray-800"
-                        >
-                          {(activeCourseCoCodes.length > 0
-                            ? activeCourseCoCodes
-                            : liveCoSummary.map((c) => c.co_code).filter(Boolean)
-                          ).map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                        {directSubs.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setDirectSubs(directSubs.filter((_, i) => i !== idx))}
-                            className="text-red-500 hover:text-red-700 p-1"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={handleClearStructure}
-                disabled={savingStructure}
-                className="text-xs font-bold text-gray-500 hover:text-red-600 transition-colors"
-              >
-                Reset to Compulsory Single Slot
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConfiguringSlot(null)}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveStructure}
-                  disabled={savingStructure}
-                  className="rounded-xl bg-purple-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {savingStructure ? "Saving..." : "Save Structure"}
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

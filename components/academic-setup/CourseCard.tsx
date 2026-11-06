@@ -338,7 +338,7 @@ export default function CourseCard(props: any) {
       label: "CIA QUESTION PAPER",
       stageKey: "cia-papers",
       status: data?.academic_preparation?.cia_question_paper?.state || "not_started",
-      route: `/neurobe/cia-question-paper?course_id=${targetCourseId}`,
+      route: `/neurobe/question-bank/${targetCourseId}?tab=cia-tests`,
       artifactsTab: "cia-papers",
       isUnlocked: isSyllabusApproved,
       unlockMessage: "Requires Syllabus Extraction to be approved first.",

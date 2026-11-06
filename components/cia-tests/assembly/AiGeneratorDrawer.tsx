@@ -3,22 +3,13 @@ import {
   Sparkles,
   X,
   AlertCircle,
-  CheckCircle2,
   Loader2,
   BookOpen,
-  Layers,
-  Award,
-  ArrowRight,
-  Sliders,
   Check,
-  Split,
-  GitBranch,
-  Compass,
-  Image as ImageIcon,
-  PenTool,
 } from "lucide-react";
 import { AiGenerationJobPayload, SyllabusTopicItem } from "@/types/cia-test.types";
 import { isLimitExhaustion } from "@/utils/function.utils";
+import { toast } from "react-toastify";
 
 interface AiGeneratorDrawerProps {
   isOpen: boolean;
@@ -54,43 +45,15 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
   const [maxMarks, setMaxMarks] = useState<number>(defaultMarks || 10);
   const [numQuestions, setNumQuestions] = useState<number>(5);
   const [difficulty, setDifficulty] = useState<string>("medium");
-  const [customInstructions, setCustomInstructions] = useState<string>("");
 
-  // Dynamic Toggles
-  const [hasSubQuestions, setHasSubQuestions] = useState<boolean>(false);
-  const [numSubQuestions, setNumSubQuestions] = useState<number>(2);
-  const [subQuestionMarks, setSubQuestionMarks] = useState<number[]>([4, 6]);
-
-  const [isEitherOr, setIsEitherOr] = useState<boolean>(false);
-
-  // Auto-select first topics when syllabusTopics loads
+  // Auto-select first topic when syllabusTopics loads (up to 3 max)
   useEffect(() => {
     if (syllabusTopics.length > 0 && selectedTopicIds.length === 0) {
       setSelectedTopicIds([syllabusTopics[0].id]);
     }
   }, [syllabusTopics, selectedTopicIds.length]);
 
-  // Adjust sub question marks automatically when maxMarks or numSubQuestions changes
-  useEffect(() => {
-    if (hasSubQuestions) {
-      const count = Math.max(1, numSubQuestions);
-      const base = Math.floor(maxMarks / count);
-      const remainder = maxMarks % count;
-      const marks = Array(count).fill(base);
-      if (remainder > 0) {
-        marks[marks.length - 1] += remainder;
-      }
-      setSubQuestionMarks(marks);
-    }
-  }, [maxMarks, numSubQuestions, hasSubQuestions]);
-
   if (!isOpen) return null;
-
-  // Validate Sub-questions sum
-  const subMarksSum = hasSubQuestions
-    ? subQuestionMarks.reduce((sum, m) => sum + (Number(m) || 0), 0)
-    : maxMarks;
-  const isMarksMatching = !hasSubQuestions || subMarksSum === maxMarks;
 
   const toggleTopic = (id: number) => {
     setSelectedTopicIds((prev) => {
@@ -103,56 +66,32 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
     });
   };
 
-  const handleSubMarkChange = (index: number, val: number) => {
-    const updated = [...subQuestionMarks];
-    updated[index] = Number(val) || 0;
-    setSubQuestionMarks(updated);
-  };
-
-  const autoDistributeMarks = () => {
-    const count = Math.max(1, numSubQuestions);
-    const base = Math.floor(maxMarks / count);
-    const remainder = maxMarks % count;
-    const marks = Array(count).fill(base);
-    if (remainder > 0) {
-      marks[marks.length - 1] += remainder;
-    }
-    setSubQuestionMarks(marks);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (hasSubQuestions && !isMarksMatching) {
-      alert(`Sub-question marks sum (${subMarksSum}M) must equal target marks (${maxMarks}M).`);
+    if (selectedTopicIds.length === 0) {
+      toast.warning("Please select at least 1 topic.");
       return;
     }
 
-    const finalTopicIds =
-      selectedTopicIds.length > 0
-        ? selectedTopicIds
-        : syllabusTopics.length > 0
-        ? [syllabusTopics[0].id]
-        : [1];
-
-    const selectedTopicNames = finalTopicIds
+    const selectedTopicNames = selectedTopicIds
       .map((id) => syllabusTopics.find((t) => t.id === id)?.topic_name)
       .filter(Boolean) as string[];
 
     const payload: AiGenerationJobPayload = {
-      topic_ids: finalTopicIds,
+      topic_ids: selectedTopicIds,
       topic_names: selectedTopicNames,
       knowledge_level: knowledgeLevel,
       max_marks: Number(maxMarks),
       num_questions: Math.min(20, Math.max(1, Number(numQuestions) || 5)),
       difficulty,
-      is_either_or: isEitherOr,
-      has_sub_questions: hasSubQuestions,
-      num_sub_questions: hasSubQuestions ? numSubQuestions : null,
-      sub_question_marks: hasSubQuestions ? subQuestionMarks : null,
-      custom_instructions: customInstructions.trim() || null,
+      is_either_or: false,
+      has_sub_questions: false,
+      num_sub_questions: null,
+      sub_question_marks: null,
+      custom_instructions: null,
       bloom_level: knowledgeLevel,
-      additional_instructions: customInstructions.trim() || undefined,
+      question_type: "direct",
     };
 
     try {
@@ -286,6 +225,9 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
                   {selectedTopicIds.length} Selected
                 </span>
               </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+                Select your desired syllabus topics. AI will intelligently select 1 to 3 balanced topics for synthesis.
+              </p>
 
               {topicsLoading ? (
                 <div className="py-4 text-center text-gray-400">Loading syllabus topics...</div>
@@ -294,7 +236,7 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
                   <span>Using default syllabus units (Topic #1).</span>
                 </div>
               ) : (
-                <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-900 space-y-2">
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-900 space-y-2">
                   {Object.entries(unitsMap).map(([unitTitle, topics]) => (
                     <div key={unitTitle} className="space-y-1">
                       <div className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
@@ -308,6 +250,7 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
                               type="button"
                               key={t.id}
                               onClick={() => toggleTopic(t.id)}
+                              title={t.topic_name}
                               className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
                                 isSelected
                                   ? "bg-purple-600 text-white shadow-sm"
@@ -372,144 +315,7 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
               </div>
             </div>
 
-            {/* DYNAMIC STRUCTURAL TOGGLES */}
-            <div className="rounded-xl border border-purple-200/80 bg-purple-50/40 p-3.5 dark:border-purple-900 dark:bg-purple-950/20 space-y-3">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
-                <Sliders className="h-3.5 w-3.5" />
-                <span>Dynamic Structure Toggles</span>
-              </div>
-
-              {/* Sub-Questions Toggle */}
-              <div className="rounded-lg border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-800">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Split className="h-4 w-4 text-purple-600" />
-                    <div>
-                      <span className="font-bold text-gray-800 dark:text-gray-200">
-                        Split into Sub-questions
-                      </span>
-                      <p className="text-[11px] text-gray-400">
-                        e.g. Generate parts (a) and (b) with custom mark allocation.
-                      </p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={hasSubQuestions}
-                    onChange={(e) => setHasSubQuestions(e.target.checked)}
-                    disabled={isGenerating}
-                    className="h-4 w-4 rounded text-purple-600 focus:ring-purple-500"
-                  />
-                </label>
-
-                {hasSubQuestions && (
-                  <div className="mt-3 border-t border-gray-100 pt-2.5 dark:border-gray-700 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
-                        Sub-Parts Count:
-                      </span>
-                      <div className="flex gap-1.5">
-                        {[2, 3, 4].map((count) => (
-                          <button
-                            type="button"
-                            key={count}
-                            onClick={() => setNumSubQuestions(count)}
-                            className={`rounded-md px-2 py-0.5 text-xs font-bold ${
-                              numSubQuestions === count
-                                ? "bg-purple-600 text-white"
-                                : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            {count} Parts
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Marks Breakdown Inputs */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
-                          Marks Breakdown (Must sum to {maxMarks}M):
-                        </span>
-                        {!isMarksMatching && (
-                          <button
-                            type="button"
-                            onClick={autoDistributeMarks}
-                            className="text-[10px] font-bold text-purple-600 hover:underline"
-                          >
-                            Auto-Distribute
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {subQuestionMarks.map((m, idx) => (
-                          <div key={idx} className="flex items-center gap-1">
-                            <span className="text-[11px] font-bold text-gray-400">
-                              ({String.fromCharCode(97 + idx)})
-                            </span>
-                            <input
-                              type="number"
-                              min="1"
-                              max={maxMarks}
-                              value={m}
-                              onChange={(e) => handleSubMarkChange(idx, Number(e.target.value))}
-                              className="w-14 rounded-lg border border-gray-300 bg-gray-50 p-1 text-center font-bold text-purple-700 dark:border-gray-600 dark:bg-gray-900 dark:text-purple-300"
-                            />
-                            {idx < subQuestionMarks.length - 1 && (
-                              <span className="font-bold text-gray-400">+</span>
-                            )}
-                          </div>
-                        ))}
-                        <span className="font-bold text-gray-400">=</span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 font-extrabold text-[11px] ${
-                            isMarksMatching
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-                          }`}
-                        >
-                          {subMarksSum}M {isMarksMatching ? "✓" : "≠"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Either / Or Choice Toggle */}
-              <div className="rounded-lg border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-800">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <GitBranch className="h-4 w-4 text-purple-600" />
-                    <div>
-                      <span className="font-bold text-gray-800 dark:text-gray-200">
-                        Either / Or Choice (Option A or Option B)
-                      </span>
-                      <p className="text-[11px] text-gray-400">
-                        Generates both choice branches carrying {maxMarks} Marks each.
-                      </p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isEitherOr}
-                    onChange={(e) => setIsEitherOr(e.target.checked)}
-                    disabled={isGenerating}
-                    className="h-4 w-4 rounded text-purple-600 focus:ring-purple-500"
-                  />
-                </label>
-
-                {isEitherOr && hasSubQuestions && (
-                  <p className="mt-2 text-[10px] text-purple-600 dark:text-purple-400 font-semibold border-t border-gray-100 pt-1.5 dark:border-gray-700">
-                    ⚡ Option A and Option B will both inherit the [{subQuestionMarks.join("m + ")}m] sub-question structure.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Bloom's Level & Difficulty Row (CO input removed) */}
+            {/* Bloom's Level & Difficulty Row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-bold text-gray-700 dark:text-gray-300 mb-1">
@@ -547,21 +353,6 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
               </div>
             </div>
 
-            {/* Custom Instructions */}
-            <div>
-              <label className="block font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Special Prompt Instructions (Optional)
-              </label>
-              <textarea
-                rows={2}
-                placeholder="e.g. Include numerical derivation or focus on industrial case studies."
-                value={customInstructions}
-                onChange={(e) => setCustomInstructions(e.target.value)}
-                disabled={isGenerating}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-2.5 font-medium text-gray-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-              />
-            </div>
-
             <div className="pt-2 flex items-center gap-2">
               {isGenerating ? (
                 <>
@@ -586,8 +377,8 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
               ) : (
                 <button
                   type="submit"
-                  disabled={hasSubQuestions && !isMarksMatching}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50"
+                  disabled={selectedTopicIds.length === 0}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 cursor-pointer"
                 >
                   <Sparkles className="h-4 w-4" />
                   <span>

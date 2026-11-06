@@ -40,6 +40,8 @@ export interface CiaTestStatus {
   job_status: string; // PENDING | PROCESSING | COMPLETED | FAILED | NONE | null
   progress_pct: number | null;
   last_run_completed_at: string | null;
+  has_template?: boolean;
+  question_paper_template_id?: number | null;
 }
 
 export interface QuestionMark {
@@ -235,7 +237,10 @@ export const MarkExtractionService = {
     const res = await commonInstance().post(
       `${COURSE_API_BASE}/cia-tests/${ciaTestId}/answer-sheet-batches`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000,
+      }
     );
     const resolvedBatchId = res.data?.batch_id ?? res.data?.id;
     return {
@@ -453,18 +458,18 @@ export const MarkExtractionService = {
         typeof resData?.detail === "string"
           ? resData.detail
           : typeof resData?.message === "string"
-          ? resData.message
-          : typeof resData?.error === "string"
-          ? resData.error
-          : Array.isArray(resData?.detail)
-          ? resData.detail
-              .map((d: any) => {
-                if (typeof d === "string") return d;
-                const field = Array.isArray(d?.loc) ? d.loc.slice(-1)[0] : "";
-                return field ? `${field}: ${d?.msg || "invalid"}` : d?.msg || JSON.stringify(d);
-              })
-              .join(", ")
-          : err?.message || "Failed to upload direct CO marks.";
+            ? resData.message
+            : typeof resData?.error === "string"
+              ? resData.error
+              : Array.isArray(resData?.detail)
+                ? resData.detail
+                  .map((d: any) => {
+                    if (typeof d === "string") return d;
+                    const field = Array.isArray(d?.loc) ? d.loc.slice(-1)[0] : "";
+                    return field ? `${field}: ${d?.msg || "invalid"}` : d?.msg || JSON.stringify(d);
+                  })
+                  .join(", ")
+                : err?.message || "Failed to upload direct CO marks.";
 
       console.warn(
         `[MarkExtractionService] uploadDirectCoMarks 400/error on Classroom ${targetId}:`,

@@ -201,6 +201,7 @@ const CourseQuestionBankPage = () => {
       {activeMainTab === "blueprints" && (
         <TemplateList
           courseCode={courseInfo.code}
+          courseId={validCourseId}
           templates={templates}
           loading={templatesLoading}
           actionLoadingId={templateActionLoadingId}

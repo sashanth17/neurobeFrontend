@@ -147,10 +147,16 @@ function InstanceDashboardPage() {
                   {ciaTests.map((t) => (
                     <option key={t.cia_test_id} value={t.cia_test_id}>
                       {t.test_name}
+                      {!t.has_template ? " (No Template)" : ""}
                       {t.job_status ? ` — ${t.job_status === "COMPLETED" ? "✓ Extracted" : t.job_status === "PROCESSING" ? "⟳ Processing" : "Pending"}` : ""}
                     </option>
                   ))}
                 </select>
+              )}
+              {selectedCiaTest && !selectedCiaTest.has_template && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
+                  No Template Assigned
+                </span>
               )}
               {selectedCiaTest?.job_status && (
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getStatusBadgeClass(selectedCiaTest.job_status)}`}>
@@ -222,6 +228,11 @@ function InstanceDashboardPage() {
                   ciaTestId={selectedCiaTest.cia_test_id}
                   initialStatus={selectedCiaTest.job_status}
                   initialJobId={selectedCiaTest.latest_job_id}
+                  hasTemplate={Boolean(selectedCiaTest.has_template)}
+                  questionPaperTemplateId={selectedCiaTest.question_paper_template_id}
+                  testName={selectedCiaTest.test_name}
+                  courseId={courseId as string}
+                  loadingTests={loadingTests}
                   onGoToExtractedView={() => setActiveTab("extracted-view")}
                   onRefreshCiaTests={fetchCiaTests}
                 />

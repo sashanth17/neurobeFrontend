@@ -30,6 +30,7 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
 
   // Active Slot for Assignment
   const [activeSlotId, setActiveSlotId] = useState<number | null>(null);
+  const [activeSubId, setActiveSubId] = useState<string | null>(null);
 
   // Filter States
   const [filters, setFilters] = useState<CandidateFilters>({
@@ -149,7 +150,7 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
           showLimitExhaustedModal(errMsg);
           toast.error(LIMIT_EXHAUSTED_MESSAGE);
         } else {
-          toast.error(`Question generation failed: ${errMsg}`);
+          toast.error(finalMsg.toLowerCase().startsWith("question generation failed") ? finalMsg : `Question generation failed: ${finalMsg}`);
         }
       } finally {
         setIsGenerating(false);
@@ -242,23 +243,127 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
     );
   }, [template]);
 
-  // Find active slot object
+  // Find active slot object with sub-slot resolution
   const activeSlot = useMemo(() => {
     if (!activeSlotId) return null;
-    return allSlots.find((s) => s.id === activeSlotId) || null;
-  }, [activeSlotId, allSlots]);
+    const baseSlot = allSlots.find((s) => s.id === activeSlotId);
+    if (!baseSlot) return null;
+
+    if (!activeSubId) {
+      return baseSlot;
+    }
+
+    // Resolve either_or or direct sub-questions
+    const struct = baseSlot.sub_question_structure;
+    if (struct?.type === "either_or") {
+      const allSubs = [
+        ...(struct.option_a?.sub_questions || []),
+        ...(struct.option_b?.sub_questions || []),
+      ];
+      const match = allSubs.find(
+        (sq: any) =>
+          String(sq.sub_id).toLowerCase() === activeSubId.toLowerCase() ||
+          String(sq.label).toLowerCase() === activeSubId.toLowerCase()
+      );
+      if (match) {
+        return {
+          ...baseSlot,
+          sub_id: match.sub_id,
+          sub_label: match.label || `${baseSlot.question_number}.${match.sub_id}`,
+          max_marks: Number(match.marks ?? baseSlot.max_marks),
+          target_co: match.co_level || struct.target_co || baseSlot.target_co,
+          actual_question_id: match.assigned_question_id || null,
+        };
+      }
+      // If default either_or and structure not yet initialized in DB
+      if (activeSubId === "a" || activeSubId === "b") {
+        return {
+          ...baseSlot,
+          sub_id: activeSubId,
+          sub_label: `${baseSlot.question_number}.${activeSubId}`,
+          max_marks: Number(baseSlot.max_marks),
+          target_co: baseSlot.target_co,
+          actual_question_id: null,
+        };
+      }
+    } else if (struct?.sub_questions) {
+      const match = struct.sub_questions.find(
+        (sq: any) =>
+          String(sq.sub_id).toLowerCase() === activeSubId.toLowerCase() ||
+          String(sq.label).toLowerCase() === activeSubId.toLowerCase()
+      );
+      if (match) {
+        return {
+          ...baseSlot,
+          sub_id: match.sub_id,
+          sub_label: match.label || `${baseSlot.question_number}.${match.sub_id}`,
+          max_marks: Number(match.marks ?? baseSlot.max_marks),
+          target_co: match.co_level || struct.target_co || baseSlot.target_co,
+          actual_question_id: match.assigned_question_id || null,
+        };
+      }
+    } else if (activeSubId === "a" || activeSubId === "b") {
+      return {
+        ...baseSlot,
+        sub_id: activeSubId,
+        sub_label: `${baseSlot.question_number}.${activeSubId}`,
+        max_marks: Number(baseSlot.max_marks),
+        target_co: baseSlot.target_co,
+        actual_question_id: null,
+      };
+    }
+
+    return {
+      ...baseSlot,
+      sub_id: activeSubId,
+      sub_label: `${baseSlot.question_number}.${activeSubId}`,
+    };
+  }, [activeSlotId, activeSubId, allSlots]);
 
   // Active slot tracking without hiding other questions in candidate pool
   useEffect(() => {
     // Keep candidate questions visible so faculty can review and assign across slots
   }, [activeSlot]);
 
-  // Calculate Assembly Completion Progress
+  // Calculate Assembly Completion Progress (accounting for sub-questions and either/or options)
   const assemblyStats = useMemo(() => {
-    const totalSlots = allSlots.length;
-    const assignedSlots = allSlots.filter((s) => s.actual_question_id).length;
-    const percentage = totalSlots > 0 ? Math.round((assignedSlots / totalSlots) * 100) : 0;
-    return { totalSlots, assignedSlots, percentage };
+    let totalTargets = 0;
+    let assignedTargets = 0;
+
+    allSlots.forEach((slot) => {
+      const isEitherOr =
+        slot.question_type === "either_or" ||
+        slot.sub_question_structure?.type === "either_or";
+      const struct = slot.sub_question_structure;
+
+      if (isEitherOr) {
+        const optASubs = struct?.option_a?.sub_questions || [];
+        if (optASubs.length > 0) {
+          totalTargets += optASubs.length;
+          assignedTargets += optASubs.filter((sq: any) => sq.assigned_question_id).length;
+        } else {
+          totalTargets += 1;
+          if (slot.actual_question_id) assignedTargets += 1;
+        }
+
+        const optBSubs = struct?.option_b?.sub_questions || [];
+        if (optBSubs.length > 0) {
+          totalTargets += optBSubs.length;
+          assignedTargets += optBSubs.filter((sq: any) => sq.assigned_question_id).length;
+        } else {
+          totalTargets += 1;
+        }
+      } else if (struct?.sub_questions?.length > 0) {
+        totalTargets += struct.sub_questions.length;
+        assignedTargets += struct.sub_questions.filter((sq: any) => sq.assigned_question_id).length;
+      } else {
+        totalTargets += 1;
+        if (slot.actual_question_id) assignedTargets += 1;
+      }
+    });
+
+    const percentage = totalTargets > 0 ? Math.round((assignedTargets / totalTargets) * 100) : 0;
+    return { totalSlots: totalTargets, assignedSlots: assignedTargets, percentage };
   }, [allSlots]);
 
   // Filtered Candidates
@@ -322,7 +427,7 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
         showLimitExhaustedModal(errMsg);
         toast.error(LIMIT_EXHAUSTED_MESSAGE);
       } else {
-        toast.error(`Question generation failed: ${errMsg}`);
+        toast.error(finalMsg.toLowerCase().startsWith("question generation failed") ? finalMsg : `Question generation failed: ${finalMsg}`);
       }
       setIsGenerating(false);
       throw err;
@@ -334,13 +439,15 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
   // =========================================================================
 
   const handleAssignSlot = async (slotId: number, questionId: number, subId?: string | null) => {
-    setActionLoadingId(`slot-assign-${slotId}${subId ? `-${subId}` : ""}`);
+    const targetSubId = subId !== undefined ? subId : activeSubId;
+    setActionLoadingId(`slot-assign-${slotId}${targetSubId ? `-${targetSubId}` : ""}`);
     try {
-      await ciaAssessmentService.assignQuestionToSlot(validTemplateId, slotId, questionId, subId);
-      toast.success(subId ? `Question assigned to sub-part ${subId}!` : "Question assigned to slot!");
+      await ciaAssessmentService.assignQuestionToSlot(validTemplateId, slotId, questionId, targetSubId);
+      toast.success(targetSubId ? `Question assigned to sub-part ${targetSubId}!` : "Question assigned to slot!");
       // Refresh both template slots and candidates
       await Promise.all([fetchTemplate(), fetchCandidates()]);
       setActiveSlotId(null);
+      setActiveSubId(null);
     } catch (err: any) {
       console.error("Failed to assign slot:", err);
       toast.error(err.response?.data?.detail || "Failed to assign question to slot");
@@ -368,7 +475,11 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
     try {
       await ciaAssessmentService.updateSlotStructure(validTemplateId, slotId, payload);
       toast.success("Sub-question structure updated!");
-      await fetchTemplate();
+      await Promise.all([fetchTemplate(), fetchCandidates()]);
+      if (activeSlotId === slotId) {
+        setActiveSlotId(null);
+        setActiveSubId(null);
+      }
       return true;
     } catch (err: any) {
       console.error("Failed to update slot structure:", err);
@@ -562,6 +673,8 @@ export const useQuestionAssembly = (courseId: string | number, templateId: strin
     actionLoadingId,
     activeSlotId,
     setActiveSlotId,
+    activeSubId,
+    setActiveSubId,
     activeSlot,
     allSlots,
     assemblyStats,

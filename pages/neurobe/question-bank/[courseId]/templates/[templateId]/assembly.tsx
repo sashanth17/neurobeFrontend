@@ -63,6 +63,8 @@ const QuestionAssemblyStudioPage = () => {
     actionLoadingId,
     activeSlotId,
     setActiveSlotId,
+    activeSubId,
+    setActiveSubId,
     activeSlot,
     allSlots,
     assemblyStats,
@@ -271,8 +273,12 @@ const QuestionAssemblyStudioPage = () => {
             candidates={candidates}
             coCodes={coCodes}
             activeSlotId={activeSlotId}
+            activeSubId={activeSubId}
             actionLoadingId={actionLoadingId}
-            onSelectSlot={(slotId) => setActiveSlotId(slotId)}
+            onSelectSlot={(slotId, subId) => {
+              setActiveSlotId(slotId);
+              setActiveSubId(subId || null);
+            }}
             onUnassignSlot={handleUnassignSlot}
             onAssignSlot={handleAssignSlot}
             onEditQuestion={handleOpenEditModal}
@@ -294,7 +300,10 @@ const QuestionAssemblyStudioPage = () => {
             filters={filters}
             actionLoadingId={actionLoadingId}
             onFilterChange={setFilters}
-            onClearActiveSlot={() => setActiveSlotId(null)}
+            onClearActiveSlot={() => {
+              setActiveSlotId(null);
+              setActiveSubId(null);
+            }}
             onOpenAiGenerator={() => setIsAiDrawerOpen(true)}
             onOpenManualAuthor={() => {
               setQuestionToEdit(null);

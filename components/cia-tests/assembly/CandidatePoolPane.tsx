@@ -46,6 +46,9 @@ interface CandidatePoolPaneProps {
     question_number?: number;
     max_marks?: number;
     section_name?: string;
+    sub_id?: string;
+    sub_label?: string;
+    target_co?: string;
   } | null;
   filters: CandidateFilters;
   actionLoadingId: number | string | null;
@@ -53,7 +56,7 @@ interface CandidatePoolPaneProps {
   onClearActiveSlot: () => void;
   onOpenAiGenerator: () => void;
   onOpenManualAuthor: () => void;
-  onAssignToSlot: (slotId: number, questionId: number) => void;
+  onAssignToSlot: (slotId: number, questionId: number, subId?: string | null) => void;
   onEditQuestion: (question: CandidateQuestion) => void;
   onDeleteQuestion: (questionId: number) => void;
   onRefreshCandidates?: () => void;
@@ -767,15 +770,10 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                 return (
                                   <span
                                     title={`Topic: ${topicName}`}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 max-w-[220px]"
+                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 max-w-[260px]"
                                   >
                                     <Bookmark className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
                                     <span className="truncate">Topic: {topicName}</span>
-                                    {((q.topic_names?.length || q.topics?.length || 0) > 1) && (
-                                      <span className="text-[10px] bg-emerald-200/60 dark:bg-emerald-800/60 px-1 rounded-sm shrink-0">
-                                        +{Math.max(q.topic_names?.length || 0, q.topics?.length || 0) - 1}
-                                      </span>
-                                    )}
                                   </span>
                                 );
                               })()}
@@ -833,12 +831,22 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                   {activeSlot && marksMatch && (
                                     <button
                                       type="button"
-                                      onClick={() => activeSlot.id && onAssignToSlot(activeSlot.id, q.id)}
-                                      disabled={actionLoadingId === `slot-assign-${activeSlot.id}`}
+                                      onClick={() =>
+                                        activeSlot.id &&
+                                        onAssignToSlot(activeSlot.id, q.id, activeSlot.sub_id)
+                                      }
+                                      disabled={
+                                        actionLoadingId ===
+                                        `slot-assign-${activeSlot.id}${
+                                          activeSlot.sub_id ? `-${activeSlot.sub_id}` : ""
+                                        }`
+                                      }
                                       className="inline-flex items-center gap-1 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 transition-all active:scale-95"
                                     >
                                       <Check className="h-3.5 w-3.5" />
-                                      <span>Assign to Q{activeSlot.question_number}</span>
+                                      <span>
+                                        Assign to {activeSlot.sub_label || `Q${activeSlot.question_number}`}
+                                      </span>
                                     </button>
                                   )}
 
@@ -882,58 +890,136 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                         </div>
                                       ) : (
                                         <div className="max-h-56 overflow-y-auto space-y-1">
-                                          {allSlots.map((slot) => {
-                                            const slotMatches = slot.max_marks === q.max_marks;
-                                            const isCurrentlyAssigned = !!slot.actual_question_id;
+                                          {allSlots.flatMap((slot) => {
+                                            const isEitherOr =
+                                              slot.question_type === "either_or" ||
+                                              slot.sub_question_structure?.type === "either_or";
+                                            const struct = slot.sub_question_structure;
 
-                                            if (!slotMatches) {
-                                              return (
-                                                <div
-                                                  key={slot.id}
-                                                  className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-gray-300 dark:text-gray-600 cursor-not-allowed"
-                                                  title={`Slot requires ${slot.max_marks} marks.`}
-                                                >
-                                                  <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold">Q{slot.question_number}</span>
-                                                    <span className="text-[10px]">({slot.section_name})</span>
-                                                  </div>
-                                                  <span className="text-[10px] italic">
-                                                    Needs {slot.max_marks}M
-                                                  </span>
-                                                </div>
-                                              );
+                                            interface TargetItem {
+                                              key: string;
+                                              subId: string | null;
+                                              label: string;
+                                              marks: number;
+                                              isAssigned: boolean;
                                             }
 
-                                            return (
-                                              <button
-                                                key={slot.id}
-                                                type="button"
-                                                onClick={() => {
-                                                  setOpenSlotMenuId(null);
-                                                  slot.id && onAssignToSlot(slot.id, q.id);
-                                                }}
-                                                className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-700 dark:text-gray-200 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors"
-                                              >
-                                                <div className="flex items-center gap-1.5">
-                                                  <span className="flex h-5 w-5 items-center justify-center rounded bg-purple-100 text-[11px] font-bold text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">
-                                                    Q{slot.question_number}
-                                                  </span>
-                                                  <span>{slot.section_name || "Section"}</span>
-                                                  <span className="rounded bg-gray-100 px-1 text-[10px] text-gray-500 dark:bg-gray-700 dark:text-gray-300">
-                                                    {slot.max_marks}M
-                                                  </span>
-                                                </div>
+                                            let targets: TargetItem[] = [];
 
-                                                <span
-                                                  className={`text-[10px] font-bold ${isCurrentlyAssigned
-                                                    ? "text-amber-600 dark:text-amber-400"
-                                                    : "text-green-600 dark:text-green-400"
-                                                    }`}
+                                            if (isEitherOr) {
+                                              const optASubs = struct?.option_a?.sub_questions || [];
+                                              if (optASubs.length > 0) {
+                                                optASubs.forEach((sq: any) => {
+                                                  targets.push({
+                                                    key: `${slot.id}-${sq.sub_id}`,
+                                                    subId: sq.sub_id,
+                                                    label: sq.label || `Q${slot.question_number}.${sq.sub_id}`,
+                                                    marks: Number(sq.marks),
+                                                    isAssigned: Boolean(sq.assigned_question_id),
+                                                  });
+                                                });
+                                              } else {
+                                                targets.push({
+                                                  key: `${slot.id}-a`,
+                                                  subId: "a",
+                                                  label: `Q${slot.question_number}.a`,
+                                                  marks: Number(slot.max_marks),
+                                                  isAssigned: Boolean(slot.actual_question_id),
+                                                });
+                                              }
+
+                                              const optBSubs = struct?.option_b?.sub_questions || [];
+                                              if (optBSubs.length > 0) {
+                                                optBSubs.forEach((sq: any) => {
+                                                  targets.push({
+                                                    key: `${slot.id}-${sq.sub_id}`,
+                                                    subId: sq.sub_id,
+                                                    label: sq.label || `Q${slot.question_number}.${sq.sub_id}`,
+                                                    marks: Number(sq.marks),
+                                                    isAssigned: Boolean(sq.assigned_question_id),
+                                                  });
+                                                });
+                                              } else {
+                                                targets.push({
+                                                  key: `${slot.id}-b`,
+                                                  subId: "b",
+                                                  label: `Q${slot.question_number}.b`,
+                                                  marks: Number(slot.max_marks),
+                                                  isAssigned: false,
+                                                });
+                                              }
+                                            } else if (struct?.sub_questions?.length > 0) {
+                                              struct.sub_questions.forEach((sq: any) => {
+                                                targets.push({
+                                                  key: `${slot.id}-${sq.sub_id}`,
+                                                  subId: sq.sub_id,
+                                                  label: sq.label || `Q${slot.question_number}.${sq.sub_id}`,
+                                                  marks: Number(sq.marks),
+                                                  isAssigned: Boolean(sq.assigned_question_id),
+                                                });
+                                              });
+                                            } else {
+                                              targets.push({
+                                                key: `${slot.id}-direct`,
+                                                subId: null,
+                                                label: `Q${slot.question_number}`,
+                                                marks: Number(slot.max_marks),
+                                                isAssigned: Boolean(slot.actual_question_id),
+                                              });
+                                            }
+
+                                            return targets.map((target) => {
+                                              const slotMatches = target.marks === q.max_marks;
+                                              if (!slotMatches) {
+                                                return (
+                                                  <div
+                                                    key={target.key}
+                                                    className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                                    title={`Slot requires ${target.marks} marks.`}
+                                                  >
+                                                    <div className="flex items-center gap-1.5">
+                                                      <span className="font-bold">{target.label}</span>
+                                                      <span className="text-[10px]">({slot.section_name})</span>
+                                                    </div>
+                                                    <span className="text-[10px] italic">
+                                                      Needs {target.marks}M
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+
+                                              return (
+                                                <button
+                                                  key={target.key}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setOpenSlotMenuId(null);
+                                                    slot.id && onAssignToSlot(slot.id, q.id, target.subId);
+                                                  }}
+                                                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-700 dark:text-gray-200 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors"
                                                 >
-                                                  {isCurrentlyAssigned ? "Replace" : "Empty"}
-                                                </span>
-                                              </button>
-                                            );
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="flex h-5 items-center justify-center rounded bg-purple-100 px-1.5 text-[11px] font-bold text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">
+                                                      {target.label}
+                                                    </span>
+                                                    <span className="truncate max-w-[90px]">{slot.section_name || "Section"}</span>
+                                                    <span className="rounded bg-gray-100 px-1 text-[10px] text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+                                                      {target.marks}M
+                                                    </span>
+                                                  </div>
+
+                                                  <span
+                                                    className={`text-[10px] font-bold ${
+                                                      target.isAssigned
+                                                        ? "text-amber-600 dark:text-amber-400"
+                                                        : "text-green-600 dark:text-green-400"
+                                                    }`}
+                                                  >
+                                                    {target.isAssigned ? "Replace" : "Empty"}
+                                                  </span>
+                                                </button>
+                                              );
+                                            });
                                           })}
                                         </div>
                                       )}

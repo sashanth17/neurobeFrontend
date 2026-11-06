@@ -52,11 +52,11 @@ import {
   AuthorManualQuestionModal,
 } from "@/components/mcq-generation";
 import {
+  SimplifiedMCQGenerator,
   HierarchyUnitItem,
 } from "@/components/mcq-generation/SimplifiedMCQGenerator";
 
-
-type MCQTabKey = "questions" | "bank" | "tests";
+type MCQTabKey = "generator" | "questions" | "bank" | "tests";
 
 const MCQGenerationIndexPage = () => {
   const dispatch = useDispatch();
@@ -132,7 +132,7 @@ const MCQGenerationIndexPage = () => {
   useEffect(() => {
     if (router.query.tab) {
       const tabParam = String(router.query.tab) as MCQTabKey;
-      if (["questions", "bank", "tests"].includes(tabParam)) {
+      if (["generator", "questions", "bank", "tests"].includes(tabParam)) {
         setState({ activeTab: tabParam });
       }
     }
@@ -785,9 +785,10 @@ const MCQGenerationIndexPage = () => {
   };
 
   const handleManageQuestions = (course: CourseItem) => {
-    setState({ selectedCourse: course, activeTab: "questions" });
+    const targetTab: MCQTabKey = (course.questions_count ?? 0) === 0 ? "generator" : "questions";
+    setState({ selectedCourse: course, activeTab: targetTab });
     router.replace(
-      { pathname: router.pathname, query: { course_id: course.code || course.id } },
+      { pathname: router.pathname, query: { course_id: course.code || course.id, tab: targetTab } },
       undefined,
       { shallow: true }
     );
@@ -870,6 +871,12 @@ const MCQGenerationIndexPage = () => {
             <div className="flex items-center gap-1.5">
               {[
                 {
+                  id: "generator",
+                  label: "AI Question Generator",
+                  icon: Sparkles,
+                  badge: null,
+                },
+                {
                   id: "questions",
                   label: isUserCoordinator ? "Generated Questions" : "Course Questions",
                   icon: Eye,
@@ -920,6 +927,20 @@ const MCQGenerationIndexPage = () => {
           </div>
 
           {/* ══════════════════════════════════════════════════════════════
+              TAB 1: AI QUESTION GENERATOR (SIMPLIFIED MCQ GENERATOR)
+              ══════════════════════════════════════════════════════════════ */}
+          {state.activeTab === "generator" && (
+            <SimplifiedMCQGenerator
+              courseCode={state.selectedCourse.code || state.selectedCourse.course_code || ""}
+              courseTitle={state.selectedCourse.title || state.selectedCourse.course_title || ""}
+              hierarchyUnits={state.hierarchyUnits}
+              loadingHierarchy={state.loadingHierarchy}
+              onGenerate={handleSimplifiedGenerate}
+              isGeneratingAI={state.isGeneratingAI}
+            />
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
               TAB 2: GENERATED QUESTIONS & REVIEW POOL
               ══════════════════════════════════════════════════════════════ */}
           {state.activeTab === "questions" && (
@@ -950,6 +971,7 @@ const MCQGenerationIndexPage = () => {
                   onApproveAll={isUserCoordinator ? handleApproveAll : undefined}
                   onCreateQuestionSet={() => setState({ isSetModalOpen: true })}
                   onAuthorManually={() => setState({ isAuthorModalOpen: true })}
+                  onGenerateAI={() => setState({ activeTab: "generator" })}
                   isGeneratingAI={state.isGeneratingAI}
                 />
               </div>

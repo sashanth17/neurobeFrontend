@@ -265,10 +265,14 @@ export const CourseSelectorView: React.FC<CourseSelectorViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onManageQuestions(course)}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-color1 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-color1/90 active:scale-[0.98]"
+                  className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold text-white shadow-xs transition active:scale-[0.98] cursor-pointer ${
+                    totalQ === 0
+                      ? "bg-purple-600 hover:bg-purple-700"
+                      : "bg-color1 hover:bg-color1/90"
+                  }`}
                 >
                   <Sparkles className="h-3 w-3" />
-                  <span>Manage Questions</span>
+                  <span>{totalQ === 0 ? "Generate Questions with AI" : "Manage Questions"}</span>
                   <ArrowRight className="h-3 w-3" />
                 </button>
               </div>

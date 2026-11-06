@@ -383,6 +383,7 @@ export interface AiGenerationJobPayload {
   num_sub_questions?: number | null;
   sub_question_marks?: number[] | null;
   is_either_or?: boolean;
+  question_type?: 'direct' | 'sub_questions' | 'either_or' | string;
   option_b_sub_question_marks?: number[] | null;
   difficulty?: 'easy' | 'medium' | 'hard' | string;
   custom_instructions?: string | null;

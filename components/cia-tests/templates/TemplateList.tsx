@@ -6,6 +6,8 @@ import CreateTemplateModal from "./CreateTemplateModal";
 
 interface TemplateListProps {
   courseCode: string;
+  courseId?: string | number;
+  availableCos?: string[];
   templates: QuestionPaperTemplate[];
   loading: boolean;
   actionLoadingId: number | null;
@@ -18,6 +20,8 @@ interface TemplateListProps {
 
 export const TemplateList: React.FC<TemplateListProps> = ({
   courseCode,
+  courseId,
+  availableCos,
   templates,
   loading,
   actionLoadingId,
@@ -143,6 +147,8 @@ export const TemplateList: React.FC<TemplateListProps> = ({
       <CreateTemplateModal
         isOpen={isModalOpen}
         courseCode={courseCode}
+        courseId={courseId}
+        availableCos={availableCos}
         initialData={editingTemplate}
         onClose={() => {
           setIsModalOpen(false);

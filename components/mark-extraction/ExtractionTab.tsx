@@ -1,26 +1,38 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { 
   Upload, FileText, Loader2, CheckCircle2, AlertCircle, ArrowRight, 
-  X, Trash2, StopCircle, RefreshCw, Layers, ShieldAlert, Sparkles, Clock, AlertTriangle
+  X, Trash2, StopCircle, RefreshCw, Layers, ShieldAlert, Sparkles, Clock, AlertTriangle, Lock
 } from 'lucide-react';
 import { MarkExtractionService } from '@/services/markExtraction.service';
 import { Success, Failure } from '@/utils/function.utils';
 
 interface ExtractionTabProps {
-  ciaTestId:          number;
-  initialStatus?:     string | null;
-  initialJobId?:      number | null;
-  onGoToExtractedView: () => void;
-  onRefreshCiaTests?:  () => void;
+  ciaTestId:                number;
+  initialStatus?:           string | null;
+  initialJobId?:            number | null;
+  hasTemplate?:             boolean;
+  questionPaperTemplateId?: number | null;
+  testName?:                string;
+  courseId?:                string | number;
+  loadingTests?:            boolean;
+  onGoToExtractedView:      () => void;
+  onRefreshCiaTests?:       () => void;
 }
 
 export default function ExtractionTab({
   ciaTestId,
   initialStatus,
   initialJobId,
+  hasTemplate = true,
+  questionPaperTemplateId,
+  testName,
+  courseId,
+  loadingTests = false,
   onGoToExtractedView,
   onRefreshCiaTests,
 }: ExtractionTabProps) {
+  const router = useRouter();
   const [file,            setFile]            = useState<File | null>(null);
   const [dragOver,        setDragOver]        = useState(false);
   const [batchId,         setBatchId]         = useState<number | null>(null);
@@ -128,6 +140,10 @@ export default function ExtractionTab({
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
+    if (!hasTemplate) {
+      Failure("Cannot upload answer sheets: No Question Paper Template is assigned to this CIA test. Please assign a template first.");
+      return;
+    }
     if (isRunning || isUploading) return;
 
     const dropped = e.dataTransfer.files[0];
@@ -138,16 +154,21 @@ export default function ExtractionTab({
     } else {
       setErrorMessage("Only PDF files are accepted.");
     }
-  }, [isRunning, isUploading]);
+  }, [hasTemplate, isRunning, isUploading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasTemplate) {
+      Failure("Cannot upload answer sheets: No Question Paper Template is assigned to this CIA test. Please assign a template first.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     const selected = e.target.files?.[0];
     if (selected) {
       setFile(selected);
       setBatchId(null);
       setErrorMessage(null);
     }
-  }, []);
+  }, [hasTemplate]);
 
   const clearFile = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -159,6 +180,10 @@ export default function ExtractionTab({
 
   // ── 4. Upload PDF Batch ───────────────────────────────────────────────────
   const handleUploadAndExtract = async () => {
+    if (!hasTemplate) {
+      Failure("Cannot upload answer sheets: No Question Paper Template is assigned to this CIA test. Please assign a template first.");
+      return;
+    }
     if (!file || isUploading || isRunning) return;
     setIsUploading(true);
     setErrorMessage(null);
@@ -468,10 +493,47 @@ export default function ExtractionTab({
           </span>
         </div>
 
+        {/* Missing Template Warning Banner */}
+        {!loadingTests && !hasTemplate && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 mt-0.5 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  Question Paper Template Required
+                </h4>
+                <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                  No Question Paper Template is assigned to {testName ? `"${testName}"` : "this CIA test"}. Uploading answer sheets and AI extraction are locked until a Question Paper Template is assigned or created.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (courseId) {
+                  router.push(`/neurobe/question-bank/${courseId}?tab=cia-tests`);
+                } else {
+                  router.push('/neurobe/my-assigned-courses');
+                }
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 transition shrink-0 shadow-2xs cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Assign / Create Template</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Drop Zone */}
         <div
           className={`relative border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-8 text-center transition-all duration-200 ${
-            isRunning || isUploading
+            loadingTests
+              ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/40 cursor-wait'
+              : !hasTemplate
+              ? 'border-amber-300/80 dark:border-amber-800/60 bg-amber-50/20 dark:bg-amber-950/10 cursor-not-allowed'
+              : isRunning || isUploading
               ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700'
               : dragOver
               ? 'border-violet-500 bg-violet-50/60 dark:bg-violet-950/20 cursor-pointer'
@@ -479,11 +541,11 @@ export default function ExtractionTab({
               ? 'border-violet-400 bg-violet-50/40 dark:bg-violet-950/10'
               : 'border-gray-300 dark:border-gray-600 hover:border-violet-400 hover:bg-gray-50/50 cursor-pointer'
           }`}
-          onDragOver={(e) => { e.preventDefault(); if (!isRunning && !isUploading) setDragOver(true); }}
+          onDragOver={(e) => { e.preventDefault(); if (!loadingTests && hasTemplate && !isRunning && !isUploading) setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleFileDrop}
           onClick={() => {
-            if (!isRunning && !isUploading && !file) {
+            if (!loadingTests && hasTemplate && !isRunning && !isUploading && !file) {
               fileInputRef.current?.click();
             }
           }}
@@ -494,11 +556,30 @@ export default function ExtractionTab({
             onChange={handleFileSelect}
             onClick={(e) => e.stopPropagation()}
             accept="application/pdf"
-            disabled={isRunning || isUploading}
+            disabled={loadingTests || !hasTemplate || isRunning || isUploading}
             className="hidden"
           />
 
-          {file ? (
+          {loadingTests ? (
+            <div className="flex flex-col items-center space-y-2 py-4">
+              <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                Checking CIA test configuration...
+              </p>
+            </div>
+          ) : !hasTemplate ? (
+            <div className="flex flex-col items-center space-y-2 py-2">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <Lock className="w-6 h-6" />
+              </div>
+              <p className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                Upload Locked — Question Paper Template Required
+              </p>
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 max-w-md">
+                Please assign or create a Question Paper Template for this CIA test before uploading answer sheets.
+              </p>
+            </div>
+          ) : file ? (
             <div className="flex flex-col items-center space-y-2 max-w-sm">
               <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-950/60 flex items-center justify-center text-violet-600">
                 <FileText className="w-6 h-6" />
@@ -562,7 +643,8 @@ export default function ExtractionTab({
           <button
             type="button"
             onClick={handleUploadAndExtract}
-            disabled={!file || isUploading || isRunning}
+            disabled={!file || isUploading || isRunning || !hasTemplate}
+            title={!hasTemplate ? "Upload locked: Please assign a Question Paper Template first." : undefined}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs bg-violet-600 hover:bg-violet-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
           >
             {isUploading ? (
