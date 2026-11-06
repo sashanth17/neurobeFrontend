@@ -732,10 +732,9 @@ export default function ExtractedViewTab({ ciaTestId, instanceId, onGoToExtracti
         }
       });
     return flags;
-  }, [selectedStudent?.marks]);
-}, [selectedStudent?.marks, selectedStudent?.is_locked]);
+  }, [selectedStudent?.marks, selectedStudent?.is_locked]);
 
-// Loading state
+  // Loading state
 if (isLoading && !results) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-12 text-gray-500 bg-white dark:bg-gray-800 h-full">
