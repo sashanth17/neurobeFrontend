@@ -13,7 +13,7 @@ import ManualQuestionModal from "@/components/cia-tests/assembly/ManualQuestionM
 import ExamPaperPreviewModal from "@/components/cia-tests/assembly/ExamPaperPreviewModal";
 import UploadPdfModal from "@/components/cia-tests/assembly/UploadPdfModal";
 import { CandidateQuestion } from "@/types/cia-test.types";
-import { Loader2, Sparkles, XCircle } from "lucide-react";
+import { Loader2, Sparkles, XCircle, AlertCircle } from "lucide-react";
 
 import { useCourseOutcomes } from "@/hook/useCourseOutcomes";
 
@@ -182,6 +182,17 @@ const QuestionAssemblyStudioPage = () => {
     }
   };
 
+  // Requirement: User must finalize the CO of each question in template before assembling
+  const isCoFinalized = React.useMemo(() => {
+    if (!template?.sections || template.sections.length === 0) return true;
+    return template.sections.every(
+      (sec) =>
+        sec.questions &&
+        sec.questions.length > 0 &&
+        sec.questions.every((q) => Boolean(q.target_co && q.target_co.trim()))
+    );
+  }, [template]);
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
@@ -205,6 +216,32 @@ const QuestionAssemblyStudioPage = () => {
         onOpenPreview={handleOpenPreviewModal}
         onOpenUploadPdf={() => setIsUploadPdfModalOpen(true)}
       />
+
+      {/* CO Finalization Guard Banner */}
+      {!isCoFinalized && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                Course Outcome (CO) Finalization Required
+              </div>
+              <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                You must finalize the Course Outcome (CO) of each question in the question paper template before assembling questions.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/neurobe/question-bank/${validCourseId}?tab=templates`)}
+            className="flex-shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-all"
+          >
+            Go to Template Blueprint
+          </button>
+        </div>
+      )}
 
       {/* Live AI Question Generation Banner (Non-blocking & Persistent) */}
       {isGenerating && (
@@ -339,6 +376,7 @@ const QuestionAssemblyStudioPage = () => {
         questionToEdit={questionToEdit}
         defaultMarks={activeSlot?.max_marks || null}
         availableCos={coCodes}
+        syllabusTopics={syllabusTopics}
         onClose={() => {
           setIsManualModalOpen(false);
           setQuestionToEdit(null);

@@ -606,14 +606,6 @@ export const BlueprintSlotsPane: React.FC<BlueprintSlotsPaneProps> = ({
         return;
       }
 
-      // 2. CO Match Guard
-      if (targetCo && qCo && qCo.toUpperCase() !== targetCo.toUpperCase()) {
-        toast.error(
-          `CO Mismatch: Slot requires ${targetCo}, but question is tagged with ${qCo}.`
-        );
-        return;
-      }
-
       if (onAssignSlot) {
         onAssignSlot(slot.id, qId, subId);
       }

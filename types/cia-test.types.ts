@@ -1,5 +1,7 @@
 export interface CourseInstanceOption {
   id: number;
+  course_instance_name?: string;
+  section_name?: string;
   instance_name?: string;
   name?: string;
   section?: string;
@@ -7,6 +9,8 @@ export interface CourseInstanceOption {
   faculty_name?: string;
   enrolled_students_count?: number;
   students_count?: number;
+  student_count?: number;
+  total_enrolled?: number;
   status?: string;
 }
 

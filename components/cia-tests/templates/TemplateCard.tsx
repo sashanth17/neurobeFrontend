@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { QuestionPaperTemplate } from "@/types/cia-test.types";
+import { toast } from "react-toastify";
 
 interface TemplateCardProps {
   template: QuestionPaperTemplate;
@@ -60,7 +61,24 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
     template.is_deletable !== false &&
     (!template.assigned_tests_count || template.assigned_tests_count === 0);
 
+  // User must finalize the CO of each question before being able to assemble
+  const isCoFinalized =
+    sections.length > 0 &&
+    sections.every(
+      (sec) =>
+        sec.questions &&
+        sec.questions.length > 0 &&
+        sec.questions.every((q) => Boolean(q.target_co && q.target_co.trim()))
+    );
+
   const handleOpenAssembly = () => {
+    if (!isCoFinalized) {
+      toast.warning(
+        "Please finalize the Course Outcome (CO) of each question in the template blueprint before assembling questions."
+      );
+      onEdit(template);
+      return;
+    }
     const cId = courseId || template.course_id || router.query.courseId;
     if (cId) {
       router.push(`/neurobe/question-bank/${cId}/templates/${template.id}/assembly`);
@@ -72,13 +90,22 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
       <div>
         {/* Header row: Status and Total Marks */}
         <div className="flex items-center justify-between gap-2 mb-3">
-          <span
-            className={`rounded-lg border px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${getStatusBadge(
-              template.status
-            )}`}
-          >
-            {template.status || "drafted"}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className={`rounded-lg border px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${getStatusBadge(
+                template.status
+              )}`}
+            >
+              {template.status || "drafted"}
+            </span>
+
+            {!isCoFinalized && (
+              <span className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                <AlertCircle className="h-3 w-3 text-amber-600" />
+                CO Finalization Required
+              </span>
+            )}
+          </div>
 
           <span className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-1 text-xs font-extrabold text-purple-700 border border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800">
             <Award className="h-3.5 w-3.5" />
@@ -124,11 +151,24 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
         {/* Assembly Studio CTA Button */}
         <button
           onClick={handleOpenAssembly}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-2.5 px-3 text-xs font-bold text-white shadow-sm shadow-purple-500/20 hover:from-purple-700 hover:to-indigo-700 transition-all mb-3 group"
+          className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-bold shadow-sm transition-all mb-3 group ${
+            isCoFinalized
+              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-purple-500/20 hover:from-purple-700 hover:to-indigo-700"
+              : "bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-700"
+          }`}
         >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Question Assembly Studio</span>
-          <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          {isCoFinalized ? (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Question Assembly Studio</span>
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </>
+          ) : (
+            <>
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+              <span>Finalize Question COs to Assemble</span>
+            </>
+          )}
         </button>
 
         {/* Footer: Status Guard, Edit & Delete CTAs */}

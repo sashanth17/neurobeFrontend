@@ -48,7 +48,6 @@ export default function ResultPageTab({
   // ── In-place Editing State inside Result Modal ───────────────────────────────
   const [isEditingStudent, setIsEditingStudent] = useState<boolean>(false);
   const [editedMarks, setEditedMarks] = useState<Record<string, number>>({});
-  const [editedCoMarks, setEditedCoMarks] = useState<Record<string, number>>({});
   const [isSavingMarks, setIsSavingMarks] = useState<boolean>(false);
 
   // ── Unlock Confirmation Dialog State ────────────────────────────────────────
@@ -203,18 +202,6 @@ export default function ResultPageTab({
     });
     setEditedMarks(initialMarks);
 
-    const initialCoMarks: Record<string, number> = {};
-    Object.entries(coDist).forEach(([co, maxM]) => {
-      const coData = student.co_marks?.[co];
-      let obt = 0;
-      if (typeof coData === 'object' && coData !== null) {
-        obt = Number(coData.obtained) || 0;
-      } else if (typeof coData === 'number') {
-        obt = coData;
-      }
-      initialCoMarks[co] = obt;
-    });
-    setEditedCoMarks(initialCoMarks);
   };
 
   const handleCloseSheetViewer = () => {
@@ -236,17 +223,8 @@ export default function ResultPageTab({
       const newTotal = Object.values(editedMarks).reduce((acc, v) => acc + (Number(v) || 0), 0);
       const roundedTotal = Math.round(newTotal * 100) / 100;
 
-      // Build CO marks payload from editedCoMarks
-      const finalCoPayload: Record<string, { obtained: number; max_mark: number; percentage: number }> = {};
-      Object.entries(coDist).forEach(([co, maxM]) => {
-        const obt = editedCoMarks[co] !== undefined ? editedCoMarks[co] : (modalCoMarks[co]?.obtained || 0);
-        const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
-        finalCoPayload[co] = {
-          obtained: Math.round(obt * 100) / 100,
-          max_mark: maxM,
-          percentage: pct,
-        };
-      });
+      // Build CO marks payload from auto-calculated modalCoMarks (derived from question marks)
+      const finalCoPayload = modalCoMarks;
 
       await MarkExtractionService.updateConfirmedMarks(ciaTestId, viewingStudent.register_number, {
         marks: marksPayload,
@@ -469,15 +447,27 @@ export default function ResultPageTab({
   }, [viewingStudent?.question_marks]);
 
   // Course Outcome (CO) Marks directly mapped from template COs and staff extraction / edits
+  // Strictly auto-calculated from individual question marks grouped by target_co
   const modalCoMarks = useMemo(() => {
     if (!viewingStudent) return {};
     const res: Record<string, { obtained: number; max_mark: number; percentage: number }> = {};
 
     Object.entries(coDist).forEach(([co, maxM]) => {
       let obt = 0;
-      if (isEditingStudent) {
-        obt = editedCoMarks[co] !== undefined ? editedCoMarks[co] : 0;
-      } else {
+      let matchedQuestions = 0;
+
+      canonicalViewingQuestions.forEach((qm) => {
+        if ((qm.target_co || '').toUpperCase() === co.toUpperCase()) {
+          matchedQuestions++;
+          const markVal = isEditingStudent
+            ? (editedMarks[qm.q_no] !== undefined ? Number(editedMarks[qm.q_no]) || 0 : qm.mark)
+            : qm.mark;
+          obt += markVal;
+        }
+      });
+
+      // Fallback to student's saved co_marks if no questions matched this CO directly
+      if (matchedQuestions === 0) {
         const coData = viewingStudent.co_marks?.[co];
         if (typeof coData === 'object' && coData !== null) {
           obt = Number(coData.obtained) || 0;
@@ -485,11 +475,12 @@ export default function ResultPageTab({
           obt = coData;
         }
       }
+
       const pct = maxM > 0 ? Math.round((obt / maxM) * 1000) / 10 : 0;
       res[co] = { obtained: Math.round(obt * 100) / 100, max_mark: maxM, percentage: pct };
     });
     return res;
-  }, [viewingStudent, isEditingStudent, editedCoMarks, coDist]);
+  }, [viewingStudent, isEditingStudent, editedMarks, canonicalViewingQuestions, coDist]);
 
   const editedGrandTotal = useMemo(() => {
     if (!isEditingStudent) {
@@ -1182,11 +1173,9 @@ export default function ResultPageTab({
                           <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
                             Course Outcome (CO) Attainment
                           </span>
-                          {isEditingStudent && (
-                            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
-                              Editable
-                            </span>
-                          )}
+                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-700 ml-1">
+                            Auto-calculated
+                          </span>
                         </div>
                         <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
                           Aligned with Template Blueprint
@@ -1196,7 +1185,7 @@ export default function ResultPageTab({
                         {Object.entries(modalCoMarks).map(([co, data]) => (
                           <div 
                             key={co} 
-                            className="bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/60 flex flex-col justify-between shadow-2xs"
+                            className="bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/60 flex flex-col justify-between shadow-2xs space-y-1.5"
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-black text-gray-800 dark:text-gray-200">
@@ -1206,29 +1195,17 @@ export default function ResultPageTab({
                                 {data.percentage}%
                               </span>
                             </div>
-                            <div className="mt-1.5 flex items-center justify-between font-mono">
-                              {isEditingStudent ? (
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  min={0}
-                                  max={data.max_mark}
-                                  value={editedCoMarks[co] ?? data.obtained}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
-                                    setEditedCoMarks(prev => ({
-                                      ...prev,
-                                      [co]: isNaN(val) ? 0 : Math.max(0, val)
-                                    }));
-                                  }}
-                                  className="w-16 px-1.5 py-1 text-center font-black font-mono text-sm rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-gray-750 text-emerald-800 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-                                  title={`Edit ${co} mark`}
-                                />
-                              ) : (
-                                <span className="font-black text-sm text-emerald-700 dark:text-emerald-300">
-                                  {data.obtained}
-                                </span>
-                              )}
+                            {/* Progress bar */}
+                            <div className="w-full h-1.5 bg-emerald-100 dark:bg-emerald-900/40 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(100, data.percentage)}%` }}
+                              />
+                            </div>
+                            <div className="flex items-center font-mono">
+                              <span className="font-black text-sm text-emerald-700 dark:text-emerald-300">
+                                {data.obtained}
+                              </span>
                               <span className="text-[11px] text-gray-400 ml-1">
                                 / {data.max_mark}
                               </span>

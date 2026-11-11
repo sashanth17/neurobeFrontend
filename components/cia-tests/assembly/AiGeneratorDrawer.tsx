@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+  import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   X,
@@ -45,6 +45,7 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
   const [maxMarks, setMaxMarks] = useState<number>(defaultMarks || 10);
   const [numQuestions, setNumQuestions] = useState<number>(5);
   const [difficulty, setDifficulty] = useState<string>("medium");
+  const [customPrompt, setCustomPrompt] = useState<string>("");
 
   // Auto-select first topic when syllabusTopics loads (up to 3 max)
   useEffect(() => {
@@ -89,7 +90,7 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
       has_sub_questions: false,
       num_sub_questions: null,
       sub_question_marks: null,
-      custom_instructions: null,
+      custom_instructions: customPrompt.trim() || null,
       bloom_level: knowledgeLevel,
       question_type: "direct",
     };
@@ -237,34 +238,59 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
                 </div>
               ) : (
                 <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-900 space-y-2">
-                  {Object.entries(unitsMap).map(([unitTitle, topics]) => (
-                    <div key={unitTitle} className="space-y-1">
-                      <div className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
-                        {unitTitle}
+                  {Object.entries(unitsMap).map(([unitTitle, topics]) => {
+                    const unitTopicIds = topics.map((t) => t.id);
+                    const isAllUnitSelected = unitTopicIds.length > 0 && unitTopicIds.every((id) => selectedTopicIds.includes(id));
+
+                    const toggleSelectAllUnit = () => {
+                      if (isAllUnitSelected) {
+                        setSelectedTopicIds((prev) => {
+                          const remaining = prev.filter((id) => !unitTopicIds.includes(id));
+                          return remaining.length > 0 ? remaining : prev;
+                        });
+                      } else {
+                        setSelectedTopicIds((prev) => Array.from(new Set([...prev, ...unitTopicIds])));
+                      }
+                    };
+
+                    return (
+                      <div key={unitTitle} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold uppercase text-gray-500 tracking-wider">
+                            {unitTitle}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={toggleSelectAllUnit}
+                            className="text-[10px] font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+                          >
+                            {isAllUnitSelected ? "Deselect Unit" : "Select Unit"}
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {topics.map((t) => {
+                            const isSelected = selectedTopicIds.includes(t.id);
+                            return (
+                              <button
+                                type="button"
+                                key={t.id}
+                                onClick={() => toggleTopic(t.id)}
+                                title={t.topic_name}
+                                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                                  isSelected
+                                    ? "bg-purple-600 text-white shadow-sm"
+                                    : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                                }`}
+                              >
+                                {isSelected && <Check className="h-3 w-3" />}
+                                <span>{t.topic_name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {topics.map((t) => {
-                          const isSelected = selectedTopicIds.includes(t.id);
-                          return (
-                            <button
-                              type="button"
-                              key={t.id}
-                              onClick={() => toggleTopic(t.id)}
-                              title={t.topic_name}
-                              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                                isSelected
-                                  ? "bg-purple-600 text-white shadow-sm"
-                                  : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
-                              }`}
-                            >
-                              {isSelected && <Check className="h-3 w-3" />}
-                              <span>{t.topic_name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -351,6 +377,24 @@ export const AiGeneratorDrawer: React.FC<AiGeneratorDrawerProps> = ({
                   <option value="hard">Hard</option>
                 </select>
               </div>
+            </div>
+
+            {/* Prompt Specific / Custom Instructions Field */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-gray-700 dark:text-gray-300">
+                  Prompt Specific (Optional)
+                </label>
+                <span className="text-[10px] text-gray-400">e.g. Include real-world scenario, numerical problem</span>
+              </div>
+              <textarea
+                rows={2}
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                disabled={isGenerating}
+                placeholder="Add specific instructions or guidance for question generation..."
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-800 placeholder-gray-400 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 resize-none"
+              />
             </div>
 
             <div className="pt-2 flex items-center gap-2">

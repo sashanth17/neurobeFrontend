@@ -47,11 +47,6 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
     "Standard CIA question paper blueprint with short and analytical sections."
   );
 
-  // Custom added COs (if syllabus doesn't define them yet or staff wants to extend)
-  const [customCos, setCustomCos] = useState<string[]>([]);
-  const [newCoInput, setNewCoInput] = useState("");
-  const [showAddCoInput, setShowAddCoInput] = useState(false);
-
   // Course Outcome Mark Distribution State (Record<string, number>) - Derived from questions ONLY
   const [coDistribution, setCoDistribution] = useState<Record<string, number>>({});
 
@@ -95,43 +90,31 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
   const [sections, setSections] = useState(defaultSections);
 
-  // STRICT Course-Scoped Active COs: Only show available COs for this course
+  // STRICT Course-Scoped Active COs: Only show available COs for this course from syllabus
   const activeCos = useMemo(() => {
-    const list: string[] = [];
+    const rawList =
+      customAvailableCos && customAvailableCos.length > 0
+        ? customAvailableCos
+        : fetchedCoCodes && fetchedCoCodes.length > 0
+        ? fetchedCoCodes
+        : [];
 
-    const addCode = (code?: string | null) => {
+    const list: string[] = [];
+    rawList.forEach((code) => {
       if (!code) return;
       const clean = code.trim().toUpperCase();
-      if (clean && !list.includes(clean)) {
+      // Only accept approved course outcome codes (e.g. CO1, CO2, CO3...)
+      if (/^CO\d+$/i.test(clean) && !list.includes(clean)) {
         list.push(clean);
       }
-    };
-
-    if (customAvailableCos && customAvailableCos.length > 0) {
-      customAvailableCos.forEach(addCode);
-    } else if (fetchedCoCodes && fetchedCoCodes.length > 0) {
-      fetchedCoCodes.forEach(addCode);
-    }
-
-    // Include any COs present in initialData if editing
-    if (initialData?.co_distribution) {
-      Object.keys(initialData.co_distribution).forEach(addCode);
-    }
-    if (initialData?.sections) {
-      initialData.sections.forEach((sec) => {
-        (sec.questions || []).forEach((q) => addCode(q.target_co));
-      });
-    }
-
-    // Include manually added custom COs
-    customCos.forEach(addCode);
+    });
 
     return list.sort((a, b) => {
       const numA = parseInt(a.replace(/\D/g, "") || "0", 10);
       const numB = parseInt(b.replace(/\D/g, "") || "0", 10);
       return numA - numB;
     });
-  }, [customAvailableCos, fetchedCoCodes, initialData, customCos]);
+  }, [customAvailableCos, fetchedCoCodes]);
 
   // Dynamic question CO statistics (Marks and Question counts for each CO)
   const questionCoStats = useMemo(() => {
@@ -198,12 +181,16 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
               section_title: sec.section_title || `Part ${String.fromCharCode(65 + idx)}`,
               section_type: secType,
               allocated_marks: Number(sec.allocated_marks) || 0,
-              questions: (sec.questions || []).map((q, qIdx) => ({
-                question_number: q.question_number || qIdx + 1,
-                max_marks: Number(q.max_marks) || 1,
-                question_type: q.question_type || (secType === "either_or" ? "either_or" : "direct"),
-                target_co: q.target_co ? q.target_co.trim().toUpperCase() : null,
-              })),
+              questions: (sec.questions || []).map((q, qIdx) => {
+                const cleanCo = q.target_co ? q.target_co.trim().toUpperCase() : null;
+                const validCo = cleanCo && activeCos.includes(cleanCo) ? cleanCo : null;
+                return {
+                  question_number: q.question_number || qIdx + 1,
+                  max_marks: Number(q.max_marks) || 1,
+                  question_type: q.question_type || (secType === "either_or" ? "either_or" : "direct"),
+                  target_co: validCo,
+                };
+              }),
             };
           })
         );
@@ -211,9 +198,16 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
         setSections(defaultSections);
       }
 
-      // Load CO Distribution
+      // Load CO Distribution (Strictly matching active syllabus Course Outcomes)
       if (initialData.co_distribution && Object.keys(initialData.co_distribution).length > 0) {
-        setCoDistribution(initialData.co_distribution);
+        const cleanDist: Record<string, number> = {};
+        Object.entries(initialData.co_distribution).forEach(([k, v]) => {
+          const cleanK = k.trim().toUpperCase();
+          if (activeCos.includes(cleanK)) {
+            cleanDist[cleanK] = Number(v) || 0;
+          }
+        });
+        setCoDistribution(cleanDist);
       } else {
         setCoDistribution({});
       }
@@ -226,7 +220,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       setSections(defaultSections);
       setCoDistribution({});
     }
-  }, [initialData, isOpen, courseCode]);
+  }, [initialData, isOpen, courseCode, activeCos]);
 
   // Dynamically balance coDistribution whenever questions change (from questions ONLY)
   useEffect(() => {
@@ -300,16 +294,6 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       }))
     );
     setCoDistribution({});
-  };
-
-  const handleAddCustomCo = () => {
-    const clean = newCoInput.trim().toUpperCase();
-    if (!clean) return;
-    if (!customCos.includes(clean) && !activeCos.includes(clean)) {
-      setCustomCos((prev) => [...prev, clean]);
-    }
-    setNewCoInput("");
-    setShowAddCoInput(false);
   };
 
   // Section Handlers
@@ -616,25 +600,15 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
             {/* If No COs Available for Course */}
             {activeCos.length === 0 && !cosLoading && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  <span>
-                    No Course Outcomes found for <strong>{courseCode}</strong> in syllabus. You can
-                    add custom COs manually or configure the syllabus.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCoInput(true)}
-                  className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-700 whitespace-nowrap"
-                >
-                  + Add Custom CO
-                </button>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                <span>
+                  No Course Outcomes found for <strong>{courseCode}</strong> in syllabus. Please ensure Course Outcomes are configured for this course syllabus.
+                </span>
               </div>
             )}
 
-            {/* CO Chips Grid (Only available COs for this course) */}
+            {/* CO Chips Grid (Strictly available COs for this course) */}
             {activeCos.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2.5">
                 {activeCos.map((co) => {
@@ -691,44 +665,6 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                     </div>
                   );
                 })}
-
-                {/* Optional Add Custom CO inline button */}
-                <div className="flex items-center justify-center p-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-center">
-                  {showAddCoInput ? (
-                    <div className="flex items-center gap-1 w-full">
-                      <input
-                        type="text"
-                        value={newCoInput}
-                        onChange={(e) => setNewCoInput(e.target.value)}
-                        placeholder="e.g. CO6"
-                        className="w-16 rounded border px-1.5 py-0.5 text-xs text-center uppercase font-bold"
-                        onKeyDown={(e) => e.key === "Enter" && handleAddCustomCo()}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddCustomCo}
-                        className="rounded bg-purple-600 text-white p-1 text-xs"
-                      >
-                        <Check className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddCoInput(false)}
-                        className="text-gray-400 p-1 text-xs"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCoInput(true)}
-                      className="text-[11px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1"
-                    >
-                      <Plus className="h-3 w-3" /> Custom CO
-                    </button>
-                  )}
-                </div>
               </div>
             )}
 
@@ -1055,3 +991,4 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 };
 
 export default CreateTemplateModal;
+  

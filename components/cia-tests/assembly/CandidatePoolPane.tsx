@@ -510,20 +510,6 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
             ))}
           </select>
 
-          {/* Course Outcome Filter */}
-          <select
-            value={filters.course_outcome}
-            onChange={(e) => onFilterChange({ ...filters, course_outcome: e.target.value })}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 focus:border-purple-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-          >
-            <option value="">All COs</option>
-            {coCodes.map((co) => (
-              <option key={co} value={co}>
-                {co}
-              </option>
-            ))}
-          </select>
-
           {/* Marks Filter */}
           <select
             value={filters.marks !== null ? String(filters.marks) : ""}
@@ -731,37 +717,12 @@ export const CandidatePoolPane: React.FC<CandidatePoolPaneProps> = ({
                                 </span>
                               )}
 
-                              {/* Interactive CO Dropdown */}
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
-                              >
-                                <span className="text-[10px] text-indigo-500 mr-1 font-extrabold">CO:</span>
-                                <select
-                                  value={q.co_level || q.course_outcome || ""}
-                                  disabled={coUpdatingId === q.id || isAssigned}
-                                  onChange={(e) => handleCoChange(q.id, e.target.value)}
-                                  className="bg-transparent font-bold text-indigo-800 dark:text-indigo-200 focus:outline-none cursor-pointer disabled:opacity-60"
-                                  title={isAssigned ? "Assigned question CO is locked" : "Change Course Outcome"}
-                                >
-                                  <option value="" className="text-gray-600 dark:bg-gray-800">None</option>
-                                  {Array.from(
-                                    new Set(
-                                      coCodes
-                                        .map((c) => (c || "").trim().toUpperCase())
-                                        .filter(Boolean)
-                                    )
-                                  ).map((co) => (
-                                    <option key={co} value={co} className="text-gray-800 dark:bg-gray-800">
-                                      {co}
-                                    </option>
-                                  ))}
-                                </select>
-                                {coUpdatingId === q.id && (
-                                  <span className="ml-1 text-[10px] animate-pulse text-indigo-600">...</span>
-                                )}
-                              </div>
+                              {/* Static CO Badge only when assigned */}
+                              {isAssigned && (q.co_level || q.course_outcome) && (
+                                <span className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                  CO: {q.co_level || q.course_outcome}
+                                </span>
+                              )}
 
                               {/* Prominent Emerald Topic Badge */}
                               {(() => {
