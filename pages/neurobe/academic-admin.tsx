@@ -35,6 +35,13 @@ const AcademicAdminPage = () => {
     }
   }, [router.isReady, router.query.tab]);
 
+  // Ensure window stays locked at top on suggestions tab so navigation is never scrolled off
+  useEffect(() => {
+    if (activeTab === "suggestions") {
+      window.scrollTo(0, 0);
+    }
+  }, [activeTab]);
+
   // Handle Tab Switch
   const handleTabChange = (newTab: AcademicTab) => {
     setActiveTab(newTab);
@@ -65,25 +72,20 @@ const AcademicAdminPage = () => {
         <style jsx global>{`
           html, body {
             overflow: hidden !important;
-            height: 100vh !important;
-          }
-          footer,
-          .main-content > div:last-child {
-            display: none !important;
           }
         `}</style>
       )}
 
-      <div className={`w-full ${activeTab === "suggestions" ? "-m-6 p-1 sm:p-1.5 h-[calc(100vh-56px)] flex flex-col overflow-hidden" : "p-4 sm:p-6 lg:p-8 space-y-6"}`}>
-        {/* ── Top Navigation Bar: 5 Main Buttons (Ultra-compact on suggestions tab) ── */}
-        <div className={`bg-white dark:bg-[#1a2234] rounded-lg border border-gray-100 dark:border-gray-800 shadow-none flex flex-wrap items-center justify-between gap-1 shrink-0 ${
-          activeTab === "suggestions" ? "px-2 py-0.5 h-7 min-h-0" : "p-4"
+      <div className={`w-full ${activeTab === "suggestions" ? "h-[calc(100vh-140px)] flex flex-col overflow-hidden space-y-1.5" : "p-4 sm:p-6 lg:p-8 space-y-6"}`}>
+        {/* ── Top Navigation Bar: 5 Main Buttons (Always locked visible at the top) ── */}
+        <div className={`bg-white dark:bg-[#1a2234] rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs flex flex-wrap items-center justify-between gap-1.5 shrink-0 ${
+          activeTab === "suggestions" ? "px-3 py-1.5 min-h-[38px]" : "p-4"
         }`}>
           {activeTab === "suggestions" ? (
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
-              <span className="text-[11px] font-black text-gray-800 dark:text-white uppercase tracking-wider">
-                AI Academic Suggestions
+              <span className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                AI Academic Suggestions & Advisor
               </span>
             </div>
           ) : (
@@ -101,20 +103,20 @@ const AcademicAdminPage = () => {
           )}
 
           {/* 5 Nav Buttons */}
-          <div className={`flex items-center bg-gray-100 dark:bg-gray-800/80 rounded-lg border border-gray-200/80 dark:border-gray-700/80 flex-wrap gap-0.5 ${
-            activeTab === "suggestions" ? "p-0.5" : "p-1.5 rounded-2xl"
+          <div className={`flex items-center bg-gray-100 dark:bg-gray-800/80 rounded-xl border border-gray-200/80 dark:border-gray-700/80 flex-wrap gap-1 ${
+            activeTab === "suggestions" ? "p-1" : "p-1.5 rounded-2xl"
           }`}>
             {/* 1. MCQ Teaching Learning Effectiveness */}
             <button
               type="button"
               onClick={() => handleTabChange("mcq")}
-              className={`flex items-center gap-1 ${activeTab === "suggestions" ? "px-2 py-0.5 text-[10px]" : "px-3.5 py-2 text-xs"} font-bold rounded-md transition-all shadow-none ${
+              className={`flex items-center gap-1.5 ${activeTab === "suggestions" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-2 text-xs"} font-bold rounded-lg transition-all shadow-none ${
                 activeTab === "mcq"
                   ? "bg-white dark:bg-gray-900 text-primary shadow-xs font-black"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15l2 2 4-4" />
@@ -127,13 +129,13 @@ const AcademicAdminPage = () => {
             <button
               type="button"
               onClick={() => handleTabChange("cia")}
-              className={`flex items-center gap-1 ${activeTab === "suggestions" ? "px-2 py-0.5 text-[10px]" : "px-3.5 py-2 text-xs"} font-bold rounded-md transition-all shadow-none ${
+              className={`flex items-center gap-1.5 ${activeTab === "suggestions" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-2 text-xs"} font-bold rounded-lg transition-all shadow-none ${
                 activeTab === "cia"
                   ? "bg-white dark:bg-gray-900 text-primary shadow-xs font-black"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 20V10M12 20V4M6 20v-6" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 20h18" />
               </svg>
@@ -144,13 +146,13 @@ const AcademicAdminPage = () => {
             <button
               type="button"
               onClick={() => handleTabChange("attainment")}
-              className={`flex items-center gap-1 ${activeTab === "suggestions" ? "px-2 py-0.5 text-[10px]" : "px-3.5 py-2 text-xs"} font-bold rounded-md transition-all shadow-none ${
+              className={`flex items-center gap-1.5 ${activeTab === "suggestions" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-2 text-xs"} font-bold rounded-lg transition-all shadow-none ${
                 activeTab === "attainment"
                   ? "bg-white dark:bg-gray-900 text-primary shadow-xs font-black"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15l-2 5l9-11h-7l2-5l-9 11h7z" />
               </svg>
               <span>Attainment</span>
@@ -160,13 +162,13 @@ const AcademicAdminPage = () => {
             <button
               type="button"
               onClick={() => handleTabChange("performance")}
-              className={`flex items-center gap-1 ${activeTab === "suggestions" ? "px-2 py-0.5 text-[10px]" : "px-3.5 py-2 text-xs"} font-bold rounded-md transition-all shadow-none ${
+              className={`flex items-center gap-1.5 ${activeTab === "suggestions" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-2 text-xs"} font-bold rounded-lg transition-all shadow-none ${
                 activeTab === "performance"
                   ? "bg-white dark:bg-gray-900 text-primary shadow-xs font-black"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <span>Performance</span>
@@ -176,13 +178,13 @@ const AcademicAdminPage = () => {
             <button
               type="button"
               onClick={() => handleTabChange("suggestions")}
-              className={`flex items-center gap-1 ${activeTab === "suggestions" ? "px-2.5 py-0.5 text-[10px]" : "px-4 py-2 text-xs"} font-black rounded-md transition-all shadow-none ${
+              className={`flex items-center gap-1.5 ${activeTab === "suggestions" ? "px-3 py-1 text-[11px]" : "px-4 py-2 text-xs"} font-black rounded-lg transition-all shadow-none ${
                 activeTab === "suggestions"
                   ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xs"
                   : "text-violet-600 dark:text-violet-400 hover:text-violet-900 dark:hover:text-white"
               }`}
             >
-              <svg className="w-3 h-3 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               <span>Ask for Suggestions</span>
@@ -191,7 +193,7 @@ const AcademicAdminPage = () => {
         </div>
 
         {/* ── Dynamic Tab Content View Container ── */}
-        <div className={activeTab === "suggestions" ? "flex-1 min-h-0 h-full overflow-hidden mt-1 flex flex-col" : "transition-opacity duration-300"}>
+        <div className={activeTab === "suggestions" ? "flex-1 min-h-0 h-full overflow-hidden flex flex-col" : "transition-opacity duration-300"}>
           {activeTab === "mcq" && (
             <TeachingLearningEffectivenessView
               key="mcq-view"

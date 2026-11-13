@@ -67,6 +67,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
   const [showHistory, setShowHistory] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // STRICT MCQ RULE: When MCQ, no word "attainment" anywhere!
@@ -388,9 +389,11 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
     });
   };
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages inside the conversation container only (NEVER scrolling the browser window)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [messages, loading]);
 
   // ── Send Message Handler ──
@@ -576,9 +579,9 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
   return (
     <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col h-full overflow-hidden relative">
       {/* ─────────────────────────────────────────────────────────────
-          1. ULTRA-COMPACT TOOLBAR (CONSOLIDATED INTO 1 SLEEK ROW ~28px)
+          1. SLEEK CONTROL TOOLBAR (ALWAYS VISIBLE & LOCKED AT TOP)
           ───────────────────────────────────────────────────────────── */}
-      <div className="bg-slate-50 dark:bg-gray-800/90 border-b border-gray-200 dark:border-gray-700/80 px-2 py-0.5 shrink-0 flex flex-wrap items-center justify-between gap-1 text-[11px] min-h-[30px]">
+      <div className="bg-slate-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-2.5 py-1 shrink-0 flex flex-wrap items-center justify-between gap-1.5 text-xs min-h-[36px]">
         {/* Left: AI Icon + Mode Toggle + Multi-Filter Dropdowns */}
         <div className="flex items-center gap-1 flex-wrap">
           <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-2xs shrink-0">
@@ -944,7 +947,10 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
       {/* ─────────────────────────────────────────────────────────────
           2. EXPANSIVE READING SECTION (MAXIMUM SCREEN REAL ESTATE ~90%+)
           ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-3 py-1.5 space-y-2 bg-gradient-to-b from-gray-50/30 to-white dark:from-gray-900/30 dark:to-[#1a2234]">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-3 py-1.5 space-y-2 bg-gradient-to-b from-gray-50/30 to-white dark:from-gray-900/30 dark:to-[#1a2234]"
+      >
         {messages.map((msg) => (
           <div
             key={msg.id}
