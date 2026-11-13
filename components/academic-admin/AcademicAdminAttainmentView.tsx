@@ -243,7 +243,7 @@ export const AcademicAdminAttainmentView: React.FC<
               <select
                 value={selectedBatch}
                 onChange={(e) => setSelectedBatch(e.target.value)}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[130px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 {batches.map((b) => (
                   <option key={String(b.id)} value={b.name}>
@@ -259,7 +259,7 @@ export const AcademicAdminAttainmentView: React.FC<
               <select
                 value={selectedDept}
                 onChange={(e) => handleDeptChange(e.target.value)}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[160px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 {departments.map((d) => (
                   <option key={d.code} value={d.code}>
@@ -289,7 +289,7 @@ export const AcademicAdminAttainmentView: React.FC<
                     }
                   }
                 }}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[200px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 <option value="ALL">All Courses (Department Average)</option>
                 {attainmentData.courses.map((c) => (
@@ -313,7 +313,7 @@ export const AcademicAdminAttainmentView: React.FC<
                     );
                     setSelectedInstance(matched || null);
                   }}
-                  className="form-select text-xs py-1.5 px-3 rounded-lg border-primary/50 dark:border-primary/50 bg-primary/5 dark:bg-primary/10 text-primary font-bold"
+                  className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[170px] rounded-lg border-primary/50 dark:border-primary/50 bg-primary/5 dark:bg-primary/10 text-primary font-bold"
                 >
                   {selectedCourse.instances.map((inst) => (
                     <option key={inst.instance_id} value={String(inst.instance_id)}>
@@ -564,7 +564,7 @@ export const AcademicAdminAttainmentView: React.FC<
                   <select
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
-                    className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                    className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[160px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
                   >
                     <option value="attainment_desc">Highest Attainment</option>
                     <option value="attainment_asc">Lowest Attainment</option>

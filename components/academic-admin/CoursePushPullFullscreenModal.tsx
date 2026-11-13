@@ -317,7 +317,7 @@ export const CoursePushPullFullscreenModal: React.FC<CoursePushPullFullscreenMod
               <select
                 value={selectedDeptFilter}
                 onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[140px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 <option value="ALL">ALL ({allCourses.length})</option>
                 {uniqueDepartments.map((d) => (
@@ -335,7 +335,7 @@ export const CoursePushPullFullscreenModal: React.FC<CoursePushPullFullscreenMod
             <select
               value={sortField}
               onChange={(e) => setSortField(e.target.value as SortField)}
-              className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+              className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[160px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
             >
               <option value="score">{type === "cia" ? "Attainment Score" : "Test Score"}</option>
               <option value="diff">Difference vs Target</option>

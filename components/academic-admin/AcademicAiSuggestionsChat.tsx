@@ -11,6 +11,7 @@ import {
   CourseBreakdownItem,
   academicAdminService,
 } from "@/services/academicAdminAnalytics.service";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface AcademicAiSuggestionsChatProps {
   initialDepartment?: string;
@@ -99,6 +100,51 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
   const isMcq = selectedMode === "MCQ";
   const scoreTerm = isMcq ? "Score" : "Attainment";
 
+  // Initial welcome message factory
+  const getWelcomeMessage = useCallback((): ChatMessage => {
+    return {
+      id: "welcome-1",
+      sender: "assistant",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      text: `### 👋 Greetings, Academic Administrator!
+I am your **AI Academic Analytics Advisor**.
+
+You can use the **embedded filters in the header above** to focus analysis on:
+- 🏛️ **Overall College** (Institutional leadership)
+- 🏢 **Department** (Departmental pacing & faculty coordination)
+- 📚 **Individual Course** (Syllabus coverage & multi-section consistency)
+- 🏫 **Classroom Section** (Classroom instructor & student cohort metrics)
+
+Ask me any specific analytics question (e.g. *"Who are the outlier faculty?"*, *"Why are K3/K4 scores dropping?"*, *"Compare CSE vs ECE"*) or use the quick inquiry buttons below to explore insights or generate the complete 6-point improvement plan!`,
+    };
+  }, []);
+
+  // Load chat memory from localStorage on mode change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storageKey = `neurobe_academic_ai_chat_session_v4_${selectedMode}`;
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+            return;
+          }
+        } catch (_) {}
+      }
+      setMessages([getWelcomeMessage()]);
+    }
+  }, [selectedMode, getWelcomeMessage]);
+
+  // Persist messages to localStorage whenever they update
+  useEffect(() => {
+    if (typeof window !== "undefined" && messages.length > 0) {
+      const storageKey = `neurobe_academic_ai_chat_session_v4_${selectedMode}`;
+      window.localStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)));
+    }
+  }, [messages, selectedMode]);
+
   // Load backend filters & courses
   useEffect(() => {
     academicAdminService.getFilters().then((res) => {
@@ -166,28 +212,66 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
     return "College-Wide";
   }, [selectedScope, selectedDept, selectedCourseObj, selectedClassroomObj]);
 
-  // Initial welcome message
-  useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: "welcome-1",
-          sender: "assistant",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          text: `👋 Greetings, Academic Administrator. I am your Executive AI Academic Assistant.\n\nYou can use the **filters embedded directly in the header above** to focus my analysis on the **Overall College**, a specific **Department**, an individual **Course**, or a specific **Classroom Section**.\n\nClick one of the prompt chips below or ask me any question to generate actionable 6-point pedagogical recommendations and root-cause diagnostics.`,
-        },
-      ]);
-    }
-  }, [messages.length]);
+  // Compute live scoped metrics
+  const liveScopedMetrics = useMemo(() => {
+    let scopedScore = 72.0;
+    let scopedParticipation = 88;
+    let scopedKLevels: Record<string, number> = { K1: 76, K2: 70, K3: 58, K4: 62, K5: 54, K6: 48 };
+    let scopedPushingUp: any[] = [];
+    let scopedPullingDown: any[] = [];
 
-  // ── Core Generation Function ──
+    if (selectedScope === "DEPARTMENT" && selectedDept !== "ALL") {
+      const deptCourses = availableCourses;
+      if (deptCourses.length > 0) {
+        const sum = deptCourses.reduce((acc, c) => acc + (c.attainment_pct || 0), 0);
+        scopedScore = Number((sum / deptCourses.length).toFixed(1));
+        scopedPushingUp = deptCourses
+          .filter((c) => c.attainment_pct >= targetBenchmark)
+          .map((c) => ({ course_code: c.course_code, course_name: c.course_title, department_code: c.department_code, attainment_pct: c.attainment_pct }));
+        scopedPullingDown = deptCourses
+          .filter((c) => c.attainment_pct < targetBenchmark)
+          .map((c) => ({ course_code: c.course_code, course_name: c.course_title, department_code: c.department_code, attainment_pct: c.attainment_pct }));
+      }
+    } else if (selectedScope === "COURSE" && selectedCourseObj) {
+      scopedScore = selectedCourseObj.attainment_pct || scopedScore;
+      if (selectedCourseObj.k_levels) {
+        scopedKLevels = { ...selectedCourseObj.k_levels };
+      }
+    } else if (selectedScope === "CLASS" && selectedCourseObj && selectedClassroomObj) {
+      scopedScore = selectedClassroomObj.attainment_pct || scopedScore;
+      if (selectedClassroomObj.k_levels) {
+        scopedKLevels = { ...selectedClassroomObj.k_levels };
+      }
+    }
+
+    return {
+      scorePct: scopedScore,
+      participationPct: scopedParticipation,
+      kLevels: scopedKLevels,
+      pushingUp: scopedPushingUp,
+      pullingDown: scopedPullingDown,
+    };
+  }, [selectedScope, selectedDept, availableCourses, targetBenchmark, selectedCourseObj, selectedClassroomObj]);
+
+  // ── Clear Chat History / Memory ──
+  const handleClearChat = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const storageKey = `neurobe_academic_ai_chat_session_v4_${selectedMode}`;
+      window.localStorage.removeItem(storageKey);
+      try {
+        await fetch("/api/academic-admin/ai-chat", { method: "DELETE" });
+      } catch (_) {}
+    }
+    setMessages([getWelcomeMessage()]);
+  }, [selectedMode, getWelcomeMessage]);
+
+  // ── Core Full 6-Point Report Generation ──
   const handleGenerateReport = useCallback(
     async (customPrompt?: string) => {
       setLoading(true);
 
-      const userText = customPrompt || `Generate comprehensive 6-point suggestions for ${scopeSummary} (${selectedMode} mode at ${targetBenchmark}% target).`;
+      const userText = customPrompt || `Generate comprehensive 6-point improvement plan for ${scopeSummary} (${selectedMode} mode at ${targetBenchmark}% target).`;
 
-      // Append user message
       const userMsg: ChatMessage = {
         id: `user-${Date.now()}`,
         sender: "user",
@@ -198,47 +282,21 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
       setMessages((prev) => [...prev, userMsg]);
 
       try {
-        let scopedScore = 72.0;
-        let scopedParticipation = 88;
-        let scopedKLevels: Record<string, number> = { K1: 76, K2: 70, K3: 58, K4: 62, K5: 54, K6: 48 };
-        let scopedPushingUp: any[] = [];
-        let scopedPullingDown: any[] = [];
-
         const scopeSelection: ScopedFilterSelection = {
           scope: selectedScope,
           departmentCode: selectedDept,
           departmentName: selectedDept,
         };
 
-        if (selectedScope === "DEPARTMENT" && selectedDept !== "ALL") {
-          const deptCourses = availableCourses;
-          if (deptCourses.length > 0) {
-            const sum = deptCourses.reduce((acc, c) => acc + (c.attainment_pct || 0), 0);
-            scopedScore = Number((sum / deptCourses.length).toFixed(1));
-            scopedPushingUp = deptCourses
-              .filter((c) => c.attainment_pct >= targetBenchmark)
-              .map((c) => ({ course_code: c.course_code, course_name: c.course_title, department_code: c.department_code, attainment_pct: c.attainment_pct }));
-            scopedPullingDown = deptCourses
-              .filter((c) => c.attainment_pct < targetBenchmark)
-              .map((c) => ({ course_code: c.course_code, course_name: c.course_title, department_code: c.department_code, attainment_pct: c.attainment_pct }));
-          }
-        } else if (selectedScope === "COURSE" && selectedCourseObj) {
+        if (selectedScope === "COURSE" && selectedCourseObj) {
           scopeSelection.courseCode = selectedCourseObj.course_code;
           scopeSelection.courseName = selectedCourseObj.course_title;
-          scopedScore = selectedCourseObj.attainment_pct || scopedScore;
-          if (selectedCourseObj.k_levels) {
-            scopedKLevels = { ...selectedCourseObj.k_levels };
-          }
         } else if (selectedScope === "CLASS" && selectedCourseObj && selectedClassroomObj) {
           scopeSelection.courseCode = selectedCourseObj.course_code;
           scopeSelection.courseName = selectedCourseObj.course_title;
           scopeSelection.classroomId = selectedClassroomObj.id;
           scopeSelection.classroomName = selectedClassroomObj.name;
           scopeSelection.facultyName = selectedClassroomObj.faculty_name;
-          scopedScore = selectedClassroomObj.attainment_pct || scopedScore;
-          if (selectedClassroomObj.k_levels) {
-            scopedKLevels = { ...selectedClassroomObj.k_levels };
-          }
         }
 
         const payload: GenerateSuggestionInput = {
@@ -247,11 +305,11 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
           batch: selectedBatch,
           testFilter: "ALL",
           targetBenchmark,
-          totalAttainmentPct: scopedScore,
-          participationPct: scopedParticipation,
-          kLevels: scopedKLevels,
-          coursesPushingUp: scopedPushingUp,
-          coursesPullingDown: scopedPullingDown,
+          totalAttainmentPct: liveScopedMetrics.scorePct,
+          participationPct: liveScopedMetrics.participationPct,
+          kLevels: liveScopedMetrics.kLevels,
+          coursesPushingUp: liveScopedMetrics.pushingUp,
+          coursesPullingDown: liveScopedMetrics.pullingDown,
           scopeSelection,
         };
 
@@ -275,7 +333,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
             id: `err-${Date.now()}`,
             sender: "assistant",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            text: "⚠️ Sorry, an error occurred while processing the suggestion pipeline. Please retry.",
+            text: "⚠️ An error occurred while formulating the action plan. Please retry.",
           },
         ]);
       } finally {
@@ -289,9 +347,117 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
       selectedScope,
       selectedDept,
       selectedBatch,
-      availableCourses,
       selectedCourseObj,
       selectedClassroomObj,
+      liveScopedMetrics,
+    ]
+  );
+
+  // ── Conversational Chat Message Handler ──
+  const handleSendChatMessage = useCallback(
+    async (textToSend: string) => {
+      const trimmed = textToSend.trim();
+      if (!trimmed || loading) return;
+
+      // If user is explicitly requesting the full 6-point plan or action plan:
+      const lower = trimmed.toLowerCase();
+      if (
+        lower.includes("6-point") ||
+        lower.includes("6 point") ||
+        lower.includes("full action plan") ||
+        lower.includes("comprehensive plan") ||
+        lower.includes("improvement report")
+      ) {
+        return handleGenerateReport(trimmed);
+      }
+
+      setLoading(true);
+
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        sender: "user",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        text: trimmed,
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+
+      try {
+        // Send to conversational AI route with multi-turn memory
+        const response = await fetch("/api/academic-admin/ai-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: trimmed,
+            history: messages.slice(-6).map((m) => ({
+              id: m.id,
+              sender: m.sender,
+              timestamp: m.timestamp,
+              text: m.text || (m.report ? m.report.scope_details?.label || "Report generated" : ""),
+            })),
+            scope: selectedScope,
+            scopeLabel: scopeSummary,
+            mode: selectedMode,
+            targetBenchmark,
+            metrics: liveScopedMetrics,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.message) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: data.message.id || `asst-${Date.now()}`,
+                sender: "assistant",
+                timestamp: data.message.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                scopeBadge: `${selectedScope}: ${scopeSummary}`,
+                text: data.message.text,
+              },
+            ]);
+            return;
+          }
+        }
+
+        // Fallback local response if endpoint is unreachable
+        const fallbackText = `### 💡 Analytics Response for **${scopeSummary}**\n\n- **Target Standard**: ${targetBenchmark}%\n- **Current ${scoreTerm}**: **${liveScopedMetrics.scorePct}%**\n\nRegarding: *"**${trimmed}**"*\n\n1. Foundational cognitive grasp on Recall/Understand (K1/K2) is solid at **${liveScopedMetrics.kLevels.K1 || 76}%**.\n2. The primary divergence occurs in application-level problem solving (K3/K4: **${liveScopedMetrics.kLevels.K3 || 58}%**).\n3. Recommend hosting targeted 20-minute guided problem-solving workshops before upcoming internal milestones.`;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `asst-${Date.now()}`,
+            sender: "assistant",
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            scopeBadge: `${selectedScope}: ${scopeSummary}`,
+            text: fallbackText,
+          },
+        ]);
+      } catch (err) {
+        console.error("Chat error:", err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            sender: "assistant",
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            text: "⚠️ Sorry, unable to complete the analytics query right now. Please try again.",
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      loading,
+      handleGenerateReport,
+      messages,
+      selectedScope,
+      scopeSummary,
+      selectedMode,
+      targetBenchmark,
+      liveScopedMetrics,
+      scoreTerm,
     ]
   );
 
@@ -300,15 +466,15 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
     if (!inputPrompt.trim() || loading) return;
     const txt = inputPrompt.trim();
     setInputPrompt("");
-    handleGenerateReport(txt);
+    handleSendChatMessage(txt);
   };
 
   return (
-    <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col h-[calc(100vh-180px)] overflow-hidden">
+    <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col h-[calc(100vh-180px)] overflow-hidden relative">
       {/* ── 1. EMBEDDED FILTERS INSIDE CHATBOT HEADER ── */}
       <div className="bg-slate-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700/80 p-3.5 space-y-3 shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-sm">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -322,12 +488,12 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
                 </span>
               </h3>
               <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                Context: <strong className="text-gray-800 dark:text-gray-200">{scopeSummary}</strong>
+                Scope: <strong className="text-gray-800 dark:text-gray-200">{scopeSummary}</strong>
               </p>
             </div>
           </div>
 
-          {/* Mode Switch & History Drawer Toggle */}
+          {/* Mode Switch, Clear Memory & History Toggle */}
           <div className="flex items-center gap-2">
             <div className="flex items-center bg-gray-200 dark:bg-gray-700 p-1 rounded-xl text-xs font-bold">
               <button
@@ -350,6 +516,20 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
               </button>
             </div>
 
+            {/* Clear Chat Memory Button */}
+            <button
+              type="button"
+              onClick={handleClearChat}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 transition"
+              title="Reset conversation memory"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Clear Chat</span>
+            </button>
+
+            {/* History Drawer Toggle */}
             <button
               type="button"
               onClick={() => setShowHistory((prev) => !prev)}
@@ -389,7 +569,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
 
           {/* Department Dropdown (shown when scope is not OVERALL) */}
           {selectedScope !== "OVERALL" && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span className="font-bold text-[10px] text-gray-500 uppercase">Dept:</span>
               <select
                 value={selectedDept}
@@ -398,7 +578,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
                   setSelectedCourseCode("");
                   setSelectedClassId("");
                 }}
-                className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 font-bold"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[150px] rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 font-bold"
               >
                 <option value="ALL">All Departments</option>
                 {departments.map((d) => (
@@ -412,7 +592,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
 
           {/* Course Dropdown (shown when scope is COURSE or CLASS) */}
           {(selectedScope === "COURSE" || selectedScope === "CLASS") && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span className="font-bold text-[10px] text-gray-500 uppercase">Course:</span>
               <select
                 value={selectedCourseObj?.course_code || ""}
@@ -420,7 +600,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
                   setSelectedCourseCode(e.target.value);
                   setSelectedClassId("");
                 }}
-                className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 font-bold max-w-[200px] truncate"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[180px] max-w-[240px] rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 font-bold truncate"
               >
                 {availableCourses.map((c) => (
                   <option key={c.course_code} value={c.course_code}>
@@ -433,12 +613,12 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
 
           {/* Classroom Dropdown (shown when scope is CLASS) */}
           {selectedScope === "CLASS" && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span className="font-bold text-[10px] text-gray-500 uppercase">Class:</span>
               <select
                 value={selectedClassId}
                 onChange={(e) => setSelectedClassId(e.target.value)}
-                className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 font-bold"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[170px] rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 font-bold"
               >
                 {availableClassrooms.map((cl) => (
                   <option key={String(cl.id || cl.instance_id)} value={String(cl.id || cl.instance_id)}>
@@ -484,27 +664,31 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
               )}
             </div>
 
-            {/* Message Bubble */}
+            {/* Message Bubble with Markdown Support */}
             {msg.text && (
               <div
-                className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap shadow-xs ${
+                className={`max-w-3xl p-4 rounded-2xl text-xs leading-relaxed shadow-xs ${
                   msg.sender === "user"
-                    ? "bg-primary text-white rounded-br-xs font-semibold"
-                    : "bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-xs"
+                    ? "bg-primary text-white rounded-br-xs font-semibold whitespace-pre-wrap"
+                    : "bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-xs w-full"
                 }`}
               >
-                {msg.text}
+                {msg.sender === "user" ? (
+                  <p>{msg.text}</p>
+                ) : (
+                  <MarkdownRenderer content={msg.text} />
+                )}
               </div>
             )}
 
-            {/* Structured 6-Point Academic Report */}
+            {/* Structured 6-Point Academic Report Card */}
             {msg.report && (
               <div className="w-full max-w-4xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm space-y-4">
                 {/* Header Badge & Summary */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-3">
                   <div>
                     <span className="text-[10px] font-black uppercase tracking-wider text-violet-600 dark:text-violet-400 block">
-                      Targeted Executive Diagnosis
+                      Targeted Executive Action Plan
                     </span>
                     <h4 className="text-sm font-black text-gray-900 dark:text-white mt-0.5">
                       {msg.report.scope_details?.label || "Institutional Improvement Action Plan"}
@@ -600,7 +784,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
         {loading && (
           <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 w-fit text-xs text-gray-500 font-bold shadow-xs">
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-violet-600 border-t-transparent" />
-            <span>Analyzing {scopeSummary} & formulating actionable solutions...</span>
+            <span>Analyzing {scopeSummary} and formulating conversational insights...</span>
           </div>
         )}
 
@@ -608,41 +792,57 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
       </div>
 
       {/* ── 3. QUICK ACTION PROMPT CHIPS ── */}
-      <div className="px-4 py-2 bg-gray-50/80 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2 overflow-x-auto text-xs shrink-0">
+      <div className="px-4 py-2.5 bg-gray-50/80 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2 overflow-x-auto text-xs shrink-0">
         <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider shrink-0">
-          Quick Prompts:
+          Quick Inquiries:
         </span>
+        <button
+          type="button"
+          onClick={() => handleSendChatMessage(`Overview of current performance and key metrics for ${scopeSummary}`)}
+          disabled={loading}
+          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+        >
+          📊 Performance Overview
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSendChatMessage(`Detect outlier teachers and sections lagging behind the benchmark in ${scopeSummary}`)}
+          disabled={loading}
+          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+        >
+          🚨 Outlier Faculty & Sections
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSendChatMessage(`Diagnose K1-K6 Bloom's cognitive gaps and student struggle areas for ${scopeSummary}`)}
+          disabled={loading}
+          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+        >
+          🧠 K1-K6 Cognitive Gaps
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSendChatMessage(`Analyze classroom cohorts dropping in specific subjects despite doing well overall in ${scopeSummary}`)}
+          disabled={loading}
+          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+        >
+          🏫 Multi-Course Section Drops
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSendChatMessage(`Recommend immediate remedial teaching interventions and doubt sessions for ${scopeSummary}`)}
+          disabled={loading}
+          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+        >
+          💡 Immediate Interventions
+        </button>
         <button
           type="button"
           onClick={() => handleGenerateReport()}
           disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+          className="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 font-extrabold hover:bg-violet-100 shrink-0 transition"
         >
-          💡 Full 6-Point Action Plan
-        </button>
-        <button
-          type="button"
-          onClick={() => handleGenerateReport(`Detect abnormal teacher divergence and sections falling behind in ${scopeSummary}.`)}
-          disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
-        >
-          🚨 Detect Outlier Sections & Abnormalities
-        </button>
-        <button
-          type="button"
-          onClick={() => handleGenerateReport(`Identify student struggle areas in K3/K4 cognitive levels and suggest immediate remedies for ${scopeSummary}.`)}
-          disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
-        >
-          🎯 K3/K4 Cognitive Remedies
-        </button>
-        <button
-          type="button"
-          onClick={() => handleGenerateReport(`Draft a practical 4-week execution checklist for teachers in ${scopeSummary}.`)}
-          disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
-        >
-          📋 4-Week Teacher Checklist
+          📋 Full 6-Point Action Plan
         </button>
       </div>
 
@@ -670,9 +870,88 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
           </svg>
         </button>
       </form>
+
+      {/* ── 5. HISTORY DRAWER OVERLAY ── */}
+      {showHistory && (
+        <div className="absolute inset-y-0 right-0 w-80 max-w-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-2xl z-30 flex flex-col animate-slideLeft">
+          <div className="p-3.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Past Suggestion Reports</span>
+            </h4>
+            <button
+              type="button"
+              onClick={() => setShowHistory(false)}
+              className="text-gray-400 hover:text-gray-700 dark:hover:text-white font-bold text-sm"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+            {pastSuggestions.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-8 font-semibold">No past reports saved yet.</p>
+            ) : (
+              pastSuggestions.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 text-xs space-y-1.5 hover:border-violet-400 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-violet-600 dark:text-violet-400 text-[11px]">
+                      {item.scope}
+                    </span>
+                    <span className="text-[10px] text-gray-400">{new Date(item.timestamp).toLocaleDateString()}</span>
+                  </div>
+                  <p className="font-bold text-gray-800 dark:text-gray-200 truncate">
+                    {item.scope_details?.label || "Institutional Report"}
+                  </p>
+                  <div className="flex items-center justify-between pt-1 text-[11px] text-gray-500">
+                    <span>Score: <strong>{item.current_metrics?.score_pct}%</strong></span>
+                    <span>Target: <strong>{item.filters?.targetBenchmark}%</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMessages((prev) => [
+                          ...prev,
+                          {
+                            id: `asst-${Date.now()}`,
+                            sender: "assistant",
+                            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                            scopeBadge: `${item.scope}: ${item.scope_details?.label}`,
+                            report: item,
+                          },
+                        ]);
+                        setShowHistory(false);
+                      }}
+                      className="text-[10px] font-black text-primary hover:underline"
+                    >
+                      Load into Chat
+                    </button>
+                    <span className="text-gray-300">•</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await academicAdminAiService.deleteSuggestion(item.id);
+                        setPastSuggestions((prev) => prev.filter((x) => x.id !== item.id));
+                      }}
+                      className="text-[10px] font-bold text-rose-500 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default AcademicAiSuggestionsChat;
-

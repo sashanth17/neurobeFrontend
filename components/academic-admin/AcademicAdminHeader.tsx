@@ -109,7 +109,7 @@ export const AcademicAdminHeader: React.FC<AcademicAdminHeaderProps> = ({
             <select
               value={selectedYear}
               onChange={(e) => onYearChange(e.target.value)}
-              className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium focus:ring-1 focus:ring-primary focus:border-primary"
+              className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[130px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium focus:ring-1 focus:ring-primary focus:border-primary"
             >
               {academicYears.map((ay) => (
                 <option key={ay.year} value={ay.year}>
@@ -126,7 +126,7 @@ export const AcademicAdminHeader: React.FC<AcademicAdminHeaderProps> = ({
               <select
                 value={selectedScope}
                 onChange={(e) => onScopeChange(e.target.value)}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium focus:ring-1 focus:ring-primary focus:border-primary"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[140px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium focus:ring-1 focus:ring-primary focus:border-primary"
               >
                 {examScopes.map((scope) => (
                   <option key={scope.id} value={scope.id}>

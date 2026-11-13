@@ -8,8 +8,6 @@ import {
   CourseBreakdownItem,
 } from "@/services/academicAdminAnalytics.service";
 import MistakeAnalysisModal from "@/components/academic-admin/MistakeAnalysisModal";
-import AiAcademicAnalyticsModal from "@/components/academic-admin/AiAcademicAnalyticsModal";
-import { GenerateSuggestionInput } from "@/services/academicAdminAiDb.service";
 
 interface PrincipalPerformanceViewProps {
   initialDepartment?: string;
@@ -52,7 +50,6 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [activeMistakeClass, setActiveMistakeClass] = useState<ClassroomComparativeItem | null>(null);
   const [isMistakeModalOpen, setIsMistakeModalOpen] = useState<boolean>(false);
-  const [showAiModal, setShowAiModal] = useState<boolean>(false);
 
   // State for Classroom Multi-Course Performance
   const [topClasses, setTopClasses] = useState<TopClassCohortItem[]>([]);
@@ -307,38 +304,6 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
     }));
   }, [courses]);
 
-  // Prepared AI suggestions input
-  const aiReportInput: GenerateSuggestionInput = useMemo(() => {
-    return {
-      type: selectedMode === "MCQ" ? "MCQ" : "CIA",
-      department: selectedDept,
-      batch: selectedBatch,
-      testFilter: "ALL",
-      targetBenchmark: 60,
-      totalAttainmentPct: summary?.average_faculty_attainment ?? 0,
-      participationPct: summary?.average_faculty_attainment ? Math.min(Math.round(summary.average_faculty_attainment), 100) : 0,
-      kLevels: { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 },
-      coursesPushingUp: courses
-        .filter((c) => c.baseline_attainment_pct >= 60)
-        .map((c) => ({
-          course_code: c.course_code,
-          course_name: c.course_title,
-          department_code: c.department_code,
-          attainment_pct: c.baseline_attainment_pct,
-          semester: 1,
-        })),
-      coursesPullingDown: courses
-        .filter((c) => c.baseline_attainment_pct < 60)
-        .map((c) => ({
-          course_code: c.course_code,
-          course_name: c.course_title,
-          department_code: c.department_code,
-          attainment_pct: c.baseline_attainment_pct,
-          semester: 1,
-        })),
-    };
-  }, [selectedMode, selectedDept, selectedBatch, summary, courses]);
-
   // Selected Course for Section 3
   const currentCourse = useMemo(() => {
     if (!courses || courses.length === 0) return null;
@@ -353,8 +318,6 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
   const handleAskSuggestionsClick = () => {
     if (onNavigateToSuggestions) {
       onNavigateToSuggestions();
-    } else {
-      setShowAiModal(true);
     }
   };
 
@@ -534,7 +497,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
             <select
               value={selectedBatch}
               onChange={(e) => setSelectedBatch(e.target.value)}
-              className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
+              className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[125px] rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
             >
               <option value="ALL">All Batches</option>
               {batches.map((b) => (
@@ -551,7 +514,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
+              className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[160px] rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
             >
               <option value="ALL">All Departments</option>
               {departments.map((d) => (
@@ -568,7 +531,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
             <select
               value={selectedMode}
               onChange={(e) => setSelectedMode(e.target.value as any)}
-              className="form-select text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
+              className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[180px] rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
             >
               <option value="COMBINED">Combined (CIA + MCQ)</option>
               <option value="CIA">CIA Only</option>
@@ -942,7 +905,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                   <select
                     value={selectedSemester}
                     onChange={(e) => setSelectedSemester(e.target.value)}
-                    className="form-select text-xs py-1.5 px-3 rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
+                    className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[140px] rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
                   >
                     <option value="ALL">All Semesters</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
@@ -1174,7 +1137,7 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
                       <select
                         value={currentCourse?.course_id ?? ""}
                         onChange={(e) => setSelectedCourseId(Number(e.target.value))}
-                        className="form-select text-xs py-1.5 px-3 rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
+                        className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[200px] rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800 font-bold"
                       >
                         {courses.map((c) => (
                           <option key={c.course_id} value={c.course_id}>
@@ -1384,15 +1347,6 @@ const PrincipalPerformanceView: React.FC<PrincipalPerformanceViewProps> = ({
           isMcq={selectedMode === "MCQ"}
         />
       )}
-
-      {/* Fallback AI Suggestions Modal if needed */}
-      <AiAcademicAnalyticsModal
-        isOpen={showAiModal}
-        onClose={() => setShowAiModal(false)}
-        reportInput={aiReportInput}
-        courseBreakdown={breakdownCourses}
-        departments={departments.map((d) => d.code)}
-      />
     </div>
   );
 };

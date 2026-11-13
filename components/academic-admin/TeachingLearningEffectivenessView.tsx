@@ -9,8 +9,6 @@ import {
   CourseBreakdownItem,
 } from "@/services/academicAdminAnalytics.service";
 import CoursePushPullFullscreenModal from "@/components/academic-admin/CoursePushPullFullscreenModal";
-import AiAcademicAnalyticsModal from "@/components/academic-admin/AiAcademicAnalyticsModal";
-import { GenerateSuggestionInput } from "@/services/academicAdminAiDb.service";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -99,7 +97,6 @@ export const TeachingLearningEffectivenessView: React.FC<
   // Modals for "Detail" clicks
   const [showClassroomModal, setShowClassroomModal] = useState<boolean>(false);
   const [showCourseModal, setShowCourseModal] = useState<boolean>(false);
-  const [showAiModal, setShowAiModal] = useState<boolean>(false);
 
   // Toggle a K-level in overview mode
   const toggleKLevel = (k: KLevelKey) => {
@@ -158,39 +155,6 @@ export const TeachingLearningEffectivenessView: React.FC<
       (c) => c.department_code === selectedDept || !c.department_code
     );
   }, [data?.course_breakdown, selectedDept]);
-
-  // Prepared current report metrics for the AI Task (injected with past memory)
-  const aiReportInput: GenerateSuggestionInput = useMemo(() => {
-    return {
-      type: type === "cia" ? "CIA" : "MCQ",
-      department: selectedDept,
-      batch: selectedBatch,
-      testFilter: selectedTest,
-      targetBenchmark,
-      totalAttainmentPct: data?.total_attainment_pct ?? 0,
-      participationPct: data?.participation?.participation_pct ?? 0,
-      kLevels: data?.k_level_performance ?? { K1: 0, K2: 0, K3: 0, K4: 0, K5: 0, K6: 0 },
-      coursesPushingUp: (data?.courses_pushing_up || []).map((c) => ({
-        course_code: c.course_code,
-        course_name: c.course_name,
-        department_code: c.department_code,
-        attainment_pct: c.attainment_pct,
-        semester: c.semester,
-      })),
-      coursesPullingDown: (data?.courses_pulling_down || []).map((c) => ({
-        course_code: c.course_code,
-        course_name: c.course_name,
-        department_code: c.department_code,
-        attainment_pct: c.attainment_pct,
-        semester: c.semester,
-      })),
-      departmentBreakdown: (data?.department_breakdown || []).map((d) => ({
-        department_code: d.department_code,
-        department_name: d.department_name,
-        total_pct: d.total_pct,
-      })),
-    };
-  }, [type, selectedDept, selectedBatch, selectedTest, targetBenchmark, data]);
 
   // ==========================================
   // Computed specifically for inspectKLevel when full-screen is active
@@ -491,23 +455,8 @@ export const TeachingLearningEffectivenessView: React.FC<
             </p>
           </div>
 
-          {/* AI Academic Intelligence Button & Narrowing indicator */}
+          {/* Narrowing indicator */}
           <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setShowAiModal(true)}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-sm hover:shadow-md transition-all scale-100 hover:scale-105"
-              title="Open AI Academic Intelligence: 6 Improvement & Analytics Points"
-            >
-              <svg className="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span>AI Advisory & 6 Improvement Points</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-white/20 text-white">
-                AI Task
-              </span>
-            </button>
-
             {selectedDept !== "ALL" && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs">
                 <span className="text-primary font-semibold">
@@ -627,7 +576,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                     setTargetBenchmark(Number(e.target.value));
                   }
                 }}
-                className="form-select text-xs py-1 px-2 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium"
+                className="form-select text-xs py-1 pl-2.5 pr-7 min-w-[95px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium"
                 title="Select preset benchmark target"
               >
                 <option value={40}>40%</option>
@@ -652,7 +601,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                   setSelectedDept(e.target.value);
                   setSelectedDrilldownCourse(null);
                 }}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[150px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 <option value="ALL">ALL Departments</option>
                 {departments.map((d) => (
@@ -672,7 +621,7 @@ export const TeachingLearningEffectivenessView: React.FC<
                   setSelectedBatch(e.target.value);
                   setSelectedDrilldownCourse(null);
                 }}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[130px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 <option value="ALL">ALL Batches</option>
                 {batches.map((b) => (
@@ -691,7 +640,7 @@ export const TeachingLearningEffectivenessView: React.FC<
               <select
                 value={selectedTest}
                 onChange={(e) => setSelectedTest(e.target.value)}
-                className="form-select text-xs py-1.5 px-3 rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
+                className="form-select text-xs py-1.5 pl-3 pr-8 min-w-[120px] rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-medium"
               >
                 <option value="ALL">ALL Tests</option>
                 {type === "cia" ? (
@@ -1734,18 +1683,6 @@ export const TeachingLearningEffectivenessView: React.FC<
               </h3>
               <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  onClick={() => setShowAiModal(true)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline"
-                  title="Run AI 6 Improvement & Analytics Diagnostics on these courses"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span>AI Diagnostics</span>
-                </button>
-                <span className="text-gray-300 dark:text-gray-600">•</span>
-                <button
                   onClick={() => setShowCourseModal(true)}
                   className="text-xs font-bold text-primary hover:underline"
                   title="Open full-screen cards view for courses pulling up and down"
@@ -2201,18 +2138,6 @@ export const TeachingLearningEffectivenessView: React.FC<
           department={selectedDept}
           batch={selectedBatch}
           scope={selectedTest}
-        />
-      )}
-
-      {/* AI Academic Advisory & 6 Key Improvement Points Modal */}
-      {data && (
-        <AiAcademicAnalyticsModal
-          isOpen={showAiModal}
-          onClose={() => setShowAiModal(false)}
-          reportInput={aiReportInput}
-          courseBreakdown={data.course_breakdown}
-          departmentBreakdown={data.department_breakdown}
-          departments={departments.map((d) => d.code)}
         />
       )}
     </div>
