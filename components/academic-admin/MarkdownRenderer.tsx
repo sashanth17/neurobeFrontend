@@ -12,6 +12,7 @@ interface CardMetadata {
   impact?: string;
   tag?: string;
   scope?: string;
+  alternatePedagogy?: string;
 }
 
 const CARD_STYLES: Record<
@@ -82,6 +83,38 @@ const CARD_STYLES: Record<
   },
 };
 
+// Safe clipboard helper that works in both secure (HTTPS) and non-secure (HTTP IP) contexts
+const safeCopyToClipboard = async (text: string): Promise<boolean> => {
+  if (typeof window === "undefined") return false;
+
+  if (navigator?.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to legacy fallback
+    }
+  }
+
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.warn("Clipboard copy not supported in this browser context:", err);
+    return false;
+  }
+};
+
 const CardBlock: React.FC<{
   metadata: CardMetadata;
   bodyLines: string[];
@@ -90,11 +123,13 @@ const CardBlock: React.FC<{
   const typeKey = (metadata.type || "insight").toLowerCase();
   const style = CARD_STYLES[typeKey] || CARD_STYLES.insight;
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const textToCopy = `${metadata.title}\n\n${bodyLines.join("\n")}`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const ok = await safeCopyToClipboard(textToCopy);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const priorityColor =
@@ -108,33 +143,38 @@ const CardBlock: React.FC<{
 
   return (
     <div
-      className={`my-3 rounded-2xl border-2 ${style.border} ${style.bg} overflow-hidden shadow-xs transition hover:shadow-md`}
+      className={`my-1.5 rounded-xl border ${style.border} ${style.bg} overflow-hidden shadow-2xs transition hover:shadow-xs`}
     >
       {/* Card Header */}
-      <div className={`px-4 py-3 ${style.headerBg} flex flex-wrap items-center justify-between gap-2 border-b border-inherit`}>
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center shadow-xs shrink-0">
-            <svg className={`w-4 h-4 ${style.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className={`px-3 py-1.5 ${style.headerBg} flex flex-wrap items-center justify-between gap-1.5 border-b border-inherit`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded-md bg-white dark:bg-gray-800 flex items-center justify-center shadow-2xs shrink-0">
+            <svg className={`w-3 h-3 ${style.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={style.icon} />
             </svg>
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${style.badgeBg}`}>
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full ${style.badgeBg}`}>
                 {metadata.tag || style.defaultTag}
               </span>
               {metadata.priority && (
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${priorityColor}`}>
+                <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full ${priorityColor}`}>
                   {metadata.priority}
                 </span>
               )}
               {metadata.impact && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
                   ⚡ {metadata.impact}
                 </span>
               )}
+              {metadata.alternatePedagogy && (
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  🎓 Alternate Pedagogy: {metadata.alternatePedagogy}
+                </span>
+              )}
             </div>
-            <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white mt-0.5 truncate">
+            <h4 className="text-xs font-black text-gray-900 dark:text-white mt-0.5 truncate">
               {metadata.title || "AI Improvement Recommendation"}
             </h4>
           </div>
@@ -142,7 +182,7 @@ const CardBlock: React.FC<{
 
         <div className="flex items-center gap-1.5 ml-auto">
           {metadata.scope && (
-            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 px-2 py-0.5 rounded-md">
+            <span className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 px-1.5 py-0.5 rounded-md">
               {metadata.scope}
             </span>
           )}
@@ -153,9 +193,9 @@ const CardBlock: React.FC<{
             title="Copy suggestion"
           >
             {copied ? (
-              <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold">Copied!</span>
+              <span className="text-emerald-600 dark:text-emerald-400 text-[9px] font-extrabold">Copied!</span>
             ) : (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -169,16 +209,36 @@ const CardBlock: React.FC<{
       </div>
 
       {/* Card Content */}
-      <div className="p-4 space-y-2 text-xs leading-relaxed text-gray-800 dark:text-gray-200">
+      <div className="p-2.5 sm:p-3 space-y-1 text-xs leading-relaxed text-gray-800 dark:text-gray-200">
         {bodyLines.map((bLine, idx) => {
           const trimmed = bLine.trim();
-          if (!trimmed) return <div key={idx} className="h-1" />;
+          if (!trimmed) return <div key={idx} className="h-0.5" />;
+
+          // Highlighted Alternate Pedagogy Box
+          const isAlternatePedagogy =
+            trimmed.toLowerCase().startsWith("- **alternate pedagogy") ||
+            trimmed.toLowerCase().startsWith("**alternate pedagogy") ||
+            trimmed.toLowerCase().includes("alternate pedagogy:");
+
+          if (isAlternatePedagogy) {
+            return (
+              <div
+                key={idx}
+                className="my-1 p-2 rounded-lg border border-indigo-300 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 flex items-start gap-2 shadow-2xs"
+              >
+                <span className="text-sm leading-none mt-0.5">🎓</span>
+                <div className="flex-1 text-[11px] font-semibold leading-relaxed">
+                  {parseInlineFormatting(trimmed.replace(/^[-*]\s*/, ""))}
+                </div>
+              </div>
+            );
+          }
 
           // Bullet point
           if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
             return (
-              <div key={idx} className="flex items-start gap-2 pl-1 my-1">
-                <span className="text-primary mt-1 font-black">•</span>
+              <div key={idx} className="flex items-start gap-1.5 pl-1 my-0.5">
+                <span className="text-primary mt-1 font-black leading-none">•</span>
                 <div className="flex-1 font-medium">{parseInlineFormatting(trimmed.slice(2))}</div>
               </div>
             );
@@ -188,8 +248,8 @@ const CardBlock: React.FC<{
           const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
           if (numMatch) {
             return (
-              <div key={idx} className="flex items-start gap-2 pl-1 my-1">
-                <span className="font-extrabold text-primary text-[11px] min-w-[16px]">{numMatch[1]}.</span>
+              <div key={idx} className="flex items-start gap-1.5 pl-1 my-0.5">
+                <span className="font-extrabold text-primary text-[10px] min-w-[14px]">{numMatch[1]}.</span>
                 <div className="flex-1 font-medium">{parseInlineFormatting(numMatch[2])}</div>
               </div>
             );
@@ -320,7 +380,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
         if (
           colonIdx > 0 &&
           cardBodyLines.length === 0 &&
-          /^(title|type|priority|impact|tag|badge|scope)$/i.test(line.slice(0, colonIdx).trim())
+          /^(title|type|priority|impact|tag|badge|scope|alternate_pedagogy|alternatepedagogy)$/i.test(line.slice(0, colonIdx).trim())
         ) {
           const key = line.slice(0, colonIdx).trim().toLowerCase();
           const val = line.slice(colonIdx + 1).trim();
@@ -330,6 +390,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
           else if (key === "impact") cardMetadata.impact = val;
           else if (key === "tag" || key === "badge") cardMetadata.tag = val;
           else if (key === "scope") cardMetadata.scope = val;
+          else if (key === "alternate_pedagogy" || key === "alternatepedagogy") cardMetadata.alternatePedagogy = val;
         } else {
           cardBodyLines.push(line);
         }

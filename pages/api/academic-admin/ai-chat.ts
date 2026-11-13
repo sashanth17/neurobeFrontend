@@ -242,24 +242,28 @@ Based on **${mode}** records against your **${targetBenchmark}%** standard:
 title: Active Guided Problem Workshops
 type: pedagogy
 priority: HIGH
-impact: +12% Attainment Lift
+impact: +12% ${ScoreWord} Lift
 tag: Classroom Delivery
 scope: ${courseInfo}
+alternate_pedagogy: Flipped Classroom & POGIL
 
 **Core Action**: Replace 20 minutes of one-way slide lectures with board-guided numerical problem breakdowns.
+- **Alternate Pedagogy**: Use **POGIL** (Process-Oriented Guided Inquiry Learning) to have small teams solve problems with defined roles.
 - Walk students through one complete problem, then have them solve a paired variation in real time.
 \`\`\`
 
 \`\`\`card
-title: High-Yield Remedial Doubt Clinics
+title: High-Yield Remedial Doubt Clinics with Alternate Pedagogy
 type: remedy
 priority: HIGH
 impact: +15% Pass Rate
 tag: Student Support
 scope: Bottom Quartile Students
+alternate_pedagogy: Think-Pair-Share & Peer Instruction
 
 **Core Action**: Host dedicated 30-minute targeted doubt clinics twice weekly before mid-term evaluations.
-- Focus strictly on high-frequency question patterns that historically cause student stumbles.
+- **Alternate Pedagogy**: Switch from passive re-lecturing to **Think-Pair-Share**: 2 minutes silent problem attempt, 3 minutes peer debate on misconceptions, 5 minutes guided breakdown.
+- Focus strictly on high-frequency question patterns and K3/K4 numerical steps that historically cause student stumbles.
 \`\`\`
 
 \`\`\`card

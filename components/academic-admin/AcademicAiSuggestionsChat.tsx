@@ -67,6 +67,7 @@ export const AcademicAiSuggestionsChat: React.FC<AcademicAiSuggestionsChatProps>
   const [showHistory, setShowHistory] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // STRICT MCQ RULE: When MCQ, no word "attainment" anywhere!
   const isMcq = selectedMode === "MCQ";
@@ -462,7 +463,7 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
         }
 
         // Fallback local response if network error
-        const fallbackText = `### 💡 Analytics Response for **${filterSummary}**\n\n- **Target Standard**: ${targetBenchmark}%\n- **Current ${scoreTerm}**: **${liveScopedMetrics.scorePct}%**\n\n\`\`\`card\ntitle: Recommended Focus: Application & Tutorial Practice\ntype: remedy\npriority: HIGH\nimpact: +10% Attainment\ntag: Immediate Step\n\n- Foundational retention (K1/K2) is solid at **${liveScopedMetrics.kLevels.K1 || 76}%**.\n- Primary growth area is numerical application and problem solving (K3/K4: **${liveScopedMetrics.kLevels.K3 || 58}%**).\n- Recommend conducting weekly 30-minute peer doubt-solving circles.\n\`\`\``;
+        const fallbackText = `### 💡 Analytics & Remedial Response for **${filterSummary}**\n\n- **Target Standard**: ${targetBenchmark}%\n- **Current ${scoreTerm}**: **${liveScopedMetrics.scorePct}%**\n\n\`\`\`card\ntitle: Targeted Remedial Doubt Clinics with Alternate Pedagogy\ntype: remedy\npriority: HIGH\nimpact: +14% ${scoreTerm} Boost\ntag: Remedial Intervention\nscope: Low-scoring students in ${filterSummary}\nalternate_pedagogy: Think-Pair-Share & Peer Instruction\n\n- Foundational retention (K1/K2) is solid at **${liveScopedMetrics.kLevels.K1 || 76}%**.\n- Primary growth area is numerical application and problem solving (K3/K4: **${liveScopedMetrics.kLevels.K3 || 58}%**).\n- **Alternate Pedagogy**: Deploy **Think-Pair-Share** and **Peer Instruction** rather than re-lecturing. Have students solve coupled problem variants in pairs with real-time feedback.\n- **Action**: Host two 30-minute structured clinics before mid-term assessments.\n\`\`\``;
 
         const fallbackMsg: ChatTurnMessage = {
           id: `asst-${Date.now()}`,
@@ -507,12 +508,29 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
     ]
   );
 
-  const handleSubmitText = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputPrompt(e.target.value);
+    // Auto-resizing textarea based on typed content
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+  };
+
+  const handleSubmitText = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!inputPrompt.trim() || loading) return;
     const txt = inputPrompt.trim();
     setInputPrompt("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     handleSendMessage(txt);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmitText();
+    }
   };
 
   // Helper to toggle item in array
@@ -556,98 +574,48 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
   }, [availableClassrooms, classSearch]);
 
   return (
-    <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col h-[calc(100vh-175px)] overflow-hidden relative">
+    <div className="bg-white dark:bg-[#1a2234] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col h-full overflow-hidden relative">
       {/* ─────────────────────────────────────────────────────────────
-          1. HEADER & INTEGRATED MULTI-FILTER BAR
+          1. ULTRA-COMPACT TOOLBAR (CONSOLIDATED INTO 1 SLEEK ROW ~28px)
           ───────────────────────────────────────────────────────────── */}
-      <div className="bg-slate-50 dark:bg-gray-800/90 border-b border-gray-200 dark:border-gray-700/80 p-3.5 space-y-3 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Title & Mode */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-                <span>AI Academic Intelligence Advisor</span>
-                <span className="px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 text-[10px] font-black uppercase tracking-wide">
-                  {selectedMode} Mode
-                </span>
-              </h3>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                Scope: <strong className="text-gray-800 dark:text-gray-200 font-bold">{filterSummary}</strong>
-              </p>
-            </div>
+      <div className="bg-slate-50 dark:bg-gray-800/90 border-b border-gray-200 dark:border-gray-700/80 px-2 py-0.5 shrink-0 flex flex-wrap items-center justify-between gap-1 text-[11px] min-h-[30px]">
+        {/* Left: AI Icon + Mode Toggle + Multi-Filter Dropdowns */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </div>
+          <span className="font-black text-gray-900 dark:text-white text-[11px] mr-0.5 hidden sm:inline">
+            Advisor
+          </span>
 
-          {/* Mode Switch, + New Chat & History Drawer Toggle */}
-          <div className="flex items-center gap-2">
-            {/* Mode switch */}
-            <div className="flex items-center bg-gray-200 dark:bg-gray-700 p-1 rounded-xl text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setSelectedMode("CIA")}
-                className={`px-3 py-1 rounded-lg transition ${
-                  selectedMode === "CIA"
-                    ? "bg-white dark:bg-gray-900 text-primary shadow-xs"
-                    : "text-gray-600 dark:text-gray-300"
-                }`}
-              >
-                CIA Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedMode("MCQ")}
-                className={`px-3 py-1 rounded-lg transition ${
-                  selectedMode === "MCQ"
-                    ? "bg-white dark:bg-gray-900 text-primary shadow-xs"
-                    : "text-gray-600 dark:text-gray-300"
-                }`}
-              >
-                MCQ Mode
-              </button>
-            </div>
-
-            {/* + New Chat */}
+          {/* Mode switch */}
+          <div className="flex items-center bg-gray-200 dark:bg-gray-700 p-0.5 rounded-md text-[9px] font-bold">
             <button
               type="button"
-              onClick={handleStartNewChat}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-violet-400 hover:text-primary transition shadow-2xs"
-              title="Start a new chat conversation"
-            >
-              <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>New Chat</span>
-            </button>
-
-            {/* Past History Drawer Toggle */}
-            <button
-              type="button"
-              onClick={() => setShowHistory((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                showHistory
-                  ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+              onClick={() => setSelectedMode("CIA")}
+              className={`px-1.5 py-0.2 rounded transition ${
+                selectedMode === "CIA"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-2xs font-black"
+                  : "text-gray-600 dark:text-gray-300"
               }`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span>History ({sessions.length})</span>
+              CIA
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMode("MCQ")}
+              className={`px-1.5 py-0.2 rounded transition ${
+                selectedMode === "MCQ"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-2xs font-black"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
+            >
+              MCQ
             </button>
           </div>
-        </div>
 
-        {/* ── Filters Row (Multi-Department, Multi-Course, Classroom, Benchmark) ── */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200/70 dark:border-gray-700/70 text-xs">
           {/* 1. Department Multi-Select */}
           <div className="relative">
             <button
@@ -657,17 +625,17 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
                 setOpenCourseDropdown(false);
                 setOpenClassDropdown(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 font-bold text-gray-700 dark:text-gray-200 hover:border-primary transition"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 font-bold text-gray-700 dark:text-gray-200 hover:border-primary transition text-[10px]"
             >
-              <span className="text-[10px] uppercase font-black text-gray-400">Dept:</span>
-              <span>
+              <span className="text-[9px] uppercase font-black text-gray-400">Dept:</span>
+              <span className="max-w-[80px] truncate">
                 {selectedDepts.length === 0
-                  ? "All Departments"
+                  ? "All"
                   : selectedDepts.length === 1
                   ? selectedDepts[0]
-                  : `${selectedDepts.length} Selected`}
+                  : `${selectedDepts.length}`}
               </span>
-              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-2.5 h-2.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -724,7 +692,7 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )}
           </div>
 
-          {/* 2. Course Multi-Select (Can choose any course without restriction) */}
+          {/* 2. Course Multi-Select */}
           <div className="relative">
             <button
               type="button"
@@ -733,17 +701,17 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
                 setOpenDeptDropdown(false);
                 setOpenClassDropdown(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 font-bold text-gray-700 dark:text-gray-200 hover:border-primary transition max-w-[260px] truncate"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 font-bold text-gray-700 dark:text-gray-200 hover:border-primary transition text-[10px] max-w-[140px] truncate"
             >
-              <span className="text-[10px] uppercase font-black text-gray-400">Course:</span>
+              <span className="text-[9px] uppercase font-black text-gray-400">Course:</span>
               <span className="truncate">
                 {selectedCourseCodes.length === 0
-                  ? "All Courses"
+                  ? "All"
                   : selectedCourseCodes.length === 1
                   ? selectedCourseCodes[0]
-                  : `${selectedCourseCodes.length} Courses Selected`}
+                  : `${selectedCourseCodes.length}`}
               </span>
-              <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-2.5 h-2.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -825,7 +793,7 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )}
           </div>
 
-          {/* 3. Classroom Multi-Select (From chosen courses alone!) */}
+          {/* 3. Classroom Multi-Select */}
           <div className="relative">
             <button
               type="button"
@@ -834,17 +802,17 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
                 setOpenDeptDropdown(false);
                 setOpenCourseDropdown(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 font-bold text-gray-700 dark:text-gray-200 hover:border-primary transition max-w-[260px] truncate"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 font-bold text-gray-700 dark:text-gray-200 hover:border-primary transition text-[10px] max-w-[140px] truncate"
             >
-              <span className="text-[10px] uppercase font-black text-gray-400">Class:</span>
+              <span className="text-[9px] uppercase font-black text-gray-400">Class:</span>
               <span className="truncate">
                 {selectedClassIds.length === 0
-                  ? "All Sections"
+                  ? "All"
                   : selectedClassIds.length === 1
-                  ? availableClassrooms.find((cl) => String(cl.id) === selectedClassIds[0])?.name || "1 Section"
-                  : `${selectedClassIds.length} Sections Selected`}
+                  ? availableClassrooms.find((cl) => String(cl.id) === selectedClassIds[0])?.name || "1 Sec"
+                  : `${selectedClassIds.length}`}
               </span>
-              <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-2.5 h-2.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -924,50 +892,82 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
               </div>
             )}
           </div>
+        </div>
 
-          {/* 4. Target Benchmark Slider */}
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="font-bold text-[10px] text-gray-500 uppercase">Benchmark:</span>
+        {/* Right: Target Benchmark Slider + New Chat + History */}
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          {/* Target Benchmark Slider */}
+          <div className="flex items-center gap-1 bg-white dark:bg-gray-900 px-1.5 py-0.2 rounded-md border border-gray-200 dark:border-gray-700">
+            <span className="font-black text-[8px] text-gray-400 uppercase">Target:</span>
             <input
               type="range"
               min="40"
               max="90"
               value={targetBenchmark}
               onChange={(e) => setTargetBenchmark(Number(e.target.value))}
-              className="w-20 accent-primary cursor-pointer"
+              className="w-10 accent-primary cursor-pointer h-0.5"
             />
-            <span className="font-extrabold text-xs text-primary">{targetBenchmark}%</span>
+            <span className="font-black text-[10px] text-primary">{targetBenchmark}%</span>
           </div>
+
+          {/* + New Chat */}
+          <button
+            type="button"
+            onClick={handleStartNewChat}
+            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-violet-400 hover:text-primary transition shadow-none"
+            title="Start new conversation"
+          >
+            <svg className="w-2.5 h-2.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>New</span>
+          </button>
+
+          {/* History Drawer Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowHistory((prev) => !prev)}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition ${
+              showHistory
+                ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+            }`}
+          >
+            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>History ({sessions.length})</span>
+          </button>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          2. CHAT FEED & MESSAGE STREAM (SINGLE CHAT INTERFACE)
+          2. EXPANSIVE READING SECTION (MAXIMUM SCREEN REAL ESTATE ~90%+)
           ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/40 dark:to-[#1a2234]">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-3 py-1.5 space-y-2 bg-gradient-to-b from-gray-50/30 to-white dark:from-gray-900/30 dark:to-[#1a2234]">
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"} space-y-1.5`}
+            className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"} space-y-1`}
           >
             {/* Sender Label & Timestamp */}
-            <div className="flex items-center gap-2 text-[11px] text-gray-400 font-semibold px-1">
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-semibold px-1">
               <span>{msg.sender === "user" ? "You (Principal)" : "AI Academic Advisor"}</span>
               <span>•</span>
               <span>{msg.timestamp}</span>
               {msg.filterBadge && (
-                <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">
+                <span className="px-1.5 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold text-[9px]">
                   {msg.filterBadge}
                 </span>
               )}
             </div>
 
-            {/* Bubble Rendering with MarkdownRenderer (Card support included!) */}
+            {/* Expansive Bubble with Markdown & Card Rendering */}
             <div
-              className={`max-w-3xl p-4 rounded-2xl text-xs leading-relaxed shadow-xs ${
+              className={`w-full max-w-full p-2.5 sm:p-3 rounded-xl text-xs leading-relaxed shadow-none ${
                 msg.sender === "user"
-                  ? "bg-primary text-white rounded-br-xs font-semibold whitespace-pre-wrap"
-                  : "bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-xs w-full"
+                  ? "bg-primary text-white rounded-br-xs font-semibold whitespace-pre-wrap ml-auto max-w-2xl"
+                  : "bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-xs"
               }`}
             >
               {msg.sender === "user" ? (
@@ -980,11 +980,11 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
         ))}
 
         {loading && (
-          <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 w-fit">
-            <div className="w-2 h-2 rounded-full bg-violet-600 animate-bounce" />
-            <div className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce [animation-delay:0.2s]" />
-            <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:0.4s]" />
-            <span className="text-xs font-bold text-gray-500">Synthesizing intelligence & suggestion cards...</span>
+          <div className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 w-fit">
+            <div className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-bounce" />
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-bounce [animation-delay:0.2s]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:0.4s]" />
+            <span className="text-[11px] font-bold text-gray-500">Synthesizing intelligence & suggestion cards...</span>
           </div>
         )}
 
@@ -992,14 +992,14 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          3. QUICK ASKING SUGGESTIONS
+          3. ULTRA-SLIM QUICK SUGGESTIONS BAR (~22px)
           ───────────────────────────────────────────────────────────── */}
-      <div className="px-3 py-2 bg-slate-50/90 dark:bg-gray-800/60 border-t border-gray-200/70 dark:border-gray-700/70 flex items-center gap-1.5 overflow-x-auto text-xs shrink-0">
-        <span className="text-[10px] font-black uppercase text-gray-400 shrink-0 mr-1 flex items-center gap-1">
-          <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="px-2 py-0.5 bg-slate-50/90 dark:bg-gray-800/60 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1 overflow-x-auto text-[10px] shrink-0 h-6.5 min-h-0">
+        <span className="text-[9px] font-black uppercase text-gray-400 shrink-0 mr-0.5 flex items-center gap-0.5">
+          <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          Quick Suggestions:
+          Quick:
         </span>
         <button
           type="button"
@@ -1009,9 +1009,9 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )
           }
           disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+          className="px-1.5 py-0.2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition text-[9px] whitespace-nowrap"
         >
-          💡 Targeted Suggestions
+          💡 Suggestions
         </button>
         <button
           type="button"
@@ -1021,9 +1021,9 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )
           }
           disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+          className="px-1.5 py-0.2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition text-[9px] whitespace-nowrap"
         >
-          🚨 Outlier Faculty & Sections
+          🚨 Outliers
         </button>
         <button
           type="button"
@@ -1033,9 +1033,22 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )
           }
           disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+          className="px-1.5 py-0.2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition text-[9px] whitespace-nowrap"
         >
-          🧠 K1-K6 Bloom's Gaps
+          🧠 Bloom's Gaps
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            handleSendMessage(
+              `Recommend targeted remedial interventions incorporating alternate pedagogies (like Flipped Classroom, Think-Pair-Share, POGIL, and Peer Instruction) for ${filterSummary}`
+            )
+          }
+          disabled={loading}
+          className="px-1.5 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-black hover:border-indigo-400 shrink-0 transition flex items-center gap-0.5 text-[9px] whitespace-nowrap shadow-none"
+        >
+          <span>🎓</span>
+          <span>Alternate Pedagogies</span>
         </button>
         <button
           type="button"
@@ -1045,9 +1058,9 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )
           }
           disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+          className="px-1.5 py-0.2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition text-[9px] whitespace-nowrap"
         >
-          🛠️ Remedial Action Steps
+          🛠️ Remedial
         </button>
         <button
           type="button"
@@ -1057,34 +1070,36 @@ Use the quick inquiry chips below to get **targeted suggestion cards** (teaching
             )
           }
           disabled={loading}
-          className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition"
+          className="px-1.5 py-0.2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:border-violet-400 shrink-0 transition text-[9px] whitespace-nowrap"
         >
-          📝 Test Calibration Tips
+          📝 Test Tips
         </button>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          4. CHAT INPUT BAR
+          4. AUTO-EXTENDING CHAT INPUT SECTION (ULTRA-SLIM BASE ~32px)
           ───────────────────────────────────────────────────────────── */}
       <form
         onSubmit={handleSubmitText}
-        className="p-3 bg-white dark:bg-[#1a2234] border-t border-gray-200 dark:border-gray-800 flex items-center gap-2 shrink-0"
+        className="p-1 sm:px-2 sm:py-1 bg-white dark:bg-[#1a2234] border-t border-gray-100 dark:border-gray-800 flex items-end gap-1.5 shrink-0 transition-all"
       >
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
+          rows={1}
           value={inputPrompt}
-          onChange={(e) => setInputPrompt(e.target.value)}
-          placeholder={`Ask about ${filterSummary} (e.g. why did scores drop, remedial steps, exam tips)...`}
-          className="form-input flex-1 text-xs py-2 px-3.5 rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={`Ask about ${filterSummary} (Type query; Enter to send)...`}
+          className="form-textarea flex-1 text-xs py-1 px-2.5 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 resize-none min-h-[32px] max-h-[140px] overflow-y-auto leading-relaxed focus:ring-1 focus:ring-primary shadow-none"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || !inputPrompt.trim()}
-          className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs transition disabled:opacity-50 shrink-0 flex items-center gap-1.5"
+          className="h-[32px] px-3 rounded-lg text-xs font-black bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-none transition disabled:opacity-50 shrink-0 flex items-center gap-1"
         >
           <span>Send</span>
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>
         </button>
