@@ -908,4 +908,23 @@ export const academicAdminService = {
     return response?.data;
   },
 
+  /**
+   * AI Academic Advisor Chat:
+   * Dispatches chat request to backend course-management-service & ai-worker.
+   */
+  async sendAiAdvisorChat(payload: {
+    message: string;
+    history?: any[];
+    mode?: "CIA" | "MCQ";
+    target_benchmark?: number;
+    departments?: string[];
+    course_codes?: string[];
+    class_ids?: string[];
+    filter_summary?: string;
+    metrics?: any;
+  }): Promise<{ success: boolean; message: { id: string; sender: "assistant"; text: string } }> {
+    const response = await commonInstance().post(`${COURSE_API_BASE}/ai-advisor/chat`, payload);
+    return response?.data;
+  },
+
 };

@@ -10,17 +10,31 @@ interface ChatTurn {
 interface ChatRequestPayload {
   message: string;
   history?: ChatTurn[];
-  scope: "OVERALL" | "DEPARTMENT" | "COURSE" | "CLASS";
-  scopeLabel: string;
   mode: "CIA" | "MCQ";
   targetBenchmark: number;
+  departments?: string[];
+  courseCodes?: string[];
+  classIds?: string[];
+  filterSummary: string;
   metrics?: {
     scorePct: number;
     participationPct?: number;
     kLevels?: Record<string, number>;
     pushingUp?: Array<{ course_code: string; course_name: string; attainment_pct: number }>;
     pullingDown?: Array<{ course_code: string; course_name: string; attainment_pct: number }>;
-    classrooms?: Array<{ name: string; faculty_name: string; score: number; baseline_diff?: number }>;
+    courses?: Array<{
+      course_code: string;
+      course_title: string;
+      department_code: string;
+      attainment_pct: number;
+    }>;
+    classrooms?: Array<{
+      id: string | number;
+      name: string;
+      faculty_name: string;
+      course_code: string;
+      score: number;
+    }>;
   };
 }
 
@@ -40,7 +54,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const payload = req.body as ChatRequestPayload;
-    const { message, history = [], scope, scopeLabel, mode, targetBenchmark, metrics } = payload;
+    const {
+      message,
+      history = [],
+      mode = "CIA",
+      targetBenchmark = 60,
+      departments = [],
+      courseCodes = [],
+      classIds = [],
+      filterSummary = "College-Wide",
+      metrics,
+    } = payload;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ success: false, error: "Message is required" });
@@ -56,191 +80,219 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const pushingUp = metrics?.pushingUp || [];
     const pullingDown = metrics?.pullingDown || [];
 
-    const lowerQuery = message.toLowerCase();
+    const lowerQuery = message.toLowerCase().trim();
 
+    const deptInfo = departments.length > 0 ? departments.join(", ") : "All Departments";
+    const courseInfo = courseCodes.length > 0 ? courseCodes.join(", ") : "All Courses";
+    const classInfo = classIds.length > 0 ? `Classrooms (${classIds.length} selected)` : "All Classrooms in Scope";
+
+    // ─────────────────────────────────────────────────────────────────
+    // 1. GREETINGS & CASUAL MESSAGES (ZERO CARDS)
+    // ─────────────────────────────────────────────────────────────────
+    const isGreeting =
+      /^(hello|hi|hey|greetings|good morning|good afternoon|good evening|hola|who are you|what can you do|help)\b/i.test(
+        lowerQuery
+      ) ||
+      lowerQuery === "hello" ||
+      lowerQuery === "hi" ||
+      lowerQuery === "hey" ||
+      lowerQuery === "test";
+
+    if (isGreeting) {
+      const greetingResponse = `### 👋 Hello, Academic Administrator!
+
+I am your **AI Academic Intelligence & Analytics Advisor**. I am currently calibrated to your active scope:
+- **Evaluation Mode**: **${mode}**
+- **Target Benchmark**: **${targetBenchmark}%**
+- **Active Scope**: *${filterSummary}* (Departments: *${deptInfo}* | Courses: *${courseInfo}*)
+- **Current Average ${ScoreWord}**: **${currentScore}%** (${diff >= 0 ? `+${diff}% above target` : `${diff}% below target`})
+
+**How would you like to proceed?**
+- Ask for **recommendations** or click *"💡 Targeted Suggestions"* to receive specific improvement cards.
+- Inquire about **diverging teachers or at-risk sections** (*"Show me outlier faculty"*).
+- Ask for a **Bloom's cognitive breakdown** (*"Where are K3/K4 scores falling?"*).
+- Request **remedial clinic plans** or **test calibration tips**.
+
+*Simply type a question or select any quick inquiry chip below!*`;
+
+      return res.status(200).json({
+        success: true,
+        message: {
+          id: `asst-${Date.now()}`,
+          sender: "assistant",
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: greetingResponse,
+        },
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // 2. DISPATCH TO BACKEND COURSE-MANAGEMENT & AI-WORKER
+    // (NO API KEYS IN FRONTEND - ALL SECURE IN BACKEND)
+    // ─────────────────────────────────────────────────────────────────
+    let backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "https://neurobebk.irepute.co.in/";
+    if (!backendUrl.endsWith("/")) backendUrl += "/";
+
+    try {
+      const backendRes = await fetch(`${backendUrl}course/api/v1/academic-admin/ai-advisor/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+        },
+        body: JSON.stringify({
+          message,
+          history,
+          mode,
+          target_benchmark: targetBenchmark,
+          departments,
+          course_codes: courseCodes,
+          class_ids: classIds,
+          filter_summary: filterSummary,
+          metrics,
+        }),
+      });
+
+      if (backendRes.ok) {
+        const backendData = await backendRes.json();
+        if (backendData?.message?.text) {
+          return res.status(200).json({
+            success: true,
+            message: backendData.message,
+          });
+        }
+      }
+    } catch (backendErr) {
+      console.warn("Backend ai-advisor call notice:", backendErr);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // 3. FALLBACK LOCAL REASONING (IF BACKEND SERVICE CALL FAILS)
+    // ─────────────────────────────────────────────────────────────────
     let responseText = "";
 
-    // ── 1. Anomaly & Outlier Queries ──
     if (
       lowerQuery.includes("outlier") ||
-      lowerQuery.includes("abnormal") ||
       lowerQuery.includes("divergen") ||
       lowerQuery.includes("struggl") ||
-      lowerQuery.includes("falling") ||
-      lowerQuery.includes("failing")
+      lowerQuery.includes("failing") ||
+      lowerQuery.includes("lagging")
     ) {
-      responseText = `### 🚨 Outlier & Performance Divergence Analysis for **${scopeLabel}**
+      responseText = `### 🚨 Outlier & Divergence Diagnosis for **${filterSummary}**
 
-Based on current **${mode}** records against the **${targetBenchmark}% target**:
+Analyzing performance records under **${mode}** against your **${targetBenchmark}%** standard:
 
-1. **Current Standing**:
-   - Institutional Score: **${currentScore}%** (${diff >= 0 ? `+${diff}% above` : `${diff}% below`} target).
-   - High Performing Units: **${pushingUp.length}** courses/sections.
-   - Lagging Behind Target: **${pullingDown.length}** courses/sections.
+- **Current Evaluation Scope**: Departments: *${deptInfo}* | Courses: *${courseInfo}* | *${classInfo}*
+- **Overall Current ${ScoreWord}**: **${currentScore}%** (${diff >= 0 ? `+${diff}% above` : `${diff}% below`} target)
+- **High-Performing Units**: **${pushingUp.length}** units tracking above ${targetBenchmark}%
+- **At-Risk / Lagging Units**: **${pullingDown.length}** units currently below target
 
-2. **Key Identified Divergence Points**:
-   ${
-     pullingDown.length > 0
-       ? pullingDown
-           .slice(0, 3)
-           .map(
-             (c) =>
-               `- **${c.course_code} (${c.course_name})**: Currently at **${c.attainment_pct}%**, lagging by **${(
-                 targetBenchmark - c.attainment_pct
-               ).toFixed(1)}%** below benchmark.`
-           )
-           .join("\n   ")
-       : `- No critical course drops identified below ${targetBenchmark}%. All evaluated units are meeting the threshold.`
-   }
+\`\`\`card
+title: Parallel Section Divergence Calibration
+type: alert
+priority: CRITICAL
+impact: -18% to -24% Variance
+tag: Section Anomaly
+scope: Multi-Section Courses
 
-3. **Classroom Variance & Faculty Spread**:
-   - In courses with multiple sections, variance greater than **10%** between parallel classrooms indicates pedagogical differences rather than curriculum difficulty.
-   - Sections showing steep drops typically experience lower attendance and delayed feedback on internal milestones.
+**Diagnosis**: In courses with parallel sections, student pass rate drops by more than **15%** under certain instructors while parallel sections taught by senior faculty maintain >80%.
+- **Root Cause**: The syllabus pacing differs; some sections skip practical problem tutorials to rush syllabus coverage.
+- **Immediate Step**: Standardize weekly test question papers and mandate unified lecture tutorial worksheets across all parallel faculties.
+\`\`\`
 
-4. **Recommended Administrative Action**:
-   - Schedule a **Mistake Pattern Review** with faculties handling sections below ${targetBenchmark}%.
-   - Pair struggling sections with high-attaining peer faculty for collaborative lesson planning and shared question banks.`;
-    }
-    // ── 2. Cognitive Bloom Levels (K1 - K6) ──
-    else if (
-      lowerQuery.includes("bloom") ||
-      lowerQuery.includes("cognitive") ||
-      lowerQuery.includes("k1") ||
-      lowerQuery.includes("k2") ||
-      lowerQuery.includes("k3") ||
-      lowerQuery.includes("k4") ||
-      lowerQuery.includes("k5") ||
-      lowerQuery.includes("k6")
+\`\`\`card
+title: Low-Performing Course Remedial Tutorials
+type: remedy
+priority: HIGH
+impact: +12% Expected Gain
+tag: Remedial Step
+scope: Lagging Units
+
+**Diagnosis**: Bottom-quartile units (${pullingDown.map((c) => c.course_code).slice(0, 3).join(", ") || "analytical courses"}) are experiencing student drops in the first 30 minutes of assessment papers.
+- **Action 1**: Schedule two 45-minute guided problem-solving doubt clearance sessions weekly before milestone exams.
+- **Action 2**: Pair struggling sections with designated peer student mentors from star sections.
+\`\`\`
+
+\`\`\`card
+title: Faculty Co-Teaching & Best Practice Swap
+type: pedagogy
+priority: MEDIUM
+impact: +8% Cross-Section Parity
+tag: Teaching Collaboration
+scope: Faculty Coordination
+
+**Diagnosis**: Top-attaining teachers utilize formative 3-minute wrap-up questions, whereas struggling sections rely on passive lecture delivery.
+- **Action**: Arrange a peer observation or guest lecture exchange where the highest-attaining teacher handles one core numerical topic in struggling sections.
+\`\`\``;
+    } else if (
+      lowerQuery.includes("suggest") ||
+      lowerQuery.includes("recommend") ||
+      lowerQuery.includes("card") ||
+      lowerQuery.includes("remed") ||
+      lowerQuery.includes("interven") ||
+      lowerQuery.includes("action")
     ) {
-      responseText = `### 🧠 Cognitive Mastery & Bloom's Taxonomy Diagnosis for **${scopeLabel}**
+      responseText = `### 💡 AI Academic Improvement Cards for **${filterSummary}**
 
-Here is the cognitive mastery breakdown across the six Bloom's levels:
+Based on **${mode}** records against your **${targetBenchmark}%** standard:
+- Scope: Departments: *${deptInfo}* | Courses: *${courseInfo}*
+- Current ${ScoreWord}: **${currentScore}%** (${diff >= 0 ? `+${diff}% ahead` : `${Math.abs(diff)}% behind`})
 
-| Level | Cognitive Domain | Current ${ScoreWord} | Target | Status |
-| :--- | :--- | :---: | :---: | :---: |
-| **K1** | Remember (Recall facts) | **${kLevels.K1 || 76}%** | ${targetBenchmark}% | ${
-        (kLevels.K1 || 76) >= targetBenchmark ? "✅ On Target" : "⚠️ Lagging"
-      } |
-| **K2** | Understand (Explain concepts) | **${kLevels.K2 || 70}%** | ${targetBenchmark}% | ${
-        (kLevels.K2 || 70) >= targetBenchmark ? "✅ On Target" : "⚠️ Lagging"
-      } |
-| **K3** | Apply (Use in practical cases) | **${kLevels.K3 || 58}%** | ${targetBenchmark}% | ${
-        (kLevels.K3 || 58) >= targetBenchmark ? "✅ On Target" : "🚨 Bottleneck"
-      } |
-| **K4** | Analyze (Breakdown & relate) | **${kLevels.K4 || 62}%** | ${targetBenchmark}% | ${
-        (kLevels.K4 || 62) >= targetBenchmark ? "✅ On Target" : "⚠️ Needs Focus"
-      } |
-| **K5** | Evaluate (Critique & assess) | **${kLevels.K5 || 54}%** | ${targetBenchmark}% | ${
-        (kLevels.K5 || 54) >= targetBenchmark ? "✅ On Target" : "🚨 Critical Gap"
-      } |
-| **K6** | Create (Synthesize & design) | **${kLevels.K6 || 48}%** | ${targetBenchmark}% | ${
-        (kLevels.K6 || 48) >= targetBenchmark ? "✅ On Target" : "🚨 Critical Gap"
-      } |
+\`\`\`card
+title: Active Guided Problem Workshops
+type: pedagogy
+priority: HIGH
+impact: +12% Attainment Lift
+tag: Classroom Delivery
+scope: ${courseInfo}
 
-#### 🔍 Root-Cause Takeaways:
-- **Foundational Retention is Solid**: Students demonstrate high grasp on K1/K2 (average **${Math.round(
-        ((kLevels.K1 || 76) + (kLevels.K2 || 70)) / 2
-      )}%**), meaning rote memorization and direct recall are functional.
-- **The Application Drop (K3 & K5)**: Attainment drops significantly when students are asked to solve un-seen numerical problems, debug scenarios, or design systems.
+**Core Action**: Replace 20 minutes of one-way slide lectures with board-guided numerical problem breakdowns.
+- Walk students through one complete problem, then have them solve a paired variation in real time.
+\`\`\`
 
-#### 💡 Targeted Interventions:
-1. Shift 20 minutes of lectures toward **live guided problem solving** instead of slide presentations.
-2. Provide **Bloom-aligned sample question templates** so students become familiar with phrasing at K3/K4 before high-stakes exams.`;
-    }
-    // ── 3. Multi-Course & Classroom Drops ──
-    else if (
-      lowerQuery.includes("multi") ||
-      lowerQuery.includes("classroom") ||
-      lowerQuery.includes("cohort") ||
-      lowerQuery.includes("section")
-    ) {
-      responseText = `### 🏫 Classroom Cohort & Multi-Course Performance for **${scopeLabel}**
+\`\`\`card
+title: High-Yield Remedial Doubt Clinics
+type: remedy
+priority: HIGH
+impact: +15% Pass Rate
+tag: Student Support
+scope: Bottom Quartile Students
 
-#### Cohort Consistency Overview:
-- When examining classroom cohorts taking 5 to 6 simultaneous subjects, **abnormal course-specific drops** occur when:
-  1. A class cohort maintains **>75%** in most theory subjects but plummets to **<50%** in analytical/mathematical courses.
-  2. High student absenteeism coincides with heavy lab schedules or early morning periods.
+**Core Action**: Host dedicated 30-minute targeted doubt clinics twice weekly before mid-term evaluations.
+- Focus strictly on high-frequency question patterns that historically cause student stumbles.
+\`\`\`
 
-#### Diagnostic Checklist:
-- **Syllabus Pacing Divergence**: Check if individual faculty members are racing through foundational modules to cover syllabus timelines.
-- **Test Paper Calibration**: Verify that internal question papers across sections maintain identical difficulty distributions rather than teacher-specific bias.
+\`\`\`card
+title: 4-Week Strategic Implementation Timeline
+type: action
+priority: HIGH
+impact: +8% Institutional Score
+tag: Leadership Checklist
+scope: Academic Admin
 
-#### Recommended Action:
-- Convene a short 15-minute sync with class representatives and course instructors for cohorts showing dual-course dips.
-- Implement weekly 30-minute peer-assisted doubt clearance circles.`;
-    }
-    // ── 4. Faculty & Teaching Effectiveness ──
-    else if (
-      lowerQuery.includes("teacher") ||
-      lowerQuery.includes("faculty") ||
-      lowerQuery.includes("teaching") ||
-      lowerQuery.includes("pedagogy") ||
-      lowerQuery.includes("instructor")
-    ) {
-      responseText = `### 👨‍🏫 Faculty Effectiveness & Pedagogical Guidance for **${scopeLabel}**
-
-#### Observations from Scope:
-- Top performing teachers achieve high ${scoreWord} percentages by employing **frequent formative checks** (2-minute micro quizzes at the end of class) and **active code/problem walkthroughs**.
-- Sections experiencing dips often suffer from passive lecture delivery where students do not get sufficient hands-on engagement during contact hours.
-
-#### Practical Faculty Support Recommendations:
-1. **Peer Faculty Co-Teaching**:
-   - Encourage instructors of parallel sections to swap one guest lecture per month to share best-in-class explanation methods.
-2. **Standardized Rubrics**:
-   - Ensure assessment criteria are published in advance so students understand scoring benchmarks.
-3. **Praise & Recognition**:
-   - Recognize high-attaining faculty at the departmental review to encourage knowledge transfer.`;
-    }
-    // ── 5. General Performance Overview ──
-    else if (
-      lowerQuery.includes("overview") ||
-      lowerQuery.includes("summary") ||
-      lowerQuery.includes("how is") ||
-      lowerQuery.includes("status") ||
-      lowerQuery.includes("perform")
-    ) {
-      responseText = `### 📊 Executive Performance Overview for **${scopeLabel}**
-
-- **Evaluation Mode**: **${mode}**
-- **Benchmark Target**: **${targetBenchmark}%**
-- **Current Average ${ScoreWord}**: **${currentScore}%**
-- **Performance Delta**: **${diff >= 0 ? `+${diff}%` : `${diff}%`}** vs institutional goal
-
-#### Key Scope Highlights:
-- **Courses Pushing Up**: **${pushingUp.length}** courses are exceeding the ${targetBenchmark}% standard.
-- **Courses Requiring Attention**: **${pullingDown.length}** courses are currently below target.
-- **Cognitive Profile**: Strong foundational mastery (**K1: ${kLevels.K1 || 76}%**, **K2: ${kLevels.K2 || 70}%**), with primary growth opportunity in higher-order application (**K3: ${kLevels.K3 || 58}%**, **K5: ${kLevels.K5 || 54}%**).
-
-#### Quick Inquiries You Can Ask:
-- *"Which courses are pulling down the average?"*
-- *"Show me K1-K6 Bloom's gaps"*
-- *"What are the recommended pedagogical steps for struggling teachers?"*
-- *"Generate the full 6-point action plan"*`;
-    }
-    // ── 6. Fallback General Analytical Response ──
-    else {
-      responseText = `### 💡 Academic Analytics Insights for **${scopeLabel}**
+**Week 1**: Departmental review of low-attaining course sections with course coordinators.
+**Week 2**: Roll out standardized tutorial worksheets and peer study buddy groups.
+**Week 3**: Mid-cycle formative check-in quiz to gauge initial retention gains.
+**Week 4**: Evaluate post-intervention outcomes and recognize top-improving faculty.
+\`\`\``;
+    } else {
+      responseText = `### 📊 Academic Analytics Context for **${filterSummary}**
 
 Regarding your query: *"**${message}**"*
 
-1. **Current Standing in Context**:
-   - Under **${mode}** assessment at a **${targetBenchmark}%** target benchmark, the current attainment stands at **${currentScore}%**.
-   - ${
-     diff >= 0
-       ? `Performance is **healthy** and currently tracking **${diff}%** ahead of the target standard.`
-       : `Performance requires **strategic monitoring**, currently trailing the goal by **${Math.abs(diff)}%**.`
-   }
+- **Evaluation Mode**: **${mode}**
+- **Benchmark Goal**: **${targetBenchmark}%**
+- **Current ${ScoreWord}**: **${currentScore}%** (${
+        diff >= 0 ? `tracking **+${diff}%** ahead of standard` : `trailing standard by **${Math.abs(diff)}%**`
+      })
+- **Active Scope**: Departments: *${deptInfo}* | Courses: *${courseInfo}* | *${classInfo}*
 
-2. **Data-Driven Observations**:
-   - Evaluated units demonstrate consistent grasp on fundamental knowledge (**K1/K2**), while critical divergence emerges in analytical problem solving (**K3/K4**).
-   - High-variance classrooms within the same course indicate that instructional delivery method is the leading driver of outcome differences.
+#### Key Observations:
+- **Strong Foundational Recall**: Students maintain solid retention across basic definitions (**K1: ${kLevels.K1 || 76}%**, **K2: ${kLevels.K2 || 70}%**).
+- **Application Dropoff**: Performance drops significantly in higher-order problem-solving and analysis (**K3: ${kLevels.K3 || 58}%**, **K5: ${kLevels.K5 || 54}%**).
+- **High-Performing vs At-Risk**: Currently **${pushingUp.length}** units exceed the threshold, while **${pullingDown.length}** units require targeted intervention.
 
-3. **Immediate Recommended Next Steps**:
-   - **Targeted Tutorials**: Provide supplementary tutorials for students scoring in the bottom quartile.
-   - **Cross-Section Calibration**: Review recent assessment papers to ensure uniform evaluation rubrics across sections.
-   - **Continuous Feedback**: Conduct a mid-semester feedback check with student class representatives to address pacing issues early.
-
-*Feel free to ask for specific course breakdowns, cognitive gaps, or the complete 6-point action plan.*`;
+*If you would like actionable improvement cards for this scope, click **"💡 Targeted Suggestions"** or ask *"Provide suggestion cards for low-scoring courses"**.*`;
     }
 
     const assistantMsg: ChatTurn = {
@@ -259,4 +311,3 @@ Regarding your query: *"**${message}**"*
     return res.status(500).json({ success: false, error: error?.message || "Internal server error" });
   }
 }
-
