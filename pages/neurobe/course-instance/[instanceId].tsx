@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import PrivateRouter from "@/hook/privateRouter";
-import { ArrowLeft, Loader2, BookOpen } from "lucide-react";
+import { ArrowLeft, Loader2, BookOpen, CheckCircle2, Lock } from "lucide-react";
 import ExtractionTab from "@/components/mark-extraction/ExtractionTab";
 import ExtractedViewTab from "@/components/mark-extraction/ExtractedViewTab";
 import ResultPageTab from "@/components/mark-extraction/ResultPageTab";
@@ -11,11 +11,22 @@ import AssignmentUploadTab from "@/components/mark-extraction/AssignmentUploadTa
 import { MarkExtractionService, CiaTestStatus } from "@/services/markExtraction.service";
 import CourseAttainmentReport from "@/components/academic-setup/CourseAttainmentReport";
 import InstanceMCQExecutionTab from "@/components/academic-setup/InstanceMCQExecutionTab";
-import MCQTestExecution from "../ins-mcq-test-execution"
+import MCQTestExecution from "../ins-mcq-test-execution";
+import ClassroomDashboard from "@/components/classroom-dashboard/ClassroomDashboard";
+import UpdateSyllabusCompletionModal from "@/components/classroom-dashboard/UpdateSyllabusCompletionModal";
+import Models from "@/imports/models.import";
+import { getAuthUser } from "@/utils/function.utils";
+
 // Tabs that do NOT need a CIA test selected to render
-const CIA_INDEPENDENT_TABS = new Set(["mcq-test-execution", "assignment-upload", "co-po-attainment"]);
+const CIA_INDEPENDENT_TABS = new Set([
+  "dashboard",
+  "mcq-test-execution",
+  "assignment-upload",
+  "co-po-attainment",
+]);
 
 const TABS = [
+  { id: "dashboard", label: "Dashboard" },
   { id: "mcq-test-execution", label: "MCQ Test Execution" },
   { id: "extraction", label: "Extraction" },
   { id: "extracted-view", label: "Extracted View" },
@@ -29,7 +40,28 @@ function InstanceDashboardPage() {
   const router = useRouter();
   const { courseId, instanceId, tab: queryTab } = router.query;
 
-  const [activeTab, setActiveTab] = useState((queryTab as string) || "mcq-test-execution");
+  const [activeTab, setActiveTab] = useState((queryTab as string) || "dashboard");
+  const [instanceDetail, setInstanceDetail] = useState<any>(null);
+  const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
+  const currentUser = useMemo(() => getAuthUser(), []);
+
+  useEffect(() => {
+    if (!instanceId) return;
+    Models.course_instance
+      .detail(instanceId)
+      .then((data: any) => setInstanceDetail(data))
+      .catch((err: any) => console.error("Failed to fetch instance detail", err));
+  }, [instanceId]);
+
+  const isCreator = useMemo(() => {
+    if (!currentUser || !instanceDetail) return false;
+    const uid = currentUser.id || (currentUser as any)?.sub;
+    return Boolean(
+      uid &&
+      instanceDetail.created_by_id &&
+      String(uid) === String(instanceDetail.created_by_id)
+    );
+  }, [currentUser, instanceDetail]);
 
   useEffect(() => {
     if (queryTab && typeof queryTab === "string") {
@@ -87,28 +119,55 @@ function InstanceDashboardPage() {
 
   return (
     <div
-      className={`flex flex-col bg-gray-50 dark:bg-gray-900 ${activeTab === "co-po-attainment"
-        ? "min-h-full"
-        : "h-[calc(100vh-80px)] overflow-hidden"
-        }`}
+      className={`flex flex-col bg-gray-50 dark:bg-gray-900 ${
+        activeTab === "co-po-attainment" || activeTab === "dashboard"
+          ? "min-h-full"
+          : "h-[calc(100vh-80px)] overflow-hidden"
+      }`}
     >
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-6 pt-6 pb-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-3 mb-1">
-          <button
-            onClick={() => router.push(`/neurobe/course-offering`)}
-            className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-          >
-            <ArrowLeft className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-          </button>
-          <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              Mark Extraction / Course {courseId} / Classroom {instanceId}
-            </p>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
-              Classroom Dashboard
-            </h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push(`/neurobe/course-offering`)}
+              className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+            >
+              <ArrowLeft className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            </button>
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Mark Extraction / Course {courseId} / Classroom {instanceId}
+              </p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                Classroom Dashboard
+              </h1>
+            </div>
+          </div>
+
+          {/* Top Button: Update Syllabus Completion Status */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSyllabusModalOpen(true)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm ${
+                isCreator
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-violet-500/20 active:scale-95"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 border border-gray-200 dark:border-gray-600"
+              }`}
+              title={
+                !isCreator
+                  ? `Only ${instanceDetail?.created_by_name || "the creator"} can update syllabus completion`
+                  : "Update Topic Completion"
+              }
+            >
+              {isCreator ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              ) : (
+                <Lock className="w-3.5 h-3.5 text-amber-500" />
+              )}
+              Update Syllabus Completion Status
+            </button>
           </div>
         </div>
 
@@ -171,13 +230,26 @@ function InstanceDashboardPage() {
       {/* ── Tab Content ──────────────────────────────────────────────────────── */}
       <div
         className={`p-6 ${
-          activeTab === "co-po-attainment"
-            ? "flex-1"
+          activeTab === "co-po-attainment" || activeTab === "dashboard"
+            ? "flex-1 min-h-0 overflow-y-auto"
             : activeTab === "mcq-test-execution"
             ? "flex-1 min-h-0 overflow-y-auto"
             : "flex-1 overflow-hidden"
         }`}
       >
+        {/* Classroom Dashboard — primary intelligence view */}
+        {activeTab === "dashboard" && (
+          <div className="w-full">
+            <ClassroomDashboard
+              instanceId={instanceId as string}
+              courseId={courseId as string}
+              currentUser={currentUser}
+              onOpenSyllabusModal={() => setIsSyllabusModalOpen(true)}
+              isCreator={isCreator}
+              creatorName={instanceDetail?.created_by_name}
+            />
+          </div>
+        )}
 
         {/* MCQ Test Execution — renders independently for this course instance */}
         {activeTab === "mcq-test-execution" && (
@@ -259,6 +331,20 @@ function InstanceDashboardPage() {
           )
         )}
       </div>
+
+      {/* Syllabus Completion Modal */}
+      <UpdateSyllabusCompletionModal
+        isOpen={isSyllabusModalOpen}
+        onClose={() => setIsSyllabusModalOpen(false)}
+        instanceId={instanceId as string}
+        creatorId={instanceDetail?.created_by_id}
+        creatorName={instanceDetail?.created_by_name}
+        currentUser={currentUser}
+        isCreator={isCreator}
+        onCompletionUpdated={() => {
+          // If in dashboard tab, this will naturally reflect on next fetch
+        }}
+      />
     </div>
   );
 }

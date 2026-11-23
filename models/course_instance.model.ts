@@ -159,9 +159,45 @@ const course_instance = {
         return promise;
     },
 
-    
+    getSyllabusTopics: (instanceId: any) => {
+        return new Promise<any>((resolve, reject) => {
+            let url = `course-instances/${instanceId}/syllabus-topics`;
+            instance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.message || error));
+        });
+    },
 
-    
+    updateSyllabusCompletion: (instanceId: any, data: { topic_id: number; completed_time: number; is_completed?: boolean; notes?: string }) => {
+        return new Promise<any>((resolve, reject) => {
+            let url = `course-instances/${instanceId}/syllabus-completion`;
+            instance()
+                .post(url, data)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.message || error));
+        });
+    },
+
+    getClassroomDashboard: (instanceId: any) => {
+        return new Promise<any>((resolve, reject) => {
+            let url = `course-instances/${instanceId}/classroom-dashboard`;
+            instance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.message || error));
+        });
+    },
+
+    generateAiRemedies: (instanceId: any) => {
+        return new Promise<any>((resolve, reject) => {
+            let url = `course-instances/${instanceId}/ai-remedy`;
+            instance()
+                .post(url, {})
+                .then((res) => resolve(res.data))
+                .catch((error) => reject(error.response?.data?.message || error.response?.data?.detail || error.message || error));
+        });
+    },
 };
 
 export default course_instance;
