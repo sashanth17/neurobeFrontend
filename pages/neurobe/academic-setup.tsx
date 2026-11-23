@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import { Settings, Home } from "lucide-react";
@@ -94,6 +94,7 @@ const AcademicSetup = () => {
   });
 
   const debouncedSearch = useDebounce(state.search, 500);
+  const autoOpenedRef = useRef(false);
 
   useEffect(() => {
     if (router.isReady) {
@@ -160,18 +161,40 @@ const AcademicSetup = () => {
   // ── modal helpers ──────────────────────────────────────────────────────────
   const openCreate = () => setState({ showModal: true, editRow: null });
   const openEdit = (row: any) => setState({ showModal: true, editRow: row });
-  const closeModal = () => setState({ showModal: false, editRow: null });
+  const closeModal = () => {
+    setState({ showModal: false, editRow: null });
+    // Clear edit_id / code from URL if present so modal does not auto re-open
+    if (router.query.edit_id || router.query.code) {
+      const { edit_id, code, ...restQuery } = router.query;
+      router.replace(
+        {
+          pathname: router.pathname,
+          query: restQuery,
+        },
+        undefined,
+        { shallow: true }
+      );
+    }
+  };
 
-  // ── Select Options derived from Live Lists ─────────────────────────────────
-  const departmentOptions = (state.departmentList ?? []).map((d: any) => ({
-    value: d.id,
-    label: d.department_name || d.name || d.department_short_name || d.code || `Department ${d.id}`,
-  }));
+  // ── Select Options derived from Live Lists (Memoized to prevent render loops) ──
+  const departmentOptions = useMemo(
+    () =>
+      (state.departmentList ?? []).map((d: any) => ({
+        value: d.id,
+        label: d.department_name || d.name || d.department_short_name || d.code || `Department ${d.id}`,
+      })),
+    [state.departmentList]
+  );
 
-  const programmeOptions = (state.programmeList ?? []).map((p: any) => ({
-    value: p.id,
-    label: p.programme_name || p.name || p.short_name || p.code || `Programme ${p.id}`,
-  }));
+  const programmeOptions = useMemo(
+    () =>
+      (state.programmeList ?? []).map((p: any) => ({
+        value: p.id,
+        label: p.programme_name || p.name || p.short_name || p.code || `Programme ${p.id}`,
+      })),
+    [state.programmeList]
+  );
 
 
   const bodyData = (searchVal = debouncedSearch) => {
@@ -288,16 +311,19 @@ const AcademicSetup = () => {
         })
       );
 
-      // Auto-open Edit Course modal if edit_id or code query parameter is passed
+      // Auto-open Edit Course modal once if edit_id or code query parameter is passed
       const editIdParam = router.query.edit_id ? String(router.query.edit_id) : null;
       const codeParam = router.query.code ? String(router.query.code) : null;
 
       let targetCourse: any = null;
-      if (editIdParam || codeParam) {
+      if ((editIdParam || codeParam) && !autoOpenedRef.current) {
         targetCourse = enrichedList.find((c: any) =>
           (editIdParam && String(c.id) === editIdParam) ||
           (codeParam && (String(c.code || "").toLowerCase() === codeParam.toLowerCase() || String(c.course_code || "").toLowerCase() === codeParam.toLowerCase()))
         );
+        if (targetCourse) {
+          autoOpenedRef.current = true;
+        }
       }
 
       setState({

@@ -141,6 +141,21 @@ const department = {
         });
         return promise;
     },
+
+    getDepartmentDashboard: (departmentId: any) => {
+        return new Promise((resolve, reject) => {
+            instance()
+                .get(`departments/${departmentId}/department-dashboard`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.detail || error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+    },
 };
 
 export default department;

@@ -9,6 +9,8 @@ import Models from "@/imports/models.import";
 import { ROLES } from "@/utils/constant.utils";
 import PDFUploadDropzone from "./PDFUploadDropzone";
 
+const EMPTY_OPTIONS: any[] = [];
+
 // ─── Body scroll lock ─────────────────────────────────────────────────────────
 const useLockBodyScroll = (active: boolean) => {
   useEffect(() => {
@@ -532,116 +534,127 @@ export const CreateCourseModal = ({
     showUploadModal: false,
   });
 
+  const courseInitializedRef = useRef<any>(null);
+
   useEffect(() => {
-    if (open) {
-      // Load faculties for coordinator and instructor dropdowns using dedicated endpoint
-      Models.faculty
-        .dropdown()
-        .then((faculties: any[]) => {
-          const opts = (faculties || []).map((f: any) => {
-            const facultyId = f.id ?? f.faculty_id;
-            const name =
-              f.name ||
-              `${f.first_name || ""} ${f.last_name || ""}`.trim() ||
-              f.email ||
-              `Faculty #${facultyId}`;
-            const secondary = f.email || f.register_number;
-            const label = secondary && secondary !== name ? `${name} (${secondary})` : name;
-            return {
-              value: facultyId,
-              label,
-              id: facultyId,
-              faculty_id: facultyId,
-              name,
-              email: f.email,
-              register_number: f.register_number,
-              department_id: f.department_id,
-              role: f.role,
-            };
-          });
-          setState({ facultyOptions: opts });
-        })
-        .catch((err) => console.error("Failed to load faculties dropdown", err));
-
-      if (initialData) {
-        setState({
-          code: initialData.course_code || initialData.code || "",
-          title: initialData.course_title || initialData.title || "",
-          status: initialData.status
-            ? { value: initialData.status, label: initialData.status }
-            : { value: "Active", label: "Active" },
-          coordinator: null,
-          instructors: [],
-          selectedInstructorToAdd: null,
-        });
-
-        if (initialData.id) {
-          Models.faculty
-            .getCourseAssignments(initialData.id)
-            .then((res: any) => {
-              let coordObj = null;
-              const coordFacultyId = res?.coordinator?.faculty_id ?? res?.coordinator?.id ?? null;
-              if (res?.coordinator) {
-                const coord = res.coordinator;
-                const facultyId = coordFacultyId;
-                const name = coord.name || `Faculty #${facultyId}`;
-                const secondary = coord.register_number || coord.email;
-                const label = secondary ? `${name} (${secondary})` : name;
-                coordObj = {
-                  value: facultyId,
-                  label,
-                  id: facultyId,
-                  faculty_id: facultyId,
-                  name,
-                  email: coord.email,
-                  register_number: coord.register_number,
-                  role: coord.role,
-                };
-              }
-              const instructorsList = Array.isArray(res?.instructors)
-                ? res.instructors
-                  .filter((ins: any) => {
-                    const fId = ins.faculty_id ?? ins.id;
-                    return !coordFacultyId || fId !== coordFacultyId;
-                  })
-                  .map((ins: any) => {
-                    const facultyId = ins.faculty_id ?? ins.id;
-                    const name = ins.name || `Faculty #${facultyId}`;
-                    const secondary = ins.register_number || ins.email;
-                    const label = secondary ? `${name} (${secondary})` : name;
-                    return {
-                      value: facultyId,
-                      label,
-                      id: facultyId,
-                      faculty_id: facultyId,
-                      name,
-                      email: ins.email,
-                      register_number: ins.register_number,
-                      role: ins.role,
-                    };
-                  })
-                : [];
-              setState({
-                coordinator: coordObj,
-                instructors: instructorsList,
-              });
-            })
-            .catch((err) =>
-              console.error("Failed to load assignments for course", err)
-            );
-        }
-      } else {
-        setState({
-          code: "",
-          title: "",
-          status: { value: "Active", label: "Active" },
-          coordinator: null,
-          instructors: [],
-          selectedInstructorToAdd: null,
-        });
-      }
+    if (!open) {
+      courseInitializedRef.current = null;
+      return;
     }
-  }, [open, initialData]);
+
+    // Load faculties for coordinator and instructor dropdowns if not loaded yet
+    Models.faculty
+      .dropdown()
+      .then((faculties: any[]) => {
+        const opts = (faculties || []).map((f: any) => {
+          const facultyId = f.id ?? f.faculty_id;
+          const name =
+            f.name ||
+            `${f.first_name || ""} ${f.last_name || ""}`.trim() ||
+            f.email ||
+            `Faculty #${facultyId}`;
+          const secondary = f.email || f.register_number;
+          const label = secondary && secondary !== name ? `${name} (${secondary})` : name;
+          return {
+            value: facultyId,
+            label,
+            id: facultyId,
+            faculty_id: facultyId,
+            name,
+            email: f.email,
+            register_number: f.register_number,
+            department_id: f.department_id,
+            role: f.role,
+          };
+        });
+        setState({ facultyOptions: opts });
+      })
+      .catch((err) => console.error("Failed to load faculties dropdown", err));
+
+    const currentKey = initialData?.id ? `edit-${initialData.id}` : "new";
+    if (courseInitializedRef.current === currentKey) {
+      return;
+    }
+    courseInitializedRef.current = currentKey;
+
+    if (initialData) {
+      setState({
+        code: initialData.course_code || initialData.code || "",
+        title: initialData.course_title || initialData.title || "",
+        status: initialData.status
+          ? { value: initialData.status, label: initialData.status }
+          : { value: "Active", label: "Active" },
+        coordinator: null,
+        instructors: [],
+        selectedInstructorToAdd: null,
+      });
+
+      if (initialData.id) {
+        Models.faculty
+          .getCourseAssignments(initialData.id)
+          .then((res: any) => {
+            let coordObj = null;
+            const coordFacultyId = res?.coordinator?.faculty_id ?? res?.coordinator?.id ?? null;
+            if (res?.coordinator) {
+              const coord = res.coordinator;
+              const facultyId = coordFacultyId;
+              const name = coord.name || `Faculty #${facultyId}`;
+              const secondary = coord.register_number || coord.email;
+              const label = secondary ? `${name} (${secondary})` : name;
+              coordObj = {
+                value: facultyId,
+                label,
+                id: facultyId,
+                faculty_id: facultyId,
+                name,
+                email: coord.email,
+                register_number: coord.register_number,
+                role: coord.role,
+              };
+            }
+            const instructorsList = Array.isArray(res?.instructors)
+              ? res.instructors
+                .filter((ins: any) => {
+                  const fId = ins.faculty_id ?? ins.id;
+                  return !coordFacultyId || fId !== coordFacultyId;
+                })
+                .map((ins: any) => {
+                  const facultyId = ins.faculty_id ?? ins.id;
+                  const name = ins.name || `Faculty #${facultyId}`;
+                  const secondary = ins.register_number || ins.email;
+                  const label = secondary ? `${name} (${secondary})` : name;
+                  return {
+                    value: facultyId,
+                    label,
+                    id: facultyId,
+                    faculty_id: facultyId,
+                    name,
+                    email: ins.email,
+                    register_number: ins.register_number,
+                    role: ins.role,
+                  };
+                })
+              : [];
+            setState({
+              coordinator: coordObj,
+              instructors: instructorsList,
+            });
+          })
+          .catch((err) =>
+            console.error("Failed to load assignments for course", err)
+          );
+      }
+    } else {
+      setState({
+        code: "",
+        title: "",
+        status: { value: "Active", label: "Active" },
+        coordinator: null,
+        instructors: [],
+        selectedInstructorToAdd: null,
+      });
+    }
+  }, [open, initialData?.id]);
 
   const handleCoordinatorChange = (v: any) => {
     setState({
@@ -956,7 +969,7 @@ export const CreateDepartmentModal = ({
   initialData,
   onSubmit,
   submitting = false,
-  facultyOptions = [],
+  facultyOptions = EMPTY_OPTIONS,
 }: DeptModalProps) => {
   const isEdit = !!initialData;
   const [facultyList, setFacultyList] = useState<{ value: number | string; label: string }[]>(facultyOptions);
@@ -967,10 +980,13 @@ export const CreateDepartmentModal = ({
     hod: null as any,
   });
 
+  const facultyFetchedRef = useRef(false);
+
   useEffect(() => {
     if (facultyOptions && facultyOptions.length > 0) {
       setFacultyList(facultyOptions);
-    } else if (open) {
+    } else if (open && !facultyFetchedRef.current) {
+      facultyFetchedRef.current = true;
       Models.faculty
         .dropdown()
         .then((faculties: any[]) => {
@@ -987,6 +1003,10 @@ export const CreateDepartmentModal = ({
   }, [open, facultyOptions]);
 
   useEffect(() => {
+    if (!open) {
+      facultyFetchedRef.current = false;
+      return;
+    }
     if (initialData) {
       const hodVal = initialData.hod_id ?? initialData.hod_user_id;
       let matchedHod = null;
@@ -1008,7 +1028,20 @@ export const CreateDepartmentModal = ({
     } else {
       setState({ code: "", name: "", status: { value: "Active", label: "Active" }, hod: null });
     }
-  }, [initialData, open, facultyList]);
+  }, [open, initialData?.id, initialData?.department_name, initialData?.department_short_name, initialData?.status, initialData?.hod_id]);
+
+  // When facultyList finishes loading, backfill hod label if needed
+  useEffect(() => {
+    if (open && initialData && facultyList.length > 0) {
+      const hodVal = initialData.hod_id ?? initialData.hod_user_id;
+      if (hodVal && (!state.hod || !state.hod.label || state.hod.label.startsWith("Faculty #"))) {
+        const matched = facultyList.find((f) => String(f.value) === String(hodVal));
+        if (matched) {
+          setState({ hod: matched });
+        }
+      }
+    }
+  }, [facultyList, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1269,7 +1302,7 @@ export const CreateBatchModal = ({
   initialData,
   onSubmit,
   submitting = false,
-  programmeOptions = [],
+  programmeOptions = EMPTY_OPTIONS,
 }: BatchModalProps) => {
   const isEdit = !!initialData;
 
@@ -1778,8 +1811,8 @@ export const CreatePSOModal = ({
   initialData,
   onSubmit,
   submitting = false,
-  departmentOptions = [],
-  programmeOptions = [],
+  departmentOptions = EMPTY_OPTIONS,
+  programmeOptions = EMPTY_OPTIONS,
 }: PSOModalProps) => {
   const isEdit = !!initialData;
   const [state, setState] = useSetState({
