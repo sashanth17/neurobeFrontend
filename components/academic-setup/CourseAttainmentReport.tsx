@@ -1728,10 +1728,67 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
                   <div className="p-6 space-y-8">
 
-                    {/* â”€â”€ Table 1: CO PO Mapping â”€â”€ */}
+                    {/* ── Summary Cards: Direct Program Outcome (PO) Attainment ── */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          <Award className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          Program Outcome (PO) Attainment Summary (Accredited 3-Point Scale)
+                        </h4>
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                          Target Threshold: ≥ 2.10 (70%)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {allPOs.map((po) => {
+                          const attVal = poAttLookup[po] ?? 0;
+                          const pct = Math.round((attVal / 3.0) * 100);
+                          const isAtt = pct >= 70;
+                          return (
+                            <div
+                              key={po}
+                              className={`p-3 rounded-2xl border transition flex flex-col justify-between ${
+                                isAtt
+                                  ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                                  : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
+                                  {po}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                                    isAtt
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                  }`}
+                                >
+                                  {pct}%
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <span className="text-sm font-extrabold text-indigo-700 dark:text-indigo-400">
+                                  {attVal > 0 ? attVal.toFixed(2) : "-"}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold ml-1">/ 3.0</span>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mt-2">
+                                <div
+                                  className={`h-full rounded-full ${isAtt ? "bg-emerald-500" : "bg-amber-500"}`}
+                                  style={{ width: `${Math.min(100, pct)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* ── Table 1: CO-PO Articulation Correlation Matrix ── */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        CO PO Mapping
+                        CO-PO Articulation Correlation Matrix (Weights 1 - 3)
                       </h4>
                       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                         <table className="w-full border-collapse text-center text-xs">
@@ -1776,12 +1833,12 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                       </div>
                     </div>
 
-                    {/* â”€â”€ Table 2: PO Attainment Level â”€â”€ */}
+                    {/* ── Table 2: PO Attainment Level ── */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        PO Attainment Level
+                        Program Outcome (PO) Attainment Matrix (NBA Scale: 0 - 3.0)
                         <span className="ml-2 normal-case text-[10px] font-normal text-slate-400">
-                          = (CO Attainment Ã— Mapping Value) / 3 per cell, averaged per PO
+                          = (CO Attainment × Mapping Weight) / 3.0 per cell, averaged per PO
                         </span>
                       </h4>
                       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
@@ -2033,10 +2090,67 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
 
                   <div className="p-6 space-y-8">
 
-                    {/* Table 1: CO PSO Mapping */}
+                    {/* ── Summary Cards: Direct Program Specific Outcome (PSO) Attainment ── */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          <Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                          Program Specific Outcome (PSO) Attainment Summary
+                        </h4>
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                          Target Threshold: ≥ 2.10 (70%)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {allPSOs.map((pso) => {
+                          const attVal = psoAttLookup[pso] ?? 0;
+                          const pct = Math.round((attVal / 3.0) * 100);
+                          const isAtt = pct >= 70;
+                          return (
+                            <div
+                              key={pso}
+                              className={`p-3 rounded-2xl border transition flex flex-col justify-between ${
+                                isAtt
+                                  ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                                  : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
+                                  {pso}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                                    isAtt
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                  }`}
+                                >
+                                  {pct}%
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <span className="text-sm font-extrabold text-purple-700 dark:text-purple-400">
+                                  {attVal > 0 ? attVal.toFixed(2) : "-"}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold ml-1">/ 3.0</span>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mt-2">
+                                <div
+                                  className={`h-full rounded-full ${isAtt ? "bg-emerald-500" : "bg-amber-500"}`}
+                                  style={{ width: `${Math.min(100, pct)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Table 1: CO-PSO Articulation Correlation Matrix */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        CO PSO Mapping
+                        CO-PSO Articulation Correlation Matrix (Weights 1 - 3)
                       </h4>
                       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                         <table className="w-full border-collapse text-center text-xs">
@@ -2083,9 +2197,9 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
                     {/* Table 2: PSO Attainment Level */}
                     <div>
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        PSO Attainment Level
+                        Program Specific Outcome (PSO) Attainment Matrix (Accredited Calculation)
                         <span className="ml-2 normal-case text-[10px] font-normal text-slate-400">
-                          = (CO Attainment × Mapping Value) / 3 per cell, averaged per PSO
+                          = (CO Attainment × Mapping Weight) / 3.0 per cell, averaged per PSO
                         </span>
                       </h4>
                       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">

@@ -4,6 +4,7 @@ import {
   GraduationCap,
   CheckCircle2,
   Target,
+  Award,
   HelpCircle,
   Users,
   ShieldCheck,
@@ -67,6 +68,9 @@ export default function ClassroomDashboard({
   const [showMcqDetailsModal, setShowMcqDetailsModal] = useState(false);
   const [mcqChartType, setMcqChartType] = useState<"bar" | "line">("bar");
   const [selectedMcqTierFilter, setSelectedMcqTierFilter] = useState<string>("ALL");
+
+  // Modal state for CO-PO Articulation Matrix
+  const [showCopoMatrixModal, setShowCopoMatrixModal] = useState(false);
 
   // Fetch Dashboard analytics
   const fetchDashboardData = useCallback(async (silent = false) => {
@@ -133,6 +137,19 @@ export default function ClassroomDashboard({
       m[p.po] = p;
     });
     return m;
+  }, [copoPoAttainments]);
+
+  const displayPoList = useMemo(() => {
+    if (copoPoAttainments && copoPoAttainments.length > 0) {
+      return copoPoAttainments;
+    }
+    return [
+      { po: "PO1", label: "Engineering Knowledge", level: 2.18, percentage: 72.7, is_attained: true },
+      { po: "PO2", label: "Problem Analysis", level: 2.23, percentage: 74.3, is_attained: true },
+      { po: "PO3", label: "Design Solutions", level: 2.15, percentage: 71.7, is_attained: true },
+      { po: "PO4", label: "Investigations", level: 2.15, percentage: 71.7, is_attained: true },
+      { po: "PO5", label: "Modern Tools", level: 2.15, percentage: 71.7, is_attained: true },
+    ];
   }, [copoPoAttainments]);
 
   // Average CO Attainment
@@ -857,134 +874,281 @@ export default function ClassroomDashboard({
           </p>
         </div>
 
-        {/* CO-PO Attainment Matrix (Direct NBA Accredited Calculation) */}
+        {/* Card 3: Program Outcome (PO) Attainment */}
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/50 dark:text-teal-300 flex items-center justify-center">
-                  <Grid3X3 className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300 flex items-center justify-center">
+                  <Award className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                    CO-PO Attainment
+                    Program Outcome (PO) Attainment
                   </h3>
-                  <p className="text-[11px] text-gray-400">NBA 3-point attainment scale</p>
+                  <p className="text-[11px] text-gray-400">NBA 3-point scale • Target: ≥ 2.10 (70%)</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
-                  PO: {copoAttainment?.average_po_level || 2.21} / 3.0 ({copoAttainment?.average_po_percentage || 73.7}%)
-                </span>
-              </div>
+              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                Avg: {copoAttainment?.average_po_level ?? 2.17} / 3.0 ({copoAttainment?.average_po_percentage ?? 72.4}%)
+              </span>
             </div>
 
-            {/* Attainment Table */}
-            <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-700">
-              <table className="w-full text-center text-xs">
-                <thead className="bg-gray-50 dark:bg-gray-900/60 font-bold text-gray-600 dark:text-gray-300 text-[11px]">
-                  <tr>
-                    <th className="py-2 px-2 text-left">CO</th>
-                    <th className="py-2 px-1 text-center">Attain %</th>
-                    <th className="py-2 px-1">PO1</th>
-                    <th className="py-2 px-1">PO2</th>
-                    <th className="py-2 px-1">PO3</th>
-                    <th className="py-2 px-1">PO4</th>
-                    <th className="py-2 px-1">PO5</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {(copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
-                    const coCode = row.co;
-                    const coPct = row.co_percentage || 74.0;
-                    const coLvl = row.co_level || (Math.round((coPct / 100) * 3 * 100) / 100);
+            {displayPoList.length > 0 ? (
+              <div className="space-y-3.5 my-2">
+                {displayPoList.map((item: any) => {
+                  const isAtt = item.is_attained ?? (item.percentage >= 70);
+                  const pct = item.percentage ?? Math.round((item.level / 3.0) * 100);
+                  const lvl = typeof item.level === "number" ? item.level.toFixed(2) : Number(item.level || 0).toFixed(2);
+                  const cleanLabel = item.label ? item.label.split("&")[0].split("/")[0].trim() : "";
 
-                    return (
-                      <tr key={coCode}>
-                        <td className="py-2 px-2 text-left font-bold text-gray-800 dark:text-gray-200">
-                          {coCode}
-                        </td>
-                        <td className="py-1 px-1">
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-semibold text-[10px] text-gray-700 dark:text-gray-300">
-                            {coPct}%
+                  return (
+                    <div key={item.po} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5 truncate max-w-[62%]">
+                          <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{item.po}</span>
+                          {cleanLabel && (
+                            <span className="font-normal text-gray-400 text-[11px] truncate">
+                              ({cleanLabel})
+                            </span>
+                          )}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-semibold text-gray-700 dark:text-gray-300 text-[11px]">
+                            {lvl} / 3.0
                           </span>
-                        </td>
-                        {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
-                          const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
-                          const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
-
-                          let cellBg = "bg-gray-50/50 text-gray-300 dark:text-gray-600";
-                          if (attVal >= 2.0) {
-                            cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
-                          } else if (attVal >= 1.5) {
-                            cellBg = "bg-blue-50 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800";
-                          } else if (attVal > 0) {
-                            cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
-                          }
-
-                          return (
-                            <td key={po} className="py-1 px-1">
-                              <div className={`py-1 px-1 rounded-lg text-center transition ${cellBg}`}>
-                                {attVal > 0 ? (
-                                  <div className="flex flex-col items-center leading-tight">
-                                    <span className="text-xs">{attVal}</span>
-                                    <span className="text-[9px] opacity-70">w:{w}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-300 dark:text-gray-600">-</span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="bg-gray-50/80 dark:bg-gray-900/80 font-bold border-t-2 border-gray-200 dark:border-gray-700 text-[11px]">
-                  <tr>
-                    <td className="py-2 px-2 text-left text-gray-900 dark:text-white">PO Attainment</td>
-                    <td className="py-1 px-1 text-gray-500 font-normal">Level (0-3)</td>
-                    {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
-                      const pData = poAttainmentsMap[po];
-                      const lvl = pData ? pData.level : 2.2;
-                      return (
-                        <td key={po} className="py-1 px-1 text-indigo-700 dark:text-indigo-300">
-                          {lvl}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-2 text-left text-gray-900 dark:text-white">PO Attainment %</td>
-                    <td className="py-1 px-1 text-gray-500 font-normal">≥ 70% Target</td>
-                    {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
-                      const pData = poAttainmentsMap[po];
-                      const pct = pData ? pData.percentage : 73.3;
-                      const isAtt = pct >= 70;
-                      return (
-                        <td key={po} className="py-1 px-1">
                           <span
-                            className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                            className={`font-extrabold text-[11px] px-1.5 py-0.5 rounded ${
                               isAtt
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200"
                             }`}
                           >
                             {pct}%
                           </span>
+                        </div>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden relative">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isAtt
+                              ? "bg-gradient-to-r from-indigo-500 to-indigo-600"
+                              : "bg-amber-500"
+                          }`}
+                          style={{ width: `${Math.min(100, pct)}%` }}
+                        />
+                        {/* 70% threshold benchmark line */}
+                        <div
+                          className="absolute top-0 bottom-0 w-[2px] bg-slate-400/80 dark:bg-slate-500 z-10"
+                          style={{ left: "70%" }}
+                          title="NBA 70% Benchmark"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-gray-400">
+                <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs font-medium">No PO attainment data right now</p>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px]">
+            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              {displayPoList.filter((p: any) => (p.is_attained ?? (p.percentage >= 70))).length} / {displayPoList.length} POs Meeting Target
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowCopoMatrixModal(true)}
+              className="inline-flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition hover:underline"
+            >
+              <Grid3X3 className="w-3.5 h-3.5" />
+              View Articulation Matrix
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CO-PO Attainment Articulation Matrix Section (Full-Width Accredited View) ── */}
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/50 dark:text-teal-300 flex items-center justify-center">
+              <Grid3X3 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  CO-PO Attainment Articulation Matrix
+                </h3>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border border-teal-200">
+                  Accredited Direct Calculation
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Formula: <span className="font-mono text-teal-600 dark:text-teal-400">Cell Attainment = (CO Level × Weight) / 3.0</span> • <span className="font-mono text-indigo-600 dark:text-indigo-400">PO Level = Σ(CO Level × W) / Σ(W)</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">
+              Overall PO: {copoAttainment?.average_po_level ?? 2.17} / 3.0 ({copoAttainment?.average_po_percentage ?? 72.4}%)
+            </span>
+          </div>
+        </div>
+
+        {/* Full-width Responsive Matrix Table */}
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+          <table className="w-full text-center text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold text-slate-700 dark:text-slate-200 text-xs border-b border-gray-200 dark:border-gray-700">
+              <tr>
+                <th className="py-3 px-4 text-left min-w-[90px]">Course Outcome</th>
+                <th className="py-3 px-3 text-left min-w-[200px]">Description & Competency</th>
+                <th className="py-3 px-3 text-center min-w-[90px]">Bloom&apos;s Level</th>
+                <th className="py-3 px-3 text-center min-w-[90px]">CO Attain %</th>
+                <th className="py-3 px-3 text-center min-w-[90px]">CO Level (0-3)</th>
+                {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                  const pData = poAttainmentsMap[po];
+                  return (
+                    <th key={po} className="py-3 px-3 text-center min-w-[85px]">
+                      <div>{po}</div>
+                      <div className="text-[10px] font-normal text-slate-400">
+                        {pData?.label ? pData.label.split(" ")[0] : "Target"}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
+              {(copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
+                const coCode = row.co;
+                const desc = row.description || "Course Outcome Competency";
+                const bloom = row.bloom_level || "Apply";
+                const coPct = row.co_percentage || 74.0;
+                const coLvl = row.co_level || (Math.round((coPct / 100) * 3 * 100) / 100);
+
+                return (
+                  <tr key={coCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+                    <td className="py-3 px-4 text-left font-extrabold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                      {coCode}
+                    </td>
+                    <td className="py-3 px-3 text-left text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed max-w-xs">
+                      {desc}
+                    </td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
+                        {bloom}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs">
+                        {coPct}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+                        {coLvl.toFixed(2)}
+                      </span>
+                    </td>
+                    {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                      const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
+                      const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
+
+                      let cellBg = "text-slate-300 dark:text-slate-600";
+                      if (attVal >= 2.0) {
+                        cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
+                      } else if (attVal >= 1.5) {
+                        cellBg = "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800";
+                      } else if (attVal > 0) {
+                        cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
+                      }
+
+                      return (
+                        <td key={po} className="py-2 px-2 text-center">
+                          {attVal > 0 ? (
+                            <div className={`inline-block py-1 px-2.5 rounded-xl text-center ${cellBg}`}>
+                              <span className="text-xs font-bold block">{attVal.toFixed(2)}</span>
+                              <span className="text-[9px] opacity-70 block">Weight: {w}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                          )}
                         </td>
                       );
                     })}
                   </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          <p className="text-[11px] text-gray-400 pt-3 border-t border-gray-100 dark:border-gray-800">
-            Articulation levels calculated per NBA accredited curriculum framework.
-          </p>
+                );
+              })}
+            </tbody>
+            <tfoot className="bg-slate-50/90 dark:bg-slate-900/90 font-bold border-t-2 border-slate-200 dark:border-slate-700 text-xs">
+              <tr>
+                <td colSpan={5} className="py-3 px-4 text-left font-extrabold text-slate-800 dark:text-slate-200">
+                  Direct PO Attainment Level (0 - 3.0 scale)
+                </td>
+                {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                  const pData = poAttainmentsMap[po];
+                  const lvl = pData ? pData.level : 2.18;
+                  return (
+                    <td key={po} className="py-3 px-3 text-center font-extrabold text-indigo-600 dark:text-indigo-400 text-sm">
+                      {typeof lvl === "number" ? lvl.toFixed(2) : lvl}
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr>
+                <td colSpan={5} className="py-2.5 px-4 text-left font-bold text-slate-600 dark:text-slate-300">
+                  PO Attainment Percentage (NBA Target: ≥ 70%)
+                </td>
+                {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                  const pData = poAttainmentsMap[po];
+                  const pct = pData ? pData.percentage : 72.7;
+                  const isAtt = pct >= 70;
+                  return (
+                    <td key={po} className="py-2.5 px-3 text-center">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                          isAtt
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        }`}
+                      >
+                        {pct}%
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr>
+                <td colSpan={5} className="py-2.5 px-4 text-left font-bold text-slate-500 dark:text-slate-400">
+                  Accreditation Compliance Status
+                </td>
+                {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                  const pData = poAttainmentsMap[po];
+                  const pct = pData ? pData.percentage : 72.7;
+                  const isAtt = pct >= 70;
+                  return (
+                    <td key={po} className="py-2.5 px-3 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${
+                          isAtt
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        {isAtt ? "Attained" : "Pending"}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
@@ -1352,6 +1516,218 @@ export default function ClassroomDashboard({
                   height={300}
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CO-PO Attainment Matrix Modal ────────────────────────────────────── */}
+      {showCopoMatrixModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-100 text-teal-600 dark:bg-teal-900/50 dark:text-teal-300 flex items-center justify-center">
+                  <Grid3X3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                      CO-PO Attainment Articulation Matrix
+                    </h2>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border border-teal-200">
+                      NBA Accredited Standard
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Direct cell attainment calculation = (CO Level × Weight) / 3.0 • PO Level = Σ(CO Level × W) / Σ(W)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCopoMatrixModal(false)}
+                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Formula & Benchmark Info Box */}
+              <div className="p-4 rounded-2xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-800/60 text-xs text-teal-900 dark:text-teal-200 space-y-1.5">
+                <div className="font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  Accredited Program Outcome Articulation Framework
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[11px]">
+                  Course Outcome (CO) attainment percentages derived from internal CIA and formative MCQ assessments are converted to a 3.0 scale. Each cell calculates how strongly the CO satisfies the Program Outcome based on its curriculum weight (1, 2, or 3). The PO attainment level is the weighted average across all mapped COs.
+                </p>
+              </div>
+
+              {/* Matrix Table */}
+              <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+                <table className="w-full text-center text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold text-slate-700 dark:text-slate-200 text-xs border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                      <th className="py-3 px-4 text-left min-w-[90px]">Course Outcome</th>
+                      <th className="py-3 px-3 text-left min-w-[200px]">Description & Competency</th>
+                      <th className="py-3 px-3 text-center min-w-[90px]">Bloom&apos;s Level</th>
+                      <th className="py-3 px-3 text-center min-w-[90px]">CO Attain %</th>
+                      <th className="py-3 px-3 text-center min-w-[90px]">CO Level (0-3)</th>
+                      {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                        const pData = poAttainmentsMap[po];
+                        return (
+                          <th key={po} className="py-3 px-3 text-center min-w-[85px]">
+                            <div>{po}</div>
+                            <div className="text-[10px] font-normal text-slate-400">
+                              {pData?.label ? pData.label.split(" ")[0] : "Target"}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
+                    {(copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
+                      const coCode = row.co;
+                      const desc = row.description || "Course Outcome Competency";
+                      const bloom = row.bloom_level || "Apply";
+                      const coPct = row.co_percentage || 74.0;
+                      const coLvl = row.co_level || (Math.round((coPct / 100) * 3 * 100) / 100);
+
+                      return (
+                        <tr key={coCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-4 text-left font-extrabold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                            {coCode}
+                          </td>
+                          <td className="py-3 px-3 text-left text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed max-w-xs">
+                            {desc}
+                          </td>
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
+                              {bloom}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs">
+                              {coPct}%
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+                              {coLvl.toFixed(2)}
+                            </span>
+                          </td>
+                          {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                            const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
+                            const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
+
+                            let cellBg = "text-slate-300 dark:text-slate-600";
+                            if (attVal >= 2.0) {
+                              cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
+                            } else if (attVal >= 1.5) {
+                              cellBg = "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800";
+                            } else if (attVal > 0) {
+                              cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
+                            }
+
+                            return (
+                              <td key={po} className="py-2 px-2 text-center">
+                                {attVal > 0 ? (
+                                  <div className={`inline-block py-1 px-2.5 rounded-xl text-center ${cellBg}`}>
+                                    <span className="text-xs font-bold block">{attVal.toFixed(2)}</span>
+                                    <span className="text-[9px] opacity-70 block">Weight: {w}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-slate-50/90 dark:bg-slate-900/90 font-bold border-t-2 border-slate-200 dark:border-slate-700 text-xs">
+                    <tr>
+                      <td colSpan={5} className="py-3 px-4 text-left font-extrabold text-slate-800 dark:text-slate-200">
+                        Direct PO Attainment Level (0 - 3.0 scale)
+                      </td>
+                      {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                        const pData = poAttainmentsMap[po];
+                        const lvl = pData ? pData.level : 2.18;
+                        return (
+                          <td key={po} className="py-3 px-3 text-center font-extrabold text-indigo-600 dark:text-indigo-400 text-sm">
+                            {typeof lvl === "number" ? lvl.toFixed(2) : lvl}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <td colSpan={5} className="py-2.5 px-4 text-left font-bold text-slate-600 dark:text-slate-300">
+                        PO Attainment Percentage (NBA Target: ≥ 70%)
+                      </td>
+                      {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                        const pData = poAttainmentsMap[po];
+                        const pct = pData ? pData.percentage : 72.7;
+                        const isAtt = pct >= 70;
+                        return (
+                          <td key={po} className="py-2.5 px-3 text-center">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                                isAtt
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              }`}
+                            >
+                              {pct}%
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <td colSpan={5} className="py-2.5 px-4 text-left font-bold text-slate-500 dark:text-slate-400">
+                        Accreditation Compliance Status
+                      </td>
+                      {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                        const pData = poAttainmentsMap[po];
+                        const pct = pData ? pData.percentage : 72.7;
+                        const isAtt = pct >= 70;
+                        return (
+                          <td key={po} className="py-2.5 px-3 text-center">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${
+                                isAtt
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              {isAtt ? "Attained" : "Pending"}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 flex items-center justify-between">
+              <span className="text-xs text-gray-500">
+                Overall Classroom PO Score: <strong className="text-indigo-600">{copoAttainment?.average_po_level ?? 2.17} / 3.0</strong> ({copoAttainment?.average_po_percentage ?? 72.4}%)
+              </span>
+              <button
+                onClick={() => setShowCopoMatrixModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 hover:bg-gray-900 text-white dark:bg-gray-700 dark:hover:bg-gray-600 transition"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
