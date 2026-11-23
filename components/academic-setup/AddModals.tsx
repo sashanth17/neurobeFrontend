@@ -938,6 +938,7 @@ export interface DepartmentFormData {
   department_name: string;
   department_short_name: string;
   status: string;
+  hod_id?: number | null;
 }
 
 interface DeptModalProps {
@@ -946,6 +947,7 @@ interface DeptModalProps {
   initialData?: any;
   onSubmit: (formData: DepartmentFormData) => void;
   submitting?: boolean;
+  facultyOptions?: { value: number | string; label: string }[];
 }
 
 export const CreateDepartmentModal = ({
@@ -954,26 +956,59 @@ export const CreateDepartmentModal = ({
   initialData,
   onSubmit,
   submitting = false,
+  facultyOptions = [],
 }: DeptModalProps) => {
-  console.log("initialData", initialData)
   const isEdit = !!initialData;
+  const [facultyList, setFacultyList] = useState<{ value: number | string; label: string }[]>(facultyOptions);
   const [state, setState] = useSetState({
     code: "",
     name: "",
     status: { value: "Active", label: "Active" } as any,
+    hod: null as any,
   });
 
   useEffect(() => {
+    if (facultyOptions && facultyOptions.length > 0) {
+      setFacultyList(facultyOptions);
+    } else if (open) {
+      Models.faculty
+        .dropdown()
+        .then((faculties: any[]) => {
+          if (Array.isArray(faculties)) {
+            const mapped = faculties.map((f: any) => ({
+              value: f.id ?? f.faculty_id,
+              label: `${f.name || `${f.first_name || ""} ${f.last_name || ""}`.trim() || f.email}${f.email ? ` (${f.email})` : ""}`,
+            }));
+            setFacultyList(mapped);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [open, facultyOptions]);
+
+  useEffect(() => {
     if (initialData) {
+      const hodVal = initialData.hod_id ?? initialData.hod_user_id;
+      let matchedHod = null;
+      if (hodVal) {
+        matchedHod = facultyList.find((f) => String(f.value) === String(hodVal));
+        if (!matchedHod && (initialData.hod_name || initialData.hod)) {
+          matchedHod = {
+            value: hodVal,
+            label: `${initialData.hod_name || initialData.hod}${initialData.hod_email ? ` (${initialData.hod_email})` : ""}`,
+          };
+        }
+      }
       setState({
         code: initialData.department_short_name ?? initialData.code ?? "",
         name: initialData.department_name ?? initialData.name ?? "",
         status: toOpt(initialData.status?.toLowerCase() === "inactive" ? "Inactive" : "Active"),
+        hod: matchedHod,
       });
     } else {
-      setState({ code: "", name: "", status: { value: "Active", label: "Active" } });
+      setState({ code: "", name: "", status: { value: "Active", label: "Active" }, hod: null });
     }
-  }, [initialData, open]);
+  }, [initialData, open, facultyList]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -990,6 +1025,7 @@ export const CreateDepartmentModal = ({
       department_name: state.name.trim(),
       department_short_name: state.code.trim(),
       status: (state.status?.value ?? "Active").toLowerCase(),
+      hod_id: state.hod?.value ? Number(state.hod.value) : null,
     });
   };
 
@@ -1023,6 +1059,19 @@ export const CreateDepartmentModal = ({
               value={state.status}
               onChange={(v) => setState({ status: v })}
             />
+          </div>
+          <div>
+            <CustomSelect
+              title="Head of Department (HOD)"
+              placeholder="Select Faculty as HOD (Optional)"
+              options={facultyList}
+              value={state.hod}
+              onChange={(v) => setState({ hod: v })}
+              isClearable
+            />
+            <p className="mt-1 text-[11px] text-gray-500">
+              Assign a faculty member as HOD. Assigned HODs can view departmental management in their dashboard.
+            </p>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">

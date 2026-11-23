@@ -271,6 +271,21 @@ const course = {
         });
     },
 
+    my_assigned_departments: (params?: { faculty_id?: number }) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/dashboard/my-departments`;
+            if (params?.faculty_id) {
+                url += `?faculty_id=${params.faculty_id}`;
+            }
+            commonInstance()
+                .get(url)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
     course_portfolio: (courseId: number | string) => {
         return new Promise((resolve, reject) => {
             let url = `course/dashboard/courses/${courseId}/portfolio`;

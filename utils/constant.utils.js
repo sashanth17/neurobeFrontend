@@ -24,6 +24,7 @@ export const ROLES = {
   COURSE_INSTRUCTOR: "Course Instructor",
   STUDENT: "Student",
   FACULTY: "Faculty",
+  HOD: "HOD",
 };
 
 export const DROPDOWN_ROLES = [
@@ -38,6 +39,10 @@ export const DROPDOWN_ROLES = [
   {
     value: ROLES.FACULTY,
     label: "Faculty",
+  },
+  {
+    value: ROLES.HOD,
+    label: "Head of Department (HOD)",
   },
   {
     value: ROLES.STUDENT,
@@ -152,6 +157,12 @@ OwnmenuConfig.FACULTY = [
     href: "/neurobe/my-assigned-courses",
   },
   {
+    type: "link",
+    icon: "IconMenuUsers",
+    label: "My Assigned Departments",
+    href: "/neurobe/my-assigned-departments",
+  },
+  {
     type: "submenu",
     icon: "IconMenuNotes",
     label: "Coordinator",
@@ -250,6 +261,9 @@ OwnmenuConfig.principal = OwnmenuConfig.ACADEMIC_ADMIN;
 OwnmenuConfig["Course Coordinator"] = OwnmenuConfig.COURSE_COORDINATOR;
 OwnmenuConfig["Course Instructor"] = OwnmenuConfig.COURSE_INSTRUCTOR;
 OwnmenuConfig["Faculty"] = OwnmenuConfig.FACULTY;
+OwnmenuConfig["HOD"] = OwnmenuConfig.FACULTY;
+OwnmenuConfig["Head of Department"] = OwnmenuConfig.FACULTY;
+OwnmenuConfig.hod = OwnmenuConfig.FACULTY;
 OwnmenuConfig["Student"] = OwnmenuConfig.STUDENT;
 OwnmenuConfig["Super Admin"] = OwnmenuConfig.ERP_ADMIN;
 OwnmenuConfig.academic_admin = OwnmenuConfig.ACADEMIC_ADMIN;
@@ -287,7 +301,11 @@ export const getMenuByRole = (role) => {
   ) {
     return OwnmenuConfig.COURSE_COORDINATOR;
   }
-  if (normalized === "FACULTY") {
+  if (
+    normalized === "FACULTY" ||
+    normalized === "HOD" ||
+    normalized === "HEAD_OF_DEPARTMENT"
+  ) {
     return OwnmenuConfig.FACULTY;
   }
   if (
@@ -330,7 +348,9 @@ export const getDefaultRouteByRole = (role) => {
     normalized === "COURSE_COORDINATOR" ||
     normalized === "COORDINATOR" ||
     normalized === "COURSE_INSTRUCTOR" ||
-    normalized === "INSTRUCTOR"
+    normalized === "INSTRUCTOR" ||
+    normalized === "HOD" ||
+    normalized === "HEAD_OF_DEPARTMENT"
   ) {
     return "/neurobe/my-assigned-courses";
   }

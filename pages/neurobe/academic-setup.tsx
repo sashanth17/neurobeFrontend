@@ -373,16 +373,18 @@ const AcademicSetup = () => {
     department_name: string;
     department_short_name: string;
     status: string;
+    hod_id?: number | null;
   }) => {
     try {
       setState({ submitting: true });
 
-      const body = {
+      const body: any = {
         organization_id: getOrganizationId(),
         department_name: formData.department_name,
         department_short_name: formData.department_short_name,
         is_approved: true,
         status: formData.status || "active",
+        hod_id: formData.hod_id ?? null,
       };
 
       if (state.editRow?.id) {

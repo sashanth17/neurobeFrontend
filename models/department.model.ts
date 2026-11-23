@@ -119,6 +119,28 @@ const department = {
         });
         return promise;
     },
+
+    my_assigned_departments: (params?: { faculty_id?: number }) => {
+        let promise = new Promise((resolve, reject) => {
+            let url = `departments/my-assigned-departments`;
+            if (params?.faculty_id) {
+                url += `?faculty_id=${params.faculty_id}`;
+            }
+            instance()
+                .get(url)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.detail || error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+        return promise;
+    },
 };
 
 export default department;

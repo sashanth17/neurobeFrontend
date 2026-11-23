@@ -67,6 +67,20 @@ export const makeDepartmentColumns = (onEdit: (r: any) => void, onDelete: (r: an
     ),
   },
   {
+    accessor: "hod",
+    title: "HEAD OF DEPARTMENT (HOD)",
+    render: (row: any) => (
+      <div className="flex flex-col">
+        <span className="font-semibold text-slate-800 dark:text-gray-200">
+          {row.hod_name || row.hod || "—"}
+        </span>
+        {row.hod_email && (
+          <span className="text-[11px] text-slate-400">{row.hod_email}</span>
+        )}
+      </div>
+    ),
+  },
+  {
     accessor: "status",
     title: "STATUS",
     render: (row: any) => <StatusCell status={row.status || "Active"} />,
