@@ -294,7 +294,7 @@ export default function CourseCard(props: any) {
       totalVersions: sPedagogy.totalVers,
       availableVersions: sPedagogy.availableVersions,
       versions: sPedagogy.versions,
-      route: `/neurobe/pedagogy?course_id=${targetCourseId}`,
+      route: `/neurobe/course-artifacts?course_id=${targetCourseId}&tab=pedagogy`,
       artifactsTab: "pedagogy",
       isUnlocked: isSyllabusApproved,
       unlockMessage: "Requires Syllabus Extraction to be approved first.",

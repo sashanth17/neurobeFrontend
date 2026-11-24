@@ -63,6 +63,7 @@ const PedagogyPage = () => {
       try {
         localStorage.setItem("active_course_id", qCid);
       } catch {}
+      router.replace(`/neurobe/course-artifacts?course_id=${qCid}&tab=pedagogy`);
     }
   }, [router.isReady, router.query, courseIdParam]);
 

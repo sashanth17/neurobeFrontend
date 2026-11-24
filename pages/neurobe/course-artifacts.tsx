@@ -368,10 +368,21 @@ const InsCourseArtifacts = () => {
     } else if (activeTab === "pedagogy" && !currentPedagogy && prioritizedPedagogy?.pedagogy_id && !sectionLoading.pedagogy) {
       Models.pedagogy.get(prioritizedPedagogy.pedagogy_id).then((full: any) => {
         setSectionData((prev) => ({ ...prev, pedagogy: full }));
+        if (full?.extractions_id && (!currentExt || currentExt.extractions_id !== full.extractions_id)) {
+          Models.syllabus.get_extraction(full.extractions_id).then((extFull: any) => {
+            setSectionData((p) => ({ ...p, syllabus: extFull }));
+          }).catch(console.error);
+        }
       }).catch(console.error);
     } else if (activeTab === "lesson_plan" && !currentLessonPlan && prioritizedLessonPlan?.lesson_plan_id && !sectionLoading.lesson_plan) {
       Models.lession_plan.get(prioritizedLessonPlan.lesson_plan_id).then((full: any) => {
         setSectionData((prev) => ({ ...prev, lesson_plan: full }));
+      }).catch(console.error);
+    }
+
+    if (activeTab === "pedagogy" && currentPedagogy?.extractions_id && !currentExt?.units && !sectionLoading.syllabus) {
+      Models.syllabus.get_extraction(currentPedagogy.extractions_id).then((extFull: any) => {
+        setSectionData((p) => ({ ...p, syllabus: extFull }));
       }).catch(console.error);
     }
   }, [
@@ -555,11 +566,17 @@ const InsCourseArtifacts = () => {
 
           if (targetVer?.pedagogy_id) {
             try {
-              const full = await Models.pedagogy.get(targetVer.pedagogy_id);
+              const full: any = await Models.pedagogy.get(targetVer.pedagogy_id);
               if (selectedVersionData.pedagogy) {
                 setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
               }
               setSectionData((prev) => ({ ...prev, pedagogy: full }));
+              if (full?.extractions_id) {
+                try {
+                  const ext = await Models.syllabus.get_extraction(full.extractions_id);
+                  setSectionData((prev) => ({ ...prev, syllabus: ext }));
+                } catch { }
+              }
             } catch { }
           }
         } else if (tab === "lesson_plan") {
@@ -657,6 +674,12 @@ const InsCourseArtifacts = () => {
             } catch { }
           }
           setSectionData((prev) => ({ ...prev, pedagogy: act }));
+          if (act?.extractions_id) {
+            try {
+              const ext = await Models.syllabus.get_extraction(act.extractions_id);
+              setSectionData((prev) => ({ ...prev, syllabus: ext }));
+            } catch { }
+          }
         } else if (tab === "lesson_plan") {
           let act = null;
           try {
@@ -4570,6 +4593,15 @@ const InsCourseArtifacts = () => {
                   const renderedSugIds = new Set<number>();
                   const hasUnits = unitsList.length > 0;
 
+                  const BLOOM_LEVELS = [
+                    "K1 - Remember",
+                    "K2 - Understand",
+                    "K3 - Apply",
+                    "K4 - Analyze",
+                    "K5 - Evaluate",
+                    "K6 - Create",
+                  ];
+
                   const renderStrategyCards = (sug: any) => (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="rounded-xl border border-emerald-200/80 bg-white p-3.5 shadow-2xs dark:border-emerald-900/60 dark:bg-slate-900 flex flex-col justify-between">
@@ -4658,67 +4690,322 @@ const InsCourseArtifacts = () => {
                     </div>
                   );
 
+                  const renderEditingForm = (sug: any) => (
+                    <div className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm dark:border-indigo-900/60 dark:bg-slate-900 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-850">
+                        <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                          Edit Strategies for: {sug.topic_name || `Topic #${sug.topic_id}`}
+                        </h5>
+                        <span className="text-[11px] text-slate-400">Specify 3 pedagogical delivery methods</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* Strategy 1 */}
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/30 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20 space-y-2">
+                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            1. Primary Strategy
+                          </span>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Strategy Name</label>
+                            <input
+                              type="text"
+                              value={pedagogyDraft.pedagogy_suggested_1 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_1: e.target.value })}
+                              placeholder="e.g. Direct Instruction & Discussion"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Bloom's Level</label>
+                            <select
+                              value={pedagogyDraft.bloom_level_1 ?? "K2 - Understand"}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_1: e.target.value })}
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            >
+                              {BLOOM_LEVELS.map((lvl) => (
+                                <option key={lvl} value={lvl}>{lvl}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Methodology</label>
+                            <input
+                              type="text"
+                              value={pedagogyDraft.methodology_1 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_1: e.target.value })}
+                              placeholder="e.g. Chalk & Talk, Interactive Slides"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Description</label>
+                            <textarea
+                              rows={2}
+                              value={pedagogyDraft.description_1 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_1: e.target.value })}
+                              placeholder="Brief strategy description"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Strategy 2 */}
+                        <div className="rounded-lg border border-sky-200 bg-sky-50/30 p-3 dark:border-sky-900/50 dark:bg-sky-950/20 space-y-2">
+                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                            2. Alternative Strategy 1
+                          </span>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Strategy Name</label>
+                            <input
+                              type="text"
+                              value={pedagogyDraft.pedagogy_suggested_2 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_2: e.target.value })}
+                              placeholder="e.g. Collaborative Problem Solving"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Bloom's Level</label>
+                            <select
+                              value={pedagogyDraft.bloom_level_2 ?? "K3 - Apply"}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_2: e.target.value })}
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            >
+                              {BLOOM_LEVELS.map((lvl) => (
+                                <option key={lvl} value={lvl}>{lvl}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Methodology</label>
+                            <input
+                              type="text"
+                              value={pedagogyDraft.methodology_2 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_2: e.target.value })}
+                              placeholder="e.g. Think-Pair-Share, Case Study"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Description</label>
+                            <textarea
+                              rows={2}
+                              value={pedagogyDraft.description_2 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_2: e.target.value })}
+                              placeholder="Brief strategy description"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Strategy 3 */}
+                        <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3 dark:border-violet-900/50 dark:bg-violet-950/20 space-y-2">
+                          <span className="rounded bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+                            3. Alternative Strategy 2
+                          </span>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Strategy Name</label>
+                            <input
+                              type="text"
+                              value={pedagogyDraft.pedagogy_suggested_3 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_3: e.target.value })}
+                              placeholder="e.g. Flipped Classroom / Project Work"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Bloom's Level</label>
+                            <select
+                              value={pedagogyDraft.bloom_level_3 ?? "K4 - Analyze"}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_3: e.target.value })}
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            >
+                              {BLOOM_LEVELS.map((lvl) => (
+                                <option key={lvl} value={lvl}>{lvl}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Methodology</label>
+                            <input
+                              type="text"
+                              value={pedagogyDraft.methodology_3 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_3: e.target.value })}
+                              placeholder="e.g. Guided Lab / Demo"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Description</label>
+                            <textarea
+                              rows={2}
+                              value={pedagogyDraft.description_3 ?? ""}
+                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_3: e.target.value })}
+                              placeholder="Brief strategy description"
+                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-850">
+                        <button
+                          type="button"
+                          onClick={() => savePedagogyTopic(sug.id)}
+                          disabled={savingPedagogyTopic}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          <Save className="h-3 w-3" />
+                          <span>{savingPedagogyTopic ? "Saving..." : "Save Strategies"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPedagogyTopicId(null)}
+                          disabled={savingPedagogyTopic}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+
+                  const renderTopicItem = (topicName: string, seqLabel: string, sug: any, key: any) => (
+                    <div
+                      key={key}
+                      className="rounded-lg border border-slate-200/70 bg-slate-50/60 p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5 dark:border-slate-750">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                            {seqLabel}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {topicName}
+                          </span>
+                        </div>
+                        {canEditPedagogy && sug && editingPedagogyTopicId !== sug.id && (
+                          <button
+                            type="button"
+                            onClick={() => startEditPedagogyTopic(sug)}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                          >
+                            <Edit2 className="h-3 w-3 text-indigo-500" />
+                            <span>Edit Strategies</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {sug ? (
+                        editingPedagogyTopicId === sug.id ? (
+                          renderEditingForm(sug)
+                        ) : (
+                          renderStrategyCards(sug)
+                        )
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
+                          No pedagogy strategies recorded for this topic.
+                        </div>
+                      )}
+                    </div>
+                  );
+
+                  const unitsWithTopics = hasUnits ? unitsList.filter((u: any) => (u.topics?.length ?? 0) > 0) : [];
+                  const showByUnits = unitsWithTopics.length > 0;
+
                   return (
                     <div className="space-y-3">
-                      {hasUnits
-                        ? unitsList.map((unit: any, uIdx: number) => {
-                          const uTopics = unit.topics ?? [];
-                          if (uTopics.length === 0) return null;
-
-                          return (
-                            <div
-                              key={unit.id ?? uIdx}
-                              className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
-                                <div className="flex items-center gap-2">
-                                  <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
-                                    Unit {unit.unit_number}
-                                  </span>
-                                  <div>
+                      {showByUnits ? (
+                        <>
+                          {unitsWithTopics.map((unit: any, uIdx: number) => {
+                            const uTopics = unit.topics ?? [];
+                            return (
+                              <div
+                                key={unit.id ?? uIdx}
+                                className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
+                                  <div className="flex items-center gap-2">
+                                    <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                                      Unit {unit.unit_number}
+                                    </span>
                                     <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                                       {unit.unit_title}
                                     </h4>
                                   </div>
                                 </div>
+
+                                <div className="space-y-2">
+                                  {uTopics.map((topic: any, tIdx: number) => {
+                                    const sug = sugByTopicId.get(topic.id);
+                                    if (sug) renderedSugIds.add(sug.id);
+                                    const topicLabel = `Topic ${unit.unit_number}.${topic.learning_sequence ?? tIdx + 1}`;
+                                    return renderTopicItem(topic.topic_name, topicLabel, sug, topic.id ?? tIdx);
+                                  })}
+                                </div>
                               </div>
+                            );
+                          })}
 
-                              <div className="space-y-2">
-                                {uTopics.map((topic: any, tIdx: number) => {
-                                  const sug = sugByTopicId.get(topic.id);
-                                  if (sug) renderedSugIds.add(sug.id);
-
-                                  return (
-                                    <div
-                                      key={topic.id ?? tIdx}
-                                      className="rounded-lg border border-slate-200/70 bg-slate-50/60 p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-2"
-                                    >
-                                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5 dark:border-slate-750">
-                                        <div className="flex items-center gap-2">
-                                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                                            Topic {unit.unit_number}.{topic.learning_sequence ?? tIdx + 1}
-                                          </span>
-                                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                            {topic.topic_name}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {sug ? (
-                                        renderStrategyCards(sug)
-                                      ) : (
-                                        <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
-                                          No pedagogy strategies recorded for this topic.
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                          {/* Any unmatched topic suggestions */}
+                          {(() => {
+                            const unmatched = topicSuggestions.filter((s: any) => !renderedSugIds.has(s.id));
+                            if (unmatched.length === 0) return null;
+                            return (
+                              <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5">
+                                <div className="border-b border-slate-100 pb-2 dark:border-slate-800">
+                                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                    Additional Topic Strategies
+                                  </h4>
+                                </div>
+                                <div className="space-y-2">
+                                  {unmatched.map((sug: any, sIdx: number) => {
+                                    const topicName = sug.topic_name || `Topic #${sug.topic_id}`;
+                                    return renderTopicItem(topicName, `Topic ${sIdx + 1}`, sug, sug.id ?? sIdx);
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })
-                        : null}
+                            );
+                          })()}
+                        </>
+                      ) : topicSuggestions.length > 0 ? (
+                        /* Fallback when units are not structured or not loaded: render topic suggestions directly! */
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                              Curriculum Topic Delivery Strategies ({topicSuggestions.length})
+                            </h4>
+                          </div>
+                          <div className="space-y-2">
+                            {topicSuggestions.map((sug: any, sIdx: number) => {
+                              const topicName = sug.topic_name || `Topic #${sug.topic_id}`;
+                              return renderTopicItem(topicName, `Topic ${sIdx + 1}`, sug, sug.id ?? sIdx);
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Empty state */
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-10 text-center dark:border-slate-800 dark:bg-slate-900">
+                          <Presentation className="h-8 w-8 text-slate-400" />
+                          <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
+                            No Topic Strategies Recorded
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            No pedagogy suggestions have been generated for this version yet.
+                          </p>
+                          {isCoord && (
+                            <button
+                              type="button"
+                              onClick={openGeneratePedagogyModal}
+                              disabled={isPedagogyBusy}
+                              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              <span>Generate Pedagogy</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}

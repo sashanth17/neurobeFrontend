@@ -170,6 +170,9 @@ OwnmenuConfig.FACULTY = [
   },
 ];
 
+OwnmenuConfig.COURSE_COORDINATOR = OwnmenuConfig.FACULTY;
+OwnmenuConfig.COURSE_INSTRUCTOR = OwnmenuConfig.FACULTY;
+
 OwnmenuConfig.STUDENT = [
   {
     type: "link",

@@ -2,7 +2,6 @@ import React from "react";
 import {
   GraduationCap,
   ArrowRight,
-  History,
   ShieldCheck,
   UserCheck,
   Building2,
@@ -56,14 +55,12 @@ export interface AssignedCourseCardProps {
   course: AssignedCourseItem;
   viewMode?: "grid" | "list";
   onOpenCourse?: (courseId: number) => void;
-  onOpenVersionHistory?: (courseId: number) => void;
 }
 
 const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   course,
   viewMode = "grid",
   onOpenCourse,
-  onOpenVersionHistory,
 }) => {
   const router = useRouter();
   const cid = course.course_id;
@@ -80,15 +77,6 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
       onOpenCourse(cid);
     } else {
       router.push(`/neurobe/course-artifacts?course_id=${cid}`);
-    }
-  };
-
-  const handleOpenVersionHistory = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onOpenVersionHistory) {
-      onOpenVersionHistory(cid);
-    } else {
-      router.push(`/neurobe/course-version-history?course_id=${cid}`);
     }
   };
 
@@ -174,17 +162,6 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
               <span>Enter</span>
               <ArrowRight className="h-3 w-3" />
             </button>
-
-            {isCoord && (
-              <button
-                type="button"
-                onClick={handleOpenVersionHistory}
-                title="Version History (Coordinator Only)"
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              >
-                <History className="h-3.5 w-3.5" />
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -262,17 +239,6 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
           <span>{isCoord ? "Manage Workspace" : "View Artifacts"}</span>
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </button>
-
-        {isCoord && (
-          <button
-            type="button"
-            onClick={handleOpenVersionHistory}
-            title="Course Version History (Coordinator Only)"
-            className="flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-          >
-            <History className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
     </div>
   );
