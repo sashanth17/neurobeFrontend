@@ -1,13 +1,12 @@
 import React from "react";
 import {
   GraduationCap,
-  Layers,
   ArrowRight,
-  Sparkles,
   History,
   ShieldCheck,
   UserCheck,
-  Award,
+  Building2,
+  Users,
 } from "lucide-react";
 import { useRouter } from "next/router";
 
@@ -45,6 +44,12 @@ export interface AssignedCourseItem {
   can_edit?: boolean;
   active_versions?: ActiveVersionsData;
   readiness_percentage?: number;
+  // Appended fields
+  is_active?: boolean;
+  status?: string;
+  no_of_classrooms?: number;
+  no_of_instructors?: number;
+  total_students_enrolled?: number;
 }
 
 export interface AssignedCourseCardProps {
@@ -53,84 +58,6 @@ export interface AssignedCourseCardProps {
   onOpenCourse?: (courseId: number) => void;
   onOpenVersionHistory?: (courseId: number) => void;
 }
-
-export const getStatusConfig = (state?: string | null, version?: number | null) => {
-  if (!version && !state) {
-    return {
-      label: "Not Started",
-      bg: "bg-slate-100 dark:bg-slate-800/70",
-      text: "text-slate-500 dark:text-slate-400",
-      border: "border-slate-200/80 dark:border-slate-700/60",
-      dot: "bg-slate-400 dark:bg-slate-500",
-    };
-  }
-  const s = String(state || "").toLowerCase();
-  if (s === "completed" || s === "approved") {
-    return {
-      label: "Ready",
-      bg: "bg-emerald-50 dark:bg-emerald-950/40",
-      text: "text-emerald-700 dark:text-emerald-400",
-      border: "border-emerald-200/80 dark:border-emerald-900/50",
-      dot: "bg-emerald-500",
-    };
-  }
-  if (s === "processing" || s === "generating" || s === "in_progress") {
-    return {
-      label: "Processing",
-      bg: "bg-amber-50 dark:bg-amber-950/40",
-      text: "text-amber-700 dark:text-amber-400",
-      border: "border-amber-200/80 dark:border-amber-900/50",
-      dot: "bg-amber-500 animate-pulse",
-    };
-  }
-  if (s === "redis_queued") {
-    return {
-      label: "Queued",
-      bg: "bg-sky-50 dark:bg-sky-950/40",
-      text: "text-sky-700 dark:text-sky-400",
-      border: "border-sky-200/80 dark:border-sky-900/50",
-      dot: "bg-sky-500 animate-pulse",
-    };
-  }
-  if (s === "failed") {
-    return {
-      label: "Failed",
-      bg: "bg-rose-50 dark:bg-rose-950/40",
-      text: "text-rose-700 dark:text-rose-400",
-      border: "border-rose-200/80 dark:border-rose-900/50",
-      dot: "bg-rose-500",
-    };
-  }
-  return {
-    label: "Draft",
-    bg: "bg-indigo-50 dark:bg-indigo-950/40",
-    text: "text-indigo-700 dark:text-indigo-400",
-    border: "border-indigo-200/80 dark:border-indigo-900/50",
-    dot: "bg-indigo-500",
-  };
-};
-
-export const getReadinessTheme = (readiness: number) => {
-  if (readiness >= 80) {
-    return {
-      badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60",
-      barColor: "bg-gradient-to-r from-emerald-500 to-teal-500",
-      iconColor: "text-emerald-500",
-    };
-  }
-  if (readiness >= 40) {
-    return {
-      badgeBg: "bg-amber-50 text-amber-700 border-amber-200/70 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60",
-      barColor: "bg-gradient-to-r from-amber-500 to-orange-500",
-      iconColor: "text-amber-500",
-    };
-  }
-  return {
-    badgeBg: "bg-indigo-50 text-indigo-700 border-indigo-200/70 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/60",
-    barColor: "bg-gradient-to-r from-indigo-500 to-purple-500",
-    iconColor: "text-indigo-500",
-  };
-};
 
 const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   course,
@@ -141,9 +68,11 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
   const router = useRouter();
   const cid = course.course_id;
   const isCoord = Boolean(course.is_coordinator);
-  const readiness = Math.min(100, Math.max(0, course.readiness_percentage ?? 0));
-  const v = course.active_versions || {};
-  const rTheme = getReadinessTheme(readiness);
+  const isActive = course.is_active !== false && course.status !== "Inactive";
+
+  const classroomsCount = course.no_of_classrooms ?? 0;
+  const instructorsCount = course.no_of_instructors ?? 0;
+  const studentsCount = course.total_students_enrolled ?? 0;
 
   const handleOpenArtifacts = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -163,20 +92,30 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
     }
   };
 
-  const stages = [
-    { key: "syllabus", label: "Syllabus", shortLabel: "Syl", version: v.syllabus_version, state: v.syllabus_state },
-    { key: "extraction", label: "Extraction", shortLabel: "Ext", version: v.extraction_version, state: v.extraction_state },
-    { key: "copo", label: "CO-PO", shortLabel: "COPO", version: v.copo_version, state: v.copo_state },
-    { key: "pedagogy", label: "Pedagogy", shortLabel: "Ped", version: v.pedagogy_version, state: v.pedagogy_state },
-    { key: "lesson_plan", label: "Lesson Plan", shortLabel: "LP", version: v.lesson_plan_version, state: v.lesson_plan_state },
-  ];
+  // Status Badge Component
+  const StatusBadge = () => (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
+        isActive
+          ? "border border-emerald-200/80 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+          : "border border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          isActive ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+        }`}
+      />
+      {isActive ? "Active" : "Inactive"}
+    </span>
+  );
 
-  // List View Layout (High Density, Zero-Scroll Friendly)
+  // List View Layout
   if (viewMode === "list") {
     return (
       <div
         onClick={() => handleOpenArtifacts()}
-        className="group relative flex cursor-pointer flex-col justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs transition-all duration-150 hover:border-indigo-400 hover:bg-slate-50/50 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600 sm:flex-row sm:items-center"
+        className="group relative flex cursor-pointer flex-col justify-between gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition-all duration-150 hover:border-indigo-400 hover:bg-slate-50/50 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600 sm:flex-row sm:items-center"
       >
         {/* Left: Code, Role & Title */}
         <div className="flex-1 min-w-0 space-y-1">
@@ -197,26 +136,7 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
               </span>
             )}
 
-            {course.semester && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                <Layers className="h-3 w-3 text-slate-400" />
-                Sem {course.semester}
-              </span>
-            )}
-
-            {v.credits ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                <Award className="h-3 w-3 text-slate-400" />
-                {v.credits} Cr
-              </span>
-            ) : null}
-
-            {course.programme_name && (
-              <span className="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 md:inline-flex items-center gap-1">
-                <GraduationCap className="h-3 w-3 text-slate-400" />
-                {course.programme_name}
-              </span>
-            )}
+            <StatusBadge />
           </div>
 
           <h3 className="truncate text-sm font-bold text-slate-900 group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400">
@@ -224,44 +144,28 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
           </h3>
         </div>
 
-        {/* Middle: Artifacts Pipeline & Readiness */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden w-24 space-y-1 sm:block">
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-slate-400">Prep</span>
-              <span className="font-bold text-slate-700 dark:text-slate-200">{readiness}%</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-              <div
-                className={`h-full rounded-full ${rTheme.barColor}`}
-                style={{ width: `${readiness}%` }}
-              />
-            </div>
+        {/* Middle: 3 Required Metrics Only */}
+        <div className="flex items-center gap-4 shrink-0 sm:gap-6">
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-[11px] text-slate-400">Classrooms:</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{classroomsCount}</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-1">
-            {stages.map((st) => {
-              const cfg = getStatusConfig(st.state, st.version);
-              const hasVer = typeof st.version === "number" && st.version > 0;
-              return (
-                <div
-                  key={st.key}
-                  title={`${st.label}: ${cfg.label}${hasVer ? ` (v${st.version})` : ""}`}
-                  className={`flex flex-col items-center rounded border px-1.5 py-0.5 text-center ${cfg.bg} ${cfg.border}`}
-                >
-                  <span className="text-[9px] font-bold text-slate-600 dark:text-slate-300">
-                    {st.shortLabel}
-                  </span>
-                  <span className={`text-[8px] font-semibold ${cfg.text}`}>
-                    {hasVer ? `v${st.version}` : "—"}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+            <Users className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-[11px] text-slate-400">Instructors:</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{instructorsCount}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+            <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-[11px] text-slate-400">Students:</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{studentsCount}</span>
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-1 pl-1">
+          <div className="flex items-center gap-1 pl-2 border-l border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={handleOpenArtifacts}
@@ -287,100 +191,69 @@ const AssignedCourseCard: React.FC<AssignedCourseCardProps> = ({
     );
   }
 
-  // Grid View Layout (Ultra Compact, Direct Clickable)
+  // Grid View Layout
   return (
     <div
       onClick={() => handleOpenArtifacts()}
-      className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-600"
+      className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-600"
     >
-      {/* Top accent readiness line */}
-      <div className="absolute inset-x-0 top-0 h-1 bg-slate-100 dark:bg-slate-800">
-        <div
-          className={`h-full transition-all duration-300 ${rTheme.barColor}`}
-          style={{ width: `${readiness}%` }}
-        />
-      </div>
-
       <div>
-        {/* Header Badges & Role */}
-        <div className="flex items-center justify-between gap-1.5 pt-0.5">
-          <div className="flex flex-wrap items-center gap-1">
+        {/* Header: Course Code, Role & Active Status */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center rounded-md border border-indigo-200/60 bg-indigo-50/70 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300">
               {course.course_code}
             </span>
 
             {isCoord ? (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-purple-200/60 bg-purple-50/70 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300">
-                <ShieldCheck className="h-2.5 w-2.5" />
+              <span className="inline-flex items-center gap-1 rounded-md border border-purple-200/60 bg-purple-50/70 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300">
+                <ShieldCheck className="h-3 w-3" />
                 Coordinator
               </span>
             ) : (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-emerald-200/60 bg-emerald-50/70 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-                <UserCheck className="h-2.5 w-2.5" />
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50/70 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <UserCheck className="h-3 w-3" />
                 Instructor
               </span>
             )}
           </div>
 
-          {/* Preparedness Pill */}
-          <div
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${rTheme.badgeBg}`}
-          >
-            <Sparkles className={`h-2.5 w-2.5 ${rTheme.iconColor}`} />
-            <span>{readiness}%</span>
-          </div>
+          <StatusBadge />
         </div>
 
         {/* Course Title */}
         <h3
-          className="mt-2 line-clamp-1 text-sm font-bold tracking-tight text-slate-900 transition-colors group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400"
+          className="mt-3 line-clamp-2 text-sm font-bold tracking-tight text-slate-900 transition-colors group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400 min-h-[2.5rem]"
           title={`${course.course_code} - ${course.course_title}`}
         >
           {course.course_title}
         </h3>
 
-        {/* Compact Metadata Row */}
-        <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-1 min-w-0 truncate">
-            <GraduationCap className="h-3 w-3 shrink-0 text-slate-400" />
-            <span className="truncate">{course.programme_name || course.department_name || "General"}</span>
+        {/* 3 Metrics: Classrooms, Instructors, Total Students Enrolled */}
+        <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5 dark:border-slate-800 dark:bg-slate-850/50">
+          <div className="flex flex-col items-center text-center">
+            <span className="text-[10px] font-medium text-slate-400">Classrooms</span>
+            <span className="mt-0.5 text-sm font-bold text-slate-800 dark:text-slate-100">
+              {classroomsCount}
+            </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0 font-medium">
-            {course.semester && <span>Sem {course.semester}</span>}
-            {v.credits ? <span>{v.credits} Cr</span> : null}
+          <div className="flex flex-col items-center border-x border-slate-200/60 px-1 text-center dark:border-slate-700/60">
+            <span className="text-[10px] font-medium text-slate-400">Instructors</span>
+            <span className="mt-0.5 text-sm font-bold text-slate-800 dark:text-slate-100">
+              {instructorsCount}
+            </span>
           </div>
-        </div>
-
-        {/* 5-Artifact Pipeline Snapshot */}
-        <div className="mt-2.5 border-t border-slate-100 pt-2 dark:border-slate-800">
-          <div className="grid grid-cols-5 gap-1">
-            {stages.map((st) => {
-              const cfg = getStatusConfig(st.state, st.version);
-              const hasVer = typeof st.version === "number" && st.version > 0;
-              return (
-                <div
-                  key={st.key}
-                  title={`${st.label}: ${cfg.label}${hasVer ? ` (v${st.version})` : ""}`}
-                  className={`flex flex-col items-center justify-between rounded border p-1 text-center ${cfg.bg} ${cfg.border}`}
-                >
-                  <span className="truncate text-[9px] font-bold text-slate-700 dark:text-slate-300">
-                    {st.shortLabel}
-                  </span>
-                  <div className="mt-0.5 flex items-center gap-0.5">
-                    <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                    <span className={`text-[8px] font-semibold ${cfg.text}`}>
-                      {hasVer ? `v${st.version}` : "—"}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-col items-center text-center">
+            <span className="text-[10px] font-medium text-slate-400">Students</span>
+            <span className="mt-0.5 text-sm font-bold text-slate-800 dark:text-slate-100">
+              {studentsCount}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Action Footer */}
-      <div className="mt-2.5 flex items-center gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800">
+      <div className="mt-3.5 flex items-center gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
         <button
           type="button"
           onClick={handleOpenArtifacts}

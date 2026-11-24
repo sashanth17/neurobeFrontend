@@ -2617,19 +2617,19 @@ const InsCourseArtifacts = () => {
             <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
             <span className="font-medium text-slate-700 dark:text-slate-300">{course.programme_name ?? "General"}</span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="inline-block h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
           <div className="flex items-center gap-1">
             <Layers className="h-3.5 w-3.5 text-slate-400" />
             <span>{course.semester ? `Sem ${course.semester}` : "All Terms"}</span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="inline-block h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
           <div className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5 text-slate-400" />
             <span>
               {course.credits ?? 0} Credits ({course.total_theory_hours ?? 0}h Theory / {course.total_lab_hours ?? 0}h Lab)
             </span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="inline-block h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
           <div className="flex items-center gap-1">
             <BookOpen className="h-3.5 w-3.5 text-slate-400" />
             <span>{course.department_name ?? "General"}</span>
@@ -3755,7 +3755,7 @@ const InsCourseArtifacts = () => {
                                 Curriculum Hierarchy (Units, Topics & Subtopics)
                               </h3>
                               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                {units.length} Units • Structured hierarchical teaching units
+                                {units.length} Units &bull; Structured hierarchical teaching units
                               </p>
                             </div>
 
@@ -3796,7 +3796,7 @@ const InsCourseArtifacts = () => {
 
                                   <div className="flex items-center gap-1.5">
                                     <span className="rounded-md bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                      {u.theory_hours ?? 0} Th • {u.lab_hours ?? 0} Lab
+                                      {u.theory_hours ?? 0} Th / {u.lab_hours ?? 0} Lab
                                     </span>
 
                                     {canEdit && (
