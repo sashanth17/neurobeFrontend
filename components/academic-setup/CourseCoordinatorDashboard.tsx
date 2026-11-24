@@ -100,6 +100,20 @@ export default function CourseCoordinatorDashboard({
   };
   const activeQb = qbTab === "mcq" ? mcqQb : ciaQb;
 
+  const handleOpenQb = () => {
+    if (qbTab === "mcq") {
+      if (onNavigateToTab) {
+        onNavigateToTab("mcq_generation");
+      }
+      router.push(`/neurobe/course-artifacts?course_id=${courseId}&tab=mcq_generation`);
+    } else {
+      if (onNavigateToTab) {
+        onNavigateToTab("cia");
+      }
+      router.push(`/neurobe/question-bank/${courseId}`);
+    }
+  };
+
   // Abstract Donut Chart for Assessment Performance (Section 2.3)
   const donutSeries = useMemo(() => {
     if (!assessment.has_data || assessment.overall_pass_percentage === null) return [0, 100];
@@ -490,11 +504,7 @@ export default function CourseCoordinatorDashboard({
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  qbTab === "mcq"
-                    ? router.push(`/neurobe/course-artifacts?course_id=${courseId}&tab=mcq_generation`)
-                    : router.push(`/neurobe/question-bank/${courseId}`)
-                }
+                onClick={handleOpenQb}
                 className="text-[11px] font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 inline-flex items-center gap-0.5 cursor-pointer"
               >
                 <span>{qbTab === "mcq" ? "MCQ Section" : "View Bank"}</span>
@@ -573,11 +583,7 @@ export default function CourseCoordinatorDashboard({
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-4">
             <button
               type="button"
-              onClick={() =>
-                qbTab === "mcq"
-                  ? router.push(`/neurobe/course-artifacts?course_id=${courseId}&tab=mcq_generation`)
-                  : router.push(`/neurobe/question-bank/${courseId}`)
-              }
+              onClick={handleOpenQb}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-purple-50 py-2.5 text-xs font-bold text-purple-700 hover:bg-purple-100 transition dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40 cursor-pointer"
             >
               <BookOpen className="h-3.5 w-3.5" />

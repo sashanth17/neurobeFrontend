@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import {
@@ -147,6 +147,42 @@ const InsCourseArtifacts = () => {
     }
     return "generator";
   });
+
+  // Synchronize URL query parameter `tab` with activeTab state
+  useEffect(() => {
+    if (!router.isReady) return;
+    const tabQuery = router.query.tab;
+    if (typeof tabQuery === "string" && tabQuery) {
+      if (tabQuery === "mcq_viva") {
+        setActiveTab("mcq_generation");
+        setMcqSubTab("viva_report");
+      } else if (tabQuery === "cia_analytics") {
+        setActiveTab("cia");
+      } else if (tabQuery === "mcq_generation") {
+        setActiveTab("mcq_generation");
+        setMcqSubTab("generator");
+      } else {
+        setActiveTab(tabQuery as any);
+      }
+    }
+  }, [router.isReady, router.query.tab]);
+
+  const handleTabChange = useCallback(
+    (newTab: typeof activeTab) => {
+      setActiveTab(newTab);
+      if (courseIdParam && router.isReady) {
+        router.replace(
+          {
+            pathname: router.pathname,
+            query: { ...router.query, tab: newTab },
+          },
+          undefined,
+          { shallow: true }
+        );
+      }
+    },
+    [router, courseIdParam]
+  );
 
   const [sectionData, setSectionData] = useState<{
     syllabus?: any;
@@ -2629,7 +2665,7 @@ const InsCourseArtifacts = () => {
         <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
-            onClick={() => setActiveTab("dashboard")}
+            onClick={() => handleTabChange("dashboard")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "dashboard"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -2640,7 +2676,7 @@ const InsCourseArtifacts = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("syllabus")}
+            onClick={() => handleTabChange("syllabus")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "syllabus"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -2651,7 +2687,7 @@ const InsCourseArtifacts = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("copo")}
+            onClick={() => handleTabChange("copo")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copo"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -2662,7 +2698,7 @@ const InsCourseArtifacts = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("copso")}
+            onClick={() => handleTabChange("copso")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copso"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -2673,7 +2709,7 @@ const InsCourseArtifacts = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("pedagogy")}
+            onClick={() => handleTabChange("pedagogy")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "pedagogy"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -2684,7 +2720,7 @@ const InsCourseArtifacts = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("lesson_plan")}
+            onClick={() => handleTabChange("lesson_plan")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "lesson_plan"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -2693,23 +2729,21 @@ const InsCourseArtifacts = () => {
             <span>4. Lesson Plan</span>
           </button>
 
-          {isCoord && (
-            <button
-              type="button"
-              onClick={() => setActiveTab("mcq_generation")}
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
-                activeTab === "mcq_generation" || activeTab === "mcq_viva"
-                  ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
-            >
-              <span>5. MCQ & Viva</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => handleTabChange("mcq_generation")}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+              activeTab === "mcq_generation" || activeTab === "mcq_viva"
+                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            }`}
+          >
+            <span>5. MCQ & Viva</span>
+          </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab("cia")}
+            onClick={() => handleTabChange("cia")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
               activeTab === "cia" || activeTab === "cia_analytics"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
@@ -2721,7 +2755,7 @@ const InsCourseArtifacts = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("report")}
+            onClick={() => handleTabChange("report")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
               activeTab === "report"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
@@ -2740,7 +2774,7 @@ const InsCourseArtifacts = () => {
               <CourseCoordinatorDashboard
                 courseId={Number(courseIdParam) || 1}
                 courseMetadata={course}
-                onNavigateToTab={(t) => setActiveTab(t as any)}
+                onNavigateToTab={(t) => handleTabChange(t as any)}
               />
             )}
 
@@ -4936,7 +4970,7 @@ const InsCourseArtifacts = () => {
               </div>
             )}
 
-            {(activeTab === "mcq_generation" || activeTab === "mcq_viva") && isCoord && (
+            {(activeTab === "mcq_generation" || activeTab === "mcq_viva") && (
               <div className="space-y-6">
                 {/* MCQ & Viva Sub-navigation Toggle */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-800 pb-3">
