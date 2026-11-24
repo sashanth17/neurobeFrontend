@@ -290,7 +290,7 @@ const RolesPermissionsPage = () => {
                   id: i.id || i.instructor_id || idx,
                   name: insName,
                   email: insEmail,
-                  status: i.is_active !== false ? "Active" : "Inactive",
+                  status: (i.is_active !== false && !i.is_archived) ? "Active" : "Inactive",
                 };
               })
             : [
@@ -321,7 +321,7 @@ const RolesPermissionsPage = () => {
             department: getSafeString(deptName, "Computer Science & Engineering"),
             programme: getSafeString(progName, "B.Tech CSE"),
             semester: item.semester ? `Semester ${item.semester}` : "Semester 4",
-            status: item.is_active !== false ? "Active" : "Inactive",
+            status: (item.is_active !== false && !item.is_archived) ? "Active" : "Inactive",
             coordinator: {
               id: item.coordinator_id || 100 + idx,
               name: coordName,
@@ -599,7 +599,7 @@ const RolesPermissionsPage = () => {
                           <div className="flex flex-wrap items-center gap-1.5">
                             {row.instructors && row.instructors.length > 0 ? (
                               row.instructors
-                                .filter((ins: any) => (ins.status || "Active") === "Active" || ins.is_active !== false)
+                                .filter((ins: any) => ins && !ins.is_archived && (ins.status ? ins.status === "Active" : ins.is_active !== false))
                                 .map((ins: any, idx: number) => {
                                   const name = getInstructorName(ins);
                                   return (

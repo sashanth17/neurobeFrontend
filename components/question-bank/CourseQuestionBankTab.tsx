@@ -31,11 +31,14 @@ interface CourseQuestionBankTabProps {
   onRefreshQuestions?: () => void;
 }
 
+const DEFAULT_EMPTY_QUESTIONS: any[] = [];
+const DEFAULT_EMPTY_UNITS: any[] = [];
+
 export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
   courseKey,
   courseTitle = "Course",
-  courseQuestions = [],
-  courseUnits = [],
+  courseQuestions = DEFAULT_EMPTY_QUESTIONS,
+  courseUnits = DEFAULT_EMPTY_UNITS,
   onRefreshQuestions,
 }) => {
   const router = useRouter();
@@ -144,7 +147,7 @@ export const CourseQuestionBankTab: React.FC<CourseQuestionBankTabProps> = ({
     } else {
       fetchQuestions();
     }
-  }, [courseKey, courseQuestions]);
+  }, [courseKey, courseQuestions?.length]);
 
   // Filter questions for QuestionReviewPool
   const displayedQuestions = useMemo(() => {

@@ -77,10 +77,16 @@ const course_instance = {
 
     create: (data: any) => {
         let promise = new Promise((resolve, reject) => {
-                     let url = `course-instances/`;
+            let url = `course-instances/`;
+            const payload = { ...data };
+            if (payload.is_archived) {
+                payload.is_active = false;
+            } else if (payload.is_active && payload.is_archived) {
+                payload.is_active = false;
+            }
 
             instance()
-                .post(url, data, {
+                .post(url, payload, {
                 })
                 .then((res) => {
                     resolve(res.data);
@@ -123,9 +129,17 @@ const course_instance = {
     update: (id: any, data: any) => {
         let promise = new Promise((resolve, reject) => {
             let url = `course-instances/${id}`;
-            const config = typeof FormData !== "undefined" && data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
+            let payload = typeof FormData !== "undefined" && data instanceof FormData ? data : { ...data };
+            if (!(payload instanceof FormData)) {
+                if (payload.is_archived) {
+                    payload.is_active = false;
+                } else if (payload.is_active && payload.is_archived) {
+                    payload.is_active = false;
+                }
+            }
+            const config = typeof FormData !== "undefined" && payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
             instance()
-                .patch(url, data, config)
+                .patch(url, payload, config)
                 .then((res) => {
                     resolve(res.data);
                 })

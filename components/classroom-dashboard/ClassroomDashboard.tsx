@@ -287,22 +287,22 @@ export default function ClassroomDashboard({
 
   // ── Bloom's Taxonomy Donut Chart (Matching reference image) ─────────────────
   const bloomsSeries = useMemo(() => {
-    if (!kLevels || kLevels.length === 0) {
-      return [15, 20, 25, 20, 12, 8];
+    if (!kLevels || kLevels.length === 0 || !data?.knowledge_level_stats?.has_data) {
+      return [];
     }
-    return kLevels.map((k: any) => k.question_count || 10);
-  }, [kLevels]);
+    return kLevels.map((k: any) => k.question_count || 0);
+  }, [kLevels, data]);
 
   const bloomsOptions: any = useMemo(() => {
     const labels =
-      kLevels.length > 0
+      kLevels.length > 0 && data?.knowledge_level_stats?.has_data
         ? kLevels.map((k: any) => `${k.level} - ${k.name}`)
         : ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
 
     const avgKScore =
-      kLevels.length > 0
+      kLevels.length > 0 && data?.knowledge_level_stats?.has_data
         ? Math.round(kLevels.reduce((acc: number, k: any) => acc + (k.score_pct || 0), 0) / kLevels.length)
-        : 72;
+        : 0;
 
     return {
       chart: {
@@ -459,14 +459,12 @@ export default function ClassroomDashboard({
           </div>
           <div>
             <div className="text-2xl font-black text-gray-900 dark:text-white">
-              {cia.latest_test?.average_score_pct
+              {cia.latest_test?.average_score_pct !== undefined && cia.latest_test?.average_score_pct !== null
                 ? `${cia.latest_test.average_score_pct}%`
-                : cia.has_data
-                ? "76.4%"
                 : "No data"}
             </div>
             <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 truncate">
-              {cia.latest_test?.test_name || "CIA Assessment 1"}
+              {cia.latest_test?.test_name || (cia.has_data ? "CIA Assessment" : "No assessments")}
             </p>
           </div>
         </div>
@@ -483,14 +481,12 @@ export default function ClassroomDashboard({
           </div>
           <div>
             <div className="text-2xl font-black text-gray-900 dark:text-white">
-              {mcq.latest_test?.average_score_pct
+              {mcq.latest_test?.average_score_pct !== undefined && mcq.latest_test?.average_score_pct !== null
                 ? `${mcq.latest_test.average_score_pct}%`
-                : mcq.has_data
-                ? "81.2%"
                 : "No data"}
             </div>
             <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 truncate">
-              {mcq.latest_test?.title || "Classroom MCQ Drill"}
+              {mcq.latest_test?.title || (mcq.has_data ? "Classroom MCQ Drill" : "No drills")}
             </p>
           </div>
         </div>
@@ -507,11 +503,19 @@ export default function ClassroomDashboard({
           </div>
           <div>
             <div className="text-2xl font-black text-gray-900 dark:text-white">
-              {avgCoAttainment > 0 ? `${avgCoAttainment}%` : "No data"}
+              {coData.has_data && avgCoAttainment > 0 ? `${avgCoAttainment}%` : "No data"}
             </div>
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold flex items-center gap-0.5">
-              <TrendingUp className="w-3 h-3" />
-              Above 70% Target
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 font-medium flex items-center gap-0.5">
+              {coData.has_data && avgCoAttainment >= 70 ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                  <TrendingUp className="w-3 h-3" />
+                  Above 70% Target
+                </span>
+              ) : coData.has_data ? (
+                <span className="text-amber-600 dark:text-amber-400">Below 70% Target</span>
+              ) : (
+                "Awaiting direct tests"
+              )}
             </p>
           </div>
         </div>
@@ -763,41 +767,53 @@ export default function ClassroomDashboard({
             </div>
 
             <div className="h-64 flex items-center justify-center">
-              <ReactApexChart
-                options={bloomsOptions}
-                series={bloomsSeries}
-                type="donut"
-                height={240}
-                width="100%"
-              />
+              {data?.knowledge_level_stats?.has_data && bloomsSeries.length > 0 && bloomsSeries.some((v: number) => v > 0) ? (
+                <ReactApexChart
+                  options={bloomsOptions}
+                  series={bloomsSeries}
+                  type="donut"
+                  height={240}
+                  width="100%"
+                />
+              ) : (
+                <div className="py-12 text-center text-gray-400">
+                  <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs font-medium">No cognitive level data right now</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Assessments have not mapped question cognitive levels yet
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100 dark:border-gray-800 text-[11px]">
-            {kLevels.map((k: any, i: number) => {
-              const dotColors = [
-                "bg-blue-500",
-                "bg-emerald-500",
-                "bg-amber-500",
-                "bg-violet-500",
-                "bg-cyan-500",
-                "bg-pink-500",
-              ];
-              return (
-                <div key={k.level} className="flex items-center justify-between gap-1.5">
-                  <span className="flex items-center gap-1.5 truncate">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColors[i % dotColors.length]}`} />
-                    <span className="truncate text-gray-600 dark:text-gray-300">
-                      {k.level} - {k.name}:
+          {data?.knowledge_level_stats?.has_data && kLevels.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100 dark:border-gray-800 text-[11px]">
+              {kLevels.map((k: any, i: number) => {
+                const dotColors = [
+                  "bg-blue-500",
+                  "bg-emerald-500",
+                  "bg-amber-500",
+                  "bg-violet-500",
+                  "bg-cyan-500",
+                  "bg-pink-500",
+                ];
+                return (
+                  <div key={k.level} className="flex items-center justify-between gap-1.5">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColors[i % dotColors.length]}`} />
+                      <span className="truncate text-gray-600 dark:text-gray-300">
+                        {k.level} - {k.name}:
+                      </span>
                     </span>
-                  </span>
-                  <span className="font-bold text-gray-800 dark:text-gray-200">
-                    {k.score_pct}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                    <span className="font-bold text-gray-800 dark:text-gray-200">
+                      {k.score_pct}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* CO Attainment Progress Bars */}
@@ -815,9 +831,11 @@ export default function ClassroomDashboard({
                   <p className="text-[11px] text-gray-400">Target threshold: ≥ 70%</p>
                 </div>
               </div>
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Avg: {avgCoAttainment}%
-              </span>
+              {coData?.has_data && (
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  Avg: {avgCoAttainment}%
+                </span>
+              )}
             </div>
 
             {coData.has_data && coData.attainments && coData.attainments.length > 0 ? (
@@ -886,7 +904,7 @@ export default function ClassroomDashboard({
                   <p className="text-[11px] text-gray-400">NBA 3-point scale • Target: ≥ 2.10 (70%)</p>
                 </div>
               </div>
-              {copoAttainment?.average_po_level !== undefined && copoAttainment?.average_po_level !== null && (
+              {copoAttainment?.has_data && copoAttainment?.average_po_level !== undefined && copoAttainment?.average_po_level !== null && (
                 <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-200">
                   Avg: {copoAttainment.average_po_level} / 3.0 ({copoAttainment.average_po_percentage}%)
                 </span>
@@ -996,9 +1014,15 @@ export default function ClassroomDashboard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">
-              Overall PO: {copoAttainment?.average_po_level ?? 2.17} / 3.0 ({copoAttainment?.average_po_percentage ?? 72.4}%)
-            </span>
+            {copoAttainment?.has_data && copoAttainment?.average_po_level !== undefined && copoAttainment?.average_po_level !== null ? (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">
+                Overall PO: {copoAttainment.average_po_level} / 3.0 ({copoAttainment.average_po_percentage}%)
+              </span>
+            ) : (
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                No CIA Assessment Data
+              </span>
+            )}
           </div>
         </div>
 
@@ -1026,65 +1050,77 @@ export default function ClassroomDashboard({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
-              {(copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
-                const coCode = row.co;
-                const desc = row.description || "Course Outcome Competency";
-                const bloom = row.bloom_level || "Apply";
-                const coPct = row.co_percentage || 74.0;
-                const coLvl = row.co_level || (Math.round((coPct / 100) * 3 * 100) / 100);
+              {(copoMatrix.length > 0 ? copoMatrix : copoGrid).length > 0 ? (
+                (copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
+                  const coCode = row.co;
+                  const desc = row.description || "Course Outcome Competency";
+                  const bloom = row.bloom_level || "Apply";
+                  const coPct = row.co_percentage ?? 0;
+                  const coLvl = row.co_level ?? (Math.round((coPct / 100) * 3 * 100) / 100);
 
-                return (
-                  <tr key={coCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4 text-left font-extrabold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                      {coCode}
-                    </td>
-                    <td className="py-3 px-3 text-left text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed max-w-xs">
-                      {desc}
-                    </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
-                        {bloom}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs">
-                        {coPct}%
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs">
-                        {coLvl.toFixed(2)}
-                      </span>
-                    </td>
-                    {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
-                      const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
-                      const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
+                  return (
+                    <tr key={coCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-4 text-left font-extrabold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                        {coCode}
+                      </td>
+                      <td className="py-3 px-3 text-left text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed max-w-xs">
+                        {desc}
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
+                          {bloom}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs">
+                          {coPct}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+                          {typeof coLvl === "number" ? coLvl.toFixed(2) : coLvl}
+                        </span>
+                      </td>
+                      {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                        const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
+                        const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
 
-                      let cellBg = "text-slate-300 dark:text-slate-600";
-                      if (attVal >= 2.0) {
-                        cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
-                      } else if (attVal >= 1.5) {
-                        cellBg = "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800";
-                      } else if (attVal > 0) {
-                        cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
-                      }
+                        let cellBg = "text-slate-300 dark:text-slate-600";
+                        if (attVal >= 2.0) {
+                          cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
+                        } else if (attVal >= 1.5) {
+                          cellBg = "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800";
+                        } else if (attVal > 0) {
+                          cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
+                        }
 
-                      return (
-                        <td key={po} className="py-2 px-2 text-center">
-                          {attVal > 0 ? (
-                            <div className={`inline-block py-1 px-2.5 rounded-xl text-center ${cellBg}`}>
-                              <span className="text-xs font-bold block">{attVal.toFixed(2)}</span>
-                              <span className="text-[9px] opacity-70 block">Weight: {w}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+                        return (
+                          <td key={po} className="py-2 px-2 text-center">
+                            {attVal > 0 ? (
+                              <div className={`inline-block py-1 px-2.5 rounded-xl text-center ${cellBg}`}>
+                                <span className="text-xs font-bold block">{attVal.toFixed(2)}</span>
+                                <span className="text-[9px] opacity-70 block">Weight: {w}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={10} className="py-8 text-center text-gray-400">
+                    <Info className="w-7 h-7 mx-auto mb-1.5 opacity-50" />
+                    <p className="text-xs font-semibold">No articulation matrix data</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      No CIA test marks or student evaluation records exist for this classroom yet
+                    </p>
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot className="bg-slate-50/90 dark:bg-slate-900/90 font-bold border-t-2 border-slate-200 dark:border-slate-700 text-xs">
               <tr>
@@ -1093,10 +1129,10 @@ export default function ClassroomDashboard({
                 </td>
                 {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
                   const pData = poAttainmentsMap[po];
-                  const lvl = pData ? pData.level : 2.18;
+                  const lvl = pData?.level != null ? (typeof pData.level === "number" ? pData.level.toFixed(2) : pData.level) : "—";
                   return (
                     <td key={po} className="py-3 px-3 text-center font-extrabold text-indigo-600 dark:text-indigo-400 text-sm">
-                      {typeof lvl === "number" ? lvl.toFixed(2) : lvl}
+                      {lvl}
                     </td>
                   );
                 })}
@@ -1107,19 +1143,23 @@ export default function ClassroomDashboard({
                 </td>
                 {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
                   const pData = poAttainmentsMap[po];
-                  const pct = pData ? pData.percentage : 72.7;
-                  const isAtt = pct >= 70;
+                  const pct = pData?.percentage;
+                  const isAtt = typeof pct === "number" && pct >= 70;
                   return (
                     <td key={po} className="py-2.5 px-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
-                          isAtt
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                        }`}
-                      >
-                        {pct}%
-                      </span>
+                      {pct != null ? (
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                            isAtt
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                          }`}
+                        >
+                          {pct}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                   );
                 })}
@@ -1130,20 +1170,24 @@ export default function ClassroomDashboard({
                 </td>
                 {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
                   const pData = poAttainmentsMap[po];
-                  const pct = pData ? pData.percentage : 72.7;
-                  const isAtt = pct >= 70;
+                  const pct = pData?.percentage;
+                  const isAtt = typeof pct === "number" && pct >= 70;
                   return (
                     <td key={po} className="py-2.5 px-3 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${
-                          isAtt
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        {isAtt ? "Attained" : "Pending"}
-                      </span>
+                      {copoAttainment?.has_data && pct != null ? (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${
+                            isAtt
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-amber-600 dark:text-amber-400"
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          {isAtt ? "Attained" : "Pending"}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 font-normal text-[11px]">—</span>
+                      )}
                     </td>
                   );
                 })}
@@ -1435,18 +1479,26 @@ export default function ClassroomDashboard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {cia.historical_tests?.map((t: any) => (
-                        <tr key={t.test_id} className="hover:bg-gray-50/60 transition">
-                          <td className="py-2 px-3 font-semibold text-gray-900 dark:text-white">
-                            {t.test_name}
+                      {cia.historical_tests && cia.historical_tests.length > 0 ? (
+                        cia.historical_tests.map((t: any) => (
+                          <tr key={t.test_id} className="hover:bg-gray-50/60 transition">
+                            <td className="py-2 px-3 font-semibold text-gray-900 dark:text-white">
+                              {t.test_name}
+                            </td>
+                            <td className="py-2 px-3 text-gray-500">{t.date || "Recent"}</td>
+                            <td className="py-2 px-3 font-bold text-violet-600">{t.average_score_pct}%</td>
+                            <td className="py-2 px-3 font-bold text-emerald-600">{t.pass_rate_pct}%</td>
+                            <td className="py-2 px-3 text-gray-600">{t.highest_score_pct}%</td>
+                            <td className="py-2 px-3 text-gray-600">{t.lowest_score_pct}%</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="py-6 text-center text-gray-400">
+                            No CIA assessment tests recorded yet.
                           </td>
-                          <td className="py-2 px-3 text-gray-500">{t.date || "Recent"}</td>
-                          <td className="py-2 px-3 font-bold text-violet-600">{t.average_score_pct}%</td>
-                          <td className="py-2 px-3 font-bold text-emerald-600">{t.pass_rate_pct}%</td>
-                          <td className="py-2 px-3 text-gray-600">{t.highest_score_pct}%</td>
-                          <td className="py-2 px-3 text-gray-600">{t.lowest_score_pct}%</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1606,65 +1658,77 @@ export default function ClassroomDashboard({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
-                    {(copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
-                      const coCode = row.co;
-                      const desc = row.description || "Course Outcome Competency";
-                      const bloom = row.bloom_level || "Apply";
-                      const coPct = row.co_percentage || 74.0;
-                      const coLvl = row.co_level || (Math.round((coPct / 100) * 3 * 100) / 100);
+                    {(copoMatrix.length > 0 ? copoMatrix : copoGrid).length > 0 ? (
+                      (copoMatrix.length > 0 ? copoMatrix : copoGrid).map((row: any) => {
+                        const coCode = row.co;
+                        const desc = row.description || "Course Outcome Competency";
+                        const bloom = row.bloom_level || "Apply";
+                        const coPct = row.co_percentage ?? 0;
+                        const coLvl = row.co_level ?? (Math.round((coPct / 100) * 3 * 100) / 100);
 
-                      return (
-                        <tr key={coCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
-                          <td className="py-3 px-4 text-left font-extrabold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                            {coCode}
-                          </td>
-                          <td className="py-3 px-3 text-left text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed max-w-xs">
-                            {desc}
-                          </td>
-                          <td className="py-3 px-3 text-center whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
-                              {bloom}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs">
-                              {coPct}%
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs">
-                              {coLvl.toFixed(2)}
-                            </span>
-                          </td>
-                          {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
-                            const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
-                            const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
+                        return (
+                          <tr key={coCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+                            <td className="py-3 px-4 text-left font-extrabold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                              {coCode}
+                            </td>
+                            <td className="py-3 px-3 text-left text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed max-w-xs">
+                              {desc}
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
+                                {bloom}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs">
+                                {coPct}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+                                {typeof coLvl === "number" ? coLvl.toFixed(2) : coLvl}
+                              </span>
+                            </td>
+                            {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
+                              const w = row.weights ? (row.weights[po] || 0) : (row[po] || 0);
+                              const attVal = row.attainments ? (row.attainments[po] || 0) : (w > 0 ? Math.round(((coLvl * w) / 3) * 100) / 100 : 0);
 
-                            let cellBg = "text-slate-300 dark:text-slate-600";
-                            if (attVal >= 2.0) {
-                              cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
-                            } else if (attVal >= 1.5) {
-                              cellBg = "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800";
-                            } else if (attVal > 0) {
-                              cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
-                            }
+                              let cellBg = "text-slate-300 dark:text-slate-600";
+                              if (attVal >= 2.0) {
+                                cellBg = "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800";
+                              } else if (attVal >= 1.5) {
+                                cellBg = "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800";
+                              } else if (attVal > 0) {
+                                cellBg = "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800";
+                              }
 
-                            return (
-                              <td key={po} className="py-2 px-2 text-center">
-                                {attVal > 0 ? (
-                                  <div className={`inline-block py-1 px-2.5 rounded-xl text-center ${cellBg}`}>
-                                    <span className="text-xs font-bold block">{attVal.toFixed(2)}</span>
-                                    <span className="text-[9px] opacity-70 block">Weight: {w}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
+                              return (
+                                <td key={po} className="py-2 px-2 text-center">
+                                  {attVal > 0 ? (
+                                    <div className={`inline-block py-1 px-2.5 rounded-xl text-center ${cellBg}`}>
+                                      <span className="text-xs font-bold block">{attVal.toFixed(2)}</span>
+                                      <span className="text-[9px] opacity-70 block">Weight: {w}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-gray-400">
+                          <Info className="w-7 h-7 mx-auto mb-1.5 opacity-50" />
+                          <p className="text-xs font-semibold">No articulation matrix data</p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            No CIA test marks or student evaluation records exist for this classroom yet
+                          </p>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                   <tfoot className="bg-slate-50/90 dark:bg-slate-900/90 font-bold border-t-2 border-slate-200 dark:border-slate-700 text-xs">
                     <tr>
@@ -1673,10 +1737,10 @@ export default function ClassroomDashboard({
                       </td>
                       {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
                         const pData = poAttainmentsMap[po];
-                        const lvl = pData ? pData.level : 2.18;
+                        const lvl = pData?.level != null ? (typeof pData.level === "number" ? pData.level.toFixed(2) : pData.level) : "—";
                         return (
                           <td key={po} className="py-3 px-3 text-center font-extrabold text-indigo-600 dark:text-indigo-400 text-sm">
-                            {typeof lvl === "number" ? lvl.toFixed(2) : lvl}
+                            {lvl}
                           </td>
                         );
                       })}
@@ -1687,19 +1751,23 @@ export default function ClassroomDashboard({
                       </td>
                       {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
                         const pData = poAttainmentsMap[po];
-                        const pct = pData ? pData.percentage : 72.7;
-                        const isAtt = pct >= 70;
+                        const pct = pData?.percentage;
+                        const isAtt = typeof pct === "number" && pct >= 70;
                         return (
                           <td key={po} className="py-2.5 px-3 text-center">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
-                                isAtt
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                              }`}
-                            >
-                              {pct}%
-                            </span>
+                            {pct != null ? (
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                                  isAtt
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                }`}
+                              >
+                                {pct}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
                         );
                       })}
@@ -1710,20 +1778,24 @@ export default function ClassroomDashboard({
                       </td>
                       {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
                         const pData = poAttainmentsMap[po];
-                        const pct = pData ? pData.percentage : 72.7;
-                        const isAtt = pct >= 70;
+                        const pct = pData?.percentage;
+                        const isAtt = typeof pct === "number" && pct >= 70;
                         return (
                           <td key={po} className="py-2.5 px-3 text-center">
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${
-                                isAtt
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-amber-600 dark:text-amber-400"
-                              }`}
-                            >
-                              <CheckCircle2 className="w-3 h-3" />
-                              {isAtt ? "Attained" : "Pending"}
-                            </span>
+                            {copoAttainment?.has_data && pct != null ? (
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${
+                                  isAtt
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-amber-600 dark:text-amber-400"
+                                }`}
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                {isAtt ? "Attained" : "Pending"}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-normal text-[11px]">—</span>
+                            )}
                           </td>
                         );
                       })}
@@ -1736,7 +1808,14 @@ export default function ClassroomDashboard({
             {/* Modal Footer */}
             <div className="p-4 px-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 flex items-center justify-between">
               <span className="text-xs text-gray-500">
-                Overall Classroom PO Score: <strong className="text-indigo-600">{copoAttainment?.average_po_level ?? 2.17} / 3.0</strong> ({copoAttainment?.average_po_percentage ?? 72.4}%)
+                Overall Classroom PO Score:{" "}
+                {copoAttainment?.has_data && copoAttainment?.average_po_level != null ? (
+                  <>
+                    <strong className="text-indigo-600">{copoAttainment.average_po_level} / 3.0</strong> ({copoAttainment.average_po_percentage}%)
+                  </>
+                ) : (
+                  <span className="text-gray-400 font-medium">Awaiting assessment calculations</span>
+                )}
               </span>
               <button
                 onClick={() => setShowCopoMatrixModal(false)}

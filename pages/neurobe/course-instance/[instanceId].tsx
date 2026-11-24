@@ -38,6 +38,8 @@ const TABS = [
   { id: "co-po-attainment", label: "CO/PO Attainment" },
 ];
 
+const EMPTY_METADATA: Record<string, any> = {};
+
 function InstanceDashboardPage() {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -89,6 +91,14 @@ function InstanceDashboardPage() {
         setSelectedCiaTest((prev) => {
           if (!prev) return tests[0];
           const matched = tests.find((t) => t.cia_test_id === prev.cia_test_id);
+          if (
+            matched &&
+            matched.cia_test_id === prev.cia_test_id &&
+            matched.job_status === prev.job_status &&
+            matched.latest_job_id === prev.latest_job_id
+          ) {
+            return prev;
+          }
           return matched || tests[0];
         });
       }
@@ -277,7 +287,7 @@ function InstanceDashboardPage() {
             <CourseAttainmentReport
               courseId={courseId as string}
               offeringId={instanceId as string}
-              courseMetadata={{}}
+              courseMetadata={instanceDetail || EMPTY_METADATA}
             />
           </div>
         )}

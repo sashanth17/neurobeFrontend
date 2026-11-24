@@ -316,6 +316,7 @@ const CourseOfferingPage = () => {
       await Models.course_instance.update(row.id, {
         ...row,
         is_archived: nextArchived,
+        is_active: nextArchived ? false : (row.is_active ?? true),
       });
       Success(nextArchived ? "Course Classroom archived" : "Course Classroom unarchived");
       await fetchAllData();

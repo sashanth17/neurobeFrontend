@@ -218,6 +218,7 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess, defaultCou
     if (isSubmitting) return;
 
     const authUser = getAuthUser();
+    const isArchived = Boolean(state.is_archived);
 
     const values = {
       organization_id: authUser?.organization_id || 0,
@@ -226,9 +227,9 @@ const CourseOfferingModal = ({ open, onClose, initialData, onSuccess, defaultCou
       programme_id: state.programme?.value,
       department_id: state.department?.value,
       semester: Number(state.term?.value),
-      is_active: true,
+      is_active: isArchived ? false : (initialData?.is_active ?? true),
       term_visibility: Boolean(state.term_visibility),
-      is_archived: Boolean(state.is_archived),
+      is_archived: isArchived,
       created_by_id: authUser?.id || 0,
       created_on: new Date().toISOString(),
     };

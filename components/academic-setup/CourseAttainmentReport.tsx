@@ -395,6 +395,13 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
   const [copsoMatrix, setCopsoMatrix] = useState<any | null>(null);
   const [loadingCopso, setLoadingCopso] = useState<boolean>(false);
 
+  const resolvedDeptId =
+    selectedDeptId ||
+    instanceDetail?.department_id ||
+    courseDetail?.department_id ||
+    courseMetadata?.department_id ||
+    null;
+
   const loadCopsoMatrix = useCallback(
     async (overrideDeptId?: string | number | null) => {
       setLoadingCopso(true);
@@ -410,12 +417,7 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
         const deptId =
           overrideDeptId !== undefined
             ? overrideDeptId
-            : selectedDeptId ||
-              instanceDetail?.department_id ||
-              matchedInst?.department_id ||
-              courseDetail?.department_id ||
-              courseMetadata?.department_id ||
-              null;
+            : resolvedDeptId || matchedInst?.department_id || null;
         const matrix = await fetchCopsoMatrixDirect(activeCourseId, deptId);
         setCopsoMatrix(matrix);
       } catch (err) {
@@ -426,14 +428,11 @@ const CourseAttainmentReport: React.FC<CourseAttainmentReportProps> = ({
     },
     [
       courseId,
-      selectedDeptId,
-      instanceDetail,
-      instances,
+      resolvedDeptId,
       selectedInstanceId,
       offeringId,
-      courseDetail,
-      courseMetadata,
-      router.query,
+      router.query.courseId,
+      router.query.course_id,
     ]
   );
 

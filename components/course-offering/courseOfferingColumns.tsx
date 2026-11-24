@@ -208,9 +208,10 @@ export const makeCourseOfferingColumns = (
   {
     accessor: "status",
     title: "STATUS",
-    render: (row: any) => (
-      <StatusCell status={row.status || (row.is_active !== false ? "Active" : "Inactive")} />
-    ),
+    render: (row: any) => {
+      const isActive = !row.is_archived && row.is_active !== false && row.status !== "Inactive";
+      return <StatusCell status={isActive ? "Active" : "Inactive"} />;
+    },
   },
   {
     accessor: "actions",
