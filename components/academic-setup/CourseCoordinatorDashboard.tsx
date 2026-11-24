@@ -116,7 +116,7 @@ export default function CourseCoordinatorDashboard({
 
   // Abstract Donut Chart for Assessment Performance (Section 2.3)
   const donutSeries = useMemo(() => {
-    if (!assessment.has_data || assessment.overall_pass_percentage === null) return [0, 100];
+    if (!assessment.has_data || assessment.overall_pass_percentage === null) return [];
     const pass = assessment.overall_pass_percentage;
     const fail = Math.max(0, 100 - pass);
     return [pass, fail];
@@ -405,7 +405,7 @@ export default function CourseCoordinatorDashboard({
 
             {/* Donut Chart */}
             <div className="my-2 h-48 flex items-center justify-center">
-              {assessment.has_data ? (
+              {assessment.has_data && donutSeries.length > 0 ? (
                 <ReactApexChart
                   options={donutOptions}
                   series={donutSeries}

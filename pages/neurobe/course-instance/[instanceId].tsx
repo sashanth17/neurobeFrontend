@@ -101,9 +101,13 @@ function InstanceDashboardPage() {
           }
           return matched || tests[0];
         });
+      } else {
+        setSelectedCiaTest(null);
       }
     } catch (err) {
       console.error("Failed to fetch CIA tests", err);
+      setCiaTests([]);
+      setSelectedCiaTest(null);
     } finally {
       if (!silent) setLoadingTests(false);
     }
