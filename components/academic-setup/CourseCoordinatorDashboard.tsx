@@ -46,6 +46,7 @@ export default function CourseCoordinatorDashboard({
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [activeSubTab, setActiveSubTab] = useState<"overview" | "classrooms" | "drilldown">("overview");
+  const [attainmentTab, setAttainmentTab] = useState<"co" | "po">("co");
 
   // Dual-tab analytics (Section 5.1): "insights" vs "suggestions"
   const [analyticsTab, setAnalyticsTab] = useState<"insights" | "suggestions">("insights");
@@ -167,6 +168,96 @@ export default function CourseCoordinatorDashboard({
       style: { fontSize: "10px", colors: ["#ffffff"] },
     },
   }), [coAttainment]);
+
+  // PO Attainment computed or extracted from dashboardData
+  const poAttainments = useMemo(() => {
+    if (dashboardData?.co_attainment?.po_attainments && dashboardData.co_attainment.po_attainments.length > 0) {
+      return dashboardData.co_attainment.po_attainments;
+    }
+    // Fallback: Compute dynamically from active matrix cells and CO attainments
+    const coMap: Record<string, any> = {};
+    (coAttainment.attainments || []).forEach((c: any) => {
+      coMap[c.co_code] = c;
+    });
+
+    const poTotals: Record<string, { po_name: string; weighted_sum: number; total_weight: number; contributing_cos: string[] }> = {};
+    (heatmap.cells || []).forEach((cell: any) => {
+      const pCode = cell.po_code;
+      const cCode = cell.co_code;
+      const lvl = cell.correlation_level || 0;
+      if (!poTotals[pCode]) {
+        poTotals[pCode] = { po_name: cell.po_name || pCode, weighted_sum: 0, total_weight: 0, contributing_cos: [] };
+      }
+      if (lvl > 0) {
+        poTotals[pCode].contributing_cos.push(cCode);
+        const cData = coMap[cCode];
+        if (cData && cData.is_calculated && cData.percentage !== null) {
+          poTotals[pCode].weighted_sum += Number(cData.percentage) * lvl;
+          poTotals[pCode].total_weight += lvl;
+        }
+      }
+    });
+
+    return Object.entries(poTotals)
+      .sort((a, b) => {
+        const numA = parseInt(a[0].replace(/\D/g, "") || "0", 10);
+        const numB = parseInt(b[0].replace(/\D/g, "") || "0", 10);
+        return numA - numB;
+      })
+      .map(([pCode, pData]) => {
+        const isCalc = pData.total_weight > 0;
+        const avg = isCalc ? Math.round((pData.weighted_sum / pData.total_weight) * 10) / 10 : null;
+        const lvl = avg !== null ? Math.round((avg / 100) * 3 * 100) / 100 : null;
+        return {
+          po_code: pCode,
+          po_name: pData.po_name,
+          percentage: avg,
+          attainment_level: lvl,
+          contributing_cos: pData.contributing_cos,
+          is_calculated: isCalc,
+          status_text: avg !== null ? `${avg}%` : "Yet to be calculated",
+        };
+      });
+  }, [dashboardData, coAttainment, heatmap]);
+
+  // Bar Chart for PO Attainment
+  const poBarSeries = useMemo(() => {
+    const vals = (poAttainments || []).map((p: any) => p.percentage || 0);
+    return [{ name: "Current Attainment (%)", data: vals }];
+  }, [poAttainments]);
+
+  const poBarOptions: any = useMemo(() => ({
+    chart: { type: "bar", height: 220, toolbar: { show: false }, fontFamily: "inherit" },
+    plotOptions: {
+      bar: {
+        borderRadius: 5,
+        columnWidth: "45%",
+        distributed: true,
+      },
+    },
+    colors: [
+      "#6366f1", "#4f46e5", "#3b82f6", "#0284c7", "#06b6d4", "#0d9488",
+      "#10b981", "#059669", "#f59e0b", "#d97706", "#ec4899", "#8b5cf6",
+    ],
+    xaxis: {
+      categories: (poAttainments || []).map((p: any) => p.po_code),
+      labels: { style: { colors: "#64748b", fontSize: "11px", fontWeight: 600 } },
+    },
+    yaxis: {
+      max: 100,
+      labels: { formatter: (val: number) => `${val}%`, style: { colors: "#64748b" } },
+    },
+    grid: { borderColor: "#f1f5f9" },
+    legend: { show: false },
+    dataLabels: {
+      enabled: true,
+      formatter: (val: number, opts: any) => {
+        const item = poAttainments?.[opts.dataPointIndex];
+        return item && item.is_calculated ? `${val}%` : "Pending";
+      },
+      style: { fontSize: "10px", colors: ["#ffffff"] },
+    },
+  }), [poAttainments]);
 
   // Mark Range Distribution Bar Chart (Section 2.3 drilldown)
   const markRangeSeries = useMemo(() => {
@@ -448,86 +539,267 @@ export default function CourseCoordinatorDashboard({
         </div>
       </div>
 
-      {/* ── CO-PO Mapping Heatmap (Section 2.1: 4-Tier Articulation Matrix) ── */}
+      {/* ── CO-PO Attainment Section (Section 2.4 & Continuous Evaluation) ── */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5 border-b border-slate-100 pb-4 dark:border-slate-800">
           <div>
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
-                <Grid3X3 className="h-4 w-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                <Target className="h-4 w-4" />
               </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                CO-PO Articulation Matrix / Heatmap
+                CO-PO Attainment Status ("As of Now")
               </h3>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Visual 4-tier correlation scale (Level 3 Dark Green, Level 2 Medium Green, Level 1 Light Green, Level 0 White)
+              Course Outcomes (CO1–CO5) and NBA Program Outcomes (PO1–PO12) evaluated against the 60% benchmark
             </p>
           </div>
 
-          {/* Heatmap Legend */}
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-emerald-700" />
-              <span className="text-[11px] text-slate-600 dark:text-slate-400">Level 3 (High)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* View Sub-Tabs: CO Attainment vs PO Attainment */}
+            <div className="flex rounded-xl bg-slate-100 p-0.5 dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => setAttainmentTab("co")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  attainmentTab === "co"
+                    ? "bg-white text-indigo-600 shadow-2xs dark:bg-slate-900 dark:text-indigo-400"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
+              >
+                <Award className="h-3.5 w-3.5" />
+                <span>Course Outcomes (CO)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttainmentTab("po")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  attainmentTab === "po"
+                    ? "bg-white text-indigo-600 shadow-2xs dark:bg-slate-900 dark:text-indigo-400"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                <span>Program Outcomes (PO)</span>
+              </button>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-emerald-400" />
-              <span className="text-[11px] text-slate-600 dark:text-slate-400">Level 2 (Mod)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-emerald-100 dark:bg-emerald-950/60" />
-              <span className="text-[11px] text-slate-600 dark:text-slate-400">Level 1 (Low)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800" />
-              <span className="text-[11px] text-slate-600 dark:text-slate-400">Level 0 (None)</span>
-            </div>
+
+            {onNavigateToTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateToTab("copo")}
+                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                title="View full CO-PO articulation matrix in Tab 2"
+              >
+                <span>Full Articulation Matrix</span>
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            )}
           </div>
         </div>
 
-        {heatmap.has_data && heatmap.cos.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-center border-collapse">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
-                  <th className="p-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 text-left">Course Outcome</th>
-                  {heatmap.pos.map((po: string) => (
-                    <th key={po} className="p-2.5 text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {po}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {heatmap.cos.map((co: string) => (
-                  <tr key={co} className="border-b border-slate-100 dark:border-slate-800 last:border-none">
-                    <td className="p-2.5 text-xs font-bold text-slate-800 dark:text-white text-left bg-slate-50/50 dark:bg-slate-800/30">
-                      {co}
-                    </td>
-                    {heatmap.pos.map((po: string) => {
-                      const cell = matrixCellMap[`${co}-${po}`];
-                      const lvl = cell ? cell.correlation_level : 0;
-                      let cellClass = "bg-white text-slate-400 dark:bg-slate-900";
-                      if (lvl === 3) cellClass = "bg-emerald-700 text-white font-bold";
-                      else if (lvl === 2) cellClass = "bg-emerald-500 text-white font-semibold";
-                      else if (lvl === 1) cellClass = "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300";
+        {/* ── Sub-View 1: Course Outcomes (CO) Attainment ── */}
+        {attainmentTab === "co" && (
+          <div className="space-y-4">
+            {/* CO Summary Cards Grid (CO1 – CO5) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {(coAttainment.attainments || []).map((co: any) => {
+                const isAttained = co.is_calculated && co.percentage !== null && co.percentage >= 60;
+                const isCalculated = co.is_calculated && co.percentage !== null;
+
+                return (
+                  <div
+                    key={co.co_code}
+                    className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 transition hover:shadow-xs dark:border-slate-800 dark:bg-slate-800/40"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-sm text-slate-800 dark:text-white">
+                          {co.co_code}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            !isCalculated
+                              ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                              : isAttained
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                              : "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                          }`}
+                        >
+                          {!isCalculated ? "Pending" : isAttained ? "Attained" : "Deficit"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-2xl font-black text-slate-900 dark:text-white">
+                            {isCalculated ? `${co.percentage}%` : "—"}
+                          </span>
+                          <span className="text-[11px] font-semibold text-slate-400">
+                            Target: 60%
+                          </span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                          <div
+                            className={`h-full transition-all duration-500 rounded-full ${
+                              !isCalculated
+                                ? "bg-slate-300 dark:bg-slate-600"
+                                : isAttained
+                                ? "bg-emerald-500"
+                                : "bg-rose-500"
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(0, co.percentage || 0))}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 dark:text-slate-400">3-Point Scale:</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {isCalculated && co.attainment_level !== null ? `${co.attainment_level} / 3.0` : "Pending"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* CO Attainment Bar Chart */}
+            <div className="rounded-xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Course Outcomes Attainment Comparison (CO1 – CO5)
+                </h4>
+                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                  NBA Attainment Target: ≥ 60%
+                </span>
+              </div>
+              {coAttainment.has_data ? (
+                <div className="h-48">
+                  <ReactApexChart
+                    options={coBarOptions}
+                    series={coBarSeries}
+                    type="bar"
+                    height={180}
+                    width="100%"
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-xs font-semibold text-slate-400">No student assessment scores recorded yet</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Enter or extract student marks to compute CO attainment.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Sub-View 2: Program Outcomes (PO) Attainment ── */}
+        {attainmentTab === "po" && (
+          <div className="space-y-4">
+            {/* PO Bar Chart */}
+            <div className="rounded-xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Program Outcomes (PO1 – PO12) Attainment Profile
+                </h4>
+                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                  NBA Benchmark: ≥ 60%
+                </span>
+              </div>
+              <div className="h-56">
+                <ReactApexChart
+                  options={poBarOptions}
+                  series={poBarSeries}
+                  type="bar"
+                  height={220}
+                  width="100%"
+                />
+              </div>
+            </div>
+
+            {/* PO Attainment Detailed Table */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                    <th className="p-3 font-bold text-slate-700 dark:text-slate-300">PO Code</th>
+                    <th className="p-3 font-bold text-slate-700 dark:text-slate-300">Program Outcome Name</th>
+                    <th className="p-3 font-bold text-slate-700 dark:text-slate-300 text-center">Contributing COs</th>
+                    <th className="p-3 font-bold text-slate-700 dark:text-slate-300 text-center">3-Point Level</th>
+                    <th className="p-3 font-bold text-slate-700 dark:text-slate-300 text-center">Attainment %</th>
+                    <th className="p-3 font-bold text-slate-700 dark:text-slate-300 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poAttainments.length > 0 ? (
+                    poAttainments.map((po: any) => {
+                      const isAttained = po.is_calculated && po.percentage !== null && po.percentage >= 60;
+                      const isCalc = po.is_calculated && po.percentage !== null;
 
                       return (
-                        <td key={po} className={`p-2.5 text-xs transition-colors ${cellClass}`} title={cell?.justification || ""}>
-                          {lvl > 0 ? lvl : "-"}
-                        </td>
+                        <tr
+                          key={po.po_code}
+                          className="border-b border-slate-100 dark:border-slate-800 last:border-none hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                        >
+                          <td className="p-3 font-extrabold text-indigo-600 dark:text-indigo-400">
+                            {po.po_code}
+                          </td>
+                          <td className="p-3 font-medium text-slate-800 dark:text-slate-200">
+                            {po.po_name}
+                          </td>
+                          <td className="p-3 text-center">
+                            {po.contributing_cos && po.contributing_cos.length > 0 ? (
+                              <div className="flex flex-wrap items-center justify-center gap-1">
+                                {po.contributing_cos.map((co: string) => (
+                                  <span
+                                    key={co}
+                                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  >
+                                    {co}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic">None</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center font-bold text-slate-800 dark:text-white">
+                            {isCalc && po.attainment_level !== null ? `${po.attainment_level} / 3.0` : "—"}
+                          </td>
+                          <td className="p-3 text-center font-extrabold text-slate-900 dark:text-white">
+                            {isCalc ? `${po.percentage}%` : "—"}
+                          </td>
+                          <td className="p-3 text-right">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                                !isCalc
+                                  ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                                  : isAttained
+                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                  : "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                              }`}
+                            >
+                              {!isCalc ? "Pending" : isAttained ? "Attained" : "Deficit"}
+                            </span>
+                          </td>
+                        </tr>
                       );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
-            <p className="text-xs font-semibold text-slate-400">No active CO-PO matrix loaded</p>
-            <p className="text-[11px] text-slate-400 mt-1">Configure and approve CO-PO mapping to render the articulation matrix.</p>
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                        No Program Outcomes mapped to this course yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
