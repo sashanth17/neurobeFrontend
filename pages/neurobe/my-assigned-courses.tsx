@@ -642,20 +642,42 @@ const MyAssignedCourses = () => {
                 <Building2 className="h-4 w-4 text-purple-600" />
               </div>
               <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                {departmentsData?.summary?.total_departments || deptList.length}
+                {departmentsData?.summary?.total_departments ?? deptList.length}
               </div>
               <div className="text-[10px] text-purple-600 font-semibold mt-0.5">HOD Administration</div>
             </div>
 
             <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                <span>Total Classrooms</span>
-                <GraduationCap className="h-4 w-4 text-indigo-600" />
+                <span>Total Courses</span>
+                <BookOpen className="h-4 w-4 text-indigo-600" />
               </div>
               <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                {departmentsData?.summary?.total_classrooms || deptList.reduce((acc, d) => acc + (d.classrooms_count || d.courses_count || 0), 0)}
+                {deptList.reduce((acc, d) => acc + (d.courses_count || 0), 0)}
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">Department Offerings</div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                <span>Total Classrooms</span>
+                <GraduationCap className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+                {departmentsData?.summary?.total_classrooms ?? deptList.reduce((acc, d) => acc + (d.classrooms_count || 0), 0)}
               </div>
               <div className="text-[10px] text-slate-400 font-medium mt-0.5">Active Sections</div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                <span>Total Faculty</span>
+                <ShieldCheck className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+                {deptList.reduce((acc, d) => acc + (d.faculties_count || 0), 0)}
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">Department Members</div>
             </div>
 
             <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -664,31 +686,9 @@ const MyAssignedCourses = () => {
                 <Users className="h-4 w-4 text-blue-600" />
               </div>
               <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                {departmentsData?.summary?.total_enrolled_students || deptList.reduce((acc, d) => acc + (d.enrolled_students || 0), 0)}
+                {departmentsData?.summary?.total_enrolled_students ?? deptList.reduce((acc, d) => acc + (d.enrolled_students || 0), 0)}
               </div>
               <div className="text-[10px] text-slate-400 font-medium mt-0.5">Across Department</div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                <span>Avg Syllabus</span>
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              </div>
-              <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                {departmentsData?.summary?.avg_syllabus_pct || 68.5}%
-              </div>
-              <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Completion Rate</div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                <span>Avg CIA Score</span>
-                <Target className="h-4 w-4 text-violet-600" />
-              </div>
-              <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                74.2%
-              </div>
-              <div className="text-[10px] text-violet-600 font-semibold mt-0.5">Pass Rate: 86.0%</div>
             </div>
           </div>
 
@@ -809,27 +809,27 @@ const MyAssignedCourses = () => {
                     <div className="grid grid-cols-2 gap-2 text-center text-xs">
                       <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
                         <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                          {d.classrooms_count ?? d.courses_count ?? 0}
+                          {d.courses_count ?? 0}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Courses</div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
+                        <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                          {d.classrooms_count ?? 0}
                         </div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400">Classrooms</div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
+                        <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                          {d.faculties_count ?? 0}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Faculty</div>
                       </div>
                       <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
                         <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
                           {d.enrolled_students ?? 0}
                         </div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400">Students</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
-                        <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                          {d.avg_syllabus_pct ?? 68.5}%
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Syllabus Avg</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
-                        <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                          {d.avg_cia_score ?? 74.2}%
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">CIA Average</div>
                       </div>
                     </div>
 
