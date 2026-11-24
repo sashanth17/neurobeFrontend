@@ -30,6 +30,9 @@ import {
   Info,
   ExternalLink,
   Loader2,
+  TrendingUp,
+  TrendingDown,
+  Award,
 } from "lucide-react";
 
 type SortOption =
@@ -81,13 +84,14 @@ const MyAssignedCourses = () => {
   const [deptDashboardLoading, setDeptDashboardLoading] = useState<boolean>(false);
   const [deptDashboardData, setDeptDashboardData] = useState<any | null>(null);
   const [deptDashboardError, setDeptDashboardError] = useState<string | null>(null);
-  const [deptActiveSection, setDeptActiveSection] = useState<"classrooms" | "blooms" | "copo" | "insights">("classrooms");
+  const [deptActiveSection, setDeptActiveSection] = useState<"courses" | "classrooms" | "outliers" | "blooms" | "copo" | "insights">("courses");
+  const [deptInsightsTab, setDeptInsightsTab] = useState<"insights" | "suggestions">("insights");
 
   const handleOpenDeptDashboard = async (dept: any) => {
     setSelectedDeptForDashboard(dept);
     setDeptDashboardLoading(true);
     setDeptDashboardError(null);
-    setDeptActiveSection("classrooms");
+    setDeptActiveSection("courses");
     try {
       const res: any = await Models.department.getDepartmentDashboard(dept.id);
       setDeptDashboardData(res);
@@ -930,8 +934,38 @@ const MyAssignedCourses = () => {
 
               {!deptDashboardLoading && deptDashboardData && (
                 <>
-                  {/* KPI Cards Row */}
+                  {/* Top-Level Department Counters (Section 4.2) */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                      <div className="text-xs font-semibold text-slate-500">Department Courses</div>
+                      <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                        {deptDashboardData.department?.total_courses || 0}
+                      </div>
+                      <div className="text-[11px] text-purple-600 font-semibold mt-0.5">
+                        {deptDashboardData.department?.classrooms_count || 0} active classrooms
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                      <div className="text-xs font-semibold text-slate-500">Total Students</div>
+                      <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                        {deptDashboardData.department?.total_students || 0}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        Enrolled across sections
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                      <div className="text-xs font-semibold text-slate-500">Total Faculty</div>
+                      <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                        {deptDashboardData.department?.total_faculty || 0}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        Teaching &amp; coordinators
+                      </div>
+                    </div>
+
                     <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
                       <div className="text-xs font-semibold text-slate-500">Syllabus Completion</div>
                       <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
@@ -941,55 +975,102 @@ const MyAssignedCourses = () => {
                         {deptDashboardData.syllabus_progress?.completed_topics || 0} / {deptDashboardData.syllabus_progress?.total_topics || 0} topics
                       </div>
                     </div>
+                  </div>
 
-                    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                      <div className="text-xs font-semibold text-slate-500">CIA Class Average</div>
-                      <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                        {deptDashboardData.cia_performance?.average_score_pct || 74}%
+                  {/* Secondary Assessment Metrics Banner */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-slate-200/90 bg-white dark:bg-slate-800/70 p-3.5 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-slate-500">CIA Class Average</div>
+                        <div className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                          {deptDashboardData.cia_performance?.average_score_pct != null
+                            ? `${deptDashboardData.cia_performance.average_score_pct}%`
+                            : "No assessments"}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-indigo-600 font-semibold mt-0.5">
-                        Pass Rate: {deptDashboardData.cia_performance?.pass_rate_pct || 86}%
+                      <div className="text-right">
+                        <span className="text-[11px] font-bold text-indigo-600">
+                          {deptDashboardData.cia_performance?.pass_rate_pct != null
+                            ? `Pass: ${deptDashboardData.cia_performance.pass_rate_pct}%`
+                            : "Pending evaluation"}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                      <div className="text-xs font-semibold text-slate-500">MCQ Performance</div>
-                      <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                        {deptDashboardData.mcq_performance?.average_score_pct || 77}%
+                    <div className="rounded-2xl border border-slate-200/90 bg-white dark:bg-slate-800/70 p-3.5 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-slate-500">MCQ Assessment</div>
+                        <div className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                          {deptDashboardData.mcq_performance?.average_score_pct != null
+                            ? `${deptDashboardData.mcq_performance.average_score_pct}%`
+                            : "No attempts"}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-amber-600 font-semibold mt-0.5">
-                        {deptDashboardData.mcq_performance?.total_attempts || 0} attempts logged
+                      <div className="text-right">
+                        <span className="text-[11px] font-bold text-amber-600">
+                          {deptDashboardData.mcq_performance?.total_attempts || 0} attempts
+                        </span>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                      <div className="text-xs font-semibold text-slate-500">PO Attainment</div>
-                      <div className="text-2xl font-black text-purple-700 dark:text-purple-300 mt-1">
-                        {deptDashboardData.copo_attainment?.average_po_level || 2.22} / 3.0
+                    <div className="rounded-2xl border border-slate-200/90 bg-white dark:bg-slate-800/70 p-3.5 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-slate-500">Program Outcomes (PO)</div>
+                        <div className="text-lg font-black text-purple-700 dark:text-purple-300 mt-0.5">
+                          {deptDashboardData.copo_attainment?.average_po_percentage != null
+                            ? `${deptDashboardData.copo_attainment.average_po_percentage}%`
+                            : "Yet to be calculated"}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-purple-600 font-semibold mt-0.5">
-                        {deptDashboardData.copo_attainment?.average_po_percentage || 74}% (NBA Target Met)
+                      <div className="text-right">
+                        <span className="text-[11px] font-bold text-purple-600">
+                          {deptDashboardData.copo_attainment?.average_po_level != null
+                            ? `Level: ${deptDashboardData.copo_attainment.average_po_level} / 3.0`
+                            : "Scale 0-3"}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Section Tabs */}
-                  <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 overflow-x-auto pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setDeptActiveSection("courses")}
+                      className={`border-b-2 px-3 py-2 text-xs font-bold whitespace-nowrap transition ${
+                        deptActiveSection === "courses"
+                          ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+                          : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400"
+                      }`}
+                    >
+                      Courses &amp; Batches ({deptDashboardData.courses_breakdown?.length || 0})
+                    </button>
                     <button
                       type="button"
                       onClick={() => setDeptActiveSection("classrooms")}
-                      className={`border-b-2 px-3 py-2 text-xs font-bold transition ${
+                      className={`border-b-2 px-3 py-2 text-xs font-bold whitespace-nowrap transition ${
                         deptActiveSection === "classrooms"
                           ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400"
                       }`}
                     >
-                      Classroom Comparison ({deptDashboardData.classrooms_comparison?.length || 0})
+                      Classrooms ({deptDashboardData.classrooms_comparison?.length || 0})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeptActiveSection("outliers")}
+                      className={`border-b-2 px-3 py-2 text-xs font-bold whitespace-nowrap transition ${
+                        deptActiveSection === "outliers"
+                          ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+                          : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400"
+                      }`}
+                    >
+                      Statistical Outliers (σ)
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeptActiveSection("blooms")}
-                      className={`border-b-2 px-3 py-2 text-xs font-bold transition ${
+                      className={`border-b-2 px-3 py-2 text-xs font-bold whitespace-nowrap transition ${
                         deptActiveSection === "blooms"
                           ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400"
@@ -1000,28 +1081,145 @@ const MyAssignedCourses = () => {
                     <button
                       type="button"
                       onClick={() => setDeptActiveSection("copo")}
-                      className={`border-b-2 px-3 py-2 text-xs font-bold transition ${
+                      className={`border-b-2 px-3 py-2 text-xs font-bold whitespace-nowrap transition ${
                         deptActiveSection === "copo"
                           ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400"
                       }`}
                     >
-                      CO-PO Attainment Matrix
+                      PO Attainment (NBA)
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeptActiveSection("insights")}
-                      className={`border-b-2 px-3 py-2 text-xs font-bold transition ${
+                      className={`border-b-2 px-3 py-2 text-xs font-bold whitespace-nowrap transition ${
                         deptActiveSection === "insights"
                           ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400"
                       }`}
                     >
-                      Statistical Insights (σ)
+                      Key Insights &amp; Suggestions
                     </button>
                   </div>
 
-                  {/* Section 1: Classroom Comparison */}
+                  {/* ── Tab 1: Courses & Batch Performance ── */}
+                  {deptActiveSection === "courses" && (
+                    <div className="space-y-5">
+                      {/* Batch Performance Segmentation (Section 4.2) */}
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-1.5">
+                          <GraduationCap className="h-4 w-4 text-purple-600" /> Batch Assessment Segmentation
+                        </h3>
+                        {deptDashboardData.batch_performance?.length > 0 ? (
+                          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-600 dark:text-slate-300">
+                                <tr>
+                                  <th className="py-2.5 px-3">Batch Name</th>
+                                  <th className="py-2.5 px-2 text-center">Enrolled Students</th>
+                                  <th className="py-2.5 px-2 text-center">Evaluated Count</th>
+                                  <th className="py-2.5 px-2 text-center">CIA Pass Rate</th>
+                                  <th className="py-2.5 px-2 text-center">CIA Class Average</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {deptDashboardData.batch_performance.map((b: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
+                                      {b.batch_name}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center font-bold">{b.student_count}</td>
+                                    <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-300">{b.appeared_students}</td>
+                                    <td className="py-2.5 px-2 text-center">
+                                      {b.cia_pass_rate != null ? (
+                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                          b.cia_pass_rate >= 70 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                        }`}>
+                                          {b.cia_pass_rate}%
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">Yet to be calculated</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center font-semibold">
+                                      {b.cia_avg_pct != null ? `${b.cia_avg_pct}%` : <span className="text-slate-400">No marks</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 p-4 text-center text-xs text-slate-500">
+                            No batch-level student assessment data recorded yet.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Course-Wise Performance Breakdown (Section 4.2) */}
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-1.5">
+                          <BookOpen className="h-4 w-4 text-indigo-600" /> Course-Wise Performance Breakdown
+                        </h3>
+                        {deptDashboardData.courses_breakdown?.length > 0 ? (
+                          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-600 dark:text-slate-300">
+                                <tr>
+                                  <th className="py-2.5 px-3">Course Code</th>
+                                  <th className="py-2.5 px-3">Course Title</th>
+                                  <th className="py-2.5 px-2 text-center">Sections</th>
+                                  <th className="py-2.5 px-2 text-center">Students</th>
+                                  <th className="py-2.5 px-2 text-center">Syllabus %</th>
+                                  <th className="py-2.5 px-2 text-center">CIA Pass %</th>
+                                  <th className="py-2.5 px-2 text-center">CIA Avg %</th>
+                                  <th className="py-2.5 px-2 text-center">MCQ Avg %</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {deptDashboardData.courses_breakdown.map((c: any) => (
+                                  <tr key={c.course_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="py-2.5 px-3 font-bold text-purple-600 dark:text-purple-400">
+                                      {c.course_code}
+                                    </td>
+                                    <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
+                                      {c.course_title}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center font-bold">{c.classrooms_count}</td>
+                                    <td className="py-2.5 px-2 text-center">{c.enrolled_students}</td>
+                                    <td className="py-2.5 px-2 text-center">
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                                        {c.syllabus_coverage_pct}%
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center">
+                                      {c.cia_pass_rate != null ? (
+                                        <span className="font-bold text-indigo-700">{c.cia_pass_rate}%</span>
+                                      ) : (
+                                        <span className="text-slate-400">-</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center">
+                                      {c.cia_avg_pct != null ? `${c.cia_avg_pct}%` : <span className="text-slate-400">-</span>}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center">
+                                      {c.mcq_avg_pct != null ? `${c.mcq_avg_pct}%` : <span className="text-slate-400">-</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 p-4 text-center text-xs text-slate-500">
+                            No courses mapped to this department yet.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Tab 2: Classroom Comparison ── */}
                   {deptActiveSection === "classrooms" && (
                     <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
                       <table className="w-full text-left text-xs">
@@ -1033,6 +1231,7 @@ const MyAssignedCourses = () => {
                             <th className="py-2.5 px-2 text-center">Students</th>
                             <th className="py-2.5 px-2 text-center">Syllabus %</th>
                             <th className="py-2.5 px-2 text-center">CIA Avg %</th>
+                            <th className="py-2.5 px-2 text-center">CIA Pass %</th>
                             <th className="py-2.5 px-2 text-center">MCQ Avg %</th>
                           </tr>
                         </thead>
@@ -1058,14 +1257,19 @@ const MyAssignedCourses = () => {
                                 </span>
                               </td>
                               <td className="py-2.5 px-2 text-center">
-                                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                                  {c.cia_avg_pct}%
-                                </span>
+                                {c.cia_avg_pct != null ? `${c.cia_avg_pct}%` : <span className="text-slate-400">-</span>}
                               </td>
                               <td className="py-2.5 px-2 text-center">
-                                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-                                  {c.mcq_avg_pct}%
-                                </span>
+                                {c.cia_pass_rate != null ? (
+                                  <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                    {c.cia_pass_rate}%
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                {c.mcq_avg_pct != null ? `${c.mcq_avg_pct}%` : <span className="text-slate-400">-</span>}
                               </td>
                             </tr>
                           ))}
@@ -1074,7 +1278,118 @@ const MyAssignedCourses = () => {
                     </div>
                   )}
 
-                  {/* Section 2: Bloom's Taxonomy Distribution */}
+                  {/* ── Tab 3: Statistical Outliers (Section 4.2) ── */}
+                  {deptActiveSection === "outliers" && (
+                    <div className="space-y-4">
+                      {/* Outlier Thresholds Banner */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-2xl border border-purple-100 dark:border-purple-900/50">
+                        <div>
+                          <div className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">Department Mean (μ)</div>
+                          <div className="text-xl font-black text-slate-900 dark:text-white mt-0.5">
+                            {deptDashboardData.outlier_analysis?.mean != null ? `${deptDashboardData.outlier_analysis.mean}%` : "N/A"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">Std Deviation (σ)</div>
+                          <div className="text-xl font-black text-slate-900 dark:text-white mt-0.5">
+                            {deptDashboardData.outlier_analysis?.std_dev != null ? `${deptDashboardData.outlier_analysis.std_dev}%` : "N/A"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Upper Threshold (μ + σ)</div>
+                          <div className="text-xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5">
+                            {deptDashboardData.outlier_analysis?.upper_threshold != null ? `${deptDashboardData.outlier_analysis.upper_threshold}%` : "N/A"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-semibold text-rose-700 dark:text-rose-400">Lower Threshold (μ - σ)</div>
+                          <div className="text-xl font-black text-rose-700 dark:text-rose-300 mt-0.5">
+                            {deptDashboardData.outlier_analysis?.lower_threshold != null ? `${deptDashboardData.outlier_analysis.lower_threshold}%` : "N/A"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Top Performers (Classrooms above mu + sigma) */}
+                      <div>
+                        <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
+                          <TrendingUp className="h-4 w-4" /> Top Performers (Above Upper Threshold)
+                        </h4>
+                        {(deptDashboardData.outlier_analysis?.top_performers || []).length > 0 ? (
+                          <div className="overflow-x-auto rounded-2xl border border-emerald-200 dark:border-emerald-900/60">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-emerald-50 dark:bg-emerald-950/40 font-bold text-emerald-900 dark:text-emerald-200">
+                                <tr>
+                                  <th className="py-2.5 px-3">Classroom</th>
+                                  <th className="py-2.5 px-3">Course</th>
+                                  <th className="py-2.5 px-3">Faculty</th>
+                                  <th className="py-2.5 px-2 text-center">Score</th>
+                                  <th className="py-2.5 px-2 text-center">Delta from Mean</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/40">
+                                {deptDashboardData.outlier_analysis.top_performers.map((p: any) => (
+                                  <tr key={p.instance_id}>
+                                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{p.instance_name}</td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="font-semibold text-purple-600">{p.course_code}</span> - {p.course_title}
+                                    </td>
+                                    <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300">{p.faculty_name}</td>
+                                    <td className="py-2.5 px-2 text-center font-black text-emerald-600">{p.score_pct}%</td>
+                                    <td className="py-2.5 px-2 text-center font-bold text-emerald-700">+{p.delta_from_mean}%</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 p-3.5 text-center text-xs text-slate-500">
+                            No classrooms performing above upper threshold standard deviation.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Top Dips (Classrooms below mu - sigma) */}
+                      <div>
+                        <h4 className="text-xs font-bold text-rose-700 dark:text-rose-400 mb-2 flex items-center gap-1.5">
+                          <TrendingDown className="h-4 w-4" /> Top Dips / Low Performers (Below Lower Threshold)
+                        </h4>
+                        {(deptDashboardData.outlier_analysis?.top_dips || []).length > 0 ? (
+                          <div className="overflow-x-auto rounded-2xl border border-rose-200 dark:border-rose-900/60">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-rose-50 dark:bg-rose-950/40 font-bold text-rose-900 dark:text-rose-200">
+                                <tr>
+                                  <th className="py-2.5 px-3">Classroom</th>
+                                  <th className="py-2.5 px-3">Course</th>
+                                  <th className="py-2.5 px-3">Faculty</th>
+                                  <th className="py-2.5 px-2 text-center">Score</th>
+                                  <th className="py-2.5 px-2 text-center">Delta from Mean</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-rose-100 dark:divide-rose-900/40">
+                                {deptDashboardData.outlier_analysis.top_dips.map((d: any) => (
+                                  <tr key={d.instance_id}>
+                                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{d.instance_name}</td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="font-semibold text-rose-600">{d.course_code}</span> - {d.course_title}
+                                    </td>
+                                    <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300">{d.faculty_name}</td>
+                                    <td className="py-2.5 px-2 text-center font-black text-rose-600">{d.score_pct}%</td>
+                                    <td className="py-2.5 px-2 text-center font-bold text-rose-700">{d.delta_from_mean}%</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 p-3.5 text-center text-xs text-slate-500">
+                            No classrooms flagged below lower threshold standard deviation.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Tab 4: Bloom's Taxonomy Distribution ── */}
                   {deptActiveSection === "blooms" && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -1083,10 +1398,10 @@ const MyAssignedCourses = () => {
                             <div className="text-xs font-bold text-slate-500">{k.level}</div>
                             <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{k.name}</div>
                             <div className="text-xl font-black text-purple-700 dark:text-purple-300 mt-2">
-                              {k.score_pct}%
+                              {k.score_pct != null ? `${k.score_pct}%` : "-"}
                             </div>
                             <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-2 overflow-hidden">
-                              <div className="h-full rounded-full bg-purple-600" style={{ width: `${Math.min(100, k.score_pct)}%` }} />
+                              <div className="h-full rounded-full bg-purple-600" style={{ width: `${Math.min(100, k.score_pct || 0)}%` }} />
                             </div>
                           </div>
                         ))}
@@ -1097,94 +1412,128 @@ const MyAssignedCourses = () => {
                     </div>
                   )}
 
-                  {/* Section 3: CO-PO Attainment Matrix */}
+                  {/* ── Tab 5: PO Attainment Summary (Exclusion Rule: Strictly NO Heatmap Articulation Matrix) ── */}
                   {deptActiveSection === "copo" && (
-                    <div className="space-y-3">
-                      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-                        <table className="w-full text-center text-xs">
-                          <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-600 dark:text-slate-300">
-                            <tr>
-                              <th className="py-2.5 px-3 text-left">Outcome</th>
-                              <th className="py-2.5 px-2">Dept Attain %</th>
-                              <th className="py-2.5 px-2">PO1</th>
-                              <th className="py-2.5 px-2">PO2</th>
-                              <th className="py-2.5 px-2">PO3</th>
-                              <th className="py-2.5 px-2">PO4</th>
-                              <th className="py-2.5 px-2">PO5</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {(deptDashboardData.copo_attainment?.matrix || []).map((row: any) => (
-                              <tr key={row.co}>
-                                <td className="py-2.5 px-3 text-left font-bold text-slate-900 dark:text-white">
-                                  {row.co}
-                                </td>
-                                <td className="py-2 px-2">
-                                  <span className="font-semibold text-emerald-600">
-                                    {row.co_percentage}% (L{row.co_level})
-                                  </span>
-                                </td>
-                                {["PO1", "PO2", "PO3", "PO4", "PO5"].map((po) => {
-                                  const attVal = row.attainments ? (row.attainments[po] || 0) : 0;
-                                  const w = row.weights ? (row.weights[po] || 0) : 0;
-                                  return (
-                                    <td key={po} className="py-1 px-1">
-                                      <div className={`py-1 px-1 rounded-lg text-center ${attVal >= 2.0 ? "bg-emerald-50 text-emerald-800 font-bold" : "bg-slate-50 text-slate-700"}`}>
-                                        {attVal > 0 ? (
-                                          <div>
-                                            <span>{attVal}</span>
-                                            <span className="text-[9px] opacity-60 ml-1">w:{w}</span>
-                                          </div>
-                                        ) : "-"}
-                                      </div>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-slate-50 dark:bg-slate-800/90 font-bold border-t-2 border-slate-200 dark:border-slate-700">
-                            <tr>
-                              <td className="py-2 px-3 text-left">PO Attainment Level</td>
-                              <td className="py-2 px-2 text-slate-400 font-normal">Scale 0-3</td>
-                              {(deptDashboardData.copo_attainment?.po_attainments || []).map((p: any) => (
-                                <td key={p.po} className="py-2 px-1 text-purple-700 dark:text-purple-300">
-                                  {p.level}
-                                </td>
-                              ))}
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-left">PO Attainment %</td>
-                              <td className="py-2 px-2 text-slate-400 font-normal">≥ 70% Target</td>
-                              {(deptDashboardData.copo_attainment?.po_attainments || []).map((p: any) => (
-                                <td key={p.po} className="py-2 px-1">
-                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-extrabold">
-                                    {p.percentage}%
-                                  </span>
-                                </td>
-                              ))}
-                            </tr>
-                          </tfoot>
-                        </table>
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Department PO Attainment Overview</div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            Accreditation Target: ≥ 70% threshold (2.10 on scale 0-3.0)
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-black text-purple-700 dark:text-purple-300">
+                            {deptDashboardData.copo_attainment?.average_po_percentage != null
+                              ? `${deptDashboardData.copo_attainment.average_po_percentage}%`
+                              : "Pending Calculation"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                        {(deptDashboardData.copo_attainment?.po_attainments || []).map((p: any) => (
+                          <div key={p.po} className="rounded-2xl border border-slate-200 p-3.5 bg-white dark:bg-slate-800/60 text-center">
+                            <div className="text-xs font-black text-purple-700 dark:text-purple-300">{p.po}</div>
+                            <div className="text-[11px] text-slate-500 font-medium truncate mt-0.5" title={p.label}>
+                              {p.label}
+                            </div>
+                            <div className="text-xl font-black text-slate-900 dark:text-white mt-2">
+                              {p.percentage != null ? `${p.percentage}%` : "-"}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                              {p.level != null ? `Level: ${p.level} / 3.0` : "Scale 0-3"}
+                            </div>
+                            <div className="mt-2">
+                              {p.has_data ? (
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  p.is_attained ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                }`}>
+                                  {p.is_attained ? "Target Met" : "Target Deficit"}
+                                </span>
+                              ) : (
+                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-500">
+                                  No assessment data
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-xl text-[11px] text-slate-500">
+                        <span className="font-bold text-purple-700 dark:text-purple-300">NBA Accreditation Governance Note:</span> As specified in accreditation guidelines (Section 4.3), CO-PO articulation matrices apply only at the individual course level and are strictly omitted from departmental aggregation.
                       </div>
                     </div>
                   )}
 
-                  {/* Section 4: Statistical Insights */}
+                  {/* ── Tab 6: Dual-Tab Key Insights & Suggestions (Section 5.1 & 5.3) ── */}
                   {deptActiveSection === "insights" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {(deptDashboardData.key_insights || []).map((ins: any, idx: number) => (
-                        <div key={idx} className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-900 dark:text-white">{ins.title}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold">
-                              σ = {ins.std_dev}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-300">{ins.description}</p>
-                          <p className="text-[11px] text-slate-400">{ins.detail}</p>
+                    <div className="space-y-4">
+                      {/* Sub-tab toggle */}
+                      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 pb-1">
+                        <button
+                          type="button"
+                          onClick={() => setDeptInsightsTab("insights")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                            deptInsightsTab === "insights"
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : "text-slate-500 hover:text-slate-800 dark:text-slate-300"
+                          }`}
+                        >
+                          Deterministic Key Insights ({deptDashboardData.key_insights?.length || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeptInsightsTab("suggestions")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                            deptInsightsTab === "suggestions"
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : "text-slate-500 hover:text-slate-800 dark:text-slate-300"
+                          }`}
+                        >
+                          Suggestions / Remedies
+                        </button>
+                      </div>
+
+                      {/* Sub-tab 1: Key Insights */}
+                      {deptInsightsTab === "insights" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {(deptDashboardData.key_insights || []).map((ins: any, idx: number) => (
+                            <div key={idx} className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white">{ins.title}</span>
+                                {ins.std_dev != null && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold">
+                                    σ = {ins.std_dev}%
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">{ins.description}</p>
+                              <p className="text-[11px] text-slate-400">{ins.detail}</p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+
+                      {/* Sub-tab 2: Suggestions / Remedies (Scoped out per Section 5.3) */}
+                      {deptInsightsTab === "suggestions" && (
+                        <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-6 dark:border-purple-900/60 dark:bg-purple-950/20 text-center space-y-3">
+                          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300">
+                            <Sparkles className="h-6 w-6" />
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                            Course &amp; Classroom-Level Remedial Scope
+                          </h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed">
+                            {deptDashboardData.ai_suggestions?.notice ||
+                              "AI pedagogical remedies and suggestions are scoped strictly to individual Course and Classroom dashboards to prevent generic advice. Department-level governance relies on deterministic statistical insights."}
+                          </p>
+                          <div className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold">
+                            Open individual Course or Classroom dashboards to generate granular, grounded AI remediation plans.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

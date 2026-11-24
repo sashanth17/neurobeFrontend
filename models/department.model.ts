@@ -156,6 +156,22 @@ const department = {
                 });
         });
     },
+
+    getInstitutionDashboard: (organizationId?: any) => {
+        return new Promise((resolve, reject) => {
+            const orgId = organizationId || getOrganizationId() || 1;
+            instance()
+                .get(`organizations/${orgId}/institution-dashboard`)
+                .then((res) => resolve(res.data))
+                .catch((error) => {
+                    if (error.response) {
+                        reject(error.response.data?.detail || error.response.data?.message || error.response.data);
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+    },
 };
 
 export default department;

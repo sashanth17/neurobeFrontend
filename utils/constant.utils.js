@@ -163,16 +163,10 @@ OwnmenuConfig.FACULTY = [
     href: "/neurobe/my-assigned-departments",
   },
   {
-    type: "submenu",
+    type: "link",
     icon: "IconMenuUsers",
-    label: "Instructor",
-    key: "instructor",
-    children: [
-      {
-        label: "Classrooms",
-        href: "/neurobe/course-offering",
-      },
-    ],
+    label: "Classrooms",
+    href: "/neurobe/course-offering",
   },
 ];
 

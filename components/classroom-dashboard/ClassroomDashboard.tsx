@@ -72,6 +72,9 @@ export default function ClassroomDashboard({
   // Modal state for CO-PO Articulation Matrix
   const [showCopoMatrixModal, setShowCopoMatrixModal] = useState(false);
 
+  // Dual-Tab Analytics state (Section 5.1): Key Insights vs AI Remedies
+  const [analyticsTab, setAnalyticsTab] = useState<"insights" | "remedies">("insights");
+
   // Fetch Dashboard analytics
   const fetchDashboardData = useCallback(async (silent = false) => {
     if (!instanceId) return;
@@ -143,13 +146,7 @@ export default function ClassroomDashboard({
     if (copoPoAttainments && copoPoAttainments.length > 0) {
       return copoPoAttainments;
     }
-    return [
-      { po: "PO1", label: "Engineering Knowledge", level: 2.18, percentage: 72.7, is_attained: true },
-      { po: "PO2", label: "Problem Analysis", level: 2.23, percentage: 74.3, is_attained: true },
-      { po: "PO3", label: "Design Solutions", level: 2.15, percentage: 71.7, is_attained: true },
-      { po: "PO4", label: "Investigations", level: 2.15, percentage: 71.7, is_attained: true },
-      { po: "PO5", label: "Modern Tools", level: 2.15, percentage: 71.7, is_attained: true },
-    ];
+    return [];
   }, [copoPoAttainments]);
 
   // Average CO Attainment
@@ -889,9 +886,11 @@ export default function ClassroomDashboard({
                   <p className="text-[11px] text-gray-400">NBA 3-point scale • Target: ≥ 2.10 (70%)</p>
                 </div>
               </div>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-200">
-                Avg: {copoAttainment?.average_po_level ?? 2.17} / 3.0 ({copoAttainment?.average_po_percentage ?? 72.4}%)
-              </span>
+              {copoAttainment?.average_po_level !== undefined && copoAttainment?.average_po_level !== null && (
+                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                  Avg: {copoAttainment.average_po_level} / 3.0 ({copoAttainment.average_po_percentage}%)
+                </span>
+              )}
             </div>
 
             {displayPoList.length > 0 ? (
@@ -959,7 +958,9 @@ export default function ClassroomDashboard({
           <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px]">
             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              {displayPoList.filter((p: any) => (p.is_attained ?? (p.percentage >= 70))).length} / {displayPoList.length} POs Meeting Target
+              {displayPoList.length > 0
+                ? `${displayPoList.filter((p: any) => (p.is_attained ?? (p.percentage >= 70))).length} / ${displayPoList.length} POs Meeting Target`
+                : "Awaiting Assessment Calculation"}
             </span>
             <button
               type="button"
@@ -1152,157 +1153,172 @@ export default function ClassroomDashboard({
         </div>
       </div>
 
-      {/* ── Key Insights Panel (Strict Standard Deviation Formula - NO AI) ───── */}
+      {/* ── Dual-Tab Analytics Container (Section 5.1): Key Insights vs AI Remedies ── */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300 flex items-center justify-center">
-              <Lightbulb className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                Key Statistical Insights
-              </h3>
-              <p className="text-[11px] text-gray-400">
-                Computed via Standard Deviation formula:{" "}
-                <span className="font-mono text-violet-600 dark:text-violet-400">
-                  σ = √( (1/N) * Σ(xᵢ - μ)² )
-                </span>{" "}
-                (Deterministic mathematical metrics)
-              </p>
-            </div>
+        {/* Tab Toggle Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-4">
+          <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => setAnalyticsTab("insights")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+                analyticsTab === "insights"
+                  ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <Lightbulb className="w-3.5 h-3.5" />
+              <span>Key Insights ({keyInsights.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAnalyticsTab("remedies")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+                analyticsTab === "remedies"
+                  ? "bg-white dark:bg-gray-800 text-violet-600 dark:text-violet-400 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Suggestions &amp; Remedies ({aiRemedies.length})</span>
+            </button>
           </div>
-          <span className="text-[10px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
-            Formula-Based Analytics
-          </span>
+
+          {analyticsTab === "insights" ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-400 font-mono hidden md:inline">
+                σ = √( (1/N) * Σ(xᵢ - μ)² )
+              </span>
+              <span className="text-[10px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
+                Formula-Based Analytics (No AI)
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={handleRegenerateAiRemedies}
+              disabled={regeneratingAi}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300 text-xs font-bold hover:bg-violet-100 border border-violet-200 dark:border-violet-800 disabled:opacity-50 transition"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${regeneratingAi ? "animate-spin" : ""}`} />
+              {regeneratingAi ? "Analyzing Classroom..." : "Regenerate AI Remedies"}
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {keyInsights.map((insight: any, idx: number) => {
-            const isWarning = insight.status === "warning";
-            const isSuccess = insight.status === "success";
+        {/* Tab 1: Key Statistical Insights */}
+        {analyticsTab === "insights" && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-gray-400">
+              Deterministic, factual classroom insights derived strictly from assessment and attainment variance formulas (no AI hallucination risk).
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {keyInsights.map((insight: any, idx: number) => {
+                const isWarning = insight.status === "warning";
+                const isSuccess = insight.status === "success";
 
-            return (
-              <div
-                key={idx}
-                className={`p-4 rounded-2xl border transition flex flex-col justify-between ${
-                  isWarning
-                    ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
-                    : isSuccess
-                    ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
-                    : "bg-gray-50/60 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700"
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                      {insight.title}
-                    </span>
-                    {insight.std_dev !== undefined && (
-                      <span className="text-xs font-extrabold font-mono text-indigo-600 dark:text-indigo-400 bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-indigo-100 shadow-2xs">
-                        σ = {insight.std_dev}
-                      </span>
+                return (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-2xl border transition flex flex-col justify-between ${
+                      isWarning
+                        ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                        : isSuccess
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                        : "bg-gray-50/60 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                          {insight.title}
+                        </span>
+                        {insight.std_dev !== undefined && (
+                          <span className="text-xs font-extrabold font-mono text-indigo-600 dark:text-indigo-400 bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-indigo-100 shadow-2xs">
+                            σ = {insight.std_dev}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                        {insight.description}
+                      </p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                        {insight.detail}
+                      </p>
+                    </div>
+
+                    {insight.mean !== undefined && (
+                      <div className="pt-2 mt-2 border-t border-gray-200/60 dark:border-gray-700/60 flex items-center justify-between text-[10px] text-gray-500">
+                        <span>Mean (μ): {insight.mean}%</span>
+                        <span>Variance (σ²): {insight.variance}</span>
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    {insight.description}
-                  </p>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                    {insight.detail}
-                  </p>
-                </div>
-
-                {insight.mean !== undefined && (
-                  <div className="pt-2 mt-2 border-t border-gray-200/60 dark:border-gray-700/60 flex items-center justify-between text-[10px] text-gray-500">
-                    <span>Mean (μ): {insight.mean}%</span>
-                    <span>Variance (σ²): {insight.variance}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── AI-Supported Possible Remedy Actions Panel ───────────────────────── */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-300 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                AI-Supported Remedial Action Recommendations
-              </h3>
-              <p className="text-[11px] text-gray-400">
-                Generated from comprehensive classroom telemetry (CIA, MCQ, K-levels & CO standard deviations)
-              </p>
+                );
+              })}
             </div>
           </div>
+        )}
 
-          <button
-            onClick={handleRegenerateAiRemedies}
-            disabled={regeneratingAi}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300 text-xs font-bold hover:bg-violet-100 border border-violet-200 dark:border-violet-800 disabled:opacity-50 transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${regeneratingAi ? "animate-spin" : ""}`} />
-            {regeneratingAi ? "Analyzing Classroom..." : "Regenerate AI Remedies"}
-          </button>
-        </div>
+        {/* Tab 2: AI-Supported Remedial Action Recommendations */}
+        {analyticsTab === "remedies" && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-gray-400">
+              Context-grounded pedagogical recommendations generated by AI using verified classroom telemetry (CIA, MCQ, K-levels &amp; CO standard deviations).
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {aiRemedies.map((remedy: any, idx: number) => {
+                const isHigh = remedy.priority === "High";
+                const isMed = remedy.priority === "Medium";
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {aiRemedies.map((remedy: any, idx: number) => {
-            const isHigh = remedy.priority === "High";
-            const isMed = remedy.priority === "Medium";
+                return (
+                  <div
+                    key={idx}
+                    className="p-5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/80 flex flex-col justify-between space-y-3 hover:border-violet-300 transition"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            isHigh
+                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-200"
+                              : isMed
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200"
+                          }`}
+                        >
+                          {remedy.priority} Priority
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-500">
+                          {remedy.timeline || "Immediate"}
+                        </span>
+                      </div>
 
-            return (
-              <div
-                key={idx}
-                className="p-5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/80 flex flex-col justify-between space-y-3 hover:border-violet-300 transition"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        isHigh
-                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-200"
-                          : isMed
-                          ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200"
-                          : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200"
-                      }`}
-                    >
-                      {remedy.priority} Priority
-                    </span>
-                    <span className="text-[10px] font-semibold text-gray-500">
-                      {remedy.timeline || "Immediate"}
-                    </span>
+                      <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-snug">
+                        {remedy.title}
+                      </h4>
+
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                        <strong className="text-gray-700 dark:text-gray-300">Diagnosis: </strong>
+                        {remedy.diagnosis}
+                      </p>
+
+                      <div className="mt-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-[11px] text-gray-700 dark:text-gray-300">
+                        <strong className="text-violet-600 dark:text-violet-400 font-semibold">
+                          Intervention Plan:{" "}
+                        </strong>
+                        {remedy.action}
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-gray-400 font-medium">
+                      Category: <span className="text-gray-600 dark:text-gray-300">{remedy.category}</span>
+                    </div>
                   </div>
-
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-snug">
-                    {remedy.title}
-                  </h4>
-
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                    <strong className="text-gray-700 dark:text-gray-300">Diagnosis: </strong>
-                    {remedy.diagnosis}
-                  </p>
-
-                  <div className="mt-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-[11px] text-gray-700 dark:text-gray-300">
-                    <strong className="text-violet-600 dark:text-violet-400 font-semibold">
-                      Intervention Plan:{" "}
-                    </strong>
-                    {remedy.action}
-                  </div>
-                </div>
-
-                <div className="text-[10px] text-gray-400 font-medium">
-                  Category: <span className="text-gray-600 dark:text-gray-300">{remedy.category}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── CIA Deep Dive Details Modal ──────────────────────────────────────── */}

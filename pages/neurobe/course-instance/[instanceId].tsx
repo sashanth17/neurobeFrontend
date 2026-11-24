@@ -14,12 +14,14 @@ import InstanceMCQExecutionTab from "@/components/academic-setup/InstanceMCQExec
 import MCQTestExecution from "../ins-mcq-test-execution";
 import ClassroomDashboard from "@/components/classroom-dashboard/ClassroomDashboard";
 import UpdateSyllabusCompletionModal from "@/components/classroom-dashboard/UpdateSyllabusCompletionModal";
+import { CourseQuestionBankTab } from "@/components/question-bank/CourseQuestionBankTab";
 import Models from "@/imports/models.import";
 import { getAuthUser } from "@/utils/function.utils";
 
 // Tabs that do NOT need a CIA test selected to render
 const CIA_INDEPENDENT_TABS = new Set([
   "dashboard",
+  "question-sets",
   "mcq-test-execution",
   "assignment-upload",
   "co-po-attainment",
@@ -27,6 +29,7 @@ const CIA_INDEPENDENT_TABS = new Set([
 
 const TABS = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "question-sets", label: "CIA Question Sets" },
   { id: "mcq-test-execution", label: "MCQ Test Execution" },
   { id: "extraction", label: "Extraction" },
   { id: "extracted-view", label: "Extracted View" },
@@ -230,7 +233,7 @@ function InstanceDashboardPage() {
       {/* ── Tab Content ──────────────────────────────────────────────────────── */}
       <div
         className={`p-6 ${
-          activeTab === "co-po-attainment" || activeTab === "dashboard"
+          activeTab === "co-po-attainment" || activeTab === "dashboard" || activeTab === "question-sets"
             ? "flex-1 min-h-0 overflow-y-auto"
             : activeTab === "mcq-test-execution"
             ? "flex-1 min-h-0 overflow-y-auto"
@@ -247,6 +250,16 @@ function InstanceDashboardPage() {
               onOpenSyllabusModal={() => setIsSyllabusModalOpen(true)}
               isCreator={isCreator}
               creatorName={instanceDetail?.created_by_name}
+            />
+          </div>
+        )}
+
+        {/* CIA Question Sets — instructor-authored/assembled sets scoped to this course & classroom (Section 1.3) */}
+        {activeTab === "question-sets" && (
+          <div className="w-full pb-16">
+            <CourseQuestionBankTab
+              courseKey={courseId ? String(courseId) : "1"}
+              courseTitle={instanceDetail?.course_title || "Course"}
             />
           </div>
         )}

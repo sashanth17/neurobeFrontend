@@ -1452,15 +1452,72 @@ pre.hljs {
   display: none;
 }
 
-/* Print styles for Question Paper */
+/* Consistent Select & Dropdown Styling across light and dark themes (Section 6.1) */
+select,
+.form-select {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.15s ease-in-out;
+}
+
+select:focus,
+.form-select:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25) !important;
+}
+
+.dark select,
+.dark .form-select {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.dark select option,
+.dark .form-select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Print styles for Reports & Question Papers (Section 6.1: Clean white backgrounds & formatting) */
 @media print {
   @page {
     margin: 8mm 10mm;
     size: auto;
   }
 
+  /* Force pristine white background and black text across all dark mode classes */
+  html,
+  body,
+  #__next,
+  .dark,
+  [class*="dark:bg-"],
+  [class*="dark"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app navigation chrome, header, sidebar, toolbars, buttons, and backdrop overlays */
+  nav,
+  aside,
+  header,
+  footer,
+  .sidebar,
+  .navbar,
+  .no-print,
+  .print\:hidden,
+  button:not(.printable-content button) {
+    display: none !important;
+  }
+
+  /* Question Paper & Exam Paper Print Canvas */
   #printable-question-paper,
-  .printable-exam-paper {
+  .printable-exam-paper,
+  .printable-report {
     position: static !important;
     left: auto !important;
     top: auto !important;
@@ -1471,12 +1528,18 @@ pre.hljs {
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #111827 !important;
     visibility: visible !important;
+    transform: none !important;
   }
 
   #printable-question-paper *,
-  .printable-exam-paper * {
+  .printable-exam-paper *,
+  .printable-report * {
     visibility: visible !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
   }
 
   #printable-question-paper .print-row-1,
@@ -1501,14 +1564,26 @@ pre.hljs {
     text-align: right !important;
   }
 
+  .print-avoid-break,
   #printable-question-paper .print-avoid-break {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
-  body {
-    background: #ffffff !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
   }
 }

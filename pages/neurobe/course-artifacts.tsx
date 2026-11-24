@@ -115,6 +115,7 @@ const InsCourseArtifacts = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<
+    | "dashboard"
     | "syllabus"
     | "copo"
     | "copso"
@@ -125,7 +126,13 @@ const InsCourseArtifacts = () => {
     | "report"
     | "cia_analytics"
     | "mcq_viva"
-  >("syllabus");
+  >(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("tab");
+      if (p) return p as any;
+    }
+    return "dashboard";
+  });
 
   const [sectionData, setSectionData] = useState<{
     syllabus?: any;
@@ -394,6 +401,7 @@ const InsCourseArtifacts = () => {
 
   const loadSectionData = async (
     tab:
+      | "dashboard"
       | "syllabus"
       | "copo"
       | "copso"
@@ -408,6 +416,7 @@ const InsCourseArtifacts = () => {
     coordOverride?: boolean
   ) => {
     if (!courseIdParam) return;
+    if (tab === "dashboard") return;
     if (
       tab === "copso" ||
       tab === "co-attainment" ||
@@ -2604,6 +2613,17 @@ const InsCourseArtifacts = () => {
         <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
+            onClick={() => setActiveTab("dashboard")}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "dashboard"
+                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+          >
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("syllabus")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "syllabus"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
@@ -2708,6 +2728,14 @@ const InsCourseArtifacts = () => {
       {(() => {
         const tabContent = (
           <>
+            {activeTab === "dashboard" && (
+              <CourseCoordinatorDashboard
+                courseId={Number(courseIdParam) || 1}
+                courseMetadata={course}
+                onNavigateToTab={(t) => setActiveTab(t as any)}
+              />
+            )}
+
             {activeTab === "syllabus" && (
               <div className="space-y-3">
                 {renderVersionCards("syllabus")}

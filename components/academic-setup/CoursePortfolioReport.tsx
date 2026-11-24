@@ -770,13 +770,13 @@ const CoursePortfolioReport: React.FC<CoursePortfolioReportProps> = ({
       {!loading && (
         <div
           ref={printContainerRef}
-          className="mx-auto flex flex-col items-center space-y-8 pb-12 transition-all duration-200"
+          className="mx-auto flex flex-col items-center space-y-8 pb-12 transition-all duration-200 printable-report"
           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top center" }}
         >
           {/* ════════════════════════════════════════════════════════════════════
               PAGE 1: Organization Header & Horizontal CO-PO Correlation Matrix
              ════════════════════════════════════════════════════════════════════ */}
-          <div className="relative w-full max-w-[850px] min-h-[1130px] rounded-lg border border-slate-300 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-950 flex flex-col justify-between">
+          <div className="relative w-full max-w-[850px] min-h-[1130px] rounded-lg border border-slate-300 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-950 flex flex-col justify-between print:bg-white print:text-black print:border-none print:shadow-none print-avoid-break">
             <div>
               {/* Header Box on Page 1 */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-slate-800 dark:bg-slate-900/60 space-y-1">
@@ -966,7 +966,7 @@ const CoursePortfolioReport: React.FC<CoursePortfolioReportProps> = ({
           {/* ════════════════════════════════════════════════════════════════════
               PAGE 2+: Lesson Plan Grouped by Unit with Active Pedagogies & hh:mm
              ════════════════════════════════════════════════════════════════════ */}
-          <div className="relative w-full max-w-[850px] min-h-[1130px] rounded-lg border border-slate-300 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-950 flex flex-col justify-between">
+          <div className="relative w-full max-w-[850px] min-h-[1130px] rounded-lg border border-slate-300 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-950 flex flex-col justify-between print:bg-white print:text-black print:border-none print:shadow-none print-avoid-break">
             <div>
               {/* Institutional Header on Page 2 */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-slate-800 dark:bg-slate-900/60 space-y-1">
