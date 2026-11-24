@@ -29,6 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  ExternalLink,
+  BarChart2,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import {
@@ -49,6 +51,7 @@ import CoursePortfolioReport from "@/components/academic-setup/CoursePortfolioRe
 import CiaAnalyticsTab from "@/components/academic-setup/CiaAnalyticsTab";
 import McqVivaTab from "@/components/academic-setup/McqVivaTab";
 import CourseCoordinatorDashboard from "@/components/academic-setup/CourseCoordinatorDashboard";
+import CourseCiaAssessmentSection from "@/components/academic-setup/CourseCiaAssessmentSection";
 import {
   SimplifiedMCQGenerator,
   HierarchyUnitItem,
@@ -124,14 +127,25 @@ const InsCourseArtifacts = () => {
     | "mcq_generation"
     | "co-attainment"
     | "report"
+    | "cia"
     | "cia_analytics"
     | "mcq_viva"
   >(() => {
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search).get("tab");
+      if (p === "mcq_viva") return "mcq_generation";
+      if (p === "cia_analytics") return "cia";
       if (p) return p as any;
     }
     return "dashboard";
+  });
+
+  const [mcqSubTab, setMcqSubTab] = useState<"generator" | "viva_report">(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("tab");
+      if (p === "mcq_viva") return "viva_report";
+    }
+    return "generator";
   });
 
   const [sectionData, setSectionData] = useState<{
@@ -410,6 +424,7 @@ const InsCourseArtifacts = () => {
       | "mcq_generation"
       | "co-attainment"
       | "report"
+      | "cia"
       | "cia_analytics"
       | "mcq_viva",
     forceRefresh = false,
@@ -421,6 +436,7 @@ const InsCourseArtifacts = () => {
       tab === "copso" ||
       tab === "co-attainment" ||
       tab === "report" ||
+      tab === "cia" ||
       tab === "cia_analytics" ||
       tab === "mcq_viva" ||
       tab === "mcq_generation"
@@ -1494,10 +1510,10 @@ const InsCourseArtifacts = () => {
               >
                 {versionsList.map((ver: any) => {
                   const itemId = ver[idKey];
-                  const tag = ver.is_active ? "â˜… Active" : ver.is_approved ? "âœ“ Approved" : "âœŽ Draft";
+                  const tag = ver.is_active ? "★ Active" : ver.is_approved ? "✓ Approved" : "✎ Draft";
                   return (
                     <option key={itemId} value={itemId}>
-                      v{ver.version_number} â€” {tag}
+                      v{ver.version_number} — {tag}
                     </option>
                   );
                 })}
@@ -1654,17 +1670,17 @@ const InsCourseArtifacts = () => {
                         <div className="flex items-center gap-1">
                           {isItemActive && (
                             <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                              â˜… Active
+                              ★ Active
                             </span>
                           )}
                           {isItemApproved && !isItemActive && (
                             <span className="rounded-full bg-sky-100 px-2 py-0.2 text-[9px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-                              âœ“ Approved
+                              ✓ Approved
                             </span>
                           )}
                           {!isItemApproved && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.2 text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              âœŽ Draft
+                              ✎ Draft
                             </span>
                           )}
                         </div>
@@ -1679,7 +1695,7 @@ const InsCourseArtifacts = () => {
                                 day: "numeric",
                                 year: "numeric",
                               })
-                            : "â€”"}
+                            : "—"}
                         </span>
                       </div>
 
@@ -2565,19 +2581,19 @@ const InsCourseArtifacts = () => {
             <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
             <span className="font-medium text-slate-700 dark:text-slate-300">{course.programme_name ?? "General"}</span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">â€¢</span>
+          <span className="text-slate-300 dark:text-slate-600">•</span>
           <div className="flex items-center gap-1">
             <Layers className="h-3.5 w-3.5 text-slate-400" />
             <span>{course.semester ? `Sem ${course.semester}` : "All Terms"}</span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">â€¢</span>
+          <span className="text-slate-300 dark:text-slate-600">•</span>
           <div className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5 text-slate-400" />
             <span>
               {course.credits ?? 0} Credits ({course.total_theory_hours ?? 0}h Theory / {course.total_lab_hours ?? 0}h Lab)
             </span>
           </div>
-          <span className="text-slate-300 dark:text-slate-600">â€¢</span>
+          <span className="text-slate-300 dark:text-slate-600">•</span>
           <div className="flex items-center gap-1">
             <BookOpen className="h-3.5 w-3.5 text-slate-400" />
             <span>{course.department_name ?? "General"}</span>
@@ -2596,7 +2612,7 @@ const InsCourseArtifacts = () => {
             onClick={() => setJobNotice(null)}
             className="text-slate-400 hover:text-slate-600 shrink-0 px-1"
           >
-            âœ•
+            ✕
           </button>
         </div>
       )}
@@ -2681,46 +2697,38 @@ const InsCourseArtifacts = () => {
             <button
               type="button"
               onClick={() => setActiveTab("mcq_generation")}
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "mcq_generation"
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+                activeTab === "mcq_generation" || activeTab === "mcq_viva"
                   ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                   : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                }`}
+              }`}
             >
-              <span>5. MCQ Gen</span>
+              <span>5. MCQ & Viva</span>
             </button>
           )}
 
           <button
             type="button"
+            onClick={() => setActiveTab("cia")}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+              activeTab === "cia" || activeTab === "cia_analytics"
+                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            }`}
+          >
+            <span>{isCoord ? "6. CIA Assessment" : "5. CIA Assessment"}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("report")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "report"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+              activeTab === "report"
                 ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            }`}
           >
-            <span>{isCoord ? "6. Report" : "5. Report"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("cia_analytics")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "cia_analytics"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
-          >
-            <span>{isCoord ? "7. CIA Analytics" : "6. CIA Analytics"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("mcq_viva")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "mcq_viva"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
-          >
-            <span>{isCoord ? "8. MCQ & Viva" : "7. MCQ & Viva"}</span>
+            <span>{isCoord ? "7. Report" : "6. Report"}</span>
           </button>
         </nav>
       </div>
@@ -3529,7 +3537,7 @@ const InsCourseArtifacts = () => {
                                   </p>
                                   <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                                     {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
-                                    {b.publisher ? `â€” ${b.publisher}` : ""}{" "}
+                                    {b.publisher ? `— ${b.publisher}` : ""}{" "}
                                     {b.publication_year ? `(${b.publication_year})` : ""}
                                   </p>
                                 </div>
@@ -3689,7 +3697,7 @@ const InsCourseArtifacts = () => {
                                   </p>
                                   <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                                     {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
-                                    {b.publisher ? `â€” ${b.publisher}` : ""}{" "}
+                                    {b.publisher ? `— ${b.publisher}` : ""}{" "}
                                     {b.publication_year ? `(${b.publication_year})` : ""}
                                   </p>
                                 </div>
@@ -3713,7 +3721,7 @@ const InsCourseArtifacts = () => {
                                 Curriculum Hierarchy (Units, Topics & Subtopics)
                               </h3>
                               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                {units.length} Units â€¢ Structured hierarchical teaching units
+                                {units.length} Units • Structured hierarchical teaching units
                               </p>
                             </div>
 
@@ -3754,7 +3762,7 @@ const InsCourseArtifacts = () => {
 
                                   <div className="flex items-center gap-1.5">
                                     <span className="rounded-md bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                      {u.theory_hours ?? 0} Th â€¢ {u.lab_hours ?? 0} Lab
+                                      {u.theory_hours ?? 0} Th • {u.lab_hours ?? 0} Lab
                                     </span>
 
                                     {canEdit && (
@@ -3859,7 +3867,7 @@ const InsCourseArtifacts = () => {
                                               </span>
                                               {st.subtopic_description && (
                                                 <span className="text-[10px] text-slate-400">
-                                                  â€” {st.subtopic_description}
+                                                  — {st.subtopic_description}
                                                 </span>
                                               )}
                                             </div>
@@ -4243,7 +4251,7 @@ const InsCourseArtifacts = () => {
                                   {co.co_code}
                                 </td>
                                 <td className="py-1.5 px-2.5 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
-                                  {co.description ?? "â€”"}
+                                  {co.description ?? "—"}
                                 </td>
                                 {posList.map((po) => {
                                   const entry = cellMap.get(
@@ -4255,7 +4263,7 @@ const InsCourseArtifacts = () => {
                                         key={po.po_id}
                                         className="py-1.5 px-1 text-center text-slate-300"
                                       >
-                                        â€”
+                                        —
                                       </td>
                                     );
                                   }
@@ -4298,8 +4306,8 @@ const InsCourseArtifacts = () => {
                                         }
                                         title={
                                           currentJust
-                                            ? `${co.co_code} â†’ ${po.po_code}: ${currentJust}`
-                                            : `${co.co_code} â†’ ${po.po_code} (${currentVal})`
+                                            ? `${co.co_code} → ${po.po_code}: ${currentJust}`
+                                            : `${co.co_code} → ${po.po_code} (${currentVal})`
                                         }
                                         className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs transition ${colorClass} ${canEditMatrix
                                             ? "cursor-pointer hover:scale-110 hover:shadow-sm"
@@ -4348,7 +4356,7 @@ const InsCourseArtifacts = () => {
                                 >
                                   <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
                                     <span>
-                                      {e.co_code ?? `CO${e.course_outcome_id}`} â†’{" "}
+                                      {e.co_code ?? `CO${e.course_outcome_id}`} →{" "}
                                       {e.po_code ?? `PO${e.po_id}`}
                                     </span>
                                     <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -4928,15 +4936,79 @@ const InsCourseArtifacts = () => {
               </div>
             )}
 
-            {activeTab === "mcq_generation" && isCoord && (
-              <SimplifiedMCQGenerator
-                courseId={courseIdParam || undefined}
+            {(activeTab === "mcq_generation" || activeTab === "mcq_viva") && isCoord && (
+              <div className="space-y-6">
+                {/* MCQ & Viva Sub-navigation Toggle */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMcqSubTab("generator")}
+                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                        mcqSubTab === "generator"
+                          ? "bg-purple-600 text-white shadow-xs"
+                          : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span>AI MCQ Generator</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMcqSubTab("viva_report")}
+                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                        mcqSubTab === "viva_report"
+                          ? "bg-purple-600 text-white shadow-xs"
+                          : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <BarChart2 className="h-4 w-4" />
+                      <span>MCQ & Viva Performance / Analytics</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/neurobe/question-bank/${courseIdParam}?code=${encodeURIComponent(
+                          course?.course_code ?? ""
+                        )}&title=${encodeURIComponent(course?.course_title ?? "")}`
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 rounded-xl transition cursor-pointer"
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>View Question Bank</span>
+                    <ExternalLink className="h-3 w-3 opacity-70" />
+                  </button>
+                </div>
+
+                {mcqSubTab === "generator" && (
+                  <SimplifiedMCQGenerator
+                    courseId={courseIdParam || undefined}
+                    courseCode={course?.course_code ?? "COURSE"}
+                    courseTitle={course?.course_title ?? "Academic Course"}
+                    hierarchyUnits={mcqHierarchyUnits}
+                    loadingHierarchy={Boolean(loadingHierarchyUnits || sectionLoading.syllabus || loading)}
+                    onGenerate={handleSimplifiedMCQGenerate}
+                    isGeneratingAI={isGeneratingMCQ}
+                  />
+                )}
+
+                {mcqSubTab === "viva_report" && (
+                  <McqVivaTab courseId={Number(courseIdParam) || 1} />
+                )}
+              </div>
+            )}
+
+            {(activeTab === "cia" || activeTab === "cia_analytics") && (
+              <CourseCiaAssessmentSection
+                courseId={courseIdParam || 1}
                 courseCode={course?.course_code ?? "COURSE"}
                 courseTitle={course?.course_title ?? "Academic Course"}
-                hierarchyUnits={mcqHierarchyUnits}
-                loadingHierarchy={Boolean(loadingHierarchyUnits || sectionLoading.syllabus || loading)}
-                onGenerate={handleSimplifiedMCQGenerate}
-                isGeneratingAI={isGeneratingMCQ}
+                initialSubTab={activeTab === "cia_analytics" ? "analytics" : "builder"}
               />
             )}
 
@@ -4947,14 +5019,6 @@ const InsCourseArtifacts = () => {
                 courseMetadata={course}
                 onRefresh={fetchPortfolio}
               />
-            )}
-
-            {activeTab === "cia_analytics" && (
-              <CiaAnalyticsTab courseId={Number(courseIdParam) || 1} />
-            )}
-
-            {activeTab === "mcq_viva" && (
-              <McqVivaTab courseId={Number(courseIdParam) || 1} />
             )}
           </>
         );
@@ -4975,7 +5039,7 @@ const InsCourseArtifacts = () => {
                     onClick={() => setSplitScreenView(false)}
                     className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded-md hover:bg-slate-800 transition"
                   >
-                    Close Split View âœ•
+                    Close Split View ✕
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -5245,7 +5309,7 @@ const InsCourseArtifacts = () => {
                   .filter((e: any) => Boolean(e.is_approved))
                   .map((e: any) => (
                     <option key={e.extractions_id} value={e.extractions_id}>
-                      Version {e.version_number} â€” {e.is_active ? "Active" : "Approved"}
+                      Version {e.version_number} — {e.is_active ? "Active" : "Approved"}
                     </option>
                   ))}
               </select>
@@ -5303,7 +5367,7 @@ const InsCourseArtifacts = () => {
                   .filter((e: any) => Boolean(e.is_approved))
                   .map((e: any) => (
                     <option key={e.extractions_id} value={e.extractions_id}>
-                      Version {e.version_number} â€” {e.is_active ? "Active" : "Approved"}
+                      Version {e.version_number} — {e.is_active ? "Active" : "Approved"}
                     </option>
                   ))}
               </select>
@@ -5362,7 +5426,7 @@ const InsCourseArtifacts = () => {
                     .filter((e: any) => Boolean(e.is_approved))
                     .map((e: any) => (
                       <option key={e.extractions_id} value={e.extractions_id}>
-                        Extraction v{e.version_number} â€” {e.is_active ? "Active" : "Approved"}
+                        Extraction v{e.version_number} — {e.is_active ? "Active" : "Approved"}
                       </option>
                     ))}
                 </select>
@@ -5384,7 +5448,7 @@ const InsCourseArtifacts = () => {
                     .filter((p: any) => Boolean(p.is_approved))
                     .map((p: any) => (
                       <option key={p.pedagogy_id} value={p.pedagogy_id}>
-                        Pedagogy v{p.version_number} â€” {p.is_active ? "Active" : "Approved"}
+                        Pedagogy v{p.version_number} — {p.is_active ? "Active" : "Approved"}
                       </option>
                     ))}
                 </select>
@@ -5434,7 +5498,7 @@ const InsCourseArtifacts = () => {
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Edit2 className="h-4 w-4 text-indigo-500" />
                 <span>
-                  Edit Cell: {copoEditingCell.co_code} â†’ {copoEditingCell.po_code}
+                  Edit Cell: {copoEditingCell.co_code} → {copoEditingCell.po_code}
                 </span>
               </h3>
               <button

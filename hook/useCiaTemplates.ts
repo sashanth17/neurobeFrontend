@@ -53,10 +53,10 @@ export const useCiaTemplates = (courseId: number | string) => {
 
   const handleCreateTemplate = async (payload: CreateTemplatePayload) => {
     try {
-      await Models.cia_test.createTemplate(courseId, payload);
+      const res: any = await Models.cia_test.createTemplate(courseId, payload);
       Success(`Template "${payload.template_name}" created successfully!`);
       await fetchTemplates();
-      return true;
+      return res || true;
     } catch (err: any) {
       console.error("Failed to create template:", err);
       Failure(err?.detail || err?.message || "Failed to create template");

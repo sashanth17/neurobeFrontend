@@ -24,6 +24,7 @@ interface AssemblyHeaderProps {
   };
   onOpenPreview: () => void;
   onOpenUploadPdf: () => void;
+  onBack?: () => void;
 }
 
 export const AssemblyHeader: React.FC<AssemblyHeaderProps> = ({
@@ -34,6 +35,7 @@ export const AssemblyHeader: React.FC<AssemblyHeaderProps> = ({
   assemblyStats,
   onOpenPreview,
   onOpenUploadPdf,
+  onBack,
 }) => {
   const router = useRouter();
 
@@ -42,8 +44,14 @@ export const AssemblyHeader: React.FC<AssemblyHeaderProps> = ({
       {/* Top Navigation Row */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-4">
         <button
-          onClick={() => router.push(`/neurobe/question-bank/${courseId}`)}
-          className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+          onClick={() => {
+            if (onBack) {
+              onBack();
+            } else {
+              router.push(`/neurobe/question-bank/${courseId}`);
+            }
+          }}
+          className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Back to Course Blueprints & Assessments</span>
