@@ -318,6 +318,20 @@ const course = {
         });
     },
 
+    coordinator_dashboard: (courseId: number | string) => {
+        return new Promise((resolve, reject) => {
+            let url = `course/dashboard/courses/${courseId}/coordinator-dashboard`;
+            commonInstance()
+                .get(url)
+                .then((res) => {
+                    resolve(res.data);
+                })
+                .catch((error) => {
+                    reject(error?.response?.data?.detail || error?.response?.data?.message || error?.message || error);
+                });
+        });
+    },
+
 };
 
 export default course;

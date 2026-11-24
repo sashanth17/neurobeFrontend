@@ -164,30 +164,6 @@ OwnmenuConfig.FACULTY = [
   },
   {
     type: "submenu",
-    icon: "IconMenuNotes",
-    label: "Coordinator",
-    key: "coordinator",
-    children: [
-      {
-        type: "submenu",
-        icon: "IconMenuNotes",
-        label: "Question Banks",
-        key: "question_banks",
-        children: [
-          {
-            label: "MCQ-bank",
-            href: "/neurobe/mcq-generation",
-          },
-          {
-            label: "CIA-bank",
-            href: "/neurobe/question-bank",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    type: "submenu",
     icon: "IconMenuUsers",
     label: "Instructor",
     key: "instructor",

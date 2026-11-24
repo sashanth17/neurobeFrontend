@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import {
@@ -48,6 +48,7 @@ import CoPsoMappingSection from "@/components/academic-setup/CoPsoMappingSection
 import CoursePortfolioReport from "@/components/academic-setup/CoursePortfolioReport";
 import CiaAnalyticsTab from "@/components/academic-setup/CiaAnalyticsTab";
 import McqVivaTab from "@/components/academic-setup/McqVivaTab";
+import CourseCoordinatorDashboard from "@/components/academic-setup/CourseCoordinatorDashboard";
 import {
   SimplifiedMCQGenerator,
   HierarchyUnitItem,
@@ -4901,6 +4902,7 @@ const InsCourseArtifacts = () => {
 
             {activeTab === "mcq_generation" && isCoord && (
               <SimplifiedMCQGenerator
+                courseId={courseIdParam || undefined}
                 courseCode={course?.course_code ?? "COURSE"}
                 courseTitle={course?.course_title ?? "Academic Course"}
                 hierarchyUnits={mcqHierarchyUnits}

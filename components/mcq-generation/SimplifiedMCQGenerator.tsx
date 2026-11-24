@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/router";
 import {
   Sparkles,
   BookOpen,
@@ -15,6 +16,8 @@ import {
   Square,
   Minus,
   Plus,
+  Layers,
+  ExternalLink,
 } from "lucide-react";
 import { PEDAGOGICAL_PRESETS } from "./types";
 
@@ -38,6 +41,7 @@ export interface HierarchyUnitItem {
 }
 
 export interface SimplifiedMCQGeneratorProps {
+  courseId?: string | number;
   courseCode: string;
   courseTitle: string;
   hierarchyUnits: HierarchyUnitItem[];
@@ -102,6 +106,7 @@ const BLOOM_LEVELS = [
 ];
 
 export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
+  courseId,
   courseCode,
   courseTitle,
   hierarchyUnits,
@@ -109,6 +114,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
   onGenerate,
   isGeneratingAI,
 }) => {
+  const router = useRouter();
   // Topic search term
   const [topicSearch, setTopicSearch] = useState("");
 
@@ -537,7 +543,19 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
           </div>
 
           {/* Quick Selection Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {courseId && (
+              <button
+                type="button"
+                onClick={() => router.push(`/neurobe/question-bank/${courseId}?code=${encodeURIComponent(courseCode)}&title=${encodeURIComponent(courseTitle)}`)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/70 px-3 py-1 text-xs font-bold text-purple-700 hover:bg-purple-100 transition shadow-2xs dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
+                title="Open Course Question Bank"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>View Question Bank</span>
+                <ExternalLink className="h-3 w-3 opacity-60" />
+              </button>
+            )}
             <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
               {totalSelectedTopicsCount} Topics • {totalSelectedSubtopicsCount} Subtopics Selected
             </span>
