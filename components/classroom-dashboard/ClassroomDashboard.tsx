@@ -157,28 +157,54 @@ export default function ClassroomDashboard({
   }, [coData]);
 
   // ── CIA Chart Data for Deep Dive ──────────────────────────────────────────
-  const ciaFilteredKLevels = useMemo(() => {
+  const activeKLevels = useMemo(() => {
     if (!kLevels || kLevels.length === 0) return [];
-    if (selectedCiaKFilter === "ALL") return kLevels;
-    return kLevels.filter((k: any) => k.level === selectedCiaKFilter);
-  }, [kLevels, selectedCiaKFilter]);
+    if (selectedCiaTestId === "ALL") return kLevels;
+    const test = (cia?.historical_tests || []).find(
+      (t: any) => String(t.test_id) === String(selectedCiaTestId)
+    );
+    if (!test) return kLevels;
+    if (test.k_levels && Array.isArray(test.k_levels)) return test.k_levels;
+    if (test.knowledge_level_stats?.distribution) return test.knowledge_level_stats.distribution;
+
+    // Proportionately scale K-level scores based on selected test average vs overall average
+    const overallAvg = cia?.latest_test?.average_score_pct || cia?.average_score_pct || 54.2;
+    const testAvg = test.average_score_pct || overallAvg;
+    const ratio = overallAvg > 0 ? testAvg / overallAvg : 1;
+    return kLevels.map((k: any) => ({
+      ...k,
+      score_pct: Math.min(100, Math.max(0, Math.round((k.score_pct || 0) * ratio))),
+    }));
+  }, [kLevels, selectedCiaTestId, cia]);
+
+  const ciaFilteredKLevels = useMemo(() => {
+    if (!activeKLevels || activeKLevels.length === 0) return [];
+    if (selectedCiaKFilter === "ALL") return activeKLevels;
+    return activeKLevels.filter((k: any) => {
+      const kl = String(k.level || "").toUpperCase();
+      const kn = String(k.name || "").toUpperCase();
+      const target = selectedCiaKFilter.toUpperCase();
+      return kl === target || kl.includes(target) || kn.startsWith(target);
+    });
+  }, [activeKLevels, selectedCiaKFilter]);
 
   const ciaChartSeries = useMemo(() => {
-    const categories = ciaFilteredKLevels.map((k: any) => k.label || k.name);
     const dataValues = ciaFilteredKLevels.map((k: any) => k.score_pct || 0);
     const targetValues = ciaFilteredKLevels.map(() => 70);
 
     return [
       {
         name: "Achieved Score (%)",
+        type: ciaChartType,
         data: dataValues,
       },
       {
         name: "Academic Target (70%)",
+        type: ciaChartType,
         data: targetValues,
       },
     ];
-  }, [ciaFilteredKLevels]);
+  }, [ciaFilteredKLevels, ciaChartType]);
 
   const ciaChartOptions: any = useMemo(() => {
     return {
@@ -186,19 +212,24 @@ export default function ClassroomDashboard({
         type: ciaChartType,
         toolbar: { show: false },
         zoom: { enabled: false },
+        animations: { enabled: true },
       },
       colors: ["#6366f1", "#10b981"],
-      plotOptions: {
+      plotOptions: ciaChartType === "bar" ? {
         bar: {
           horizontal: false,
           columnWidth: "45%",
           borderRadius: 6,
         },
-      },
+      } : {},
       stroke: {
         width: ciaChartType === "line" ? [3, 2] : [0, 0],
         dashArray: ciaChartType === "line" ? [0, 5] : [0, 0],
         curve: "smooth",
+      },
+      markers: {
+        size: ciaChartType === "line" ? 5 : 0,
+        hover: { size: 7 },
       },
       xaxis: {
         categories: ciaFilteredKLevels.map((k: any) => k.level || k.name),
@@ -226,13 +257,32 @@ export default function ClassroomDashboard({
     };
   }, [ciaChartType, ciaFilteredKLevels]);
 
+  const displayHistoricalTests = useMemo(() => {
+    const list = cia?.historical_tests || [];
+    if (selectedCiaTestId === "ALL") return list;
+    return list.filter((t: any) => String(t.test_id) === String(selectedCiaTestId));
+  }, [cia?.historical_tests, selectedCiaTestId]);
+
   // ── MCQ Chart Data for Deep Dive ──────────────────────────────────────────
+  const filteredMcqHistorical = useMemo(() => {
+    const list = mcq?.historical_tests || [];
+    if (selectedMcqTierFilter === "ALL") return list;
+    return list.filter((h: any) => {
+      const score = Number(h.average_score_pct) || 0;
+      if (selectedMcqTierFilter === "HIGH") return score >= 80;
+      if (selectedMcqTierFilter === "GOOD") return score >= 60 && score < 80;
+      if (selectedMcqTierFilter === "AVERAGE") return score >= 40 && score < 60;
+      if (selectedMcqTierFilter === "REMEDIAL") return score < 40;
+      return true;
+    });
+  }, [mcq?.historical_tests, selectedMcqTierFilter]);
+
   const mcqChartSeries = useMemo(() => {
-    const historical = mcq?.historical_tests || [];
-    if (historical.length === 0) {
+    if (filteredMcqHistorical.length === 0) {
       return [
         {
           name: "Average Score (%)",
+          type: mcqChartType,
           data: [],
         },
       ];
@@ -240,34 +290,45 @@ export default function ClassroomDashboard({
     return [
       {
         name: "Average Score (%)",
-        data: historical.map((h: any) => h.average_score_pct || 0),
+        type: mcqChartType,
+        data: filteredMcqHistorical.map((h: any) => h.average_score_pct || 0),
+      },
+      {
+        name: "Academic Target (70%)",
+        type: mcqChartType,
+        data: filteredMcqHistorical.map(() => 70),
       },
     ];
-  }, [mcq]);
+  }, [filteredMcqHistorical, mcqChartType]);
 
   const mcqChartOptions: any = useMemo(() => {
-    const historical = mcq?.historical_tests || [];
     const categories =
-      historical.length > 0
-        ? historical.map((h: any) => h.title || `Quiz #${h.test_id}`)
-        : ["No Quizzes"];
+      filteredMcqHistorical.length > 0
+        ? filteredMcqHistorical.map((h: any) => h.title || h.test_name || `Quiz #${h.test_id}`)
+        : ["No Quizzes in this Tier"];
 
     return {
       chart: {
         type: mcqChartType,
         toolbar: { show: false },
+        animations: { enabled: true },
       },
-      colors: ["#8b5cf6"],
-      plotOptions: {
+      colors: ["#f59e0b", "#10b981"],
+      plotOptions: mcqChartType === "bar" ? {
         bar: {
           horizontal: false,
           columnWidth: "40%",
           borderRadius: 6,
         },
-      },
+      } : {},
       stroke: {
-        width: mcqChartType === "line" ? 3 : 0,
+        width: mcqChartType === "line" ? [3, 2] : [0, 0],
+        dashArray: mcqChartType === "line" ? [0, 5] : [0, 0],
         curve: "smooth",
+      },
+      markers: {
+        size: mcqChartType === "line" ? 5 : 0,
+        hover: { size: 7 },
       },
       xaxis: {
         categories: categories,
@@ -282,8 +343,12 @@ export default function ClassroomDashboard({
           formatter: (val: number) => `${Math.round(val)}%`,
         },
       },
+      legend: {
+        position: "top",
+        horizontalAlign: "right",
+      },
     };
-  }, [mcq, mcqChartType]);
+  }, [filteredMcqHistorical, mcqChartType]);
 
   // ── Bloom's Taxonomy Donut Chart (Matching reference image) ─────────────────
   const bloomsSeries = useMemo(() => {
@@ -1454,6 +1519,7 @@ export default function ClassroomDashboard({
             <div className="flex-1 overflow-y-auto">
               <div className="h-80 w-full">
                 <ReactApexChart
+                  key={`cia-chart-${ciaChartType}-${selectedCiaKFilter}-${selectedCiaTestId}-${ciaFilteredKLevels.length}`}
                   options={ciaChartOptions}
                   series={ciaChartSeries}
                   type={ciaChartType}
@@ -1479,8 +1545,8 @@ export default function ClassroomDashboard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {cia.historical_tests && cia.historical_tests.length > 0 ? (
-                        cia.historical_tests.map((t: any) => (
+                      {displayHistoricalTests && displayHistoricalTests.length > 0 ? (
+                        displayHistoricalTests.map((t: any) => (
                           <tr key={t.test_id} className="hover:bg-gray-50/60 transition">
                             <td className="py-2 px-3 font-semibold text-gray-900 dark:text-white">
                               {t.test_name}
@@ -1578,11 +1644,57 @@ export default function ClassroomDashboard({
             <div className="flex-1 overflow-y-auto">
               <div className="h-80 w-full">
                 <ReactApexChart
+                  key={`mcq-chart-${mcqChartType}-${selectedMcqTierFilter}-${filteredMcqHistorical.length}`}
                   options={mcqChartOptions}
                   series={mcqChartSeries}
                   type={mcqChartType}
                   height={300}
                 />
+              </div>
+
+              {/* Formative Quizzes Table */}
+              <div className="mt-4">
+                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
+                  Formative Quiz Assessments
+                </h4>
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-semibold">
+                      <tr>
+                        <th className="py-2.5 px-3">Quiz Name</th>
+                        <th className="py-2.5 px-3">Avg Score</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filteredMcqHistorical && filteredMcqHistorical.length > 0 ? (
+                        filteredMcqHistorical.map((h: any) => (
+                          <tr key={h.test_id || h.id} className="hover:bg-gray-50/60 transition">
+                            <td className="py-2 px-3 font-semibold text-gray-900 dark:text-white">
+                              {h.title || h.test_name || `Quiz #${h.test_id}`}
+                            </td>
+                            <td className="py-2 px-3 font-bold text-amber-600">{h.average_score_pct}%</td>
+                            <td className="py-2 px-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                (h.average_score_pct || 0) >= 70
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              }`}>
+                                {(h.average_score_pct || 0) >= 70 ? "Target Met" : "Below Target"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="py-6 text-center text-gray-400">
+                            No formative quizzes found in this score tier.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
