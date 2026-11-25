@@ -860,7 +860,7 @@ const MCQTestExecution = ({ courseId: propCourseId, instanceId: propInstanceId }
             </div>
           </div>
           <p className="mt-2 text-2xl font-black text-indigo-600 dark:text-indigo-400">
-            {state.questionSets.length || (state.questionPool.length > 0 ? 2 : 0)} Sets
+            {state.questionSets.length} {state.questionSets.length === 1 ? "Set" : "Sets"}
           </p>
           <p className="mt-0.5 text-xs text-gray-500">Available for assignment</p>
         </div>
