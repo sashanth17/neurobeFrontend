@@ -194,7 +194,7 @@ const LoginBoxed = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#F7F9FE] p-3 font-montserrat selection:bg-[#5C28CA] selection:text-white dark:bg-[#060818] sm:p-5 lg:p-6">
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#F7F9FE] p-3 font-inter selection:bg-[#5C28CA] selection:text-white dark:bg-[#060818] sm:p-5 lg:p-6">
       {/* Background ambient lighting effects */}
       <div className="pointer-events-none absolute -left-40 -top-40 h-[480px] w-[480px] rounded-full bg-[#5C28CA]/10 blur-3xl filter dark:bg-[#5C28CA]/20" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-[480px] w-[480px] rounded-full bg-[#4361ee]/10 blur-3xl filter dark:bg-[#4361ee]/15" />

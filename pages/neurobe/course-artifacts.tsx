@@ -32,12 +32,9 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
-<<<<<<< Updated upstream
   ExternalLink,
   BarChart2,
-=======
   Settings,
->>>>>>> Stashed changes
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import {
@@ -1417,10 +1414,10 @@ const InsCourseArtifacts = () => {
     const isProcessing = state === "sent_to_llm" || state === "processing";
 
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-indigo-200/80 bg-gradient-to-b from-indigo-50/70 via-white to-indigo-50/30 p-5 text-center shadow-xs dark:border-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-indigo-950/20 my-2">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-blue-200/80 bg-gradient-to-b from-blue-50/70 via-white to-blue-50/30 p-5 text-center shadow-xs dark:border-blue-900/50 dark:from-blue-950/40 dark:via-slate-900 dark:to-blue-950/20 my-2">
         <div className="relative mb-3 flex h-11 w-11 items-center justify-center">
-          <div className="absolute inset-0 animate-ping rounded-full bg-indigo-400/20 dark:bg-indigo-500/20" />
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-500/25 dark:bg-indigo-500">
+          <div className="absolute inset-0 animate-ping rounded-full bg-blue-400/20 dark:bg-blue-500/20" />
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl btn-bg text-white shadow-md shadow-blue-500/25 dark:bg-blue-500">
             {isProcessing ? (
               <Sparkles className="h-5 w-5 animate-pulse text-amber-300" />
             ) : (
@@ -1475,7 +1472,7 @@ const InsCourseArtifacts = () => {
               loadSectionData(activeTab, true);
             }}
             disabled={refreshing}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 disabled:opacity-50"
           >
             <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
             <span>{refreshing ? "Checking..." : "Refresh to Load Data"}</span>
@@ -1543,17 +1540,37 @@ const InsCourseArtifacts = () => {
     const isCurrentBusy = isBusyState(currentItem?.current_state);
     const isViewingHistorical = Boolean(selectedVer && !selectedVer.is_active);
 
+    const isBlueTheme = tabType === "syllabus" || tabType === "copo";
+
     return (
       <div className="space-y-2">
         {/* Main Version Control Bar: Clean, accessible, ~38px height */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white/95 px-3 py-1.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900/95">
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl border px-3.5 py-2 shadow-2xs ${
+            isBlueTheme
+              ? "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/95"
+              : "border-slate-200/90 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95"
+          }`}
+        >
           {/* Left: Indicator, Quick Dropdown, Semantic Status Pill */}
           <div className="flex items-center gap-2.5 flex-wrap min-w-0">
             <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold shrink-0">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                <History className="h-3.5 w-3.5" />
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                  isBlueTheme
+                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400"
+                    : "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400"
+                }`}
+              >
+                <History className="h-4 w-4" />
               </div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Version</span>
+              <span
+                className={`${
+                  isBlueTheme ? "text-sm text-slate-900 dark:text-slate-100" : "text-xs text-slate-800 dark:text-slate-200"
+                } font-bold`}
+              >
+                Version
+              </span>
             </div>
 
             {/* Quick Switch Dropdown */}
@@ -1572,7 +1589,11 @@ const InsCourseArtifacts = () => {
                   }
                 }}
                 disabled={loadingVersionDetail}
-                className="h-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800 pl-2.5 pr-7 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200 transition hover:border-indigo-400 focus:border-indigo-500 focus:bg-white focus:outline-hidden cursor-pointer appearance-none shadow-2xs"
+                className={`h-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800 pl-2.5 pr-7 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200 transition focus:bg-white focus:outline-hidden cursor-pointer appearance-none shadow-2xs ${
+                  isBlueTheme
+                    ? "hover:border-blue-400 focus:border-blue-500"
+                    : "hover:border-blue-400 focus:border-blue-500"
+                }`}
               >
                 {versionsList.map((ver: any) => {
                   const itemId = ver[idKey];
@@ -1590,17 +1611,31 @@ const InsCourseArtifacts = () => {
             {/* Semantic Lifecycle Badges */}
             <div className="flex items-center gap-1.5 shrink-0">
               {isCurrentActive ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-300">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-300 ${
+                    isBlueTheme ? "text-[11px]" : "text-[10px] font-bold"
+                  }`}
+                >
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live Active
                 </span>
               ) : isCurrentApproved ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200/80 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:border-sky-800/60 dark:text-sky-300">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-semibold ${
+                    isBlueTheme
+                      ? "bg-blue-50 border-blue-200/80 text-[11px] text-blue-700 dark:bg-blue-950/50 dark:border-blue-800/60 dark:text-blue-300"
+                      : "bg-sky-50 border-sky-200/80 text-[10px] text-sky-700 dark:bg-sky-950/50 dark:border-sky-800/60 dark:text-sky-300"
+                  }`}
+                >
                   <Check className="h-3 w-3" />
                   Approved
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 font-semibold text-amber-700 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300 ${
+                    isBlueTheme ? "text-[11px]" : "text-[10px]"
+                  }`}
+                >
                   <Edit2 className="h-2.5 w-2.5" />
                   Draft v{currentItem?.version_number}
                 </span>
@@ -1657,7 +1692,9 @@ const InsCourseArtifacts = () => {
                 type="button"
                 onClick={() => activateFn?.(currentItemId)}
                 disabled={isCurrentBusy || actionLoading === `${activateLoadingPrefix}${currentItemId}`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition disabled:opacity-50"
+                className={`inline-flex items-center gap-1.5 rounded-lg active:scale-95 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition disabled:opacity-50 ${
+                  isBlueTheme ? "btn-bg hover:bg-blue-700" : "btn-bg hover:bg-blue-700"
+                }`}
                 title={`Set v${currentItem.version_number} as active live version`}
               >
                 <ShieldCheck className="h-3 w-3" />
@@ -1680,8 +1717,12 @@ const InsCourseArtifacts = () => {
               }
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
                 isExpanded
-                  ? "border-indigo-300 bg-indigo-50/70 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300"
-                  : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  ? isBlueTheme
+                    ? "border-blue-300 bg-blue-50/70 text-blue-700 dark:border-blue-800 dark:bg-blue-950/70 dark:text-blue-300"
+                    : "border-blue-300 bg-blue-50/70 text-blue-700 dark:border-blue-800 dark:bg-blue-950/70 dark:text-blue-300"
+                  : isBlueTheme
+                    ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               }`}
               title="Toggle version history card drawer"
             >
@@ -1697,7 +1738,7 @@ const InsCourseArtifacts = () => {
 
         {/* Expandable Version Cards Shelf */}
         {isExpanded && (
-          <div className="rounded-xl border border-slate-200/90 bg-white/95 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/95 animate-fadeIn">
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/95 animate-fadeIn">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                 Version Timeline & Approvals ({versionsList.length})
@@ -1724,7 +1765,9 @@ const InsCourseArtifacts = () => {
                     key={itemId}
                     className={`min-w-[190px] max-w-[220px] shrink-0 rounded-xl border p-2.5 transition flex flex-col justify-between ${
                       isSelected
-                        ? "border-indigo-500 bg-indigo-50/50 shadow-xs dark:border-indigo-600 dark:bg-indigo-950/40 ring-1 ring-indigo-500"
+                        ? isBlueTheme
+                          ? "border-blue-500 bg-blue-50/50 shadow-xs dark:border-blue-600 dark:bg-blue-950/40 ring-1 ring-blue-500"
+                          : "border-blue-500 bg-blue-50/50 shadow-xs dark:border-blue-600 dark:bg-blue-950/40 ring-1 ring-blue-500"
                         : "border-slate-200 bg-slate-50/70 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40"
                     }`}
                   >
@@ -1785,7 +1828,13 @@ const InsCourseArtifacts = () => {
 
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
                       {isSelected ? (
-                        <span className="rounded-md bg-indigo-600/10 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                            isBlueTheme
+                              ? "btn-bg/10 text-blue-600 dark:text-blue-400"
+                              : "btn-bg/10 text-blue-600 dark:text-blue-400"
+                          }`}
+                        >
                           Viewing
                         </span>
                       ) : (
@@ -1825,7 +1874,9 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={() => activateFn?.(itemId)}
                           disabled={isBusy || actionLoading === `${activateLoadingPrefix}${itemId}`}
-                          className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-white disabled:opacity-50 transition ${
+                            isBlueTheme ? "btn-bg hover:bg-blue-700" : "btn-bg hover:bg-blue-700"
+                          }`}
                         >
                           <ShieldCheck className="h-2.5 w-2.5" />
                           <span>
@@ -2550,55 +2601,56 @@ const InsCourseArtifacts = () => {
   }; return (
     <div className="min-h-screen space-y-3 pb-8">
       {/* Compact Course Header Card */}
-      <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      <div className=" p-3  dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col justify-between gap-2.5 sm:flex-row sm:items-center">
           {/* Left: Back + Badges + Title */}
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex flex-wrap items-center gap-4 min-w-0">
             <button
               type="button"
               onClick={() => router.push("/neurobe/my-assigned-courses")}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-gray-800 transition hover:border-slate-300 hover:bg-slate-100 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               title="Back to My Courses"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Courses</span>
+              <span className="hidden sm:inline font-semibold">Courses</span>
             </button>
 
-            <span className="rounded-md border border-indigo-200/60 bg-indigo-50/80 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300">
-              {course.course_code ?? "Course"}
-            </span>
+            
 
-            {isCoord ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-purple-200/60 bg-purple-50/70 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300">
+            {/* {isCoord ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-green-200/60 bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold text-green-800 dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-300">
                 <ShieldCheck className="h-3 w-3" />
                 Coordinator
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50/70 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1 rounded-md border border-green-200/60 bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold text-green-800 dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-300">
                 <UserCheck className="h-3 w-3" />
                 Instructor
               </span>
-            )}
+            )} */}
 
-            <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white sm:text-base md:text-lg truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">
+            <h1 className="text-sm font-bold  text-slate-900 dark:text-white sm:text-base md:text-2xl truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">
               {course.course_title ?? "Course Artifacts"}
-            </h1>
+            </h1> 
+            <span className="rounded-md border border-blue-200/60 bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300">
+              {course.course_code ?? "Course"}
+            </span>
           </div>
 
           {/* Right: Actions */}
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             {activeSyllabus && (
               <button
                 type="button"
                 onClick={() => setSplitScreenView(!splitScreenView)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-xs transition ${splitScreenView
-                    ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/70 dark:text-indigo-300"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                className={`inline-flex items-center gap-1.5 rounded-lg border border-[#005bff] px-2.5 py-2 text-xs font-semibold shadow-xs transition ${splitScreenView
+                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/70 dark:text-blue-300"
+                    : "border-[#005bff] bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                   }`}
                 title={splitScreenView ? "Close split screen view" : "View source document in split screen"}
               >
-                <Columns className="h-3.5 w-3.5 text-indigo-500" />
-                <span>{splitScreenView ? "Close Split" : "Split View"}</span>
+                <Columns className="h-4 w-4 text-color2" />
+                <span className="text-color2 font-semibold text-sm">{splitScreenView ? "Close Split" : "Split View"}</span>
               </button>
             )}
 
@@ -2613,16 +2665,16 @@ const InsCourseArtifacts = () => {
                   setShowUploadModal(true);
                 }}
                 disabled={isExtractionBusy}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50 dark:bg-indigo-500"
+                className="inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 disabled:opacity-50 dark:bg-blue-500"
               >
                 {isExtractionBusy ? (
                   <>
-                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    <RefreshCw className="h-4 w-4 animate-spin" />
                     <span>Extracting...</span>
                   </>
                 ) : (
                   <>
-                    <Upload className="h-3 w-3" />
+                    <Upload className="h-4 w-4" />
                     <span>Upload Syllabus</span>
                   </>
                 )}
@@ -2633,44 +2685,55 @@ const InsCourseArtifacts = () => {
               type="button"
               onClick={() => fetchPortfolio(true)}
               disabled={refreshing || loading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm font-semibold text-gray-800 shadow-xs transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
             >
-              <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin text-indigo-500" : ""}`} />
-              <span>{refreshing ? "..." : "Refresh"}</span>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-blue-500" : ""}`} />
+              <span className="text-gray-800 font-semibold ">{refreshing ? "..." : "Refresh"}</span>
             </button>
           </div>
         </div>
 
         {/* Compact Metadata Strip */}
-        <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          <div className="flex items-center gap-1">
-            <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
-            <span className="font-medium text-slate-700 dark:text-slate-300">{course.programme_name ?? "General"}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2 text-xs text-gray-900 font-medium dark:border-slate-800 dark:text-slate-400">
+          {course.programme_name && <div className="flex items-center gap-1">
+            <GraduationCap className="h-3.5 w-3.5 text-gray-900" />
+            <span className="font-medium text-gray-900 dark:text-slate-300">{course.programme_name}</span>
+          </div>}
+         {course.semester   &&
+         <> <span className="inline-block h-1 w-1 rounded-full bg-gray-400 dark:bg-slate-600" />
+           <div className="flex items-center gap-1">
+            <Layers className="h-3.5 w-3.5 text-gray-900" />
+            <span className="text-gray-900 font-medium">{`Sem ${course.semester}`}</span>
           </div>
-          <span className="inline-block h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <div className="flex items-center gap-1">
-            <Layers className="h-3.5 w-3.5 text-slate-400" />
-            <span>{course.semester ? `Sem ${course.semester}` : "All Terms"}</span>
-          </div>
-          <span className="inline-block h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <div className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5 text-slate-400" />
-            <span>
+          </>
+          }
+           {(course.total_theory_hours || course.credits || course.total_lab_hours) && <>
+           <span className="inline-block h-1 w-1 rounded-full bg-gray-400 dark:bg-slate-600" />
+         <div className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5 text-gray-900" />
+            <span className="font-medium text-gray-900">
               {course.credits ?? 0} Credits ({course.total_theory_hours ?? 0}h Theory / {course.total_lab_hours ?? 0}h Lab)
             </span>
           </div>
-          <span className="inline-block h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <div className="flex items-center gap-1">
-            <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-            <span>{course.department_name ?? "General"}</span>
+          </>
+          }
+
+           {course.department_name &&  
+           <>
+          <span className="inline-block h-1 w-1 rounded-full bg-gray-400 dark:bg-slate-600" />
+         <div className="flex items-center gap-1">
+            <BookOpen className="h-3.5 w-3.5 text-gray-900" />
+            <span className="text-gray-900 font-medium">{course.department_name }</span>
           </div>
+           </>
+           }
         </div>
       </div>
 
       {jobNotice && (
-        <div className="flex items-center justify-between gap-2.5 rounded-xl border border-indigo-200 bg-indigo-50/80 p-2.5 text-xs text-indigo-900 shadow-2xs dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+        <div className="flex items-center justify-between gap-2.5 rounded-xl border border-blue-200 bg-blue-50/80 p-2.5 text-xs text-blue-900 shadow-2xs dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
           <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-blue-500" />
             <span className="truncate">{jobNotice}</span>
           </div>
           <button
@@ -2691,108 +2754,108 @@ const InsCourseArtifacts = () => {
       )}
 
       {/* High Density Pill Navigation Bar */}
-      <div className="border-b border-slate-200/80 dark:border-slate-800">
-        <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+      <div className="!mt-1  border-b border-slate-200/80 dark:border-slate-800">
+        <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 pb-3">
           <button
             type="button"
             onClick={() => handleTabChange("dashboard")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "dashboard"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "dashboard"
+               ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
-            <span>Dashboard</span>
+            <span className={`text-sm font-semibold ${activeTab === "dashboard" ?  "text-[#fff]" :  "text-gray-900 "}`}>Dashboard</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("syllabus")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "syllabus"
-                ? "bg-sky-600 text-white shadow-xs dark:bg-sky-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition shrink-0 ${activeTab === "syllabus"
+                ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
-            <span>1. Syllabus</span>
+            <span className={`text-sm font-semibold ${activeTab === "syllabus" ?  "text-[#fff]" :  "text-gray-900 "}`}>1. Syllabus</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("copo")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copo"
-                ? "bg-sky-600 text-white shadow-xs dark:bg-sky-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition shrink-0 ${activeTab === "copo"
+                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
-            <span>2. CO-PO</span>
+            <span className={`text-sm font-semibold ${activeTab === "copo" ?  "text-[#fff]" :  "text-gray-900 "}`}>2. CO-PO</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("copso")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copso"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copso"
+                ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
-            <span>2b. CO-PSO</span>
+            <span className={`text-sm font-semibold ${activeTab === "copso" ?  "text-[#fff]" :  "text-gray-900 "}`}>2b. CO-PSO</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("pedagogy")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "pedagogy"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "pedagogy"
+                ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
-            <span>3. Pedagogy</span>
+            <span className={`text-sm font-semibold ${activeTab === "pedagogy" ?  "text-[#fff]" :  "text-gray-900 "}`}>3. Pedagogy</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("lesson_plan")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "lesson_plan"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "lesson_plan"
+                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
-            <span>4. Lesson Plan</span>
+            <span className={`text-sm font-semibold ${activeTab === "lesson_plan" ?  "text-[#fff]" :  "text-gray-900 "}`}>4. Lesson Plan</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("mcq_generation")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
               activeTab === "mcq_generation" || activeTab === "mcq_viva"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+               ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
           >
-            <span>5. MCQ & Viva</span>
+            <span className={`text-sm font-semibold ${activeTab === "mcq_generation" || activeTab === "mcq_viva" ?  "text-[#fff]" :  "text-gray-900 "}`}>5. MCQ & Viva</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("cia")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
               activeTab === "cia" || activeTab === "cia_analytics"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
           >
-            <span>{isCoord ? "6. CIA Assessment" : "5. CIA Assessment"}</span>
+            <span className={`text-sm font-semibold ${activeTab === "cia" || activeTab === "cia_analytics"?  "text-[#fff]" :  "text-gray-900 "}`}>{isCoord ? "6. CIA Assessment" : "5. CIA Assessment"}</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("report")}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
               activeTab === "report"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
+                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
+                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
           >
-            <span>{isCoord ? "7. Report" : "6. Report"}</span>
+            <span className={`text-sm font-semibold ${activeTab === "report" ?  "text-[#fff]" :  "text-gray-900 "}`}>{isCoord ? "7. Report" : "6. Report"}</span>
           </button>
         </nav>
       </div>
@@ -2809,21 +2872,21 @@ const InsCourseArtifacts = () => {
             )}
 
             {activeTab === "syllabus" && (
-              <div className="space-y-3 [&_h3]:text-[15px] [&_h3]:font-extrabold [&_h3]:text-slate-900 [&_h4]:text-sm [&_h4]:font-bold [&_h4]:text-slate-900 [&_p]:text-[13px] [&_p]:font-medium [&_p]:leading-relaxed [&_p]:text-slate-700 [&_li]:text-[13px] [&_li]:text-slate-800 dark:[&_h3]:text-slate-100 dark:[&_h4]:text-slate-100 dark:[&_p]:text-slate-200 dark:[&_li]:text-slate-200">
+              <div className="space-y-3">
                 {renderVersionCards("syllabus")}
 
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0">
-                      <FileText className="h-4 w-4" />
+                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0">
+                      <FileText className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[11px] text-slate-400 font-medium leading-none">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold leading-tight">
                         {selectedVersionData.syllabus
                           ? "Viewing Version File"
                           : "Active Curriculum File"}
                       </p>
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                      <h4 className="mt-0.5 text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white truncate">
                         {activeSyllabus?.original_filename ?? "No syllabus uploaded"}
                       </h4>
                     </div>
@@ -2831,12 +2894,12 @@ const InsCourseArtifacts = () => {
 
                   <div className="flex flex-wrap items-center gap-2">
                     {currentExt?.is_approved ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[13px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-400">
+                        <CheckCircle2 className="h-4 w-4" />
                         Extraction Approved
                       </span>
                     ) : currentExt ? (
-                      <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[13px] font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/50 dark:text-amber-400">
                         Draft Extraction (v{currentExt.version_number})
                       </span>
                     ) : null}
@@ -2846,7 +2909,7 @@ const InsCourseArtifacts = () => {
                         type="button"
                         onClick={() => handleApproveExtraction(currentExt.extractions_id)}
                         disabled={actionLoading === `approve_syllabus_${currentExt.extractions_id}`}
-                        className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                        className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
                       >
                         {actionLoading === `approve_syllabus_${currentExt.extractions_id}`
                           ? "Approving..."
@@ -2859,7 +2922,7 @@ const InsCourseArtifacts = () => {
                         type="button"
                         onClick={() => handleActivateExtraction(currentExt.extractions_id)}
                         disabled={actionLoading === `activate_syllabus_${currentExt.extractions_id}`}
-                        className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
+                        className="rounded-xl btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-95 disabled:opacity-50"
                       >
                         {actionLoading === `activate_syllabus_${currentExt.extractions_id}`
                           ? "Activating..."
@@ -2871,12 +2934,12 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={() => setSplitScreenView(!splitScreenView)}
-                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-semibold shadow-xs transition ${splitScreenView
-                            ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-semibold shadow-xs transition ${splitScreenView
+                            ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300"
+                            : "border-slate-300/80 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                           }`}
                       >
-                        <Columns className="h-3.5 w-3.5 text-indigo-500" />
+                        <Columns className="h-4 w-4 text-slate-700 dark:text-slate-300" />
                         <span>
                           {splitScreenView ? "Close Split View" : "Split View (Source Document)"}
                         </span>
@@ -2887,11 +2950,11 @@ const InsCourseArtifacts = () => {
 
                 {(sectionLoading.syllabus || loadingVersionDetail) && !currentExt && (
                   <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 mb-2" />
+                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Loading syllabus data...
                     </p>
-                    <p className="text-[11px] text-slate-400">Fetching latest extraction details</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Fetching latest extraction details</p>
                   </div>
                 )}
 
@@ -2951,7 +3014,7 @@ const InsCourseArtifacts = () => {
                             setShowUploadModal(true);
                           }}
                           disabled={isExtractionBusy}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                         >
                           <Upload className="h-3.5 w-3.5" />
                           <span>Upload Syllabus Document</span>
@@ -2962,11 +3025,11 @@ const InsCourseArtifacts = () => {
 
                 {currentExt && !isBusyState(currentExt.current_state) && (
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-indigo-500" />
-                          <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                          <Clock className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                          <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
                             Curriculum Hours & Credits
                           </h3>
                         </div>
@@ -2975,9 +3038,9 @@ const InsCourseArtifacts = () => {
                           <button
                             type="button"
                             onClick={startEditHours}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                           >
-                            <Edit2 className="h-3 w-3 text-indigo-500" />
+                            <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
                             <span>Edit Hours</span>
                           </button>
                         )}
@@ -3000,7 +3063,7 @@ const InsCourseArtifacts = () => {
                                     credits: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             </div>
                             <div>
@@ -3017,7 +3080,7 @@ const InsCourseArtifacts = () => {
                                     total_theory_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             </div>
                             <div>
@@ -3034,7 +3097,7 @@ const InsCourseArtifacts = () => {
                                     total_lab_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             </div>
                             <div>
@@ -3051,7 +3114,7 @@ const InsCourseArtifacts = () => {
                                     lecture_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             </div>
                             <div>
@@ -3068,7 +3131,7 @@ const InsCourseArtifacts = () => {
                                     tutorial_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             </div>
                             <div>
@@ -3085,7 +3148,7 @@ const InsCourseArtifacts = () => {
                                     practical_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             </div>
                           </div>
@@ -3111,59 +3174,59 @@ const InsCourseArtifacts = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
-                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
-                            <Layers aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <Layers aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
                             <div>
-                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
                                 {currentExt?.credits ?? course?.credits ?? 0}
                               </p>
-                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Credits</p>
+                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Credits</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/40 px-3 py-2 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <BookOpen aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <BookOpen aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
                             <div>
-                              <p className="text-lg font-extrabold leading-5 text-blue-600 dark:text-blue-400">
+                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-blue-400">
                                 {currentExt?.total_theory_hours ?? course?.total_theory_hours ?? 0}
                               </p>
-                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Theory Hours</p>
+                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Theory Hours</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                            <Beaker aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <Beaker aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-emerald-400" />
                             <div>
-                              <p className="text-lg font-extrabold leading-5 text-emerald-700 dark:text-emerald-400">
+                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-emerald-400">
                                 {currentExt?.total_lab_hours ?? course?.total_lab_hours ?? 0}
                               </p>
-                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Lab Hours</p>
+                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Lab Hours</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
-                            <Monitor aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <Monitor aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
                             <div>
-                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
                                 {currentExt?.lecture_hours ?? 0}
                               </p>
-                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Lecture (L)</p>
+                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Lecture (L)</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
-                            <Users aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <Users aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
                             <div>
-                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
                                 {currentExt?.tutorial_hours ?? 0}
                               </p>
-                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Tutorial (T)</p>
+                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Tutorial (T)</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
-                            <Settings aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <Settings aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
                             <div>
-                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
                                 {currentExt?.practical_hours ?? 0}
                               </p>
-                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Practical (P)</p>
+                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Practical (P)</p>
                             </div>
                           </div>
                         </div>
@@ -3172,11 +3235,11 @@ const InsCourseArtifacts = () => {
 
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                       <div className="space-y-3 lg:col-span-1">
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <Award className="h-4 w-4 text-indigo-500" />
-                              <span>Course Objectives</span>
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
+                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <Award className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                              <span className="font-bold">Course Objectives</span>
                             </h3>
 
                             {canEdit && (
@@ -3186,36 +3249,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddObjectiveRow}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                                       title="Add Objective"
                                     >
-                                      <Plus className="h-3 w-3" />
+                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveObjectives}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
                                     >
-                                      <Save className="h-3 w-3" />
+                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditObjectives}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                   >
-                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3242,7 +3305,7 @@ const InsCourseArtifacts = () => {
                                         )
                                       );
                                     }}
-                                    className="w-12 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                                    className="w-12 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-blue-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
                                     placeholder="#"
                                   />
                                   <textarea
@@ -3256,16 +3319,16 @@ const InsCourseArtifacts = () => {
                                         )
                                       );
                                     }}
-                                    className="flex-1 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    className="flex-1 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                                     placeholder="Objective description..."
                                   />
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteObjectiveRow(obj.id)}
-                                    className="mt-1 rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                    className="mt-0.5 rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                     title="Delete Objective"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                   </button>
                                 </div>
                               ))}
@@ -3280,16 +3343,16 @@ const InsCourseArtifacts = () => {
                               {(currentExt?.objectives ?? []).map((obj: any, idx: number) => (
                                 <li
                                   key={idx}
-                                  className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300"
+                                  className="flex items-start gap-2.5 text-[13.5px] font-medium text-slate-800 dark:text-slate-200"
                                 >
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-400">
                                     {obj.objective_number ?? idx + 1}
                                   </span>
-                                  <span className="leading-relaxed">{obj.description}</span>
+                                  <span className="leading-relaxed text-[#040e1d] text-sm font-medium dark:text-slate-200">{obj.description}</span>
                                 </li>
                               ))}
                               {(!currentExt?.objectives || currentExt.objectives.length === 0) && (
-                                <li className="text-xs text-slate-400 italic">
+                                <li className="text-[13px] text-slate-500 italic">
                                   No specific objectives defined.
                                 </li>
                               )}
@@ -3297,11 +3360,11 @@ const InsCourseArtifacts = () => {
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                              <span>Course Outcomes (COs)</span>
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
+                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
+                              <span className="font-bold">Course Outcomes (COs)</span>
                             </h3>
 
                             {canEdit && (
@@ -3311,36 +3374,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddOutcomeRow}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                                       title="Add Course Outcome"
                                     >
-                                      <Plus className="h-3 w-3" />
+                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveOutcomes}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
                                     >
-                                      <Save className="h-3 w-3" />
+                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditOutcomes}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                   >
-                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3367,7 +3430,7 @@ const InsCourseArtifacts = () => {
                                           )
                                         );
                                       }}
-                                      className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-indigo-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                                      className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-blue-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
                                       placeholder="CO#"
                                     />
                                     <select
@@ -3393,10 +3456,10 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteOutcomeRow(co.id)}
-                                      className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                      className="rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                       title="Delete Outcome"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
+                                      <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                   <textarea
@@ -3410,7 +3473,7 @@ const InsCourseArtifacts = () => {
                                         )
                                       );
                                     }}
-                                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                                     placeholder="Course outcome description..."
                                   />
                                 </div>
@@ -3426,32 +3489,32 @@ const InsCourseArtifacts = () => {
                               {(currentExt?.outcomes ?? []).map((co: any, idx: number) => (
                                 <div
                                   key={idx}
-                                  className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
+                                  className="rounded-xl border border-slate-200 bg-[#F8FAFC] p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                    <span className="rounded-md bg-blue-50 px-2.5 py-0.5 text-[13px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
                                       {co.co_code}
                                     </span>
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       {co.knowledge_level && (
-                                        <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                        <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/80 dark:text-blue-300">
                                           {co.knowledge_level}
                                         </span>
                                       )}
                                       {co.bloom_level && (
-                                        <span className="rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/80 dark:text-purple-300">
+                                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/80 dark:text-emerald-300">
                                           {co.bloom_level}
                                         </span>
                                       )}
                                     </div>
                                   </div>
-                                  <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  <p className="mt-4 text-sm text-[#040e1d] font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
                                     {co.description}
                                   </p>
                                 </div>
                               ))}
                               {(!currentExt?.outcomes || currentExt.outcomes.length === 0) && (
-                                <p className="text-xs text-slate-400 italic">
+                                <p className="text-[13px] text-slate-500 italic">
                                   No course outcomes extracted.
                                 </p>
                               )}
@@ -3459,11 +3522,11 @@ const InsCourseArtifacts = () => {
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <BookOpen className="h-4 w-4 text-purple-500" />
-                              <span>Prescribed Textbooks</span>
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
+                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <BookOpen className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                              <span className="font-bold">Prescribed Textbooks</span>
                             </h3>
 
                             {canEdit && (
@@ -3473,36 +3536,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddTextbookRow}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                                       title="Add Textbook"
                                     >
-                                      <Plus className="h-3 w-3" />
+                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveTextbooks}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
                                     >
-                                      <Save className="h-3 w-3" />
+                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditTextbooks}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                   >
-                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3535,10 +3598,10 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteTextbookRow(t.id)}
-                                      className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                      className="rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                       title="Delete Textbook"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
+                                      <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                   <input
@@ -3600,12 +3663,12 @@ const InsCourseArtifacts = () => {
                               {(currentExt?.textbooks ?? []).map((b: any, idx: number) => (
                                 <div
                                   key={idx}
-                                  className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300"
+                                  className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3 dark:border-slate-800 dark:bg-slate-800/40"
                                 >
-                                  <p className="font-semibold text-slate-900 dark:text-white">
+                                  <p className="text-[13.5px] sm:text-sm font-semibold text-slate-900 dark:text-white leading-snug">
                                     {b.title}
                                   </p>
-                                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
                                     {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
                                     {b.publisher ? `— ${b.publisher}` : ""}{" "}
                                     {b.publication_year ? `(${b.publication_year})` : ""}
@@ -3613,17 +3676,17 @@ const InsCourseArtifacts = () => {
                                 </div>
                               ))}
                               {(!currentExt?.textbooks || currentExt.textbooks.length === 0) && (
-                                <p className="text-xs text-slate-400 italic">No textbooks recorded.</p>
+                                <p className="text-[13px] text-slate-500 italic">No textbooks recorded.</p>
                               )}
                             </div>
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <BookOpen className="h-4 w-4 text-teal-500" />
-                              <span>Reference Books</span>
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
+                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <BookOpen className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                              <span className="font-bold">Reference Books</span>
                             </h3>
 
                             {canEdit && (
@@ -3633,36 +3696,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddReferenceBookRow}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                                       title="Add Reference Book"
                                     >
-                                      <Plus className="h-3 w-3" />
+                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveReferenceBooks}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
                                     >
-                                      <Save className="h-3 w-3" />
+                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditReferenceBooks}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                   >
-                                    <Edit2 className="h-3 w-3 text-indigo-500" />
+                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3695,10 +3758,10 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteReferenceBookRow(t.id)}
-                                      className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                      className="rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                       title="Delete Reference Book"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
+                                      <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                     </button>
                                   </div>
                                   <input
@@ -3760,12 +3823,12 @@ const InsCourseArtifacts = () => {
                               {(currentExt?.reference_books ?? []).map((b: any, idx: number) => (
                                 <div
                                   key={idx}
-                                  className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300"
+                                  className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3 dark:border-slate-800 dark:bg-slate-800/40"
                                 >
-                                  <p className="font-semibold text-slate-900 dark:text-white">
+                                  <p className="text-[13.5px] sm:text-sm font-semibold text-slate-900 dark:text-white leading-snug">
                                     {b.title}
                                   </p>
-                                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
                                     {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
                                     {b.publisher ? `— ${b.publisher}` : ""}{" "}
                                     {b.publication_year ? `(${b.publication_year})` : ""}
@@ -3774,7 +3837,7 @@ const InsCourseArtifacts = () => {
                               ))}
                               {(!currentExt?.reference_books ||
                                 currentExt.reference_books.length === 0) && (
-                                  <p className="text-xs text-slate-400 italic">
+                                  <p className="text-[13px] text-slate-500 italic">
                                     No reference books recorded.
                                   </p>
                                 )}
@@ -3784,13 +3847,13 @@ const InsCourseArtifacts = () => {
                       </div>
 
                       <div className="space-y-3 lg:col-span-2">
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800">
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
                             <div>
-                              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                              <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
                                 Curriculum Hierarchy (Units, Topics & Subtopics)
                               </h3>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              <p className="mt-0.5 text-[13px] font-medium text-slate-600 dark:text-slate-400">
                                 {units.length} Units &bull; Structured hierarchical teaching units
                               </p>
                             </div>
@@ -3799,166 +3862,166 @@ const InsCourseArtifacts = () => {
                               <button
                                 type="button"
                                 onClick={() => openUnitModal("add")}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500"
+                                className="inline-flex items-center gap-1.5 rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 dark:bg-blue-500"
                               >
-                                <Plus className="h-3.5 w-3.5" />
+                                <Plus className="h-4 w-4 stroke-[2.5]" />
                                 <span>Add Unit</span>
                               </button>
                             )}
                           </div>
 
-                          <div className="mt-3 space-y-2.5">
+                          <div className="mt-3 space-y-3">
                             {units.map((u: any, uIdx: number) => (
                               <div
                                 key={u.id ?? uIdx}
-                                className="rounded-xl border border-sky-100 bg-sky-50/40 p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
+                                className="rounded-xl border border-blue-200/80 bg-[#EAF2FF] p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="space-y-0.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="rounded-md bg-sky-600 px-2 py-0.5 font-mono text-[10px] font-bold text-white shadow-2xs dark:bg-sky-500">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2.5">
+                                      <span className="rounded-md btn-bg px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:bg-blue-500">
                                         Unit {u.unit_number}
                                       </span>
-                                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                      <h4 className="text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white">
                                         {u.unit_title}
                                       </h4>
                                     </div>
                                     {u.unit_overview && (
-                                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                                      <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed max-w-xl">
                                         {u.unit_overview}
                                       </p>
                                     )}
                                   </div>
 
                                   <div className="flex items-center gap-1.5">
-                                    <span className="rounded-md bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    <span className="rounded-md border border-slate-300/80 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                       {u.theory_hours ?? 0} Th / {u.lab_hours ?? 0} Lab
                                     </span>
 
                                     {canEdit && (
-                                      <div className="flex items-center gap-1">
+                                      <div className="flex items-center gap-1.5">
                                         <button
                                           type="button"
                                           onClick={() => openTopicModal("add", u.id)}
-                                          className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400"
+                                          className="inline-flex items-center gap-1 rounded-lg border border-blue-300/80 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 shadow-2xs transition hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                                           title="Add Topic to this Unit"
                                         >
-                                          <Plus className="h-3 w-3" />
+                                          <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                           <span>Add Topic</span>
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => openUnitModal("edit", u)}
-                                          className="rounded-md border border-slate-200 bg-white p-1 text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                          className="rounded-lg border border-slate-300 bg-white p-1.5 text-blue-600 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
                                           title="Edit Unit"
                                         >
-                                          <Edit2 className="h-3 w-3" />
+                                          <Edit2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleDeleteUnit(u.id)}
-                                          className="rounded-md border border-rose-200 bg-rose-50 p-1 text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                          className="rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-rose-600 shadow-2xs transition hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                           title="Delete Unit"
                                         >
-                                          <Trash2 className="h-3 w-3" />
+                                          <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                         </button>
                                       </div>
                                     )}
                                   </div>
                                 </div>
 
-                                <div className="mt-2.5 space-y-2">
+                                <div className="mt-3 space-y-2">
                                   {(u.topics ?? []).map((t: any, tIdx: number) => (
                                     <div
                                       key={t.id ?? tIdx}
-                                      className="rounded-lg border border-slate-200/70 bg-white p-2.5 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800"
+                                      className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800"
                                     >
                                       <div className="flex flex-wrap items-center justify-between gap-1.5">
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="font-bold text-xs text-slate-900 dark:text-white">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-[13.5px] sm:text-sm text-slate-900 dark:text-white">
                                             {t.topic_code ? `${t.topic_code} : ` : ""}
                                             {t.topic_name}
                                           </span>
                                           {t.knowledge_level && (
-                                            <span className="rounded bg-indigo-50 px-1.5 py-0.2 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                            <span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                                               {t.knowledge_level}
                                             </span>
                                           )}
                                         </div>
 
                                         {canEdit && (
-                                          <div className="flex items-center gap-1">
+                                          <div className="flex items-center gap-1.5">
                                             <button
                                               type="button"
                                               onClick={() => openSubtopicModal("add", t.id)}
-                                              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-400"
+                                              className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
                                               title="Add Subtopic under this Topic"
                                             >
-                                              <Plus className="h-2.5 w-2.5" />
+                                              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                               <span>Subtopic</span>
                                             </button>
                                             <button
                                               type="button"
                                               onClick={() => openTopicModal("edit", u.id, t)}
-                                              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                                              className="rounded-md border border-slate-200 bg-slate-50 p-1.5 text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
                                               title="Edit Topic"
                                             >
-                                              <Edit2 className="h-2.5 w-2.5" />
+                                              <Edit2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                             </button>
                                             <button
                                               type="button"
                                               onClick={() => handleDeleteTopic(t.id)}
-                                              className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                              className="rounded-md border border-rose-200 bg-rose-50/70 p-1.5 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                               title="Delete Topic"
                                             >
-                                              <Trash2 className="h-2.5 w-2.5" />
+                                              <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
                                             </button>
                                           </div>
                                         )}
                                       </div>
 
                                       {t.topic_description && (
-                                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                        <p className="mt-1 text-[13px] font-medium text-slate-600 dark:text-slate-300">
                                           {t.topic_description}
                                         </p>
                                       )}
 
-                                      <div className="mt-2 ml-2 border-l-2 border-indigo-200 pl-2.5 space-y-1.5 dark:border-indigo-900/60">
+                                      <div className="mt-2 ml-2 border-l-2 border-blue-300 pl-3 space-y-1.5 dark:border-blue-900/60">
                                         {(t.subtopics ?? []).map((st: any, stIdx: number) => (
                                           <div
                                             key={st.id ?? stIdx}
-                                            className="group flex items-center justify-between gap-2 rounded-md bg-slate-50/70 px-2 py-1 text-xs transition hover:bg-slate-100 dark:bg-slate-855/60 dark:hover:bg-slate-850"
+                                            className="group flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2.5 py-1.5 text-[13px] transition hover:bg-slate-100 dark:bg-slate-855/60 dark:hover:bg-slate-850"
                                           >
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
-                                              <span className="font-medium text-slate-700 dark:text-slate-200">
+                                            <div className="flex items-center gap-2">
+                                              <span className="h-1.5 w-1.5 shrink-0 rounded-full btn-bg" />
+                                              <span className="font-semibold text-slate-800 dark:text-slate-200">
                                                 {st.subtopic_code ? `${st.subtopic_code} : ` : ""}
                                                 {st.subtopic_name}
                                               </span>
                                               {st.subtopic_description && (
-                                                <span className="text-[10px] text-slate-400">
+                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                                                   — {st.subtopic_description}
                                                 </span>
                                               )}
                                             </div>
 
                                             {canEdit && (
-                                              <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                              <div className="flex items-center gap-1.5">
                                                 <button
                                                   type="button"
                                                   onClick={() => openSubtopicModal("edit", t.id, st)}
-                                                  className="rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                                  className="rounded-md border border-slate-200 bg-white p-1 text-blue-600 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
                                                   title="Edit Subtopic"
                                                 >
-                                                  <Edit2 className="h-2.5 w-2.5" />
+                                                  <Edit2 className="h-3 w-3 stroke-[2.25]" />
                                                 </button>
                                                 <button
                                                   type="button"
                                                   onClick={() => handleDeleteSubtopic(st.id)}
-                                                  className="rounded p-0.5 text-slate-400 hover:text-rose-600"
+                                                  className="rounded-md border border-rose-200 bg-rose-50/80 p-1 text-rose-600 shadow-2xs transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
                                                   title="Delete Subtopic"
                                                 >
-                                                  <Trash2 className="h-2.5 w-2.5" />
+                                                  <Trash2 className="h-3 w-3 stroke-[2.25]" />
                                                 </button>
                                               </div>
                                             )}
@@ -3966,13 +4029,13 @@ const InsCourseArtifacts = () => {
                                         ))}
 
                                         {(!t.subtopics || t.subtopics.length === 0) && (
-                                          <div className="flex items-center gap-2 text-[10px] text-slate-400 italic">
+                                          <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 italic">
                                             <span>No subtopics nested.</span>
                                             {canEdit && (
                                               <button
                                                 type="button"
                                                 onClick={() => openSubtopicModal("add", t.id)}
-                                                className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400 not-italic"
+                                                className="inline-flex items-center gap-0.5 rounded-md border border-blue-200 bg-blue-50/80 px-2 py-0.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300 not-italic"
                                               >
                                                 + Add Subtopic
                                               </button>
@@ -3984,13 +4047,13 @@ const InsCourseArtifacts = () => {
                                   ))}
 
                                   {(!u.topics || u.topics.length === 0) && (
-                                    <div className="rounded-lg border border-dashed border-slate-200 p-2.5 text-center text-xs text-slate-400 dark:border-slate-800">
+                                    <div className="rounded-lg border border-dashed border-slate-300 p-3 text-center text-[13px] font-medium text-slate-600 dark:border-slate-800">
                                       <span>No topics in this unit yet.</span>
                                       {canEdit && (
                                         <button
                                           type="button"
                                           onClick={() => openTopicModal("add", u.id)}
-                                          className="ml-2 font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                                          className="ml-2 inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
                                         >
                                           Add Topic
                                         </button>
@@ -4002,17 +4065,17 @@ const InsCourseArtifacts = () => {
                             ))}
 
                             {units.length === 0 && (
-                              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-slate-800">
-                                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                              <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center dark:border-slate-800">
+                                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
                                   No curriculum units recorded
                                 </p>
                                 {canEdit && (
                                   <button
                                     type="button"
                                     onClick={() => openUnitModal("add")}
-                                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700"
+                                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700"
                                   >
-                                    <Plus className="h-3 w-3" />
+                                    <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                     <span>Create First Unit</span>
                                   </button>
                                 )}
@@ -4028,16 +4091,16 @@ const InsCourseArtifacts = () => {
             )}
 
             {activeTab === "copo" && (
-              <div className="space-y-3 [&_h3]:text-[15px] [&_h3]:font-extrabold [&_h3]:text-slate-900 [&_h4]:text-sm [&_h4]:font-bold [&_h4]:text-slate-900 [&_p]:text-[13px] [&_p]:font-medium [&_p]:leading-relaxed [&_p]:text-slate-700 [&_th]:text-[13px] [&_th]:font-bold [&_th]:text-slate-800 [&_td]:text-[13px] [&_td]:text-slate-800 dark:[&_h3]:text-slate-100 dark:[&_h4]:text-slate-100 dark:[&_p]:text-slate-200 dark:[&_th]:text-slate-200 dark:[&_td]:text-slate-200">
+              <div className="space-y-3">
                 {renderVersionCards("copo")}
 
                 {!currentCopo && (
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
                     <div>
-                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                      <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
                         Course Outcome to Program Outcome (CO-PO) Correlation Matrix
                       </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="mt-0.5 text-[13px] font-medium text-slate-600 dark:text-slate-400">
                         Accreditation correlation matrix (1 = Low, 2 = Medium, 3 = High, 0 = None)
                       </p>
                     </div>
@@ -4048,7 +4111,7 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={openGenerateCopoModal}
                           disabled={isCopoBusy || actionLoading === "generate_copo"}
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                          className="rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                         >
                           {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
                         </button>
@@ -4058,9 +4121,9 @@ const InsCourseArtifacts = () => {
                 )}
 
                 {Object.keys(copoDirtyCells).length > 0 && (
-                  <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-2.5 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/50 dark:text-indigo-200">
+                  <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-200">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       <span>
                         You have <strong>{Object.keys(copoDirtyCells).length}</strong> unsaved matrix
                         cell change(s).
@@ -4070,7 +4133,7 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={() => setCopoDirtyCells({})}
-                        className="rounded-lg border border-slate-300 px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                       >
                         Discard
                       </button>
@@ -4089,11 +4152,11 @@ const InsCourseArtifacts = () => {
 
                 {(sectionLoading.copo || loadingVersionDetail) && !currentCopo && (
                   <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 mb-2" />
+                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Loading CO-PO matrix data...
                     </p>
-                    <p className="text-[11px] text-slate-400">Fetching latest correlation matrix</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Fetching latest correlation matrix</p>
                   </div>
                 )}
 
@@ -4145,7 +4208,7 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={openGenerateCopoModal}
                           disabled={isCopoBusy}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                         >
                           <Sparkles className="h-3.5 w-3.5" />
                           <span>Generate CO-PO Mapping</span>
@@ -4199,36 +4262,36 @@ const InsCourseArtifacts = () => {
 
                   return (
                     <div className="space-y-3">
-                      <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
                         {/* Streamlined Header Bar */}
-                        <div className="space-y-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <div className="space-y-1.5 pb-3 border-b border-slate-100 dark:border-slate-800">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
                                 Course Outcome to Program Outcome (CO-PO) Correlation Matrix
                               </h3>
-                              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                ({cosList.length} COs Ã— {posList.length} POs)
+                              <span className="text-[13px] font-semibold text-slate-600 dark:text-slate-400">
+                                ({cosList.length} COs × {posList.length} POs)
                               </span>
                               {currentCopo?.is_approved ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-                                  <CheckCircle2 className="h-3 w-3" />
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
                                   Approved
                                 </span>
                               ) : (
-                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/50 dark:text-amber-400">
                                   Draft Version {currentCopo?.version_number}
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
                               {isCoord && (
                                 <button
                                   type="button"
                                   onClick={openGenerateCopoModal}
                                   disabled={isCopoBusy || actionLoading === "generate_copo"}
-                                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                                  className="rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                                 >
                                   {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
                                 </button>
@@ -4239,7 +4302,7 @@ const InsCourseArtifacts = () => {
                                   type="button"
                                   onClick={() => handleApproveCopo(currentCopo.copo_id)}
                                   disabled={actionLoading === `approve_copo_${currentCopo.copo_id}`}
-                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                                  className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
                                 >
                                   {actionLoading === `approve_copo_${currentCopo.copo_id}`
                                     ? "Approving..."
@@ -4252,7 +4315,7 @@ const InsCourseArtifacts = () => {
                                   type="button"
                                   onClick={() => handleActivateCopo(currentCopo.copo_id)}
                                   disabled={actionLoading === `activate_copo_${currentCopo.copo_id}`}
-                                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                                  className="rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                                 >
                                   {actionLoading === `activate_copo_${currentCopo.copo_id}`
                                     ? "Activating..."
@@ -4262,65 +4325,65 @@ const InsCourseArtifacts = () => {
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px] text-slate-500">
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-600">
                             <div>
                               {canEditMatrix ? (
-                                <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                                <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950 dark:text-blue-400">
                                   Click any cell to edit score & justification
                                 </span>
                               ) : (
-                                <span className="text-[10px] text-slate-400">
+                                <span className="text-xs font-medium text-slate-600">
                                   Matrix is read-only
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2.5 text-[10px] text-slate-500">
-                              <span className="flex items-center gap-1 font-medium">
-                                <span className="h-2 w-2 rounded-full bg-emerald-500" /> 3 = High
+                            <div className="flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-900 ">
+                                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 3 = High
                               </span>
-                              <span className="flex items-center gap-1 font-medium">
-                                <span className="h-2 w-2 rounded-full bg-sky-500" /> 2 = Medium
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 2 = Medium
                               </span>
-                              <span className="flex items-center gap-1 font-medium">
-                                <span className="h-2 w-2 rounded-full bg-amber-500" /> 1 = Low
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 1 = Low
                               </span>
-                              <span className="flex items-center gap-1 font-medium">
-                                <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" /> 0 = None
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" /> 0 = None
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <table className="mt-2 w-full text-left text-xs border-collapse">
+                        <table className="mt-3 w-full text-left text-[13px] border-collapse">
                           <thead>
-                            <tr className="border-b border-sky-100 dark:border-slate-700 bg-sky-50/70 dark:bg-slate-800/60">
-                              <th className="py-2 px-2.5 font-bold text-slate-700 dark:text-slate-300 w-20 text-[11px]">
+                            <tr className="border-b border-blue-200/80 dark:border-slate-700 bg-[#EAF2FF] dark:bg-slate-800/60">
+                              <th className="!py-5 px-3 font-bold text-slate-900 dark:text-slate-100 w-20 text-[16px]">
                                 CO
                               </th>
-                              <th className="py-2 px-2.5 font-bold text-slate-700 dark:text-slate-300 min-w-[180px] text-[11px]">
+                              <th className="!py-5 px-3 font-bold text-slate-900 dark:text-slate-100 min-w-[180px] text-[16px]">
                                 Outcome Description
                               </th>
                               {posList.map((po) => (
                                 <th
                                   key={po.po_id}
-                                  className="py-2 px-1 text-center font-bold text-slate-700 dark:text-slate-300 w-14 text-[11px]"
+                                  className="!py-5 px-1 text-center font-bold text-slate-900 dark:text-slate-100 w-14 text-[16px]"
                                 >
                                   {po.po_code}
                                 </th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
                             {cosList.map((co) => (
                               <tr
                                 key={co.course_outcome_id}
-                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition"
+                                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
                               >
-                                <td className="py-1.5 px-2.5 font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+                                <td className="!py-4 px-3 font-bold text-blue-700 dark:text-blue-400 text-[13.5px]">
                                   {co.co_code}
                                 </td>
-                                <td className="py-1.5 px-2.5 text-slate-600 dark:text-slate-300 text-[11px] leading-snug max-w-sm">
+                                <td className="!py-4 px-3 text-[#040e1d] dark:text-slate-200 text-sm font-medium leading-relaxed max-w-sm">
                                   {co.description ?? "—"}
                                 </td>
                                 {posList.map((po) => {
@@ -4331,7 +4394,7 @@ const InsCourseArtifacts = () => {
                                     return (
                                       <td
                                         key={po.po_id}
-                                        className="py-1.5 px-1 text-center text-slate-300"
+                                        className="!py-4 px-1 text-center text-slate-400"
                                       >
                                         —
                                       </td>
@@ -4349,7 +4412,7 @@ const InsCourseArtifacts = () => {
                                   const isDirty = dirty !== undefined;
 
                                   let colorClass =
-                                    "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500";
+                                    "bg-slate-100 text-slate-600 border-slate-300/80 font-semibold dark:bg-slate-800 dark:text-slate-400";
                                   if (currentVal === 3)
                                     colorClass =
                                       "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-bold";
@@ -4358,10 +4421,10 @@ const InsCourseArtifacts = () => {
                                       "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 font-bold";
                                   else if (currentVal === 1)
                                     colorClass =
-                                      "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-semibold";
+                                      "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-bold";
 
                                   return (
-                                    <td key={po.po_id} className="py-1.5 px-1 text-center">
+                                    <td key={po.po_id} className="!py-4 px-1 text-center">
                                       <button
                                         type="button"
                                         disabled={!canEditMatrix}
@@ -4379,10 +4442,10 @@ const InsCourseArtifacts = () => {
                                             ? `${co.co_code} → ${po.po_code}: ${currentJust}`
                                             : `${co.co_code} → ${po.po_code} (${currentVal})`
                                         }
-                                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs transition ${colorClass} ${canEditMatrix
+                                        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-[13px] transition ${colorClass} ${canEditMatrix
                                             ? "cursor-pointer hover:scale-110 hover:shadow-sm"
                                             : "cursor-default"
-                                          } ${isDirty ? "ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900" : ""}`}
+                                          } ${isDirty ? "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-900" : ""}`}
                                       >
                                         {currentVal}
                                       </button>
@@ -4395,8 +4458,8 @@ const InsCourseArtifacts = () => {
                         </table>
                       </div>
 
-                      <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 border-b border-slate-100 pb-2 dark:border-slate-800">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                        <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 pb-2.5 dark:border-slate-800">
                           Matrix Correlation Justifications (
                           {
                             entries.filter(
@@ -4407,7 +4470,7 @@ const InsCourseArtifacts = () => {
                           }
                           )
                         </h4>
-                        <div className="mt-2.5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto pr-1">
                           {entries
                             .filter(
                               (e: any) =>
@@ -4422,18 +4485,18 @@ const InsCourseArtifacts = () => {
                               return (
                                 <div
                                   key={e.id}
-                                  className="rounded-lg bg-slate-50 p-2.5 text-xs dark:bg-slate-800/40"
+                                  className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3 text-[13px] dark:border-slate-800 dark:bg-slate-800/40"
                                 >
-                                  <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
-                                    <span>
+                                  <div className="flex items-center justify-between gap-1 font-bold text-slate-900 dark:text-slate-100">
+                                    <span className="font-bold text-blue-700">
                                       {e.co_code ?? `CO${e.course_outcome_id}`} →{" "}
                                       {e.po_code ?? `PO${e.po_id}`}
                                     </span>
-                                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                    <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950 dark:text-blue-300">
                                       Level {val}
                                     </span>
                                   </div>
-                                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                  <p className="mt-4 text-sm font-medium text-[#040e1d] dark:text-slate-300 leading-relaxed">
                                     {just}
                                   </p>
                                 </div>
@@ -4488,7 +4551,7 @@ const InsCourseArtifacts = () => {
                         type="button"
                         onClick={openGeneratePedagogyModal}
                         disabled={isPedagogyBusy || actionLoading === "generate_pedagogy"}
-                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                        className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                       >
                         {isPedagogyBusy ? "Generating..." : "Generate Pedagogy"}
                       </button>
@@ -4519,7 +4582,7 @@ const InsCourseArtifacts = () => {
                           disabled={
                             actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}`
                           }
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                          className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                         >
                           {actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}`
                             ? "Activating..."
@@ -4531,7 +4594,7 @@ const InsCourseArtifacts = () => {
 
                 {(sectionLoading.pedagogy || loadingVersionDetail) && !currentPedagogy && (
                   <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 mb-2" />
+                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Loading pedagogy suggestions...
                     </p>
@@ -4587,7 +4650,7 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={openGeneratePedagogyModal}
                           disabled={isPedagogyBusy}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                         >
                           <Sparkles className="h-3.5 w-3.5" />
                           <span>Generate Pedagogy</span>
@@ -4704,7 +4767,7 @@ const InsCourseArtifacts = () => {
                   );
 
                   const renderEditingForm = (sug: any) => (
-                    <div className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm dark:border-indigo-900/60 dark:bg-slate-900 space-y-4">
+                    <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-900/60 dark:bg-slate-900 space-y-4">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-850">
                         <h5 className="text-xs font-bold text-slate-900 dark:text-white">
                           Edit Strategies for: {sug.topic_name || `Topic #${sug.topic_id}`}
@@ -4890,7 +4953,7 @@ const InsCourseArtifacts = () => {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5 dark:border-slate-750">
                         <div className="flex items-center gap-2">
-                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                          <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                             {seqLabel}
                           </span>
                           <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -4903,7 +4966,7 @@ const InsCourseArtifacts = () => {
                             onClick={() => startEditPedagogyTopic(sug)}
                             className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                           >
-                            <Edit2 className="h-3 w-3 text-indigo-500" />
+                            <Edit2 className="h-3 w-3 text-blue-500" />
                             <span>Edit Strategies</span>
                           </button>
                         )}
@@ -4939,7 +5002,7 @@ const InsCourseArtifacts = () => {
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
                                   <div className="flex items-center gap-2">
-                                    <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-indigo-500">
+                                    <span className="rounded-md btn-bg px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-blue-500">
                                       Unit {unit.unit_number}
                                     </span>
                                     <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
@@ -5011,7 +5074,7 @@ const InsCourseArtifacts = () => {
                               type="button"
                               onClick={openGeneratePedagogyModal}
                               disabled={isPedagogyBusy}
-                              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                              className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                             >
                               <Sparkles className="h-3.5 w-3.5" />
                               <span>Generate Pedagogy</span>
@@ -5056,7 +5119,7 @@ const InsCourseArtifacts = () => {
                         type="button"
                         onClick={openGenerateLessonPlanModal}
                         disabled={isLessonPlanBusy || actionLoading === "generate_lp"}
-                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                        className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                       >
                         {isLessonPlanBusy ? "Generating..." : "Generate Lesson Plan"}
                       </button>
@@ -5090,7 +5153,7 @@ const InsCourseArtifacts = () => {
                             actionLoading ===
                             `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
                           }
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                          className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                         >
                           {actionLoading ===
                             `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
@@ -5103,7 +5166,7 @@ const InsCourseArtifacts = () => {
 
                 {(sectionLoading.lesson_plan || loadingVersionDetail) && !currentLessonPlan && (
                   <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 mb-2" />
+                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Loading lesson plan schedule...
                     </p>
@@ -5164,7 +5227,7 @@ const InsCourseArtifacts = () => {
                             <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                               {group.unitTitle}
                             </h4>
-                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                            <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                               {formatMinutes(group.totalHours)} Total Allocated
                             </span>
                           </div>
@@ -5181,7 +5244,7 @@ const InsCourseArtifacts = () => {
                                 >
                                   <div className="flex flex-wrap items-start justify-between gap-2">
                                     <div className="space-y-0.5">
-                                      <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 mr-2">
+                                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 mr-2">
                                         Slot #{sIdx + 1}
                                       </span>
                                       <span className="text-xs font-bold text-slate-900 dark:text-white">
@@ -5190,7 +5253,7 @@ const InsCourseArtifacts = () => {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                      <span className="rounded-lg bg-indigo-100/70 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                                      <span className="rounded-lg bg-blue-100/70 px-2.5 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                                         {formatMinutes(slot.time_allocated)}
                                       </span>
                                       {canEditLp && !isEditingThisSlot && (
@@ -5199,7 +5262,7 @@ const InsCourseArtifacts = () => {
                                           onClick={() => startEditLpSlot(slot)}
                                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                                         >
-                                          <Edit2 className="h-3 w-3 text-indigo-500" />
+                                          <Edit2 className="h-3 w-3 text-blue-500" />
                                           <span>Edit Slot</span>
                                         </button>
                                       )}
@@ -5207,7 +5270,7 @@ const InsCourseArtifacts = () => {
                                   </div>
 
                                   {isEditingThisSlot ? (
-                                    <div className="rounded-lg border border-indigo-200 bg-white p-3 dark:border-indigo-900 dark:bg-slate-900 space-y-3">
+                                    <div className="rounded-lg border border-blue-200 bg-white p-3 dark:border-blue-900 dark:bg-slate-900 space-y-3">
                                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         <div>
                                           <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
@@ -5363,7 +5426,7 @@ const InsCourseArtifacts = () => {
               <div className="lg:col-span-6 h-[calc(100vh-140px)] min-h-[580px] sticky top-3 rounded-xl border border-slate-200/90 bg-slate-900 shadow-xs overflow-hidden dark:border-slate-800 flex flex-col">
                 <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300">
                   <div className="flex items-center gap-2 truncate">
-                    <FileText className="h-4 w-4 text-indigo-400 shrink-0" />
+                    <FileText className="h-4 w-4 text-blue-400 shrink-0" />
                     <span className="font-semibold truncate">
                       {activeSyllabus?.original_filename ?? "Syllabus Document"}
                     </span>
@@ -5379,7 +5442,7 @@ const InsCourseArtifacts = () => {
                 <div className="flex-1 overflow-hidden">
                   {loadingDoc ? (
                     <div className="flex h-full items-center justify-center text-slate-400 text-xs">
-                      <RefreshCw className="h-5 w-5 animate-spin mr-2 text-indigo-400" />
+                      <RefreshCw className="h-5 w-5 animate-spin mr-2 text-blue-400" />
                       Loading document preview...
                     </div>
                   ) : (
@@ -5398,7 +5461,7 @@ const InsCourseArtifacts = () => {
           );
         }
 
-        return <div className="mt-2.5 space-y-3">{tabContent}</div>;
+        return <div className="!mt-3 space-y-3">{tabContent}</div>;
       })()}
 
       {hierarchyModal && canEdit && (
@@ -5443,7 +5506,7 @@ const InsCourseArtifacts = () => {
                         onChange={(e) =>
                           setModalForm({ ...modalForm, unit_number: Number(e.target.value) })
                         }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     <div className="col-span-3">
@@ -5457,7 +5520,7 @@ const InsCourseArtifacts = () => {
                         onChange={(e) =>
                           setModalForm({ ...modalForm, unit_title: e.target.value })
                         }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         placeholder="e.g., Introduction to Neural Networks"
                       />
                     </div>
@@ -5473,7 +5536,7 @@ const InsCourseArtifacts = () => {
                       onChange={(e) =>
                         setModalForm({ ...modalForm, unit_overview: e.target.value })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </>
@@ -5492,7 +5555,7 @@ const InsCourseArtifacts = () => {
                         onChange={(e) =>
                           setModalForm({ ...modalForm, topic_code: e.target.value })
                         }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                   </div>
@@ -5507,7 +5570,7 @@ const InsCourseArtifacts = () => {
                       onChange={(e) =>
                         setModalForm({ ...modalForm, topic_name: e.target.value })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </>
@@ -5525,7 +5588,7 @@ const InsCourseArtifacts = () => {
                       onChange={(e) =>
                         setModalForm({ ...modalForm, subtopic_code: e.target.value })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
@@ -5539,7 +5602,7 @@ const InsCourseArtifacts = () => {
                       onChange={(e) =>
                         setModalForm({ ...modalForm, subtopic_name: e.target.value })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </>
@@ -5557,7 +5620,7 @@ const InsCourseArtifacts = () => {
                 <button
                   type="submit"
                   disabled={submittingModal}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl btn-bg px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                 >
                   <Save className="h-3.5 w-3.5" />
                   <span>{submittingModal ? "Saving..." : "Save Changes"}</span>
@@ -5575,7 +5638,7 @@ const InsCourseArtifacts = () => {
               Upload Course Syllabus
             </h3>
             <form onSubmit={handleUploadSyllabus} className="mt-4 space-y-3">
-              <div className="rounded-lg border-2 border-dashed border-slate-300 p-4 text-center hover:border-indigo-500 dark:border-slate-700">
+              <div className="rounded-lg border-2 border-dashed border-slate-300 p-4 text-center hover:border-blue-500 dark:border-slate-700">
                 <input
                   type="file"
                   accept=".pdf,.docx,.doc"
@@ -5585,7 +5648,7 @@ const InsCourseArtifacts = () => {
                 />
                 <label htmlFor="syllabus-upload-input" className="cursor-pointer flex flex-col items-center">
                   <Upload className="h-6 w-6 text-slate-400" />
-                  <span className="mt-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                  <span className="mt-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
                     {uploadFile ? uploadFile.name : "Click to browse file"}
                   </span>
                 </label>
@@ -5603,7 +5666,7 @@ const InsCourseArtifacts = () => {
                 <button
                   type="submit"
                   disabled={!uploadFile || uploading || isExtractionBusy}
-                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
                 >
                   {uploading ? "Uploading..." : "Upload & Extract"}
                 </button>
@@ -5618,7 +5681,7 @@ const InsCourseArtifacts = () => {
           <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-indigo-500" />
+                <Sparkles className="h-4 w-4 text-blue-500" />
                 <span>Generate CO-PO Mapping</span>
               </h3>
               <button
@@ -5637,7 +5700,7 @@ const InsCourseArtifacts = () => {
               <select
                 value={selectedExtractionForCopo ?? ""}
                 onChange={(e) => setSelectedExtractionForCopo(Number(e.target.value))}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
                 {versionsExtractions
                   .filter((e: any) => Boolean(e.is_approved))
@@ -5661,7 +5724,7 @@ const InsCourseArtifacts = () => {
                 type="button"
                 onClick={handleConfirmGenerateCopo}
                 disabled={actionLoading === "generate_copo" || !selectedExtractionForCopo || isCopoBusy}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl btn-bg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Queue Generation</span>
@@ -5676,7 +5739,7 @@ const InsCourseArtifacts = () => {
           <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Presentation className="h-4 w-4 text-indigo-500" />
+                <Presentation className="h-4 w-4 text-blue-500" />
                 <span>Generate Pedagogy Strategies</span>
               </h3>
               <button
@@ -5695,7 +5758,7 @@ const InsCourseArtifacts = () => {
               <select
                 value={selectedExtractionForPedagogy ?? ""}
                 onChange={(e) => setSelectedExtractionForPedagogy(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
                 {versionsExtractions
                   .filter((e: any) => Boolean(e.is_approved))
@@ -5719,7 +5782,7 @@ const InsCourseArtifacts = () => {
                 type="button"
                 onClick={handleConfirmGeneratePedagogy}
                 disabled={actionLoading === "generate_pedagogy" || !selectedExtractionForPedagogy || isPedagogyBusy}
-                className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Queue Generation</span>
@@ -5734,7 +5797,7 @@ const InsCourseArtifacts = () => {
           <div className="w-full max-w-lg rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-indigo-500" />
+                <Calendar className="h-4 w-4 text-blue-500" />
                 <span>Generate Lesson Plan Schedule</span>
               </h3>
               <button
@@ -5754,7 +5817,7 @@ const InsCourseArtifacts = () => {
                 <select
                   value={selectedExtractionForLp ?? ""}
                   onChange={(e) => setSelectedExtractionForLp(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 >
                   {versionsExtractions
                     .filter((e: any) => Boolean(e.is_approved))
@@ -5775,7 +5838,7 @@ const InsCourseArtifacts = () => {
                   onChange={(e) =>
                     setSelectedPedagogyForLp(e.target.value ? Number(e.target.value) : null)
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 >
                   <option value="">None (Use standard classroom delivery activities)</option>
                   {versionsPedagogies
@@ -5797,7 +5860,7 @@ const InsCourseArtifacts = () => {
                   min={1}
                   value={lpTargetHours}
                   onChange={(e) => setLpTargetHours(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   placeholder="e.g. 45"
                 />
               </div>
@@ -5815,7 +5878,7 @@ const InsCourseArtifacts = () => {
                 type="button"
                 onClick={handleConfirmGenerateLessonPlan}
                 disabled={actionLoading === "generate_lp" || !selectedExtractionForLp || isLessonPlanBusy}
-                className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Queue Generation</span>
@@ -5830,7 +5893,7 @@ const InsCourseArtifacts = () => {
           <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Edit2 className="h-4 w-4 text-indigo-500" />
+                <Edit2 className="h-4 w-4 text-blue-500" />
                 <span>
                   Edit Cell: {copoEditingCell.co_code} → {copoEditingCell.po_code}
                 </span>
@@ -5863,7 +5926,7 @@ const InsCourseArtifacts = () => {
                         setCopoEditingCell({ ...copoEditingCell, matrix_value: opt.val })
                       }
                       className={`rounded-lg border py-2 text-center text-xs font-bold transition ${opt.color} ${copoEditingCell.matrix_value === opt.val
-                          ? "border-indigo-600 ring-2 ring-indigo-500/30"
+                          ? "border-blue-600 ring-2 ring-blue-500/30"
                           : "border-slate-200 dark:border-slate-700"
                         }`}
                     >
@@ -5887,7 +5950,7 @@ const InsCourseArtifacts = () => {
                     })
                   }
                   placeholder="Explain why this CO supports this Program Outcome..."
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -5912,7 +5975,7 @@ const InsCourseArtifacts = () => {
                   }));
                   setCopoEditingCell(null);
                 }}
-                className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 active:scale-95"
+                className="inline-flex items-center gap-1 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-95"
               >
                 <Check className="h-3.5 w-3.5" />
                 <span>Apply to Cell</span>

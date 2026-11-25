@@ -48,7 +48,7 @@ const Analytics = () => {
             chart: {
                 height: 58,
                 type: 'line',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 sparkline: {
                     enabled: true,
                 },
@@ -93,7 +93,7 @@ const Analytics = () => {
             chart: {
                 height: 58,
                 type: 'line',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 sparkline: {
                     enabled: true,
                 },
@@ -147,7 +147,7 @@ const Analytics = () => {
             chart: {
                 height: 360,
                 type: 'bar',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 toolbar: {
                     show: false,
                 },
@@ -234,7 +234,7 @@ const Analytics = () => {
             chart: {
                 height: 160,
                 type: 'area',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 sparkline: {
                     enabled: true,
                 },
@@ -277,7 +277,7 @@ const Analytics = () => {
             chart: {
                 height: 160,
                 type: 'area',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 sparkline: {
                     enabled: true,
                 },
@@ -321,7 +321,7 @@ const Analytics = () => {
             chart: {
                 height: 160,
                 type: 'area',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 sparkline: {
                     enabled: true,
                 },

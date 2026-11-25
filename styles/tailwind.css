@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 /* Animate css */
 @import "./animate.css";
@@ -57,8 +57,13 @@
 
   body {
     @apply bg-[#F7F9FE] ;
-    font-family: "Montserrat", sans-serif;
+    font-family: "Inter", sans-serif;
     font-style: normal;
+    letter-spacing: 0.2px;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: 0.2px;
   }
 
   body.dark {
@@ -900,12 +905,21 @@ pre.hljs {
 
   .bg-color1 {
     /* background-color: #000E3B; */
-    background: linear-gradient(to bottom,  #1e55b9, #002a7a);
+    background: linear-gradient(to bottom, #005bff, #00319f);
+  }
+
+  .btn-bg {
+    /* background: linear-gradient(to right,  #1e55b9, #002a7a); */
+    background : linear-gradient(to right, #005bff, #00319f);
   }
 
   .bg-color2 {
     background-color: #5C28CA;
     /* background:  linear-gradient(to bottom, #f6fbfe, #c9e7fd); */
+  }
+
+  .bg-color3 {
+    background: linear-gradient(to top, #f6fbfe, #c9e7fd);
   }
 
   .bg-color2-l {
@@ -985,7 +999,7 @@ pre.hljs {
   }
 
   .text-color2 {
-    color: #5C28CA;
+    color: #0d46f7;
   }
 
   .text-color-white1 {

@@ -398,9 +398,45 @@ const Icons: Record<string, () => JSX.Element> = {
     </svg>
   ),
   "My Courses": () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+   <svg width="28" height="28" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <path d="M60 12h-2v34a3 3 0 0 1-3 3H42.72a17 17 0 0 0-7.6 1.8l-1.78.88A2.9 2.9 0 0 1 32 52a4.2 4.2 0 0 1-2-.65c-.27-.15-.59-.32-1-.51h-.1a17 17 0 0 0-7.6-1.8H9a3 3 0 0 1-3-3V12H4a1 1 0 0 0-1 1v40a1 1 0 0 0 1 1h56a1 1 0 0 0 1-1V13a1 1 0 0 0-1-1Z" />
+  <path d="M30.67 10.22A21.1 21.1 0 0 0 22 8v23a1 1 0 0 1-1.55.83L18 30.2l-2.45 1.63A1 1 0 0 1 14 31V8H9a1 1 0 0 0-1 1v37a1 1 0 0 0 1 1h12.28a19 19 0 0 1 8.5 2c.52.22.9.43 1.22.6V10.38ZM55 8H42.72a21.1 21.1 0 0 0-9.39 2.22l-.33.16v39.24l1.22-.62a19 19 0 0 1 8.5-2H55a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1Z" />
+  <path d="M38 26h8.13M38 34h8.13M38 40h12M38 32h12M38 24h12" />
+</svg>
+  ),
+  "My Assigned Departments": () => (
+    <svg
+      width="32"
+      height="32"
+      viewBox="0 0 512 511"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path
+        fillRule="nonzero"
+        d="M216.984 377.945c0 21.504 17.512 39.016 39.016 39.016s39.016-17.512 39.016-39.016S277.504 338.93 256 338.93s-39.016 17.511-39.016 39.015M283.137 421.363c-2.254-.511-4.61-.101-6.555 1.332-6.144 4.301-13.004 6.555-20.379 6.555-7.371 0-14.23-2.152-20.375-6.555-1.945-1.332-4.2-1.843-6.555-1.332-24.882 5.836-42.906 28.57-42.906 54.067v5.222c0 4.508 3.586 8.707 8.09 8.707h123.188c4.503 0 8.09-4.199 8.09-8.707v-5.222c-.102-25.496-17.923-48.23-42.598-54.067M403.148 377.945c0 21.504 17.512 39.016 39.016 39.016s39.016-17.512 39.016-39.016-17.512-39.015-39.016-39.015-39.016 17.511-39.016 39.015M469.402 421.363c-2.254-.511-4.71-.101-6.656 1.332-6.144 4.301-13.004 6.555-20.379 6.555-7.37 0-14.234-2.152-20.375-6.555-1.945-1.332-4.199-1.843-6.453-1.332-24.883 5.836-42.805 28.57-42.805 54.067v5.222c0 4.508 3.38 8.707 7.887 8.707H503.81c4.503 0 8.191-4.199 8.191-8.707v-5.222c0-25.496-17.922-48.23-42.598-54.067M69.734 417.063c21.504 0 39.016-17.508 39.016-39.016 0-21.504-17.512-39.012-39.016-39.012s-39.015 17.406-39.015 38.91c0 21.606 17.511 39.118 39.015 39.118M96.77 421.363c-2.254-.511-4.61-.101-6.555 1.332-6.145 4.301-12.903 6.555-20.38 6.555-7.37 0-14.23-2.152-20.374-6.555-1.945-1.332-4.3-1.843-6.555-1.332C18.023 427.2 0 449.933 0 475.43v5.222c0 4.504 3.688 8.703 8.191 8.703H131.38c4.504 0 7.887-4.199 7.887-8.703v-5.222c0-25.496-17.82-48.23-42.496-54.067M63.488 317.121c4.504 0 8.192-3.687 8.192-8.191v-45.875h176.129v45.875c0 4.504 3.687 8.191 8.191 8.191 4.508 0 8.191-3.687 8.191-8.191v-45.875h176.13v45.875c0 4.504 3.687 8.191 8.19 8.191 4.509 0 8.192-3.687 8.192-8.191v-54.582c0-4.504-3.683-7.68-8.191-7.68h-184.32v-43.52c0-4.503-3.688-8.191-8.192-8.191-4.508 0-8.191 3.688-8.191 8.191v43.52H63.489c-4.505 0-8.192 3.176-8.192 7.68v54.582c0 4.605 3.687 8.191 8.191 8.191M256 88.973c24.371 0 44.238-19.864 44.238-44.235S280.371.5 256 .5s-44.238 19.867-44.238 44.238S231.629 88.973 256 88.973M184.012 172.941h143.87c4.509 0 7.888-3.789 7.888-8.293v-6.144c0-14.336-4.813-28.469-13.723-39.629-8.805-11.059-21.094-18.945-34.715-22.121-2.25-.512-4.605-.102-6.55 1.332-7.27 5.121-15.77 7.887-24.579 7.887-8.805 0-17.305-2.766-24.574-7.887-1.945-1.332-4.2-1.844-6.453-1.332-28.465 6.656-48.946 32.668-48.946 61.75v6.144c-.101 4.504 3.278 8.293 7.782 8.293m0 0"
+      />
+    </svg>
+  ),
+
+  "Classrooms": () => (
+    <svg
+      width="32"
+      height="32"
+      viewBox="0 0 512 512"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M484.119 343.741V48.195H88.187V159.89c30.976 11.39 53.132 41.189 53.132 76.068 0 20.254-7.489 38.781-19.82 53h95.968l86.5-42.555 13.243 26.919-81.283 39.988v22.65a67.38 67.38 0 0 1-11.537 37.781H512v-30Z" />
+      <path d="M368.562 107.005v30H203.743v-30M177.861 200.574v-30h216.583v30" />
+      <circle cx="60.305" cy="235.957" r="51.013" />
+      <path d="M205.926 335.96v-17.003H60.305C27 318.957 0 345.957 0 379.262v84.543h120.611s-.021-89.704-.028-90.077h47.574c20.859 0 37.769-16.909 37.769-37.768Z" />
     </svg>
   ),
   Coordinator: () => (
@@ -702,7 +738,7 @@ const SidebarDynamic = () => {
   return (
     <div className={semidark ? "dark" : ""}>
       <nav
-        className="sidebar bg-color1 fixed bottom-0 top-0 z-50 h-full overflow-hidden transition-[width] duration-300 ease-in-out lg:top-[72px] lg:max-h-[calc(100vh-72px)]"
+        className="sidebar bg-[#00319f]  fixed bottom-0 top-0 z-50 h-full overflow-hidden transition-[width] duration-300 ease-in-out lg:top-[72px] lg:max-h-[calc(100vh-72px)]"
         style={{ width: showLabels ? "270px" : "58px" }}
         onMouseEnter={() => {
           if (!isMobile) setHovered(true);
@@ -735,8 +771,8 @@ const SidebarDynamic = () => {
           <div
             className="flex items-center overflow-hidden rounded-[12px] transition-all duration-300"
             style={{
-              background: showLabels ? "#000" : "transparent",
-              border: showLabels ? "0.2px solid #fff" : "1px solid transparent",
+              background: showLabels ? "#000E3B" : "transparent",
+              border: showLabels ? "0.2px solid transparent" : "1px solid transparent",
               padding: showLabels ? "10px 12px" : "8px 0",
               justifyContent: showLabels ? "flex-start" : "center",
               minHeight: 56,
@@ -767,7 +803,7 @@ const SidebarDynamic = () => {
 
         {/* Menu list */}
         <div
-          className="sidebar-menu-scroll flex flex-col space-y-1 overflow-y-auto overflow-x-hidden py-4"
+          className="sidebar-menu-scroll flex flex-col space-y-3 overflow-y-auto overflow-x-hidden py-4"
           style={{ maxHeight: "calc(100% - 100px)" }}
         >
           {menu.map((item: any, idx: number) => {
@@ -827,7 +863,7 @@ const SidebarDynamic = () => {
                   className={`sidebar-nav-item mx-[8px] font-bold flex items-center transition-colors duration-150 ${disabledClass}`}
                   style={{
                     minHeight: 40,
-                    borderRadius: "10px",
+                    borderRadius: "20px",
                     padding: showLabels ? "9px 14px" : "9px 0",
                     justifyContent: showLabels ? "flex-start" : "center",
                     background: active ? ACTIVE_BG : "transparent",

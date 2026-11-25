@@ -317,7 +317,7 @@ const Header = () => {
 
           {/* greeting */}
           <div className="ltr:ml-6 rtl:mr-6 hidden lg:block flex-1">
-            <p className="text-xl font-bold text-[#000] dark:text-white flex gap-4 items-center">
+            <p className="text-xl font-bold text-[#000] dark:text-white flex gap-4 items-center capitalize">
               {getGreeting()}, {state.name} <IconHandWave />
             </p>
           </div>
@@ -327,9 +327,9 @@ const Header = () => {
             {/* notification bell */}
             <button
               type="button"
-              className="me-3  relative flex h-12 w-12 items-center justify-center rounded-full bg-[#ECE3FC] text-[#000] hover:bg-[#e0e3ff]"
+              className="me-3  relative flex h-12 w-12 items-center justify-center rounded-full bg-color3 text-[#000]"
             >
-              <IconBellBing className="h-6 w-6" />
+              <IconBellBing className="h-6 w-6 " />
               <span className="absolute right-3.5 top-3 h-2 w-2 rounded-full bg-red-600 border border-[#fff]"></span>
             </button>
 
@@ -339,8 +339,8 @@ const Header = () => {
                 {(state.name || "U").trim().charAt(0).toUpperCase()}
               </div>
               <div className="text-left sm:block">
-                <p className="text-md font-bold text-[#000] dark:text-white">{state.name || "User"}</p>
-                <p className="text-xs text-color2 capitalize">{state.user_type || "ERP Admin"}</p>
+                <p className="text-md font-bold text-[#000] dark:text-white capitalize">{state.name || "User"}</p>
+                <p className="text-xs text-color2 font-semibold capitalize">{state.user_type || "ERP Admin"}</p>
               </div>
             </div>
 

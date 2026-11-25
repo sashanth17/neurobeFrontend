@@ -27,7 +27,7 @@ function App({ children }: PropsWithChildren) {
         <div
             className={`${(themeConfig.sidebar && 'toggle-sidebar') || ''} ${themeConfig.menu} ${themeConfig.layout} ${
                 themeConfig.rtlClass
-            } main-section relative font-montserrat text-sm font-normal antialiased`}
+            } main-section relative font-inter text-sm font-normal antialiased`}
         >
             {children}
         </div>

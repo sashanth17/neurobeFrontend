@@ -30,7 +30,7 @@ const Typography = () => {
                                 <p className="text-4xl leading-[60px] text-[#515365] dark:text-white-light">The quick brown fox</p>
                             </div>
                             <div className="border-border-white-dark/20 border-t bg-dark-light p-4 dark:border-black dark:bg-[#191e3a]">
-                                <h5 className="text-base dark:text-white-light">Montserrat</h5>
+                                <h5 className="text-base dark:text-white-light">Inter</h5>
                                 <button className="text-[13px] text-primary">Google Fonts</button>
                                 <div className="mt-7 flex justify-center">
                                     <button className="btn btn-primary">View Family</button>

@@ -4,12 +4,8 @@ export default function Document() {
     return (
         <Html lang="en" data-scroll-behavior="smooth">
             <Head>
-<<<<<<< Updated upstream
                 <meta charSet="utf-8" />
-                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" />
-=======
-                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" />
->>>>>>> Stashed changes
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" />
             </Head>
             <body>
                 <Main />
