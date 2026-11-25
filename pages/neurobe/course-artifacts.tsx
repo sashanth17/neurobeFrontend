@@ -3,9 +3,11 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/router";
 import {
   BookOpen,
+  Beaker,
   Layers,
   GraduationCap,
   Clock,
+  Monitor,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
@@ -18,6 +20,7 @@ import {
   FileText,
   ShieldCheck,
   UserCheck,
+  Users,
   Check,
   History,
   Columns,
@@ -29,8 +32,12 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+<<<<<<< Updated upstream
   ExternalLink,
   BarChart2,
+=======
+  Settings,
+>>>>>>> Stashed changes
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import {
@@ -2701,7 +2708,7 @@ const InsCourseArtifacts = () => {
             type="button"
             onClick={() => handleTabChange("syllabus")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "syllabus"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+                ? "bg-sky-600 text-white shadow-xs dark:bg-sky-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
@@ -2712,7 +2719,7 @@ const InsCourseArtifacts = () => {
             type="button"
             onClick={() => handleTabChange("copo")}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copo"
-                ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+                ? "bg-sky-600 text-white shadow-xs dark:bg-sky-500"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
           >
@@ -2802,7 +2809,7 @@ const InsCourseArtifacts = () => {
             )}
 
             {activeTab === "syllabus" && (
-              <div className="space-y-3">
+              <div className="space-y-3 [&_h3]:text-[15px] [&_h3]:font-extrabold [&_h3]:text-slate-900 [&_h4]:text-sm [&_h4]:font-bold [&_h4]:text-slate-900 [&_p]:text-[13px] [&_p]:font-medium [&_p]:leading-relaxed [&_p]:text-slate-700 [&_li]:text-[13px] [&_li]:text-slate-800 dark:[&_h3]:text-slate-100 dark:[&_h4]:text-slate-100 dark:[&_p]:text-slate-200 dark:[&_li]:text-slate-200">
                 {renderVersionCards("syllabus")}
 
                 <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -3104,54 +3111,60 @@ const InsCourseArtifacts = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                          <div className="rounded-lg bg-slate-50 p-2 text-center dark:bg-slate-800/40">
-                            <p className="text-base font-bold text-slate-900 dark:text-white">
-                              {currentExt?.credits ?? course?.credits ?? 0}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                              Credits
-                            </p>
+                        <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
+                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
+                            <Layers aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                            <div>
+                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                                {currentExt?.credits ?? course?.credits ?? 0}
+                              </p>
+                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Credits</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-slate-50 p-2 text-center dark:bg-slate-800/40">
-                            <p className="text-base font-bold text-indigo-600 dark:text-indigo-400">
-                              {currentExt?.total_theory_hours ?? course?.total_theory_hours ?? 0}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                              Theory Hours
-                            </p>
+                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/40 px-3 py-2 dark:border-blue-900/50 dark:bg-blue-950/20">
+                            <BookOpen aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                            <div>
+                              <p className="text-lg font-extrabold leading-5 text-blue-600 dark:text-blue-400">
+                                {currentExt?.total_theory_hours ?? course?.total_theory_hours ?? 0}
+                              </p>
+                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Theory Hours</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-slate-50 p-2 text-center dark:bg-slate-800/40">
-                            <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
-                              {currentExt?.total_lab_hours ?? course?.total_lab_hours ?? 0}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                              Lab Hours
-                            </p>
+                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                            <Beaker aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            <div>
+                              <p className="text-lg font-extrabold leading-5 text-emerald-700 dark:text-emerald-400">
+                                {currentExt?.total_lab_hours ?? course?.total_lab_hours ?? 0}
+                              </p>
+                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Lab Hours</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-slate-50 p-2 text-center dark:bg-slate-800/40">
-                            <p className="text-base font-bold text-slate-700 dark:text-slate-300">
-                              {currentExt?.lecture_hours ?? 0}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                              Lecture (L)
-                            </p>
+                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
+                            <Monitor aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                            <div>
+                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                                {currentExt?.lecture_hours ?? 0}
+                              </p>
+                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Lecture (L)</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-slate-50 p-2 text-center dark:bg-slate-800/40">
-                            <p className="text-base font-bold text-slate-700 dark:text-slate-300">
-                              {currentExt?.tutorial_hours ?? 0}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                              Tutorial (T)
-                            </p>
+                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
+                            <Users aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                            <div>
+                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                                {currentExt?.tutorial_hours ?? 0}
+                              </p>
+                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Tutorial (T)</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-slate-50 p-2 text-center dark:bg-slate-800/40">
-                            <p className="text-base font-bold text-slate-700 dark:text-slate-300">
-                              {currentExt?.practical_hours ?? 0}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                              Practical (P)
-                            </p>
+                          <div className="flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/40">
+                            <Settings aria-hidden="true" className="h-5 w-5 shrink-0 text-blue-500" />
+                            <div>
+                              <p className="text-lg font-extrabold leading-5 text-slate-900 dark:text-white">
+                                {currentExt?.practical_hours ?? 0}
+                              </p>
+                              <p className="text-[11px] font-medium leading-4 text-slate-500 dark:text-slate-400">Practical (P)</p>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -3798,12 +3811,12 @@ const InsCourseArtifacts = () => {
                             {units.map((u: any, uIdx: number) => (
                               <div
                                 key={u.id ?? uIdx}
-                                className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
+                                className="rounded-xl border border-sky-100 bg-sky-50/40 p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-2">
-                                      <span className="rounded-md bg-indigo-600 px-2 py-0.5 font-mono text-[10px] font-bold text-white shadow-2xs dark:bg-indigo-500">
+                                      <span className="rounded-md bg-sky-600 px-2 py-0.5 font-mono text-[10px] font-bold text-white shadow-2xs dark:bg-sky-500">
                                         Unit {u.unit_number}
                                       </span>
                                       <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
@@ -4015,7 +4028,7 @@ const InsCourseArtifacts = () => {
             )}
 
             {activeTab === "copo" && (
-              <div className="space-y-3">
+              <div className="space-y-3 [&_h3]:text-[15px] [&_h3]:font-extrabold [&_h3]:text-slate-900 [&_h4]:text-sm [&_h4]:font-bold [&_h4]:text-slate-900 [&_p]:text-[13px] [&_p]:font-medium [&_p]:leading-relaxed [&_p]:text-slate-700 [&_th]:text-[13px] [&_th]:font-bold [&_th]:text-slate-800 [&_td]:text-[13px] [&_td]:text-slate-800 dark:[&_h3]:text-slate-100 dark:[&_h4]:text-slate-100 dark:[&_p]:text-slate-200 dark:[&_th]:text-slate-200 dark:[&_td]:text-slate-200">
                 {renderVersionCards("copo")}
 
                 {!currentCopo && (
@@ -4281,7 +4294,7 @@ const InsCourseArtifacts = () => {
 
                         <table className="mt-2 w-full text-left text-xs border-collapse">
                           <thead>
-                            <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                            <tr className="border-b border-sky-100 dark:border-slate-700 bg-sky-50/70 dark:bg-slate-800/60">
                               <th className="py-2 px-2.5 font-bold text-slate-700 dark:text-slate-300 w-20 text-[11px]">
                                 CO
                               </th>

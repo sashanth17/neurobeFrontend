@@ -344,7 +344,7 @@ const MyAssignedCourses = () => {
                 onClick={() => setRoleFilter("all")}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
                   roleFilter === "all"
-                    ? "bg-indigo-600 text-white shadow-xs"
+                    ? "bg-color1 text-white shadow-xs"
                     : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                 }`}
               >

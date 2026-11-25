@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
 /* Animate css */
 @import "./animate.css";
 /* tippy css */
@@ -54,7 +56,9 @@
   }
 
   body {
-    @apply bg-[#F7F9FE] font-nunito;
+    @apply bg-[#F7F9FE] ;
+    font-family: "Montserrat", sans-serif;
+    font-style: normal;
   }
 
   body.dark {
@@ -895,15 +899,17 @@ pre.hljs {
   }
 
   .bg-color1 {
-    background-color: #000E3B;
+    /* background-color: #000E3B; */
+    background: linear-gradient(to bottom,  #1e55b9, #002a7a);
   }
 
   .bg-color2 {
     background-color: #5C28CA;
+    /* background:  linear-gradient(to bottom, #f6fbfe, #c9e7fd); */
   }
 
   .bg-color2-l {
-    background-color: #ECE3FC;
+    background-color: #c9e7fd;
   }
 
   .bg-dark_grey {
@@ -1349,6 +1355,15 @@ pre.hljs {
   .Toastify__toast--error   .neurobe-toast-progress  { background: #ef4444 !important; }
   .Toastify__toast--warning .neurobe-toast-progress  { background: #f59e0b !important; }
   .Toastify__toast--info    .neurobe-toast-progress  { background: #6c8fff !important; }
+
+  .sidebar-nav-item:not([disabled]):hover {
+    background: linear-gradient(to right, #e1f1fd, #c1e2f9) !important;
+    color: #000E3B !important;
+  }
+
+  /* .sidebar-nav-item:not([disabled]):hover * {
+    color: #000E3B !important;
+  } */
 
   .sidebar-menu-scroll {
     scrollbar-width: thin;

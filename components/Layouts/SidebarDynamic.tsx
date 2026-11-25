@@ -507,7 +507,7 @@ const FallbackIcon = () => (
   </svg>
 );
 
-const ACTIVE_BG = "#5C28CA";
+const ACTIVE_BG = "linear-gradient(to right, #e1f1fd, #c1e2f9)";
 
 const SidebarDynamic = () => {
   const router = useRouter();
@@ -824,14 +824,14 @@ const SidebarDynamic = () => {
                 <Link
                   key={idx}
                   href={disabled ? "#" : item.href || "#"}
-                  className={`mx-[8px] flex items-center transition-colors duration-150 ${disabledClass}`}
+                  className={`sidebar-nav-item mx-[8px] font-bold flex items-center transition-colors duration-150 ${disabledClass}`}
                   style={{
                     minHeight: 40,
-                    borderRadius: "9999px",
+                    borderRadius: "10px",
                     padding: showLabels ? "9px 14px" : "9px 0",
                     justifyContent: showLabels ? "flex-start" : "center",
                     background: active ? ACTIVE_BG : "transparent",
-                    color: "#fff",
+                    color: active ? "#000E3B" : "#fff",
                   }}
                   onClick={(e) => {
                     if (disabled) {
@@ -851,16 +851,6 @@ const SidebarDynamic = () => {
                       }));
                     }
                   }}
-                  onMouseEnter={(e) => {
-                    if (!disabled)
-                      (e.currentTarget as HTMLElement).style.background =
-                        ACTIVE_BG;
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = active
-                      ? ACTIVE_BG
-                      : "transparent";
-                  }}
                 >
                   <span
                     className="flex shrink-0 items-center justify-center"
@@ -869,7 +859,7 @@ const SidebarDynamic = () => {
                     <Icon />
                   </span>
                   {showLabels && (
-                    <span className="ml-3 whitespace-nowrap text-[14px] font-medium leading-none">
+                    <span className="ml-3 whitespace-nowrap text-[14px] font-semibold leading-none">
                       {item.label}
                     </span>
                   )}
@@ -901,7 +891,7 @@ const SidebarDynamic = () => {
                     <button
                       type="button"
                       disabled={disabled}
-                      className={`flex items-center transition-colors duration-150 cursor-pointer ${
+                      className={`sidebar-nav-item flex items-center transition-colors duration-150 cursor-pointer ${
                         level === 1 ? "mx-[8px] rounded-full" : "rounded-full px-3 py-[7px] text-[13px]"
                       }`}
                       style={{
@@ -915,16 +905,6 @@ const SidebarDynamic = () => {
                       }}
                       onClick={() => {
                         if (!disabled && showLabels) toggleKey(key);
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!disabled)
-                          (e.currentTarget as HTMLElement).style.background =
-                            level === 1 ? ACTIVE_BG : "rgba(255, 255, 255, 0.18)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = isHighlighted
-                          ? (level === 1 ? ACTIVE_BG : "rgba(255, 255, 255, 0.12)")
-                          : "transparent";
                       }}
                     >
                       <span
@@ -981,19 +961,10 @@ const SidebarDynamic = () => {
                             <Link
                               key={ci}
                               href={child.href || "#"}
-                              className="flex items-center gap-2 rounded-full px-3 py-[7px] text-[13px] font-medium transition-colors duration-150"
+                              className="sidebar-nav-item flex items-center gap-2 rounded-full px-3 py-[7px] text-[13px] font-medium transition-colors duration-150"
                               style={{
                                 color: "#fff",
                                 background: active ? "rgba(255, 255, 255, 0.2)" : "transparent",
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!active)
-                                  (e.currentTarget as HTMLElement).style.background =
-                                    "rgba(255, 255, 255, 0.15)";
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!active)
-                                  (e.currentTarget as HTMLElement).style.background = "transparent";
                               }}
                               onClick={() => {
                                 if (key.includes("coordinator") || parentKey.includes("coordinator")) {
