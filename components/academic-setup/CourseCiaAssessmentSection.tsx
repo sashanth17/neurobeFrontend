@@ -144,17 +144,15 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ── Top Level Sub-Navigation: Builder vs Analytics ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
+      <div className="ui-card-compact flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setActiveSubTab("builder")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-              activeSubTab === "builder"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            className={`ui-tab-pill ${
+              activeSubTab === "builder" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
             }`}
           >
             <FileCheck className="h-4 w-4" />
@@ -167,10 +165,8 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
           <button
             type="button"
             onClick={() => setActiveSubTab("analytics")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-              activeSubTab === "analytics"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            className={`ui-tab-pill ${
+              activeSubTab === "analytics" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
             }`}
           >
             <BarChart2 className="h-4 w-4" />
@@ -179,9 +175,9 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
         </div>
 
         {/* Quick Helper / Info */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-          <span>Course:</span>
-          <span className="font-bold text-gray-800 dark:text-gray-200">{courseCode}</span>
+        <div className="flex items-center gap-2">
+          <span className="section-mini-cap">Course:</span>
+          <span className="ui-badge-code">{courseCode}</span>
         </div>
       </div>
 
@@ -194,21 +190,19 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
 
       {/* ── SUB-VIEW 1: Assessment Builder (Linear CIA Flow) ── */}
       {activeSubTab === "builder" && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Stepper Progress Bar (Visible when in an active flow step) */}
           {flowStep !== "overview" && (
-            <div className="rounded-2xl border border-purple-200/80 bg-white p-4 shadow-xs dark:border-purple-900/50 dark:bg-gray-850">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="ui-card-compact">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 {/* Stepper Steps */}
-                <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:gap-3 sm:pb-0">
                   {/* Step 1: Template */}
                   <button
                     type="button"
                     onClick={() => setFlowStep("template_selection")}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                      flowStep === "template_selection"
-                        ? "bg-purple-600 text-white shadow-xs"
-                        : "text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800"
+                    className={`ui-tab-pill ${
+                      flowStep === "template_selection" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
                     }`}
                   >
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">
@@ -216,23 +210,23 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                     </span>
                     <span>1. Choose / Create Template</span>
                     {activeTemplate && (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                     )}
                   </button>
 
-                  <ArrowRight className="h-4 w-4 text-gray-400 shrink-0" />
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
 
                   {/* Step 2: Question Assembly */}
                   <button
                     type="button"
                     disabled={!selectedTemplateId}
                     onClick={() => selectedTemplateId && setFlowStep("assembly")}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                    className={`ui-tab-pill ${
                       flowStep === "assembly"
-                        ? "bg-purple-600 text-white shadow-xs"
+                        ? "ui-tab-pill-active"
                         : selectedTemplateId
-                        ? "text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 cursor-pointer"
-                        : "text-gray-400 bg-gray-50 dark:bg-gray-800/40 opacity-60 cursor-not-allowed"
+                        ? "ui-tab-pill-idle"
+                        : "cursor-not-allowed opacity-50"
                     }`}
                   >
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">
@@ -241,19 +235,19 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                     <span>2. Question Assembly Studio</span>
                   </button>
 
-                  <ArrowRight className="h-4 w-4 text-gray-400 shrink-0" />
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
 
                   {/* Step 3: Schedule Test */}
                   <button
                     type="button"
                     disabled={!selectedTemplateId}
                     onClick={() => selectedTemplateId && setFlowStep("schedule")}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                    className={`ui-tab-pill ${
                       flowStep === "schedule"
-                        ? "bg-purple-600 text-white shadow-xs"
+                        ? "ui-tab-pill-active"
                         : selectedTemplateId
-                        ? "text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 cursor-pointer"
-                        : "text-gray-400 bg-gray-50 dark:bg-gray-800/40 opacity-60 cursor-not-allowed"
+                        ? "ui-tab-pill-idle"
+                        : "cursor-not-allowed opacity-50"
                     }`}
                   >
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">
@@ -267,7 +261,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                 <button
                   type="button"
                   onClick={() => setFlowStep("overview")}
-                  className="self-end sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition cursor-pointer shrink-0"
+                  className="ui-btn-secondary-sm self-end sm:self-auto"
                 >
                   <span>✕ Exit Flow / Overview</span>
                 </button>
@@ -277,31 +271,31 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
 
           {/* ── STEP: OVERVIEW DASHBOARD ── */}
           {flowStep === "overview" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Primary Linear Hero CTA Banner */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-3xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white shadow-lg shadow-purple-500/10">
-                <div className="space-y-2 max-w-xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-semibold backdrop-blur-xs">
+              <div className="flex flex-col justify-between gap-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 p-5 text-white shadow-sm md:flex-row md:items-center sm:p-6">
+                <div className="max-w-xl space-y-2">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>Linear Assessment Workflow</span>
+                    <span className="!text-white">Linear Assessment Workflow</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+                  <h2 className="text-lg font-bold tracking-tight !text-white sm:text-xl">
                     Course Internal Assessment (CIA) Studio
                   </h2>
-                  <p className="text-xs sm:text-sm text-purple-100">
+                  <p className="text-xs leading-relaxed !text-indigo-100 sm:text-[13px]">
                     A guided, step-by-step workflow: Select or configure your question paper blueprint, assemble questions with AI synthesis, preview the university exam paper, and schedule tests for classrooms.
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <div className="flex shrink-0 flex-col items-stretch gap-2.5 sm:flex-row sm:items-center">
                   <button
                     type="button"
                     onClick={() => setFlowStep("template_selection")}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-purple-700 font-bold text-xs sm:text-sm hover:bg-purple-50 active:scale-[0.98] transition shadow-md cursor-pointer"
+                    className="ui-btn-secondary"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-4 w-4 text-indigo-600" />
                     <span>Start CIA Assessment Flow</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <ArrowRight className="h-4 w-4 text-indigo-600" />
                   </button>
                   <button
                     type="button"
@@ -309,91 +303,78 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                       setEditTestId(null);
                       setIsCreateTestModalOpen(true);
                     }}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/20 text-white font-bold text-xs sm:text-sm transition backdrop-blur-xs cursor-pointer"
+                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/15 px-4 py-2 text-xs font-semibold !text-white transition hover:bg-white/25"
                   >
                     <Calendar className="h-4 w-4" />
-                    <span>Quick Schedule</span>
+                    <span className="!text-white">Quick Schedule</span>
                   </button>
                 </div>
               </div>
 
               {/* Quick Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-850 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Blueprint Templates</span>
-                    <FileCheck className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="stat-card stat-card-indigo">
+                  <FileCheck className="h-6 w-6 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <p className="stat-value">{templates.length}</p>
+                    <p className="stat-label">Blueprint Templates ({courseCode})</p>
                   </div>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">
-                    {templates.length}
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Configured for {courseCode}
-                  </p>
                 </div>
 
-                <div className="p-4 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-850 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Scheduled CIA Tests</span>
-                    <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <div className="stat-card stat-card-purple">
+                  <Calendar className="h-6 w-6 shrink-0 text-purple-600 dark:text-purple-400" />
+                  <div>
+                    <p className="stat-value">{activeTests.length}</p>
+                    <p className="stat-label">Scheduled CIA Tests ({archivedTests.length} archived)</p>
                   </div>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">
-                    {activeTests.length}
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    {archivedTests.length} archived tests
-                  </p>
                 </div>
 
-                <div className="p-4 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-850 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Active Outcomes</span>
-                    <Award className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <div className="stat-card stat-card-emerald">
+                  <Award className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div>
+                    <p className="stat-value">{coCodes.length} COs</p>
+                    <p className="stat-label">Active Mapped Outcomes</p>
                   </div>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">
-                    {coCodes.length} COs
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Mapped for assessment evaluation
-                  </p>
                 </div>
               </div>
 
               {/* Blueprints Section */}
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      <FileCheck className="h-4 w-4 text-purple-600" />
-                      <span>Question Paper Blueprints & Assembly</span>
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Blueprints define the exam structure, mark distribution, and question slots.
-                    </p>
+              <div className="ui-card space-y-4">
+                <div className="ui-card-header">
+                  <div className="flex items-center gap-2.5">
+                    <div className="ui-icon-badge">
+                      <FileCheck className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="section-ti">
+                        Question Paper Blueprints & Assembly
+                      </h3>
+                      <p className="section-mini-cap">
+                        Blueprints define the exam structure, mark distribution, and question slots.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingTemplate(null);
-                        setIsCreateTemplateModalOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition cursor-pointer shadow-2xs"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>+ Create Blueprint</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTemplate(null);
+                      setIsCreateTemplateModalOpen(true);
+                    }}
+                    className="ui-btn-primary-sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Create Blueprint</span>
+                  </button>
                 </div>
 
                 {templates.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-850 text-center">
-                    <FileCheck className="h-10 w-10 text-gray-400 mb-2" />
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                  <div className="ui-empty-state">
+                    <FileCheck className="mb-2 h-10 w-10 text-slate-400" />
+                    <h4 className="section-ti">
                       No Question Paper Templates Yet
                     </h4>
-                    <p className="text-xs text-gray-500 max-w-md mt-1 mb-4">
+                    <p className="section-mini-cap mb-4 mt-1 max-w-md">
                       Create your first question paper template blueprint or start the linear CIA flow to assemble exam questions.
                     </p>
                     <button
@@ -402,38 +383,38 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                         setEditingTemplate(null);
                         setIsCreateTemplateModalOpen(true);
                       }}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition cursor-pointer"
+                      className="ui-btn-primary-sm"
                     >
                       <Plus className="h-4 w-4" />
                       <span>Create First Blueprint</span>
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     {templates.map((tmpl) => (
                       <div
                         key={tmpl.id}
-                        className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-2xs hover:border-purple-300 dark:border-gray-800 dark:bg-gray-850 transition"
+                        className="ui-subcard flex flex-col justify-between transition hover:border-indigo-300"
                       >
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                            <span className="ui-badge-purple uppercase">
                               {tmpl.status || "drafted"}
                             </span>
-                            <span className="text-xs font-black text-purple-700 dark:text-purple-300">
+                            <span className="ui-badge-code">
                               {tmpl.total_maximum_marks} Marks
                             </span>
                           </div>
 
-                          <h4 className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">
+                          <h4 className="card-ti line-clamp-1">
                             {tmpl.template_name}
                           </h4>
 
-                          <p className="text-xs text-gray-500 line-clamp-2">
+                          <p className="ui-body-text line-clamp-2">
                             {tmpl.description || "Question paper blueprint."}
                           </p>
 
-                          <div className="flex items-center gap-3 text-xs text-gray-500 pt-1">
+                          <div className="ui-muted-text flex items-center gap-3 pt-0.5">
                             <span>{tmpl.sections?.length || 0} Sections</span>
                             <span>•</span>
                             <span>
@@ -446,14 +427,14 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                           </div>
                         </div>
 
-                        <div className="pt-4 mt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
+                        <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-200/80 pt-3 dark:border-slate-700/80">
                           <button
                             type="button"
                             onClick={() => {
                               setEditingTemplate(tmpl);
                               setIsCreateTemplateModalOpen(true);
                             }}
-                            className="text-xs font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer"
+                            className="ui-btn-secondary-sm"
                           >
                             Edit Blueprint
                           </button>
@@ -461,7 +442,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                           <button
                             type="button"
                             onClick={() => handleSelectTemplateForAssembly(tmpl.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition cursor-pointer shadow-2xs"
+                            className="ui-btn-primary-sm"
                           >
                             <span>Assemble Questions</span>
                             <ArrowRight className="h-3.5 w-3.5" />
@@ -474,16 +455,20 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
               </div>
 
               {/* Scheduled CIA Tests Section */}
-              <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-indigo-600" />
-                      <span>Scheduled CIA Tests & Question Papers</span>
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Tests assigned to student cohorts with marks entry and extraction status.
-                    </p>
+              <div className="ui-card space-y-4">
+                <div className="ui-card-header">
+                  <div className="flex items-center gap-2.5">
+                    <div className="ui-icon-badge">
+                      <Calendar className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="section-ti">
+                        Scheduled CIA Tests & Question Papers
+                      </h3>
+                      <p className="section-mini-cap">
+                        Tests assigned to student cohorts with marks entry and extraction status.
+                      </p>
+                    </div>
                   </div>
 
                   <button
@@ -492,10 +477,10 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                       setEditTestId(null);
                       setIsCreateTestModalOpen(true);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 rounded-xl transition cursor-pointer"
+                    className="ui-btn-primary-sm"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ Schedule New Test</span>
+                    <span>Schedule New Test</span>
                   </button>
                 </div>
 
@@ -519,18 +504,18 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
 
           {/* ── STEP 1: TEMPLATE SELECTION / CREATION ── */}
           {flowStep === "template_selection" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Stepper Header Prompt */}
-              <div className="p-6 rounded-3xl bg-purple-50/80 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="ui-card">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                   <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                    <span className="ui-badge-code">
                       Step 1 of 3
                     </span>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    <h2 className="section-ti pt-1">
                       Choose an Existing Blueprint or Create a New One
                     </h2>
-                    <p className="text-xs text-gray-600 dark:text-gray-300">
+                    <p className="section-mini-cap">
                       Select a blueprint template to populate question slots, or design a new template blueprint for this assessment.
                     </p>
                   </div>
@@ -541,29 +526,33 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                       setEditingTemplate(null);
                       setIsCreateTemplateModalOpen(true);
                     }}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 active:scale-[0.98] transition shadow-xs cursor-pointer shrink-0"
+                    className="ui-btn-primary-sm"
                   >
                     <Plus className="h-4 w-4" />
-                    <span>+ Create New Blueprint</span>
+                    <span>Create New Blueprint</span>
                   </button>
                 </div>
               </div>
 
               {/* Options Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
                 {/* Option A: Existing Templates List (2 Columns on large) */}
-                <div className="lg:col-span-2 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      <FileCheck className="h-4 w-4 text-purple-600" />
-                      <span>Available Blueprints for {courseCode} ({templates.length})</span>
-                    </h3>
+                <div className="ui-card space-y-4 lg:col-span-2">
+                  <div className="ui-card-header">
+                    <div className="flex items-center gap-2.5">
+                      <div className="ui-icon-badge">
+                        <FileCheck className="h-4 w-4" />
+                      </div>
+                      <h3 className="section-ti">
+                        Available Blueprints for {courseCode} ({templates.length})
+                      </h3>
+                    </div>
                   </div>
 
                   {templates.length === 0 ? (
-                    <div className="p-8 text-center rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850">
-                      <p className="text-xs font-semibold text-gray-500">
-                        No templates found. Click "Create New Blueprint" to get started.
+                    <div className="ui-empty-state">
+                      <p className="section-mini-cap">
+                        No templates found. Click &quot;Create New Blueprint&quot; to get started.
                       </p>
                     </div>
                   ) : (
@@ -571,18 +560,18 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                       {templates.map((tmpl) => (
                         <div
                           key={tmpl.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:border-purple-400 dark:border-gray-800 dark:bg-gray-850 transition shadow-2xs"
+                          className="ui-subcard flex flex-col justify-between gap-3 transition hover:border-indigo-400 sm:flex-row sm:items-center"
                         >
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                              <h4 className="card-ti">
                                 {tmpl.template_name}
                               </h4>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300">
+                              <span className="ui-badge-code">
                                 {tmpl.total_maximum_marks} Marks
                               </span>
                             </div>
-                            <p className="text-xs text-gray-500 line-clamp-1">
+                            <p className="ui-muted-text line-clamp-1">
                               {tmpl.description || `${tmpl.sections?.length || 0} sections configured`}
                             </p>
                           </div>
@@ -590,7 +579,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                           <button
                             type="button"
                             onClick={() => handleSelectTemplateForAssembly(tmpl.id)}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition cursor-pointer shrink-0 shadow-2xs"
+                            className="ui-btn-primary-sm"
                           >
                             <span>Select & Assemble</span>
                             <ArrowRight className="h-3.5 w-3.5" />
@@ -602,15 +591,15 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                 </div>
 
                 {/* Option B: Create New Blueprint Card (1 Column) */}
-                <div className="p-6 rounded-3xl border-2 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 text-center space-y-4">
-                  <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-purple-600 text-white shadow-md shadow-purple-600/20">
+                <div className="ui-empty-state space-y-4">
+                  <div className="ui-icon-badge !h-12 !w-12">
                     <Sparkles className="h-6 w-6" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                    <h4 className="section-ti">
                       Create Custom Blueprint
                     </h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="section-mini-cap mt-1">
                       Define Part A/B sections, marks per question, and question outcome targets. Once created, you will proceed directly to question assembly.
                     </p>
                   </div>
@@ -620,7 +609,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                       setEditingTemplate(null);
                       setIsCreateTemplateModalOpen(true);
                     }}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition cursor-pointer shadow-xs"
+                    className="ui-btn-primary w-full"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Create Template</span>
@@ -632,7 +621,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
 
           {/* ── STEP 2: QUESTION ASSEMBLY STUDIO ── */}
           {flowStep === "assembly" && selectedTemplateId && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <QuestionAssemblyStudio
                 courseId={validCourseId}
                 templateId={selectedTemplateId}
@@ -652,17 +641,17 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
 
           {/* ── STEP 3: SCHEDULE / PUBLISH CIA TEST ── */}
           {flowStep === "schedule" && (
-            <div className="space-y-6">
-              <div className="p-6 rounded-3xl bg-white dark:bg-gray-850 border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-4">
+              <div className="ui-card space-y-4">
+                <div className="ui-card-header">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                    <span className="ui-badge-code">
                       Step 3 of 3
                     </span>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    <h2 className="section-ti pt-1">
                       Schedule CIA Test for Classrooms
                     </h2>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="section-mini-cap">
                       Link the assembled question paper ({activeTemplate?.template_name || `Template #${selectedTemplateId}`}) to a CIA assessment.
                     </p>
                   </div>
@@ -671,7 +660,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                     <button
                       type="button"
                       onClick={() => setFlowStep("assembly")}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 rounded-xl transition cursor-pointer"
+                      className="ui-btn-secondary-sm"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
                       <span>Back to Assembly</span>
@@ -683,7 +672,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                         setEditTestId(null);
                         setIsCreateTestModalOpen(true);
                       }}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition cursor-pointer shadow-xs"
+                      className="ui-btn-primary-sm"
                     >
                       <Calendar className="h-4 w-4" />
                       <span>Open Schedule Form</span>
@@ -691,16 +680,16 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/60 flex items-center justify-between">
+                <div className="ui-subcard flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white">
+                    <div className="ui-icon-badge">
                       <CheckCircle2 className="h-5 w-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                      <h4 className="card-ti">
                         Question Paper Assembled: {activeTemplate?.template_name}
                       </h4>
-                      <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                      <p className="ui-muted-text">
                         Total Marks: {activeTemplate?.total_maximum_marks || 100} • Status: Ready
                       </p>
                     </div>
@@ -712,7 +701,7 @@ export const CourseCiaAssessmentSection: React.FC<CourseCiaAssessmentSectionProp
                       setEditTestId(null);
                       setIsCreateTestModalOpen(true);
                     }}
-                    className="px-4 py-2 text-xs font-bold text-purple-700 bg-white border border-purple-300 hover:bg-purple-50 rounded-xl transition cursor-pointer shadow-2xs"
+                    className="ui-btn-secondary-sm"
                   >
                     Schedule Assessment Now
                   </button>

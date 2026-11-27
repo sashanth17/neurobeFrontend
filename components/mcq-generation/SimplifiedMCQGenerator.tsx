@@ -518,25 +518,25 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ── SECTION 1: Topics & Subtopics Selection ── */}
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-all">
+      <div className="ui-card !p-0 transition-all">
         {/* Header */}
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="ui-card-header px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
-              <BookOpen className="h-5 w-5" />
+            <div className="ui-icon-badge">
+              <BookOpen className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                <span className="ui-badge-code">
                   Step 1
                 </span>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                <h3 className="section-ti">
                   Select Topics & Subtopics
                 </h3>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="section-mini-cap">
                 Populated from active Topic Hierarchy version data. Choose the scope for question generation.
               </p>
             </div>
@@ -548,28 +548,28 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
               <button
                 type="button"
                 onClick={() => router.push(`/neurobe/question-bank/${courseId}?code=${encodeURIComponent(courseCode)}&title=${encodeURIComponent(courseTitle)}`)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/70 px-3 py-1 text-xs font-bold text-purple-700 hover:bg-purple-100 transition shadow-2xs dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
+                className="ui-btn-secondary-sm"
                 title="Open Course Question Bank"
               >
-                <Layers className="h-3.5 w-3.5" />
+                <Layers className="h-3.5 w-3.5 text-indigo-600" />
                 <span>View Question Bank</span>
                 <ExternalLink className="h-3 w-3 opacity-60" />
               </button>
             )}
-            <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+            <span className="ui-badge-info">
               {totalSelectedTopicsCount} Topics • {totalSelectedSubtopicsCount} Subtopics Selected
             </span>
             <button
               type="button"
               onClick={handleSelectAllAll}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              className="ui-btn-secondary-sm"
             >
               Select All
             </button>
             <button
               type="button"
               onClick={handleDeselectAllAll}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              className="ui-btn-secondary-sm"
             >
               Clear
             </button>
@@ -737,24 +737,24 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
       </div>
 
       {/* ── SECTION 2: Knowledge Levels (Bloom's Stratification 1D) ── */}
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-all">
+      <div className="ui-card !p-0 transition-all">
         {/* Header */}
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
+        <div className="ui-card-header px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-              <Sparkles className="h-5 w-5" />
+            <div className="ui-icon-badge">
+              <Sparkles className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                <span className="ui-badge-code">
                   Step 2
                 </span>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                  Knowledge Levels (Bloom's Taxonomy)
+                <h3 className="section-ti">
+                  Knowledge Levels (Bloom&apos;s Taxonomy)
                 </h3>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Specify question counts for each Bloom's level. The sum determines the total questions generated.
+              <p className="section-mini-cap">
+                Specify question counts for each Bloom&apos;s level. The sum determines the total questions generated.
               </p>
             </div>
           </div>
@@ -1002,23 +1002,23 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
       </div>
 
       {/* ── SECTION 3: Pedagogical Focus & Question Style (Just the 4 options) ── */}
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-all">
+      <div className="ui-card !p-0 transition-all">
         {/* Header */}
-        <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="ui-card-header px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-              <Code2 className="h-5 w-5" />
+            <div className="ui-icon-badge">
+              <Code2 className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                <span className="ui-badge-code">
                   Step 3 (Optional)
                 </span>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                <h3 className="section-ti">
                   Pedagogical Focus & Question Style
                 </h3>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="section-mini-cap">
                 Choose one of the 4 specialized problem orientations for the generated questions.
               </p>
             </div>
@@ -1028,7 +1028,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
             <button
               type="button"
               onClick={() => setActivePresetId(null)}
-              className="text-xs font-semibold text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+              className="ui-btn-secondary-sm"
             >
               Reset Style
             </button>
@@ -1067,8 +1067,8 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
                       </span>
                     )}
                   </div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">{p.label}</span>
-                  <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">
+                  <span className="card-ti">{p.label}</span>
+                  <p className="ui-muted-text mt-1 line-clamp-2">
                     {p.description}
                   </p>
                 </button>
@@ -1079,25 +1079,25 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
       </div>
 
       {/* ── SECTION 4: Generation Action Bar ── */}
-      <div className="rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-purple-50/80 p-5 shadow-sm dark:border-gray-800 dark:from-purple-950/30 dark:via-gray-900 dark:to-purple-950/30">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="ui-card border-indigo-200/80 bg-gradient-to-r from-indigo-50/70 via-white to-indigo-50/50 dark:border-slate-800 dark:from-indigo-950/30 dark:via-slate-900 dark:to-indigo-950/30">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Summary Metrics */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-bold text-gray-900 dark:text-white">
+              <span className="section-ti">
                 Total Questions to Generate:
               </span>
-              <span className="rounded-xl bg-purple-600 px-3 py-1 text-sm font-extrabold text-white shadow-xs">
+              <span className="ui-badge-code">
                 {totalQuestions} Questions
               </span>
               {totalQuestions > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-purple-700 dark:text-purple-300">
+                <div className="flex items-center gap-1.5">
                   {Object.entries(bloomCounts)
                     .filter(([, c]) => c > 0)
                     .map(([k, c]) => (
                       <span
                         key={k}
-                        className="rounded-md bg-purple-100 px-2 py-0.5 text-[11px] font-bold dark:bg-purple-900/60"
+                        className="ui-badge-purple"
                       >
                         {k}: {c}
                       </span>
@@ -1106,7 +1106,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+            <div className="section-mini-cap flex flex-wrap items-center gap-3">
               <span>
                 Scope: <strong>{totalSelectedTopicsCount} Topics</strong> & <strong>{totalSelectedSubtopicsCount} Subtopics</strong> across {selectedUnitsPayload.length} Units
               </span>
@@ -1116,7 +1116,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
                   type="checkbox"
                   checked={includeExplanation}
                   onChange={(e) => setIncludeExplanation(e.target.checked)}
-                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span>Include Explanations</span>
               </label>
@@ -1125,7 +1125,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
                   type="checkbox"
                   checked={shuffleOptions}
                   onChange={(e) => setShuffleOptions(e.target.checked)}
-                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span>Shuffle Options</span>
               </label>
@@ -1138,11 +1138,7 @@ export const SimplifiedMCQGenerator: React.FC<SimplifiedMCQGeneratorProps> = ({
               type="button"
               disabled={!canGenerate}
               onClick={handleGenerateClick}
-              className={`flex items-center justify-center gap-2 rounded-xl px-7 py-3 text-sm font-bold text-white shadow-md transition-all ${
-                canGenerate
-                  ? "bg-purple-600 hover:bg-purple-700 active:scale-[0.98] shadow-purple-600/30"
-                  : "bg-gray-300 cursor-not-allowed opacity-60 dark:bg-gray-800 dark:text-gray-500"
-              }`}
+              className="ui-btn-primary !px-6 !py-2.5"
             >
               {isGeneratingAI ? (
                 <>

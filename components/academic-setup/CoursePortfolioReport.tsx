@@ -673,24 +673,24 @@ const CoursePortfolioReport: React.FC<CoursePortfolioReportProps> = ({
   return (
     <div className="space-y-3">
       {/* ── Toolbar - Compact Sleek Single Row ───────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+      <div className="ui-card-compact flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-3">
+          <div className="ui-icon-badge">
             <FileText className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+            <h3 className="section-ti">
               Course Portfolio Comprehensive Report
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="section-mini-cap">
               Institutional syllabus report: CO-PO matrix (P.1) & Lesson Plan with active pedagogies (P.2+)
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Zoom controls */}
-          <div className="hidden sm:flex items-center rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-0.5 dark:border-slate-800 dark:bg-slate-800/60 text-xs">
+          <div className="hidden sm:flex items-center rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-1 dark:border-slate-800 dark:bg-slate-800/60 text-xs">
             <button
               type="button"
               onClick={() => setZoomLevel((z) => Math.max(70, z - 10))}
@@ -716,20 +716,20 @@ const CoursePortfolioReport: React.FC<CoursePortfolioReportProps> = ({
             type="button"
             onClick={loadAllReportData}
             disabled={loading}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="ui-btn-secondary-sm"
             title="Refresh Report Data"
           >
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin text-indigo-600" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-indigo-600" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="ui-btn-secondary-sm"
             title="Browser Print Preview"
           >
-            <Printer className="h-3 w-3 text-slate-500" />
+            <Printer className="h-3.5 w-3.5 text-slate-500" />
             <span>Print</span>
           </button>
 
@@ -737,17 +737,17 @@ const CoursePortfolioReport: React.FC<CoursePortfolioReportProps> = ({
             type="button"
             onClick={generateAndDownloadPDF}
             disabled={downloadingPdf || loading}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
+            className="ui-btn-primary-sm"
             title="Download unified PDF"
           >
             {downloadingPdf ? (
               <>
-                <RefreshCw className="h-3 w-3 animate-spin" />
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 <span>Generating...</span>
               </>
             ) : (
               <>
-                <Download className="h-3 w-3" />
+                <Download className="h-3.5 w-3.5" />
                 <span>Download PDF</span>
               </>
             )}
@@ -757,10 +757,10 @@ const CoursePortfolioReport: React.FC<CoursePortfolioReportProps> = ({
 
       {/* ── Loading Spinner ─────────────────────────────────────────────────── */}
       {loading && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-20 text-center dark:border-slate-800 dark:bg-slate-900">
-          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
-          <h4 className="text-sm font-bold text-slate-900 dark:text-white">Assembling Course Portfolio Report...</h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <div className="ui-card flex flex-col items-center justify-center py-20 text-center">
+          <RefreshCw className="mb-3 h-8 w-8 animate-spin text-indigo-600" />
+          <h4 className="section-ti">Assembling Course Portfolio Report...</h4>
+          <p className="section-mini-cap mt-1">
             Aggregating organization details, CO-PO correlation matrix, and active lesson plan timeline...
           </p>
         </div>

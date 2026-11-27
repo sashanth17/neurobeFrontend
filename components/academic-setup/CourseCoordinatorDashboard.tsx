@@ -380,23 +380,23 @@ export default function CourseCoordinatorDashboard({
       </div>
 
       {/* ── Top-Level Abstract Row (Section 1.4 & 2.3): Donut Pass %, CO Attainment, Question Bank Card ── */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Card 1: Assessment Performance (Abstract) */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 flex flex-col justify-between">
+        <div className="ui-card flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+            <div className="ui-card-header">
+              <div className="flex items-center gap-2.5">
+                <div className="ui-icon-badge">
                   <PieChart className="h-4 w-4" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                <h3 className="section-ti">
                   Assessment Performance
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowDrilldownModal(true)}
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 inline-flex items-center gap-0.5"
+                className="ui-btn-ghost"
               >
                 <span>View Details</span>
                 <ChevronRight className="h-3 w-3" />
@@ -444,21 +444,21 @@ export default function CourseCoordinatorDashboard({
         </div>
 
         {/* Card 2: CO-PO Attainment Bar Chart (Section 2.4) */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 flex flex-col justify-between">
+        <div className="ui-card flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+            <div className="ui-card-header">
+              <div className="flex items-center gap-2.5">
+                <div className="ui-icon-badge">
                   <BarChart3 className="h-4 w-4" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  CO Attainment ("As of Now")
+                <h3 className="section-ti">
+                  CO Attainment
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAttainmentModal(true)}
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 inline-flex items-center gap-0.5"
+                className="ui-btn-ghost"
               >
                 <span>View Details</span>
                 <ChevronRight className="h-3 w-3" />
@@ -491,21 +491,21 @@ export default function CourseCoordinatorDashboard({
         </div>
 
         {/* Card 3: Question Bank Summary Card (Section 2.5) */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 flex flex-col justify-between">
+        <div className="ui-card flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+            <div className="ui-card-header">
+              <div className="flex items-center gap-2.5">
+                <div className="ui-icon-badge">
                   <Layers className="h-4 w-4" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Question Bank Summary
+                <h3 className="section-ti">
+                  Question Bank
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={handleOpenQb}
-                className="text-[11px] font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 inline-flex items-center gap-0.5 cursor-pointer"
+                className="ui-btn-ghost cursor-pointer"
               >
                 <span>{qbTab === "mcq" ? "MCQ Section" : "View Bank"}</span>
                 <ChevronRight className="h-3 w-3" />
@@ -596,32 +596,30 @@ export default function CourseCoordinatorDashboard({
       </div>
 
       {/* ── CO-PO Attainment Section (Section 2.4 & Continuous Evaluation) ── */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5 border-b border-slate-100 pb-4 dark:border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
-                <Target className="h-4 w-4" />
-              </div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                CO-PO Attainment Status ("As of Now")
-              </h3>
+      <div className="ui-card">
+        <div className="ui-card-header mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="ui-icon-badge">
+              <Target className="h-4 w-4" />
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Course Outcomes (CO1–CO5) and NBA Program Outcomes (PO1–PO12) evaluated against the 60% benchmark
-            </p>
+            <div>
+              <h3 className="section-ti">
+                CO-PO Attainment Status (&quot;As of Now&quot;)
+              </h3>
+              <p className="section-mini-cap">
+                Course Outcomes (CO1–CO5) and NBA Program Outcomes (PO1–PO12) evaluated against the 60% benchmark
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* View Sub-Tabs: CO Attainment vs PO Attainment */}
-            <div className="flex rounded-xl bg-slate-100 p-0.5 dark:bg-slate-800">
+            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
               <button
                 type="button"
                 onClick={() => setAttainmentTab("co")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                  attainmentTab === "co"
-                    ? "bg-white text-indigo-600 shadow-2xs dark:bg-slate-900 dark:text-indigo-400"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                className={`ui-tab-pill !py-1.5 ${
+                  attainmentTab === "co" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
                 }`}
               >
                 <Award className="h-3.5 w-3.5" />
@@ -630,10 +628,8 @@ export default function CourseCoordinatorDashboard({
               <button
                 type="button"
                 onClick={() => setAttainmentTab("po")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                  attainmentTab === "po"
-                    ? "bg-white text-indigo-600 shadow-2xs dark:bg-slate-900 dark:text-indigo-400"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                className={`ui-tab-pill !py-1.5 ${
+                  attainmentTab === "po" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
                 }`}
               >
                 <BarChart3 className="h-3.5 w-3.5" />
@@ -645,7 +641,7 @@ export default function CourseCoordinatorDashboard({
               <button
                 type="button"
                 onClick={() => onNavigateToTab("copo")}
-                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="ui-btn-secondary-sm"
                 title="View full CO-PO articulation matrix in Tab 2"
               >
                 <span>Full Articulation Matrix</span>
@@ -861,17 +857,17 @@ export default function CourseCoordinatorDashboard({
       </div>
 
       {/* ── Classroom-Wise Performance Table (Section 2.6) ── */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+      <div className="ui-card">
+        <div className="ui-card-header mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="ui-icon-badge">
               <Users className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              <h3 className="section-ti">
                 Classroom-Wise Performance
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="section-mini-cap">
                 Active classrooms mapped to this course across all participating sections & batches
               </p>
             </div>

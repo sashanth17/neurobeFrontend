@@ -545,7 +545,11 @@ const FallbackIcon = () => (
 
 const ACTIVE_BG = "linear-gradient(to right, #e1f1fd, #c1e2f9)";
 
-const SidebarDynamic = () => {
+interface SidebarDynamicProps {
+  onHoverChange?: (hovered: boolean) => void;
+}
+
+const SidebarDynamic = ({ onHoverChange }: SidebarDynamicProps) => {
   const router = useRouter();
   const dispatch = useDispatch();
   const [group, setGroup] = useState<string>("");
@@ -617,11 +621,21 @@ const SidebarDynamic = () => {
   }, [router.pathname]);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
+    const check = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) {
+        setHovered(false);
+      }
+    };
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  useEffect(() => {
+    onHoverChange?.(!isMobile && hovered);
+  }, [hovered, isMobile, onHoverChange]);
 
   useEffect(() => {
     pathnameRef.current = router.pathname;
@@ -889,13 +903,13 @@ const SidebarDynamic = () => {
                   }}
                 >
                   <span
-                    className="flex shrink-0 items-center justify-center"
-                    style={{ width: 28 }}
+                    className="flex shrink-0 items-center justify-center group-hover:!text-[#000E3B]"
+                    style={{ width: 28 ,  color: active ? "#000E3B" : "#fff",}}
                   >
                     <Icon />
                   </span>
                   {showLabels && (
-                    <span className="ml-3 whitespace-nowrap text-[14px] font-semibold leading-none">
+                    <span className="ml-3 whitespace-nowrap text-[14px] font-semibold leading-none group-hover:!text-[#000E3B]" style={{  color: active ? "#000E3B" : "#fff",}}>
                       {item.label}
                     </span>
                   )}

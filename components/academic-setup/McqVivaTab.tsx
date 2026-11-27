@@ -230,31 +230,34 @@ const McqVivaTab: React.FC<McqVivaTabProps> = ({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Top Bar with Sub-View Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-4 dark:border-slate-800">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              MCQ Assessment & Viva System
-            </h2>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {userRole}
-            </span>
+      <div className="ui-card-compact flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="ui-icon-badge">
+            <BarChart2 className="h-4 w-4" />
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Compare MCQ score distributions and review comprehensive student dossiers with AI viva reports
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="section-ti">
+                MCQ Assessment & Viva System
+              </h2>
+              <span className="ui-badge-success">
+                {userRole}
+              </span>
+            </div>
+            <p className="section-mini-cap">
+              Compare MCQ score distributions and review comprehensive student dossiers with AI viva reports
+            </p>
+          </div>
         </div>
 
         {/* View Switcher: Graph vs Student Roster */}
-        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
           <button
             onClick={() => setSubView("graph")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-              subView === "graph"
-                ? "bg-white text-emerald-700 shadow-xs dark:bg-slate-900 dark:text-emerald-300"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+            className={`ui-tab-pill !py-1.5 ${
+              subView === "graph" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
             }`}
           >
             <BarChart2 className="h-3.5 w-3.5" />
@@ -262,10 +265,8 @@ const McqVivaTab: React.FC<McqVivaTabProps> = ({
           </button>
           <button
             onClick={() => setSubView("roster")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-              subView === "roster"
-                ? "bg-white text-emerald-700 shadow-xs dark:bg-slate-900 dark:text-emerald-300"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+            className={`ui-tab-pill !py-1.5 ${
+              subView === "roster" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
             }`}
           >
             <TableIcon className="h-3.5 w-3.5" />
@@ -280,25 +281,24 @@ const McqVivaTab: React.FC<McqVivaTabProps> = ({
       {subView === "graph" && (
         <div className="space-y-4">
           {/* Selectors */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {!lockedInstanceId && (
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-emerald-600" />
-                    Select Instances ({selectedInstanceIds.length}/{instances.length}):
+              <div className="ui-card">
+                <div className="ui-card-header mb-2.5">
+                  <span className="card-ti flex items-center gap-1.5">
+                    <Users className="h-4 w-4 text-indigo-600" />
+                    Select Instances ({selectedInstanceIds.length}/{instances.length})
                   </span>
-                  <div className="flex items-center gap-2 text-[11px]">
+                  <div className="flex items-center gap-2 text-xs">
                     <button
                       onClick={() => setSelectedInstanceIds(instances.map((i) => i.id))}
-                      className="font-semibold text-emerald-600 hover:underline"
+                      className="ui-btn-ghost"
                     >
                       Select All
                     </button>
-                    <span className="text-slate-300">|</span>
                     <button
                       onClick={() => setSelectedInstanceIds([])}
-                      className="font-semibold text-slate-500 hover:underline"
+                      className="ui-btn-secondary-sm"
                     >
                       Clear
                     </button>
@@ -333,23 +333,22 @@ const McqVivaTab: React.FC<McqVivaTabProps> = ({
               </div>
             )}
 
-            <div className={`rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${lockedInstanceId ? 'col-span-2' : ''}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-indigo-600" />
-                  Select MCQ Tests ({selectedTestIds.length}/{tests.length}):
+            <div className={`ui-card ${lockedInstanceId ? 'col-span-2' : ''}`}>
+              <div className="ui-card-header mb-2.5">
+                <span className="card-ti flex items-center gap-1.5">
+                  <GraduationCap className="h-4 w-4 text-indigo-600" />
+                  Select MCQ Tests ({selectedTestIds.length}/{tests.length})
                 </span>
-                <div className="flex items-center gap-2 text-[11px]">
+                <div className="flex items-center gap-2 text-xs">
                   <button
                     onClick={() => setSelectedTestIds(tests.map((t) => t.id))}
-                    className="font-semibold text-indigo-600 hover:underline"
+                    className="ui-btn-ghost"
                   >
                     Select All
                   </button>
-                  <span className="text-slate-300">|</span>
                   <button
                     onClick={() => setSelectedTestIds([])}
-                    className="font-semibold text-slate-500 hover:underline"
+                    className="ui-btn-secondary-sm"
                   >
                     Clear
                   </button>

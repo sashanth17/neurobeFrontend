@@ -35,6 +35,15 @@ import {
   ExternalLink,
   BarChart2,
   Settings,
+  LayoutDashboard,
+  Eye,
+  Download,
+  Network,
+  Target,
+  MoreHorizontal,
+  ClipboardList,
+  FileBarChart2,
+  CheckCheck,
 } from "lucide-react";
 import { setPageTitle } from "@/store/themeConfigSlice";
 import {
@@ -66,7 +75,10 @@ interface VersionSortConfig {
   idKey: string;
 }
 
-const sortAndNumberVersions = (items: any[], config: VersionSortConfig): any[] => {
+const sortAndNumberVersions = (
+  items: any[],
+  config: VersionSortConfig,
+): any[] => {
   if (!Array.isArray(items)) {
     return [];
   }
@@ -88,12 +100,13 @@ const pickPrioritizedVersion = (items: any[]): any | null => {
   const approvedList = items.filter((v) => Boolean(v.is_approved));
   if (approvedList.length > 0) {
     return [...approvedList].sort(
-      (a, b) => (Number(b.version_number) || 0) - (Number(a.version_number) || 0)
+      (a, b) =>
+        (Number(b.version_number) || 0) - (Number(a.version_number) || 0),
     )[0];
   }
   // Priority 3: Draft version (highest version number)
   return [...items].sort(
-    (a, b) => (Number(b.version_number) || 0) - (Number(a.version_number) || 0)
+    (a, b) => (Number(b.version_number) || 0) - (Number(a.version_number) || 0),
   )[0];
 };
 
@@ -102,9 +115,11 @@ const InsCourseArtifacts = () => {
   const router = useRouter();
 
   const courseIdParam = useMemo(() => {
-    if (typeof router.query.course_id === "string") return router.query.course_id;
+    if (typeof router.query.course_id === "string")
+      return router.query.course_id;
     if (typeof router.query.id === "string") return router.query.id;
-    if (typeof window !== "undefined") return localStorage.getItem("active_course_id");
+    if (typeof window !== "undefined")
+      return localStorage.getItem("active_course_id");
     return null;
   }, [router.query.course_id, router.query.id]);
 
@@ -112,7 +127,7 @@ const InsCourseArtifacts = () => {
     if (courseIdParam) {
       try {
         localStorage.setItem("active_course_id", courseIdParam);
-      } catch { }
+      } catch {}
     }
   }, [courseIdParam]);
 
@@ -144,13 +159,15 @@ const InsCourseArtifacts = () => {
     return "dashboard";
   });
 
-  const [mcqSubTab, setMcqSubTab] = useState<"generator" | "viva_report">(() => {
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search).get("tab");
-      if (p === "mcq_viva") return "viva_report";
-    }
-    return "generator";
-  });
+  const [mcqSubTab, setMcqSubTab] = useState<"generator" | "viva_report">(
+    () => {
+      if (typeof window !== "undefined") {
+        const p = new URLSearchParams(window.location.search).get("tab");
+        if (p === "mcq_viva") return "viva_report";
+      }
+      return "generator";
+    },
+  );
 
   // Synchronize URL query parameter `tab` with activeTab state
   useEffect(() => {
@@ -181,11 +198,11 @@ const InsCourseArtifacts = () => {
             query: { ...router.query, tab: newTab },
           },
           undefined,
-          { shallow: true }
+          { shallow: true },
         );
       }
     },
-    [router, courseIdParam]
+    [router, courseIdParam],
   );
 
   const [sectionData, setSectionData] = useState<{
@@ -245,14 +262,15 @@ const InsCourseArtifacts = () => {
         can_generate_pedagogy: false,
         can_generate_lesson_plan: false,
       },
-    [portfolio]
+    [portfolio],
   );
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     try {
-      const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const userStr =
+        typeof window !== "undefined" ? localStorage.getItem("user") : null;
       if (userStr) {
         setCurrentUser(JSON.parse(userStr));
       }
@@ -278,7 +296,8 @@ const InsCourseArtifacts = () => {
     if (userRole.includes("coordinator")) return true;
     if (userRole === "admin") return true;
     if (userRole === "super_admin") return true;
-    if (currentUser?.id && course?.coordinator_id === currentUser.id) return true;
+    if (currentUser?.id && course?.coordinator_id === currentUser.id)
+      return true;
     return false;
   }, [perms, userRole, currentUser, course]);
 
@@ -288,15 +307,41 @@ const InsCourseArtifacts = () => {
     pedagogy?: any;
     lesson_plan?: any;
   }>({});
-  const [loadingVersionDetail, setLoadingVersionDetail] = useState<boolean>(false);
-  const [expandedVersionHistory, setExpandedVersionHistory] = useState<Record<string, boolean>>({});
+  const [loadingVersionDetail, setLoadingVersionDetail] =
+    useState<boolean>(false);
+  const [expandedVersionHistory, setExpandedVersionHistory] = useState<
+    Record<string, boolean>
+  >({});
+  const [collapsedUnits, setCollapsedUnits] = useState<
+    Record<string | number, boolean>
+  >({});
+
+  const toggleUnitCollapse = (key: string | number) => {
+    setCollapsedUnits((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getShortKnowledgeCode = (level?: string) => {
+    if (!level) return "";
+    const match = level.match(/K\d+/i);
+    return match ? match[0].toUpperCase() : level;
+  };
+
+  const getBloomBadgeClass = (level?: string) => {
+    const val = (level || "").toLowerCase();
+    if (val.includes("understand")) return "bloom-understand";
+    if (val.includes("apply")) return "bloom-apply";
+    if (val.includes("analy")) return "bloom-analyze";
+    if (val.includes("evaluat")) return "bloom-evaluate";
+    if (val.includes("creat")) return "bloom-create";
+    return "bloom-remember";
+  };
 
   // Normalized, sorted, and indexed version lists
   const versionsExtractions = useMemo(() => {
     const source =
       sectionVersions.extractions.length > 0
         ? sectionVersions.extractions
-        : (portfolio?.versions?.extractions ?? []);
+        : portfolio?.versions?.extractions ?? [];
     return sortAndNumberVersions(source, { idKey: "extractions_id" });
   }, [sectionVersions.extractions, portfolio?.versions?.extractions]);
 
@@ -304,7 +349,7 @@ const InsCourseArtifacts = () => {
     const source =
       sectionVersions.copo.length > 0
         ? sectionVersions.copo
-        : (portfolio?.versions?.copo ?? []);
+        : portfolio?.versions?.copo ?? [];
     return sortAndNumberVersions(source, { idKey: "copo_id" });
   }, [sectionVersions.copo, portfolio?.versions?.copo]);
 
@@ -312,7 +357,7 @@ const InsCourseArtifacts = () => {
     const source =
       sectionVersions.pedagogies.length > 0
         ? sectionVersions.pedagogies
-        : (portfolio?.versions?.pedagogies ?? []);
+        : portfolio?.versions?.pedagogies ?? [];
     return sortAndNumberVersions(source, { idKey: "pedagogy_id" });
   }, [sectionVersions.pedagogies, portfolio?.versions?.pedagogies]);
 
@@ -320,7 +365,7 @@ const InsCourseArtifacts = () => {
     const source =
       sectionVersions.lesson_plans.length > 0
         ? sectionVersions.lesson_plans
-        : (portfolio?.versions?.lesson_plans ?? []);
+        : portfolio?.versions?.lesson_plans ?? [];
     return sortAndNumberVersions(source, { idKey: "lesson_plan_id" });
   }, [sectionVersions.lesson_plans, portfolio?.versions?.lesson_plans]);
 
@@ -328,14 +373,17 @@ const InsCourseArtifacts = () => {
     const source =
       sectionVersions.syllabi.length > 0
         ? sectionVersions.syllabi
-        : (portfolio?.versions?.syllabi ?? []);
+        : portfolio?.versions?.syllabi ?? [];
     return sortAndNumberVersions(source, { idKey: "course_syllabus_id" });
   }, [sectionVersions.syllabi, portfolio?.versions?.syllabi]);
 
-  const activeExt = sectionData.syllabus ?? portfolio?.active_extraction ?? null;
+  const activeExt =
+    sectionData.syllabus ?? portfolio?.active_extraction ?? null;
   const activeCopo = sectionData.copo ?? portfolio?.active_copo ?? null;
-  const activePedagogy = sectionData.pedagogy ?? portfolio?.active_pedagogy ?? null;
-  const activeLessonPlan = sectionData.lesson_plan ?? portfolio?.active_lesson_plan ?? null;
+  const activePedagogy =
+    sectionData.pedagogy ?? portfolio?.active_pedagogy ?? null;
+  const activeLessonPlan =
+    sectionData.lesson_plan ?? portfolio?.active_lesson_plan ?? null;
 
   const currentExt = selectedVersionData.syllabus ?? activeExt;
   const currentCopo = selectedVersionData.copo ?? activeCopo;
@@ -344,50 +392,96 @@ const InsCourseArtifacts = () => {
 
   const prioritizedExt = useMemo(
     () => pickPrioritizedVersion(versionsExtractions),
-    [versionsExtractions]
+    [versionsExtractions],
   );
   const prioritizedCopo = useMemo(
     () => pickPrioritizedVersion(versionsCopo),
-    [versionsCopo]
+    [versionsCopo],
   );
   const prioritizedPedagogy = useMemo(
     () => pickPrioritizedVersion(versionsPedagogies),
-    [versionsPedagogies]
+    [versionsPedagogies],
   );
   const prioritizedLessonPlan = useMemo(
     () => pickPrioritizedVersion(versionsLessonPlans),
-    [versionsLessonPlans]
+    [versionsLessonPlans],
   );
 
   useEffect(() => {
     if (!courseIdParam) return;
-    if (activeTab === "copo" && !currentCopo && prioritizedCopo?.copo_id && !sectionLoading.copo) {
-      Models.copo.get(prioritizedCopo.copo_id).then((full: any) => {
-        setSectionData((prev) => ({ ...prev, copo: full }));
-      }).catch(console.error);
-    } else if (activeTab === "syllabus" && !currentExt && prioritizedExt?.extractions_id && !sectionLoading.syllabus) {
-      Models.syllabus.get_extraction(prioritizedExt.extractions_id).then((full: any) => {
-        setSectionData((prev) => ({ ...prev, syllabus: full }));
-      }).catch(console.error);
-    } else if (activeTab === "pedagogy" && !currentPedagogy && prioritizedPedagogy?.pedagogy_id && !sectionLoading.pedagogy) {
-      Models.pedagogy.get(prioritizedPedagogy.pedagogy_id).then((full: any) => {
-        setSectionData((prev) => ({ ...prev, pedagogy: full }));
-        if (full?.extractions_id && (!currentExt || currentExt.extractions_id !== full.extractions_id)) {
-          Models.syllabus.get_extraction(full.extractions_id).then((extFull: any) => {
-            setSectionData((p) => ({ ...p, syllabus: extFull }));
-          }).catch(console.error);
-        }
-      }).catch(console.error);
-    } else if (activeTab === "lesson_plan" && !currentLessonPlan && prioritizedLessonPlan?.lesson_plan_id && !sectionLoading.lesson_plan) {
-      Models.lession_plan.get(prioritizedLessonPlan.lesson_plan_id).then((full: any) => {
-        setSectionData((prev) => ({ ...prev, lesson_plan: full }));
-      }).catch(console.error);
+    if (
+      activeTab === "copo" &&
+      !currentCopo &&
+      prioritizedCopo?.copo_id &&
+      !sectionLoading.copo
+    ) {
+      Models.copo
+        .get(prioritizedCopo.copo_id)
+        .then((full: any) => {
+          setSectionData((prev) => ({ ...prev, copo: full }));
+        })
+        .catch(console.error);
+    } else if (
+      activeTab === "syllabus" &&
+      !currentExt &&
+      prioritizedExt?.extractions_id &&
+      !sectionLoading.syllabus
+    ) {
+      Models.syllabus
+        .get_extraction(prioritizedExt.extractions_id)
+        .then((full: any) => {
+          setSectionData((prev) => ({ ...prev, syllabus: full }));
+        })
+        .catch(console.error);
+    } else if (
+      activeTab === "pedagogy" &&
+      !currentPedagogy &&
+      prioritizedPedagogy?.pedagogy_id &&
+      !sectionLoading.pedagogy
+    ) {
+      Models.pedagogy
+        .get(prioritizedPedagogy.pedagogy_id)
+        .then((full: any) => {
+          setSectionData((prev) => ({ ...prev, pedagogy: full }));
+          if (
+            full?.extractions_id &&
+            (!currentExt || currentExt.extractions_id !== full.extractions_id)
+          ) {
+            Models.syllabus
+              .get_extraction(full.extractions_id)
+              .then((extFull: any) => {
+                setSectionData((p) => ({ ...p, syllabus: extFull }));
+              })
+              .catch(console.error);
+          }
+        })
+        .catch(console.error);
+    } else if (
+      activeTab === "lesson_plan" &&
+      !currentLessonPlan &&
+      prioritizedLessonPlan?.lesson_plan_id &&
+      !sectionLoading.lesson_plan
+    ) {
+      Models.lession_plan
+        .get(prioritizedLessonPlan.lesson_plan_id)
+        .then((full: any) => {
+          setSectionData((prev) => ({ ...prev, lesson_plan: full }));
+        })
+        .catch(console.error);
     }
 
-    if (activeTab === "pedagogy" && currentPedagogy?.extractions_id && !currentExt?.units && !sectionLoading.syllabus) {
-      Models.syllabus.get_extraction(currentPedagogy.extractions_id).then((extFull: any) => {
-        setSectionData((p) => ({ ...p, syllabus: extFull }));
-      }).catch(console.error);
+    if (
+      activeTab === "pedagogy" &&
+      currentPedagogy?.extractions_id &&
+      !currentExt?.units &&
+      !sectionLoading.syllabus
+    ) {
+      Models.syllabus
+        .get_extraction(currentPedagogy.extractions_id)
+        .then((extFull: any) => {
+          setSectionData((p) => ({ ...p, syllabus: extFull }));
+        })
+        .catch(console.error);
     }
   }, [
     activeTab,
@@ -408,7 +502,7 @@ const InsCourseArtifacts = () => {
     if (activeMatch) return activeMatch;
     if (currentExt?.course_syllabus_id) {
       const match = versionsSyllabi.find(
-        (s: any) => s.course_syllabus_id === currentExt.course_syllabus_id
+        (s: any) => s.course_syllabus_id === currentExt.course_syllabus_id,
       );
       if (match) return match;
     }
@@ -419,11 +513,14 @@ const InsCourseArtifacts = () => {
 
   const refreshCurrentVersion = async (
     tab: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
-    id?: number
+    id?: number,
   ) => {
     try {
       if (tab === "syllabus") {
-        const extId = id ?? selectedVersionData.syllabus?.extractions_id ?? currentExt?.extractions_id;
+        const extId =
+          id ??
+          selectedVersionData.syllabus?.extractions_id ??
+          currentExt?.extractions_id;
         if (extId) {
           const full = await Models.syllabus.get_extraction(extId);
           if (selectedVersionData.syllabus || isCoord) {
@@ -432,7 +529,8 @@ const InsCourseArtifacts = () => {
           setSectionData((prev) => ({ ...prev, syllabus: full }));
         }
       } else if (tab === "copo") {
-        const copoId = id ?? selectedVersionData.copo?.copo_id ?? currentCopo?.copo_id;
+        const copoId =
+          id ?? selectedVersionData.copo?.copo_id ?? currentCopo?.copo_id;
         if (copoId) {
           const full = await Models.copo.get(copoId);
           if (selectedVersionData.copo || isCoord) {
@@ -441,7 +539,10 @@ const InsCourseArtifacts = () => {
           setSectionData((prev) => ({ ...prev, copo: full }));
         }
       } else if (tab === "pedagogy") {
-        const pedId = id ?? selectedVersionData.pedagogy?.pedagogy_id ?? currentPedagogy?.pedagogy_id;
+        const pedId =
+          id ??
+          selectedVersionData.pedagogy?.pedagogy_id ??
+          currentPedagogy?.pedagogy_id;
         if (pedId) {
           const full = await Models.pedagogy.get(pedId);
           if (selectedVersionData.pedagogy || isCoord) {
@@ -450,7 +551,10 @@ const InsCourseArtifacts = () => {
           setSectionData((prev) => ({ ...prev, pedagogy: full }));
         }
       } else if (tab === "lesson_plan") {
-        const lpId = id ?? selectedVersionData.lesson_plan?.lesson_plan_id ?? currentLessonPlan?.lesson_plan_id;
+        const lpId =
+          id ??
+          selectedVersionData.lesson_plan?.lesson_plan_id ??
+          currentLessonPlan?.lesson_plan_id;
         if (lpId) {
           const full = await Models.lession_plan.get(lpId);
           if (selectedVersionData.lesson_plan || isCoord) {
@@ -479,7 +583,7 @@ const InsCourseArtifacts = () => {
       | "cia_analytics"
       | "mcq_viva",
     forceRefresh = false,
-    coordOverride?: boolean
+    coordOverride?: boolean,
   ) => {
     if (!courseIdParam) return;
     if (tab === "dashboard") return;
@@ -505,7 +609,9 @@ const InsCourseArtifacts = () => {
             Models.syllabus.list_syllabi({ course_id: courseIdParam }),
           ]);
           const rawExts = Array.isArray(extractionsRes) ? extractionsRes : [];
-          const sortedExts = sortAndNumberVersions(rawExts, { idKey: "extractions_id" });
+          const sortedExts = sortAndNumberVersions(rawExts, {
+            idKey: "extractions_id",
+          });
           setSectionVersions((prev) => ({
             ...prev,
             extractions: rawExts,
@@ -514,30 +620,40 @@ const InsCourseArtifacts = () => {
 
           const targetVer = selectedVersionData.syllabus?.extractions_id
             ? sortedExts.find(
-                (e: any) => e.extractions_id === selectedVersionData.syllabus.extractions_id
+                (e: any) =>
+                  e.extractions_id ===
+                  selectedVersionData.syllabus.extractions_id,
               )
             : pickPrioritizedVersion(sortedExts);
 
           if (targetVer?.extractions_id) {
             try {
-              const full = await Models.syllabus.get_extraction(targetVer.extractions_id);
+              const full = await Models.syllabus.get_extraction(
+                targetVer.extractions_id,
+              );
               if (selectedVersionData.syllabus) {
                 setSelectedVersionData((prev) => ({ ...prev, syllabus: full }));
               }
               setSectionData((prev) => ({ ...prev, syllabus: full }));
-            } catch { }
+            } catch {}
           }
         } else if (tab === "copo") {
-          const copoRes: any = await Models.copo.list({ course_id: courseIdParam });
+          const copoRes: any = await Models.copo.list({
+            course_id: courseIdParam,
+          });
           const rawCopos = Array.isArray(copoRes) ? copoRes : [];
-          const sortedCopos = sortAndNumberVersions(rawCopos, { idKey: "copo_id" });
+          const sortedCopos = sortAndNumberVersions(rawCopos, {
+            idKey: "copo_id",
+          });
           setSectionVersions((prev) => ({
             ...prev,
             copo: rawCopos,
           }));
 
           const targetVer = selectedVersionData.copo?.copo_id
-            ? sortedCopos.find((c: any) => c.copo_id === selectedVersionData.copo.copo_id)
+            ? sortedCopos.find(
+                (c: any) => c.copo_id === selectedVersionData.copo.copo_id,
+              )
             : pickPrioritizedVersion(sortedCopos);
 
           if (targetVer?.copo_id) {
@@ -547,7 +663,7 @@ const InsCourseArtifacts = () => {
                 setSelectedVersionData((prev) => ({ ...prev, copo: full }));
               }
               setSectionData((prev) => ({ ...prev, copo: full }));
-            } catch { }
+            } catch {}
           }
         } else if (tab === "pedagogy") {
           const [pedRes, extractionsRes]: [any, any] = await Promise.all([
@@ -557,7 +673,9 @@ const InsCourseArtifacts = () => {
               : Models.syllabus.list_extractions({ course_id: courseIdParam }),
           ]);
           const rawPeds = Array.isArray(pedRes) ? pedRes : [];
-          const sortedPeds = sortAndNumberVersions(rawPeds, { idKey: "pedagogy_id" });
+          const sortedPeds = sortAndNumberVersions(rawPeds, {
+            idKey: "pedagogy_id",
+          });
           setSectionVersions((prev) => ({
             ...prev,
             pedagogies: rawPeds,
@@ -565,36 +683,48 @@ const InsCourseArtifacts = () => {
           }));
 
           const targetVer = selectedVersionData.pedagogy?.pedagogy_id
-            ? sortedPeds.find((p: any) => p.pedagogy_id === selectedVersionData.pedagogy.pedagogy_id)
+            ? sortedPeds.find(
+                (p: any) =>
+                  p.pedagogy_id === selectedVersionData.pedagogy.pedagogy_id,
+              )
             : pickPrioritizedVersion(sortedPeds);
 
           if (targetVer?.pedagogy_id) {
             try {
-              const full: any = await Models.pedagogy.get(targetVer.pedagogy_id);
+              const full: any = await Models.pedagogy.get(
+                targetVer.pedagogy_id,
+              );
               if (selectedVersionData.pedagogy) {
                 setSelectedVersionData((prev) => ({ ...prev, pedagogy: full }));
               }
               setSectionData((prev) => ({ ...prev, pedagogy: full }));
               if (full?.extractions_id) {
                 try {
-                  const ext = await Models.syllabus.get_extraction(full.extractions_id);
+                  const ext = await Models.syllabus.get_extraction(
+                    full.extractions_id,
+                  );
                   setSectionData((prev) => ({ ...prev, syllabus: ext }));
-                } catch { }
+                } catch {}
               }
-            } catch { }
+            } catch {}
           }
         } else if (tab === "lesson_plan") {
-          const [lpRes, extractionsRes, pedRes]: [any, any, any] = await Promise.all([
-            Models.lession_plan.list({ course_id: courseIdParam }),
-            sectionVersions.extractions.length > 0
-              ? Promise.resolve(sectionVersions.extractions)
-              : Models.syllabus.list_extractions({ course_id: courseIdParam }),
-            sectionVersions.pedagogies.length > 0
-              ? Promise.resolve(sectionVersions.pedagogies)
-              : Models.pedagogy.list({ course_id: courseIdParam }),
-          ]);
+          const [lpRes, extractionsRes, pedRes]: [any, any, any] =
+            await Promise.all([
+              Models.lession_plan.list({ course_id: courseIdParam }),
+              sectionVersions.extractions.length > 0
+                ? Promise.resolve(sectionVersions.extractions)
+                : Models.syllabus.list_extractions({
+                    course_id: courseIdParam,
+                  }),
+              sectionVersions.pedagogies.length > 0
+                ? Promise.resolve(sectionVersions.pedagogies)
+                : Models.pedagogy.list({ course_id: courseIdParam }),
+            ]);
           const rawLps = Array.isArray(lpRes) ? lpRes : [];
-          const sortedLps = sortAndNumberVersions(rawLps, { idKey: "lesson_plan_id" });
+          const sortedLps = sortAndNumberVersions(rawLps, {
+            idKey: "lesson_plan_id",
+          });
           setSectionVersions((prev) => ({
             ...prev,
             lesson_plans: rawLps,
@@ -604,18 +734,25 @@ const InsCourseArtifacts = () => {
 
           const targetVer = selectedVersionData.lesson_plan?.lesson_plan_id
             ? sortedLps.find(
-                (l: any) => l.lesson_plan_id === selectedVersionData.lesson_plan.lesson_plan_id
+                (l: any) =>
+                  l.lesson_plan_id ===
+                  selectedVersionData.lesson_plan.lesson_plan_id,
               )
             : pickPrioritizedVersion(sortedLps);
 
           if (targetVer?.lesson_plan_id) {
             try {
-              const full = await Models.lession_plan.get(targetVer.lesson_plan_id);
+              const full = await Models.lession_plan.get(
+                targetVer.lesson_plan_id,
+              );
               if (selectedVersionData.lesson_plan) {
-                setSelectedVersionData((prev) => ({ ...prev, lesson_plan: full }));
+                setSelectedVersionData((prev) => ({
+                  ...prev,
+                  lesson_plan: full,
+                }));
               }
               setSectionData((prev) => ({ ...prev, lesson_plan: full }));
-            } catch { }
+            } catch {}
           }
         }
       } else {
@@ -623,84 +760,93 @@ const InsCourseArtifacts = () => {
           let act = null;
           try {
             act = await Models.syllabus.get_active_extraction(courseIdParam);
-          } catch { }
+          } catch {}
           if (!act) {
             try {
-              const extractionsRes: any = await Models.syllabus.list_extractions({
-                course_id: courseIdParam,
-              });
+              const extractionsRes: any =
+                await Models.syllabus.list_extractions({
+                  course_id: courseIdParam,
+                });
               const sorted = sortAndNumberVersions(
                 Array.isArray(extractionsRes) ? extractionsRes : [],
-                { idKey: "extractions_id" }
+                { idKey: "extractions_id" },
               );
               const best = pickPrioritizedVersion(sorted);
               if (best?.extractions_id) {
                 act = await Models.syllabus.get_extraction(best.extractions_id);
               }
-            } catch { }
+            } catch {}
           }
           setSectionData((prev) => ({ ...prev, syllabus: act }));
         } else if (tab === "copo") {
           let act = null;
           try {
             act = await Models.copo.get_active(courseIdParam);
-          } catch { }
+          } catch {}
           if (!act) {
             try {
-              const copoRes: any = await Models.copo.list({ course_id: courseIdParam });
+              const copoRes: any = await Models.copo.list({
+                course_id: courseIdParam,
+              });
               const sorted = sortAndNumberVersions(
                 Array.isArray(copoRes) ? copoRes : [],
-                { idKey: "copo_id" }
+                { idKey: "copo_id" },
               );
               const best = pickPrioritizedVersion(sorted);
               if (best?.copo_id) {
                 act = await Models.copo.get(best.copo_id);
               }
-            } catch { }
+            } catch {}
           }
           setSectionData((prev) => ({ ...prev, copo: act }));
         } else if (tab === "pedagogy") {
           let act = null;
           try {
             act = await Models.pedagogy.get_active(courseIdParam);
-          } catch { }
+          } catch {}
           if (!act) {
             try {
-              const pedRes: any = await Models.pedagogy.list({ course_id: courseIdParam });
+              const pedRes: any = await Models.pedagogy.list({
+                course_id: courseIdParam,
+              });
               const sorted = sortAndNumberVersions(
                 Array.isArray(pedRes) ? pedRes : [],
-                { idKey: "pedagogy_id" }
+                { idKey: "pedagogy_id" },
               );
               const best = pickPrioritizedVersion(sorted);
               if (best?.pedagogy_id) {
                 act = await Models.pedagogy.get(best.pedagogy_id);
               }
-            } catch { }
+            } catch {}
           }
           setSectionData((prev) => ({ ...prev, pedagogy: act }));
           if (act?.extractions_id) {
             try {
-              const ext = await Models.syllabus.get_extraction(act.extractions_id);
+              const ext = await Models.syllabus.get_extraction(
+                act.extractions_id,
+              );
               setSectionData((prev) => ({ ...prev, syllabus: ext }));
-            } catch { }
+            } catch {}
           }
         } else if (tab === "lesson_plan") {
           let act = null;
           try {
             act = await Models.lession_plan.get_active(courseIdParam);
-          } catch { }
+          } catch {}
           if (!act) {
             try {
-              const lpRes: any = await Models.lession_plan.list({ course_id: courseIdParam });
+              const lpRes: any = await Models.lession_plan.list({
+                course_id: courseIdParam,
+              });
               const sorted = sortAndNumberVersions(
                 Array.isArray(lpRes) ? lpRes : [],
-                { idKey: "lesson_plan_id" }
+                { idKey: "lesson_plan_id" },
               );
               const best = pickPrioritizedVersion(sorted);
               if (best?.lesson_plan_id) {
                 act = await Models.lession_plan.get(best.lesson_plan_id);
               }
-            } catch { }
+            } catch {}
           }
           setSectionData((prev) => ({ ...prev, lesson_plan: act }));
         }
@@ -725,7 +871,8 @@ const InsCourseArtifacts = () => {
       let role = "";
       let uid: any = null;
       try {
-        const uStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+        const uStr =
+          typeof window !== "undefined" ? localStorage.getItem("user") : null;
         if (uStr) {
           const u = JSON.parse(uStr);
           role = String(u.role).toLowerCase();
@@ -739,15 +886,15 @@ const InsCourseArtifacts = () => {
             if (g) role = g.toLowerCase();
           }
         }
-      } catch { }
+      } catch {}
 
       const userIsCoord = Boolean(
         res?.permissions?.is_coordinator ||
-        res?.permissions?.can_edit ||
-        role.includes("coordinator") ||
-        role === "admin" ||
-        role === "super_admin" ||
-        (uid && res?.course && res.course.coordinator_id === uid)
+          res?.permissions?.can_edit ||
+          role.includes("coordinator") ||
+          role === "admin" ||
+          role === "super_admin" ||
+          (uid && res?.course && res.course.coordinator_id === uid),
       );
       loadSectionData(activeTab, true, userIsCoord);
     } catch (err: any) {
@@ -770,30 +917,42 @@ const InsCourseArtifacts = () => {
   }, [activeTab]);
 
   const isBusyState = (state?: string) =>
-    state === "redis_queued" || state === "sent_to_llm" || state === "processing";
+    state === "redis_queued" ||
+    state === "sent_to_llm" ||
+    state === "processing";
 
   const isExtractionBusy = Boolean(
-    versionsExtractions.some((e: any) => isBusyState(e.current_state))
+    versionsExtractions.some((e: any) => isBusyState(e.current_state)),
   );
   const isCopoBusy = Boolean(
-    versionsCopo.some((c: any) => isBusyState(c.current_state))
+    versionsCopo.some((c: any) => isBusyState(c.current_state)),
   );
   const isPedagogyBusy = Boolean(
-    versionsPedagogies.some((p: any) => isBusyState(p.current_state))
+    versionsPedagogies.some((p: any) => isBusyState(p.current_state)),
   );
   const isLessonPlanBusy = Boolean(
-    versionsLessonPlans.some((l: any) => isBusyState(l.current_state))
+    versionsLessonPlans.some((l: any) => isBusyState(l.current_state)),
   );
 
-  const [showGenerateCopoModal, setShowGenerateCopoModal] = useState<boolean>(false);
-  const [selectedExtractionForCopo, setSelectedExtractionForCopo] = useState<number | null>(null);
+  const [showGenerateCopoModal, setShowGenerateCopoModal] =
+    useState<boolean>(false);
+  const [selectedExtractionForCopo, setSelectedExtractionForCopo] = useState<
+    number | null
+  >(null);
 
-  const [showGeneratePedagogyModal, setShowGeneratePedagogyModal] = useState<boolean>(false);
-  const [selectedExtractionForPedagogy, setSelectedExtractionForPedagogy] = useState<number | null>(null);
+  const [showGeneratePedagogyModal, setShowGeneratePedagogyModal] =
+    useState<boolean>(false);
+  const [selectedExtractionForPedagogy, setSelectedExtractionForPedagogy] =
+    useState<number | null>(null);
 
-  const [showGenerateLessonPlanModal, setShowGenerateLessonPlanModal] = useState<boolean>(false);
-  const [selectedExtractionForLp, setSelectedExtractionForLp] = useState<number | null>(null);
-  const [selectedPedagogyForLp, setSelectedPedagogyForLp] = useState<number | null>(null);
+  const [showGenerateLessonPlanModal, setShowGenerateLessonPlanModal] =
+    useState<boolean>(false);
+  const [selectedExtractionForLp, setSelectedExtractionForLp] = useState<
+    number | null
+  >(null);
+  const [selectedPedagogyForLp, setSelectedPedagogyForLp] = useState<
+    number | null
+  >(null);
   const [lpTargetHours, setLpTargetHours] = useState<number>(45);
 
   const [copoEditingCell, setCopoEditingCell] = useState<any | null>(null);
@@ -802,7 +961,9 @@ const InsCourseArtifacts = () => {
   >({});
   const [savingCopoDelta, setSavingCopoDelta] = useState<boolean>(false);
 
-  const [editingPedagogyTopicId, setEditingPedagogyTopicId] = useState<number | null>(null);
+  const [editingPedagogyTopicId, setEditingPedagogyTopicId] = useState<
+    number | null
+  >(null);
   const [pedagogyDraft, setPedagogyDraft] = useState<{
     bloom_level_1?: string;
     pedagogy_suggested_1?: string;
@@ -817,7 +978,8 @@ const InsCourseArtifacts = () => {
     description_3?: string;
     methodology_3?: string;
   }>({});
-  const [savingPedagogyTopic, setSavingPedagogyTopic] = useState<boolean>(false);
+  const [savingPedagogyTopic, setSavingPedagogyTopic] =
+    useState<boolean>(false);
 
   const [editingLpSlotId, setEditingLpSlotId] = useState<number | null>(null);
   const [lpSlotDraft, setLpSlotDraft] = useState<{
@@ -827,13 +989,16 @@ const InsCourseArtifacts = () => {
   }>({});
   const [savingLpSlot, setSavingLpSlot] = useState<boolean>(false);
 
-  const [editingLpSubtopicSlotId, setEditingLpSubtopicSlotId] = useState<number | null>(null);
+  const [editingLpSubtopicSlotId, setEditingLpSubtopicSlotId] = useState<
+    number | null
+  >(null);
   const [lpSubtopicSlotDraft, setLpSubtopicSlotDraft] = useState<{
     time_allocated?: number;
     bloom_level?: string;
     suggested_activity?: string;
   }>({});
-  const [savingLpSubtopicSlot, setSavingLpSubtopicSlot] = useState<boolean>(false);
+  const [savingLpSubtopicSlot, setSavingLpSubtopicSlot] =
+    useState<boolean>(false);
 
   const [splitScreenView, setSplitScreenView] = useState<boolean>(false);
   const [documentBlobUrl, setDocumentBlobUrl] = useState<string | null>(null);
@@ -850,7 +1015,8 @@ const InsCourseArtifacts = () => {
     let isMounted = true;
     setLoadingDoc(true);
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : "";
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
     const directFileUrl = `${BACKEND_URL}course/syllabi/${sylId}/file${tokenParam}`;
 
@@ -882,10 +1048,43 @@ const InsCourseArtifacts = () => {
     };
   }, [splitScreenView, activeSyllabus?.course_syllabus_id]);
 
+  const handleDownloadSyllabus = async () => {
+    const sylId = activeSyllabus?.course_syllabus_id;
+    if (!sylId) {
+      Failure("No syllabus file available to download.");
+      return;
+    }
+    const filename =
+      activeSyllabus?.original_filename ?? `syllabus_${sylId}.pdf`;
+    try {
+      const blob: any = await Models.syllabus.getFileBlob(sylId);
+      if (blob instanceof Blob && blob.size > 0) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return;
+      }
+    } catch {}
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : "";
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+    window.open(
+      `${BACKEND_URL}course/syllabi/${sylId}/file${tokenParam}`,
+      "_blank",
+    );
+  };
+
   const handleUploadSyllabus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isExtractionBusy) {
-      Failure("An extraction job is already in progress for this course. Please wait for it to complete.");
+      Failure(
+        "An extraction job is already in progress for this course. Please wait for it to complete.",
+      );
       return;
     }
     if (!uploadFile || !courseIdParam) return;
@@ -900,7 +1099,7 @@ const InsCourseArtifacts = () => {
       setShowUploadModal(false);
       setUploadFile(null);
       setJobNotice(
-        "A syllabus extraction job has been queued. When processing completes, please click the Refresh button above to load the extracted curriculum."
+        "A syllabus extraction job has been queued. When processing completes, please click the Refresh button above to load the extracted curriculum.",
       );
       if (res?.extractions_id) {
         setSelectedVersionData((prev) => ({ ...prev, syllabus: res }));
@@ -952,9 +1151,13 @@ const InsCourseArtifacts = () => {
       Failure("A CO-PO generation job is already in progress for this course.");
       return;
     }
-    const approvedExts = versionsExtractions.filter((e: any) => Boolean(e.is_approved));
+    const approvedExts = versionsExtractions.filter((e: any) =>
+      Boolean(e.is_approved),
+    );
     if (approvedExts.length === 0) {
-      Failure("No approved extraction found. Please approve an extraction version first.");
+      Failure(
+        "No approved extraction found. Please approve an extraction version first.",
+      );
       return;
     }
     setSelectedExtractionForCopo(approvedExts[0].extractions_id);
@@ -969,11 +1172,13 @@ const InsCourseArtifacts = () => {
     if (!selectedExtractionForCopo) return;
     try {
       setActionLoading("generate_copo");
-      const res: any = await Models.copo.generate({ extractions_id: selectedExtractionForCopo });
+      const res: any = await Models.copo.generate({
+        extractions_id: selectedExtractionForCopo,
+      });
       Success("CO-PO mapping generation queued!");
       setShowGenerateCopoModal(false);
       setJobNotice(
-        "CO-PO mapping generation is queued. When completed, click the Refresh button to load the generated matrix."
+        "CO-PO mapping generation is queued. When completed, click the Refresh button to load the generated matrix.",
       );
       if (res?.copo_id) {
         setSelectedVersionData((prev) => ({ ...prev, copo: res }));
@@ -1022,12 +1227,18 @@ const InsCourseArtifacts = () => {
 
   const openGeneratePedagogyModal = () => {
     if (isPedagogyBusy) {
-      Failure("A pedagogy suggestion generation job is already in progress for this course.");
+      Failure(
+        "A pedagogy suggestion generation job is already in progress for this course.",
+      );
       return;
     }
-    const approvedExts = versionsExtractions.filter((e: any) => Boolean(e.is_approved));
+    const approvedExts = versionsExtractions.filter((e: any) =>
+      Boolean(e.is_approved),
+    );
     if (approvedExts.length === 0) {
-      Failure("No approved extraction found. Please approve an extraction version first.");
+      Failure(
+        "No approved extraction found. Please approve an extraction version first.",
+      );
       return;
     }
     setSelectedExtractionForPedagogy(approvedExts[0].extractions_id);
@@ -1036,7 +1247,9 @@ const InsCourseArtifacts = () => {
 
   const handleConfirmGeneratePedagogy = async () => {
     if (isPedagogyBusy) {
-      Failure("A pedagogy suggestion generation job is already in progress for this course.");
+      Failure(
+        "A pedagogy suggestion generation job is already in progress for this course.",
+      );
       return;
     }
     if (!selectedExtractionForPedagogy) return;
@@ -1048,7 +1261,7 @@ const InsCourseArtifacts = () => {
       Success("Pedagogy suggestions generation queued!");
       setShowGeneratePedagogyModal(false);
       setJobNotice(
-        "Pedagogy generation is queued. When completed, click the Refresh button to load the new teaching strategies."
+        "Pedagogy generation is queued. When completed, click the Refresh button to load the new teaching strategies.",
       );
       if (res?.pedagogy_id) {
         setSelectedVersionData((prev) => ({ ...prev, pedagogy: res }));
@@ -1097,24 +1310,36 @@ const InsCourseArtifacts = () => {
 
   const openGenerateLessonPlanModal = () => {
     if (isLessonPlanBusy) {
-      Failure("A lesson plan generation job is already in progress for this course.");
+      Failure(
+        "A lesson plan generation job is already in progress for this course.",
+      );
       return;
     }
-    const approvedExts = versionsExtractions.filter((e: any) => Boolean(e.is_approved));
+    const approvedExts = versionsExtractions.filter((e: any) =>
+      Boolean(e.is_approved),
+    );
     if (approvedExts.length === 0) {
-      Failure("No approved extraction found. Please approve an extraction version first.");
+      Failure(
+        "No approved extraction found. Please approve an extraction version first.",
+      );
       return;
     }
     setSelectedExtractionForLp(approvedExts[0].extractions_id);
-    const approvedPeds = versionsPedagogies.filter((p: any) => Boolean(p.is_approved));
-    setSelectedPedagogyForLp(approvedPeds.length > 0 ? approvedPeds[0].pedagogy_id : null);
+    const approvedPeds = versionsPedagogies.filter((p: any) =>
+      Boolean(p.is_approved),
+    );
+    setSelectedPedagogyForLp(
+      approvedPeds.length > 0 ? approvedPeds[0].pedagogy_id : null,
+    );
     setLpTargetHours(currentExt?.total_theory_hours ?? 45);
     setShowGenerateLessonPlanModal(true);
   };
 
   const handleConfirmGenerateLessonPlan = async () => {
     if (isLessonPlanBusy) {
-      Failure("A lesson plan generation job is already in progress for this course.");
+      Failure(
+        "A lesson plan generation job is already in progress for this course.",
+      );
       return;
     }
     if (!selectedExtractionForLp) return;
@@ -1128,7 +1353,7 @@ const InsCourseArtifacts = () => {
       Success("Lesson plan generation queued!");
       setShowGenerateLessonPlanModal(false);
       setJobNotice(
-        "Lesson plan schedule generation is queued. When completed, click the Refresh button to load the hourly timeline."
+        "Lesson plan schedule generation is queued. When completed, click the Refresh button to load the hourly timeline.",
       );
       if (res?.lesson_plan_id) {
         setSelectedVersionData((prev) => ({ ...prev, lesson_plan: res }));
@@ -1176,17 +1401,22 @@ const InsCourseArtifacts = () => {
   };
 
   const [isGeneratingMCQ, setIsGeneratingMCQ] = useState<boolean>(false);
-  const [mcqHierarchyUnits, setMcqHierarchyUnits] = useState<HierarchyUnitItem[]>([]);
-  const [loadingHierarchyUnits, setLoadingHierarchyUnits] = useState<boolean>(false);
+  const [mcqHierarchyUnits, setMcqHierarchyUnits] = useState<
+    HierarchyUnitItem[]
+  >([]);
+  const [loadingHierarchyUnits, setLoadingHierarchyUnits] =
+    useState<boolean>(false);
 
   const fetchTopicHierarchyUnits = async (courseId: string | number) => {
     if (!courseId) return;
     try {
       setLoadingHierarchyUnits(true);
-      const portRes: any = await Models.course.course_portfolio(courseId).catch((err: any) => {
-        console.warn("Course portfolio fetch error:", err);
-        return null;
-      });
+      const portRes: any = await Models.course
+        .course_portfolio(courseId)
+        .catch((err: any) => {
+          console.warn("Course portfolio fetch error:", err);
+          return null;
+        });
 
       let rawUnits: any[] = [];
       if (portRes?.active_extraction?.units) {
@@ -1203,37 +1433,43 @@ const InsCourseArtifacts = () => {
       }
 
       if (Array.isArray(rawUnits) && rawUnits.length > 0) {
-        const mapped: HierarchyUnitItem[] = rawUnits.map((u: any, uIdx: number) => ({
-          unit_number: Number(u.unit_number) || uIdx + 1,
-          unit_title: u.unit_title || `Unit ${uIdx + 1}`,
-          topics: (u.topics || []).map((t: any, tIdx: number) => {
-            const topicTitle = typeof t === "string" ? t : t.topic_name || `Topic ${tIdx + 1}`;
-            const topicCode =
-              typeof t === "object" && t.topic_code
-                ? String(t.topic_code)
-                : `${uIdx + 1}.${tIdx + 1}`;
-            const rawSub = typeof t === "object" && Array.isArray(t.subtopics) ? t.subtopics : [];
-            return {
-              id: topicCode,
-              code: topicCode,
-              title: topicTitle,
-              subtopics: rawSub.map((st: any, sIdx: number) => ({
-                id:
-                  typeof st === "object" && st.subtopic_code
-                    ? String(st.subtopic_code)
-                    : `${topicCode}.${sIdx + 1}`,
-                code:
-                  typeof st === "object" && st.subtopic_code
-                    ? String(st.subtopic_code)
-                    : `${topicCode}.${sIdx + 1}`,
-                title:
-                  typeof st === "string"
-                    ? st
-                    : st.subtopic_name || `Subtopic ${sIdx + 1}`,
-              })),
-            };
+        const mapped: HierarchyUnitItem[] = rawUnits.map(
+          (u: any, uIdx: number) => ({
+            unit_number: Number(u.unit_number) || uIdx + 1,
+            unit_title: u.unit_title || `Unit ${uIdx + 1}`,
+            topics: (u.topics || []).map((t: any, tIdx: number) => {
+              const topicTitle =
+                typeof t === "string" ? t : t.topic_name || `Topic ${tIdx + 1}`;
+              const topicCode =
+                typeof t === "object" && t.topic_code
+                  ? String(t.topic_code)
+                  : `${uIdx + 1}.${tIdx + 1}`;
+              const rawSub =
+                typeof t === "object" && Array.isArray(t.subtopics)
+                  ? t.subtopics
+                  : [];
+              return {
+                id: topicCode,
+                code: topicCode,
+                title: topicTitle,
+                subtopics: rawSub.map((st: any, sIdx: number) => ({
+                  id:
+                    typeof st === "object" && st.subtopic_code
+                      ? String(st.subtopic_code)
+                      : `${topicCode}.${sIdx + 1}`,
+                  code:
+                    typeof st === "object" && st.subtopic_code
+                      ? String(st.subtopic_code)
+                      : `${topicCode}.${sIdx + 1}`,
+                  title:
+                    typeof st === "string"
+                      ? st
+                      : st.subtopic_name || `Subtopic ${sIdx + 1}`,
+                })),
+              };
+            }),
           }),
-        }));
+        );
         setMcqHierarchyUnits(mapped);
       } else {
         setMcqHierarchyUnits([]);
@@ -1261,10 +1497,15 @@ const InsCourseArtifacts = () => {
     includeExplanation: boolean;
     shuffleOptions: boolean;
     enableBreakdown?: boolean;
-    difficultyBreakdown?: Record<string, { easy: number; medium: number; hard: number }>;
+    difficultyBreakdown?: Record<
+      string,
+      { easy: number; medium: number; hard: number }
+    >;
   }) => {
     if (!isCoord) {
-      Failure("Permission Denied: Only Course Coordinators can generate new MCQ questions.");
+      Failure(
+        "Permission Denied: Only Course Coordinators can generate new MCQ questions.",
+      );
       return;
     }
     try {
@@ -1300,7 +1541,11 @@ const InsCourseArtifacts = () => {
         payload.distribution_mode = "knowledge_and_difficulty";
         const diffBreakdown: any = {};
         ["K1", "K2", "K3", "K4", "K5", "K6"].forEach((k) => {
-          const bd = genData.difficultyBreakdown?.[k] ?? { easy: 0, medium: 0, hard: 0 };
+          const bd = genData.difficultyBreakdown?.[k] ?? {
+            easy: 0,
+            medium: 0,
+            hard: 0,
+          };
           diffBreakdown[k] = {
             easy: Number(bd.easy) || 0,
             medium: Number(bd.medium) || 0,
@@ -1332,7 +1577,9 @@ const InsCourseArtifacts = () => {
 
       const jobId = res?.job_id;
       if (jobId) {
-        Success("MCQ generation job submitted! Questions are being generated in the background.");
+        Success(
+          "MCQ generation job submitted! Questions are being generated in the background.",
+        );
         let attempts = 0;
         const maxAttempts = 60;
         const interval = setInterval(async () => {
@@ -1343,7 +1590,9 @@ const InsCourseArtifacts = () => {
             if (st === "completed" || st === "success") {
               clearInterval(interval);
               setIsGeneratingMCQ(false);
-              Success(`AI Generated ${genData.totalQuestions} questions successfully!`);
+              Success(
+                `AI Generated ${genData.totalQuestions} questions successfully!`,
+              );
             } else if (st === "failed" || st === "failure") {
               clearInterval(interval);
               setIsGeneratingMCQ(false);
@@ -1380,7 +1629,7 @@ const InsCourseArtifacts = () => {
   const handleSelectVersionCard = async (
     tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
     versionItem: any,
-    idKey: string
+    idKey: string,
   ) => {
     const itemId = versionItem[idKey];
     if (!itemId) return;
@@ -1409,15 +1658,15 @@ const InsCourseArtifacts = () => {
   const renderGenerationLoadingScreen = (
     stageName: string,
     state: string,
-    versionNumber?: number | string
+    versionNumber?: number | string,
   ) => {
     const isProcessing = state === "sent_to_llm" || state === "processing";
 
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-blue-200/80 bg-gradient-to-b from-blue-50/70 via-white to-blue-50/30 p-5 text-center shadow-xs dark:border-blue-900/50 dark:from-blue-950/40 dark:via-slate-900 dark:to-blue-950/20 my-2">
+      <div className="my-2 flex flex-col items-center justify-center rounded-2xl border border-indigo-200/80 bg-gradient-to-b from-indigo-50/70 via-white to-indigo-50/30 p-5 text-center shadow-sm dark:border-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-indigo-950/20">
         <div className="relative mb-3 flex h-11 w-11 items-center justify-center">
-          <div className="absolute inset-0 animate-ping rounded-full bg-blue-400/20 dark:bg-blue-500/20" />
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl btn-bg text-white shadow-md shadow-blue-500/25 dark:bg-blue-500">
+          <div className="absolute inset-0 animate-ping rounded-full bg-indigo-400/20 dark:bg-indigo-500/20" />
+          <div className="btn-bg relative flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-md shadow-indigo-500/25">
             {isProcessing ? (
               <Sparkles className="h-5 w-5 animate-pulse text-amber-300" />
             ) : (
@@ -1433,32 +1682,35 @@ const InsCourseArtifacts = () => {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75"></span>
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-purple-500"></span>
               </span>
-              <span className="text-[10px] font-bold tracking-wide uppercase">
+              <span className="text-[10px] font-bold uppercase tracking-wide">
                 Processing (Sent to LLM)
               </span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-              <span className="text-[10px] font-bold tracking-wide uppercase">Queued</span>
+              <span className="text-[10px] font-bold uppercase tracking-wide">
+                Queued
+              </span>
             </span>
           )}
         </div>
 
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white sm:text-base">
-          {stageName} {versionNumber ? `(v${versionNumber})` : ""} Generation in Progress
+        <h3 className="section-ti">
+          {stageName} {versionNumber ? `(v${versionNumber})` : ""} Generation in
+          Progress
         </h3>
 
         <div className="mt-2 max-w-md space-y-1.5">
-          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+          <p className="section-mini-cap">
             {isProcessing
               ? "The AI worker has picked up this job and is actively querying the LLM to synthesize curriculum data."
               : "This generation job is currently waiting in the processing queue."}
           </p>
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200 text-center">
-            <p className="font-bold flex items-center justify-center gap-1 text-[11px] text-amber-900 dark:text-amber-200">
-              <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-center text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <p className="flex items-center justify-center gap-1 text-[11px] font-bold text-amber-900 dark:text-amber-200">
+              <Clock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
               <span>Please check back in ~2 minutes</span>
             </p>
           </div>
@@ -1472,9 +1724,11 @@ const InsCourseArtifacts = () => {
               loadSectionData(activeTab, true);
             }}
             disabled={refreshing}
-            className="inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 disabled:opacity-50"
+            className="ui-btn-primary-sm"
           >
-            <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`}
+            />
             <span>{refreshing ? "Checking..." : "Refresh to Load Data"}</span>
           </button>
         </div>
@@ -1482,7 +1736,10 @@ const InsCourseArtifacts = () => {
     );
   };
 
-  const renderVersionCards = (tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan") => {
+  const renderVersionCards = (
+    tabType: "syllabus" | "copo" | "pedagogy" | "lesson_plan",
+    options?: { hideBar?: boolean },
+  ) => {
     if (!isCoord) return null;
 
     let versionsList: any[] = [];
@@ -1531,224 +1788,197 @@ const InsCourseArtifacts = () => {
     const currentItemId = selectedVer
       ? selectedVer[idKey]
       : activeVer
-        ? activeVer[idKey]
-        : prioritizedVer?.[idKey] || versionsList[0]?.[idKey];
+      ? activeVer[idKey]
+      : prioritizedVer?.[idKey] || versionsList[0]?.[idKey];
     const currentItem =
-      versionsList.find((v: any) => v[idKey] === currentItemId) || activeVer || prioritizedVer || versionsList[0];
+      versionsList.find((v: any) => v[idKey] === currentItemId) ||
+      activeVer ||
+      prioritizedVer ||
+      versionsList[0];
     const isCurrentActive = Boolean(currentItem?.is_active);
     const isCurrentApproved = Boolean(currentItem?.is_approved);
     const isCurrentBusy = isBusyState(currentItem?.current_state);
     const isViewingHistorical = Boolean(selectedVer && !selectedVer.is_active);
 
-    const isBlueTheme = tabType === "syllabus" || tabType === "copo";
-
     return (
-      <div className="space-y-2">
-        {/* Main Version Control Bar: Clean, accessible, ~38px height */}
-        <div
-          className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl border px-3.5 py-2 shadow-2xs ${
-            isBlueTheme
-              ? "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/95"
-              : "border-slate-200/90 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95"
-          }`}
-        >
-          {/* Left: Indicator, Quick Dropdown, Semantic Status Pill */}
-          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold shrink-0">
-              <div
-                className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                  isBlueTheme
-                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400"
-                    : "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400"
-                }`}
-              >
-                <History className="h-4 w-4" />
+      <div className="space-y-2.5">
+        {!options?.hideBar && (
+          <div className="ui-card-compact flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <div className="relative inline-flex items-center">
+                <select
+                  value={currentItemId ?? ""}
+                  onChange={(e) => {
+                    const targetId = Number(e.target.value) || e.target.value;
+                    const targetVer = versionsList.find(
+                      (v: any) => v[idKey] == targetId,
+                    );
+                    if (!targetVer) return;
+                    if (targetVer.is_active) {
+                      setSelectedVersionData((prev) => ({
+                        ...prev,
+                        [tabType]: undefined,
+                      }));
+                      loadSectionData(tabType, true);
+                    } else {
+                      handleSelectVersionCard(tabType, targetVer, idKey);
+                    }
+                  }}
+                  disabled={loadingVersionDetail}
+                  className="ui-select h-8 cursor-pointer appearance-none py-1 pl-3 pr-8"
+                >
+                  {versionsList.map((ver: any) => {
+                    const itemId = ver[idKey];
+                    const tag = ver.is_active
+                      ? "Active"
+                      : ver.is_approved
+                      ? "Approved"
+                      : "Draft";
+                    return (
+                      <option key={itemId} value={itemId}>
+                        v{ver.version_number} - {tag}
+                      </option>
+                    );
+                  })}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400" />
               </div>
-              <span
-                className={`${
-                  isBlueTheme ? "text-sm text-slate-900 dark:text-slate-100" : "text-xs text-slate-800 dark:text-slate-200"
-                } font-bold`}
-              >
-                Version
-              </span>
+
+              <div className="flex shrink-0 items-center gap-1.5">
+                {isCurrentActive ? (
+                  <span className="ui-badge-success">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    Live Active
+                  </span>
+                ) : isCurrentApproved ? (
+                  <span className="ui-badge-info">
+                    <Check className="h-3 w-3" />
+                    Approved
+                  </span>
+                ) : (
+                  <span className="ui-badge-warning">
+                    <Edit2 className="h-2.5 w-2.5" />
+                    Draft v{currentItem?.version_number}
+                  </span>
+                )}
+
+                {isViewingHistorical && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVersionData((prev) => ({
+                        ...prev,
+                        [tabType]: undefined,
+                      }));
+                      loadSectionData(tabType, true);
+                    }}
+                    className="ui-btn-secondary-sm"
+                    title="Return to the active live version"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    <span>Back to Live</span>
+                  </button>
+                )}
+
+                {isCurrentBusy && (
+                  <span className="ui-badge-purple">
+                    <Sparkles className="h-3 w-3 animate-spin" />
+                    <span>Processing</span>
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Quick Switch Dropdown */}
-            <div className="relative inline-flex items-center">
-              <select
-                value={currentItemId ?? ""}
-                onChange={(e) => {
-                  const targetId = Number(e.target.value) || e.target.value;
-                  const targetVer = versionsList.find((v: any) => v[idKey] == targetId);
-                  if (!targetVer) return;
-                  if (targetVer.is_active) {
-                    setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
-                    loadSectionData(tabType, true);
-                  } else {
-                    handleSelectVersionCard(tabType, targetVer, idKey);
-                  }
-                }}
-                disabled={loadingVersionDetail}
-                className={`h-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800 pl-2.5 pr-7 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200 transition focus:bg-white focus:outline-hidden cursor-pointer appearance-none shadow-2xs ${
-                  isBlueTheme
-                    ? "hover:border-blue-400 focus:border-blue-500"
-                    : "hover:border-blue-400 focus:border-blue-500"
-                }`}
-              >
-                {versionsList.map((ver: any) => {
-                  const itemId = ver[idKey];
-                  const tag = ver.is_active ? "★ Active" : ver.is_approved ? "✓ Approved" : "✎ Draft";
-                  return (
-                    <option key={itemId} value={itemId}>
-                      v{ver.version_number} — {tag}
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-slate-400" />
-            </div>
-
-            {/* Semantic Lifecycle Badges */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              {isCurrentActive ? (
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-300 ${
-                    isBlueTheme ? "text-[11px]" : "text-[10px] font-bold"
-                  }`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Active
-                </span>
-              ) : isCurrentApproved ? (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-semibold ${
-                    isBlueTheme
-                      ? "bg-blue-50 border-blue-200/80 text-[11px] text-blue-700 dark:bg-blue-950/50 dark:border-blue-800/60 dark:text-blue-300"
-                      : "bg-sky-50 border-sky-200/80 text-[10px] text-sky-700 dark:bg-sky-950/50 dark:border-sky-800/60 dark:text-sky-300"
-                  }`}
-                >
-                  <Check className="h-3 w-3" />
-                  Approved
-                </span>
-              ) : (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 font-semibold text-amber-700 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300 ${
-                    isBlueTheme ? "text-[11px]" : "text-[10px]"
-                  }`}
-                >
-                  <Edit2 className="h-2.5 w-2.5" />
-                  Draft v{currentItem?.version_number}
-                </span>
-              )}
-
-              {/* Reset button if viewing non-active version */}
-              {isViewingHistorical && (
+            <div className="flex shrink-0 items-center gap-2">
+              {currentItem && !isCurrentApproved && approveFn && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
-                    loadSectionData(tabType, true);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 transition"
-                  title="Return to the active live version"
+                  onClick={() => approveFn?.(currentItemId)}
+                  disabled={
+                    isCurrentBusy ||
+                    actionLoading === `${approveLoadingPrefix}${currentItemId}`
+                  }
+                  className="ui-btn-success-sm"
+                  title={`Approve v${currentItem.version_number}`}
                 >
-                  <RotateCcw className="h-2.5 w-2.5" />
-                  <span>Back to Live</span>
+                  <Check className="h-4 w-4" />
+                  <span>
+                    {actionLoading === `${approveLoadingPrefix}${currentItemId}`
+                      ? "Approving..."
+                      : `Approve v${currentItem.version_number}`}
+                  </span>
                 </button>
               )}
 
-              {isCurrentBusy && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
-                  <Sparkles className="h-3 w-3 animate-spin" />
-                  <span>Processing</span>
-                </span>
-              )}
+              {currentItem &&
+                isCurrentApproved &&
+                !isCurrentActive &&
+                activateFn && (
+                  <button
+                    type="button"
+                    onClick={() => activateFn?.(currentItemId)}
+                    disabled={
+                      isCurrentBusy ||
+                      actionLoading ===
+                        `${activateLoadingPrefix}${currentItemId}`
+                    }
+                    className="ui-btn-primary-sm"
+                    title={`Set v${currentItem.version_number} as active live version`}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>
+                      {actionLoading ===
+                      `${activateLoadingPrefix}${currentItemId}`
+                        ? "Activating..."
+                        : `Set v${currentItem.version_number} Active`}
+                    </span>
+                  </button>
+                )}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedVersionHistory((prev) => ({
+                    ...prev,
+                    [tabType]: !prev[tabType],
+                  }))
+                }
+                className={`ui-btn-secondary-sm ${
+                  isExpanded
+                    ? "!border-indigo-400 !bg-indigo-50/70 !text-indigo-700 dark:!bg-indigo-950/60 dark:!text-indigo-300"
+                    : ""
+                }`}
+                title="Toggle version history card drawer"
+              >
+                <span>All Versions ({versionsList.length})</span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${
+                    isExpanded ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Right: Quick Action Buttons (Approve / Activate) & Drawer Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Contextual Approve Action */}
-            {currentItem && !isCurrentApproved && approveFn && (
-              <button
-                type="button"
-                onClick={() => approveFn?.(currentItemId)}
-                disabled={isCurrentBusy || actionLoading === `${approveLoadingPrefix}${currentItemId}`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition disabled:opacity-50"
-                title={`Approve v${currentItem.version_number}`}
-              >
-                <Check className="h-3 w-3" />
-                <span>
-                  {actionLoading === `${approveLoadingPrefix}${currentItemId}`
-                    ? "Approving..."
-                    : `Approve v${currentItem.version_number}`}
-                </span>
-              </button>
-            )}
-
-            {/* Contextual Activate Action */}
-            {currentItem && isCurrentApproved && !isCurrentActive && activateFn && (
-              <button
-                type="button"
-                onClick={() => activateFn?.(currentItemId)}
-                disabled={isCurrentBusy || actionLoading === `${activateLoadingPrefix}${currentItemId}`}
-                className={`inline-flex items-center gap-1.5 rounded-lg active:scale-95 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition disabled:opacity-50 ${
-                  isBlueTheme ? "btn-bg hover:bg-blue-700" : "btn-bg hover:bg-blue-700"
-                }`}
-                title={`Set v${currentItem.version_number} as active live version`}
-              >
-                <ShieldCheck className="h-3 w-3" />
-                <span>
-                  {actionLoading === `${activateLoadingPrefix}${currentItemId}`
-                    ? "Activating..."
-                    : `Set v${currentItem.version_number} Active`}
-                </span>
-              </button>
-            )}
-
-            {/* Toggle Drawer Shelf */}
-            <button
-              type="button"
-              onClick={() =>
-                setExpandedVersionHistory((prev) => ({
-                  ...prev,
-                  [tabType]: !prev[tabType],
-                }))
-              }
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
-                isExpanded
-                  ? isBlueTheme
-                    ? "border-blue-300 bg-blue-50/70 text-blue-700 dark:border-blue-800 dark:bg-blue-950/70 dark:text-blue-300"
-                    : "border-blue-300 bg-blue-50/70 text-blue-700 dark:border-blue-800 dark:bg-blue-950/70 dark:text-blue-300"
-                  : isBlueTheme
-                    ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              }`}
-              title="Toggle version history card drawer"
-            >
-              <span>All Versions ({versionsList.length})</span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                  isExpanded ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Expandable Version Cards Shelf */}
         {isExpanded && (
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/95 animate-fadeIn">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Version Timeline & Approvals ({versionsList.length})
-              </span>
-              <span className="text-[11px] text-slate-500">
+          <div className="ui-card">
+            <div className="ui-card-header mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="ui-icon-badge">
+                  <History className="h-4 w-4" />
+                </div>
+                <span className="section-ti">
+                  Version Timeline & Approvals
+                </span>
+                <span className="ui-badge-code">{versionsList.length}</span>
+              </div>
+              <span className="section-mini-cap">
                 Sorted chronologically (v1 = initial extraction)
               </span>
             </div>
 
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-thin">
+            <div className="scrollbar-thin flex items-stretch gap-3 overflow-x-auto pb-1.5">
               {versionsList.map((ver: any) => {
                 const itemId = ver[idKey];
                 const isItemActive = Boolean(ver.is_active);
@@ -1756,69 +1986,75 @@ const InsCourseArtifacts = () => {
                 const isSelected = Boolean(
                   selectedVer
                     ? selectedVer[idKey] === itemId
-                    : currentItemId === itemId
+                    : currentItemId === itemId,
                 );
                 const isBusy = isBusyState(ver.current_state);
 
                 return (
                   <div
                     key={itemId}
-                    className={`min-w-[190px] max-w-[220px] shrink-0 rounded-xl border p-2.5 transition flex flex-col justify-between ${
+                    className={`flex min-w-[230px] max-w-[260px] shrink-0 flex-col justify-between gap-3 rounded-xl border p-3.5 transition ${
                       isSelected
-                        ? isBlueTheme
-                          ? "border-blue-500 bg-blue-50/50 shadow-xs dark:border-blue-600 dark:bg-blue-950/40 ring-1 ring-blue-500"
-                          : "border-blue-500 bg-blue-50/50 shadow-xs dark:border-blue-600 dark:bg-blue-950/40 ring-1 ring-blue-500"
-                        : "border-slate-200 bg-slate-50/70 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40"
+                        ? "border-indigo-500 bg-indigo-50/60 shadow-sm ring-1 ring-indigo-500/20 dark:border-indigo-500 dark:bg-indigo-950/40"
+                        : "border-slate-200 bg-[#F8FAFC] hover:border-indigo-300 hover:bg-white dark:border-slate-700 dark:bg-slate-800/50"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between gap-1.5">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white">
-                          v{ver.version_number}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="card-ti">
+                          Version {ver.version_number}
                         </span>
                         <div className="flex items-center gap-1">
                           {isItemActive && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                              ★ Active
+                            <span className="ui-badge-success">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Active
                             </span>
                           )}
                           {isItemApproved && !isItemActive && (
-                            <span className="rounded-full bg-sky-100 px-2 py-0.2 text-[9px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-                              ✓ Approved
+                            <span className="ui-badge-info">
+                              <Check className="h-3 w-3 stroke-[2.5]" />
+                              Approved
                             </span>
                           )}
                           {!isItemApproved && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.2 text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              ✎ Draft
+                            <span className="ui-badge-warning">
+                              <Edit2 className="h-2.5 w-2.5" />
+                              Draft
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
-                        <Clock className="h-3 w-3 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                        <Clock className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
                         <span>
                           {ver.created_at
-                            ? new Date(ver.created_at).toLocaleDateString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
+                            ? new Date(ver.created_at).toLocaleDateString(
+                                undefined,
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )
                             : "—"}
                         </span>
                       </div>
 
                       {isBusy && (
                         <div
-                          className={`mt-1.5 flex items-center gap-1 text-[9px] font-semibold ${
-                            ver.current_state === "sent_to_llm" || ver.current_state === "processing"
-                              ? "text-purple-600 dark:text-purple-400"
-                              : "text-amber-600 dark:text-amber-400"
-                          }`}
+                          className={
+                            ver.current_state === "sent_to_llm" ||
+                            ver.current_state === "processing"
+                              ? "ui-badge-purple"
+                              : "ui-badge-warning"
+                          }
                         >
-                          <Sparkles className="h-2.5 w-2.5 animate-spin" />
+                          <Sparkles className="h-3 w-3 animate-spin" />
                           <span>
-                            {ver.current_state === "sent_to_llm" || ver.current_state === "processing"
+                            {ver.current_state === "sent_to_llm" ||
+                            ver.current_state === "processing"
                               ? "Processing LLM..."
                               : "Queued..."}
                           </span>
@@ -1826,15 +2062,10 @@ const InsCourseArtifacts = () => {
                       )}
                     </div>
 
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 pt-2.5 dark:border-slate-700/80">
                       {isSelected ? (
-                        <span
-                          className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                            isBlueTheme
-                              ? "btn-bg/10 text-blue-600 dark:text-blue-400"
-                              : "btn-bg/10 text-blue-600 dark:text-blue-400"
-                          }`}
-                        >
+                        <span className="ui-badge-info">
+                          <CheckCircle2 className="h-4 w-4" />
                           Viewing
                         </span>
                       ) : (
@@ -1842,48 +2073,65 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={() => {
                             if (isItemActive) {
-                              setSelectedVersionData((prev) => ({ ...prev, [tabType]: undefined }));
+                              setSelectedVersionData((prev) => ({
+                                ...prev,
+                                [tabType]: undefined,
+                              }));
                               loadSectionData(tabType, true);
                             } else {
                               handleSelectVersionCard(tabType, ver, idKey);
                             }
                           }}
                           disabled={loadingVersionDetail}
-                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
+                          className="ui-btn-secondary-sm"
                         >
                           View
                         </button>
                       )}
 
-                      {!isItemApproved && approveFn && (
-                        <button
-                          type="button"
-                          onClick={() => approveFn?.(itemId)}
-                          disabled={isBusy || actionLoading === `${approveLoadingPrefix}${itemId}`}
-                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
-                        >
-                          <Check className="h-2.5 w-2.5" />
-                          <span>
-                            {actionLoading === `${approveLoadingPrefix}${itemId}` ? "..." : "Approve"}
-                          </span>
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {!isItemApproved && approveFn && (
+                          <button
+                            type="button"
+                            onClick={() => approveFn?.(itemId)}
+                            disabled={
+                              isBusy ||
+                              actionLoading ===
+                                `${approveLoadingPrefix}${itemId}`
+                            }
+                            className="ui-btn-success-sm"
+                          >
+                            <Check className="h-3 w-3 stroke-[2.5]" />
+                            <span>
+                              {actionLoading ===
+                              `${approveLoadingPrefix}${itemId}`
+                                ? "..."
+                                : "Approve"}
+                            </span>
+                          </button>
+                        )}
 
-                      {isItemApproved && !isItemActive && activateFn && (
-                        <button
-                          type="button"
-                          onClick={() => activateFn?.(itemId)}
-                          disabled={isBusy || actionLoading === `${activateLoadingPrefix}${itemId}`}
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-white disabled:opacity-50 transition ${
-                            isBlueTheme ? "btn-bg hover:bg-blue-700" : "btn-bg hover:bg-blue-700"
-                          }`}
-                        >
-                          <ShieldCheck className="h-2.5 w-2.5" />
-                          <span>
-                            {actionLoading === `${activateLoadingPrefix}${itemId}` ? "..." : "Activate"}
-                          </span>
-                        </button>
-                      )}
+                        {isItemApproved && !isItemActive && activateFn && (
+                          <button
+                            type="button"
+                            onClick={() => activateFn?.(itemId)}
+                            disabled={
+                              isBusy ||
+                              actionLoading ===
+                                `${activateLoadingPrefix}${itemId}`
+                            }
+                            className="ui-btn-primary-sm"
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            <span>
+                              {actionLoading ===
+                              `${activateLoadingPrefix}${itemId}`
+                                ? "..."
+                                : "Activate"}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1900,7 +2148,11 @@ const InsCourseArtifacts = () => {
     try {
       setSavingCopoDelta(true);
       for (const [cellIdStr, delta] of Object.entries(copoDirtyCells)) {
-        await Models.copo.update_matrix_cell(currentCopo.copo_id, cellIdStr, delta);
+        await Models.copo.update_matrix_cell(
+          currentCopo.copo_id,
+          cellIdStr,
+          delta,
+        );
       }
       Success("CO-PO matrix delta changes saved successfully!");
       setCopoDirtyCells({});
@@ -1935,20 +2187,24 @@ const InsCourseArtifacts = () => {
     if (!currentPedagogy?.pedagogy_id) return;
     try {
       setSavingPedagogyTopic(true);
-      await Models.pedagogy.update_topic_suggestion(currentPedagogy.pedagogy_id, sugId, {
-        bloom_level_1: pedagogyDraft.bloom_level_1,
-        pedagogy_suggested_1: pedagogyDraft.pedagogy_suggested_1?.trim(),
-        description_1: pedagogyDraft.description_1?.trim() ?? undefined,
-        methodology_1: pedagogyDraft.methodology_1?.trim() ?? undefined,
-        bloom_level_2: pedagogyDraft.bloom_level_2,
-        pedagogy_suggested_2: pedagogyDraft.pedagogy_suggested_2?.trim(),
-        description_2: pedagogyDraft.description_2?.trim() ?? undefined,
-        methodology_2: pedagogyDraft.methodology_2?.trim() ?? undefined,
-        bloom_level_3: pedagogyDraft.bloom_level_3,
-        pedagogy_suggested_3: pedagogyDraft.pedagogy_suggested_3?.trim(),
-        description_3: pedagogyDraft.description_3?.trim() ?? undefined,
-        methodology_3: pedagogyDraft.methodology_3?.trim() ?? undefined,
-      });
+      await Models.pedagogy.update_topic_suggestion(
+        currentPedagogy.pedagogy_id,
+        sugId,
+        {
+          bloom_level_1: pedagogyDraft.bloom_level_1,
+          pedagogy_suggested_1: pedagogyDraft.pedagogy_suggested_1?.trim(),
+          description_1: pedagogyDraft.description_1?.trim() ?? undefined,
+          methodology_1: pedagogyDraft.methodology_1?.trim() ?? undefined,
+          bloom_level_2: pedagogyDraft.bloom_level_2,
+          pedagogy_suggested_2: pedagogyDraft.pedagogy_suggested_2?.trim(),
+          description_2: pedagogyDraft.description_2?.trim() ?? undefined,
+          methodology_2: pedagogyDraft.methodology_2?.trim() ?? undefined,
+          bloom_level_3: pedagogyDraft.bloom_level_3,
+          pedagogy_suggested_3: pedagogyDraft.pedagogy_suggested_3?.trim(),
+          description_3: pedagogyDraft.description_3?.trim() ?? undefined,
+          methodology_3: pedagogyDraft.methodology_3?.trim() ?? undefined,
+        },
+      );
       Success("Topic pedagogy strategies updated successfully!");
       setEditingPedagogyTopicId(null);
       await refreshCurrentVersion("pedagogy", currentPedagogy.pedagogy_id);
@@ -1961,7 +2217,8 @@ const InsCourseArtifacts = () => {
   };
 
   const formatMinutes = (hours: number | string | undefined | null) => {
-    if (hours === undefined || hours === null || hours === "") return "0 minutes";
+    if (hours === undefined || hours === null || hours === "")
+      return "0 minutes";
     const h = Number(hours);
     if (isNaN(h)) return `${hours}`;
     const mins = Math.round(h * 60);
@@ -1981,14 +2238,22 @@ const InsCourseArtifacts = () => {
     if (!currentLessonPlan?.lesson_plan_id) return;
     try {
       setSavingLpSlot(true);
-      await Models.lession_plan.update_topic_slot(currentLessonPlan.lesson_plan_id, slotId, {
-        time_allocated: Number(lpSlotDraft.time_allocated) || 1,
-        bloom_level: lpSlotDraft.bloom_level,
-        suggested_activity: lpSlotDraft.suggested_activity?.trim() ?? undefined,
-      });
+      await Models.lession_plan.update_topic_slot(
+        currentLessonPlan.lesson_plan_id,
+        slotId,
+        {
+          time_allocated: Number(lpSlotDraft.time_allocated) || 1,
+          bloom_level: lpSlotDraft.bloom_level,
+          suggested_activity:
+            lpSlotDraft.suggested_activity?.trim() ?? undefined,
+        },
+      );
       Success("Topic slot schedule updated successfully!");
       setEditingLpSlotId(null);
-      await refreshCurrentVersion("lesson_plan", currentLessonPlan.lesson_plan_id);
+      await refreshCurrentVersion(
+        "lesson_plan",
+        currentLessonPlan.lesson_plan_id,
+      );
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to update lesson plan slot"));
@@ -2010,14 +2275,22 @@ const InsCourseArtifacts = () => {
     if (!currentLessonPlan?.lesson_plan_id) return;
     try {
       setSavingLpSubtopicSlot(true);
-      await Models.lession_plan.update_subtopic_slot(currentLessonPlan.lesson_plan_id, subSlotId, {
-        time_allocated: Number(lpSubtopicSlotDraft.time_allocated) || 0.5,
-        bloom_level: lpSubtopicSlotDraft.bloom_level,
-        suggested_activity: lpSubtopicSlotDraft.suggested_activity?.trim() ?? undefined,
-      });
+      await Models.lession_plan.update_subtopic_slot(
+        currentLessonPlan.lesson_plan_id,
+        subSlotId,
+        {
+          time_allocated: Number(lpSubtopicSlotDraft.time_allocated) || 0.5,
+          bloom_level: lpSubtopicSlotDraft.bloom_level,
+          suggested_activity:
+            lpSubtopicSlotDraft.suggested_activity?.trim() ?? undefined,
+        },
+      );
       Success("Subtopic slot schedule updated successfully!");
       setEditingLpSubtopicSlotId(null);
-      await refreshCurrentVersion("lesson_plan", currentLessonPlan.lesson_plan_id);
+      await refreshCurrentVersion(
+        "lesson_plan",
+        currentLessonPlan.lesson_plan_id,
+      );
       fetchPortfolio(true);
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to update subtopic slot"));
@@ -2071,8 +2344,10 @@ const InsCourseArtifacts = () => {
       lecture_hours: currentExt?.lecture_hours ?? 0,
       tutorial_hours: currentExt?.tutorial_hours ?? 0,
       practical_hours: currentExt?.practical_hours ?? 0,
-      total_theory_hours: currentExt?.total_theory_hours ?? course?.total_theory_hours ?? 0,
-      total_lab_hours: currentExt?.total_lab_hours ?? course?.total_lab_hours ?? 0,
+      total_theory_hours:
+        currentExt?.total_theory_hours ?? course?.total_theory_hours ?? 0,
+      total_lab_hours:
+        currentExt?.total_lab_hours ?? course?.total_lab_hours ?? 0,
     });
     setEditingSection("hours");
   };
@@ -2102,7 +2377,9 @@ const InsCourseArtifacts = () => {
   };
 
   const startEditObjectives = () => {
-    setObjectivesDraft((currentExt?.objectives ?? []).map((o: any) => ({ ...o })));
+    setObjectivesDraft(
+      (currentExt?.objectives ?? []).map((o: any) => ({ ...o })),
+    );
     setEditingSection("objectives");
   };
 
@@ -2128,7 +2405,9 @@ const InsCourseArtifacts = () => {
     try {
       setSavingSection(true);
       const original = currentExt?.objectives ?? [];
-      const currentIds = new Set(objectivesDraft.filter((o) => !o.isNew).map((o) => o.id));
+      const currentIds = new Set(
+        objectivesDraft.filter((o) => !o.isNew).map((o) => o.id),
+      );
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
@@ -2167,8 +2446,10 @@ const InsCourseArtifacts = () => {
     setOutcomesDraft(
       (currentExt?.outcomes ?? []).map((co: any) => ({
         ...co,
-        knowledge_level: co.knowledge_level ?? (co.bloom_level ? `K2 - ${co.bloom_level}` : "K2 - Understand"),
-      }))
+        knowledge_level:
+          co.knowledge_level ??
+          (co.bloom_level ? `K2 - ${co.bloom_level}` : "K2 - Understand"),
+      })),
     );
     setEditingSection("outcomes");
   };
@@ -2197,7 +2478,9 @@ const InsCourseArtifacts = () => {
     try {
       setSavingSection(true);
       const original = currentExt?.outcomes ?? [];
-      const currentIds = new Set(outcomesDraft.filter((co) => !co.isNew).map((co) => co.id));
+      const currentIds = new Set(
+        outcomesDraft.filter((co) => !co.isNew).map((co) => co.id),
+      );
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
@@ -2207,7 +2490,9 @@ const InsCourseArtifacts = () => {
 
       for (const co of outcomesDraft) {
         const kLevel = co.knowledge_level ?? "K2 - Understand";
-        const bloomPart = kLevel.includes("-") ? kLevel.split("-")[1].trim() : kLevel;
+        const bloomPart = kLevel.includes("-")
+          ? kLevel.split("-")[1].trim()
+          : kLevel;
 
         if (co.isNew) {
           if (co.description?.trim()) {
@@ -2243,8 +2528,10 @@ const InsCourseArtifacts = () => {
     setTextbooksDraft(
       (currentExt?.textbooks ?? []).map((t: any) => ({
         ...t,
-        authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors ?? ""),
-      }))
+        authorsStr: Array.isArray(t.authors)
+          ? t.authors.join(", ")
+          : t.authors ?? "",
+      })),
     );
     setEditingSection("textbooks");
   };
@@ -2274,7 +2561,9 @@ const InsCourseArtifacts = () => {
     try {
       setSavingSection(true);
       const original = currentExt?.textbooks ?? [];
-      const currentIds = new Set(textbooksDraft.filter((t) => !t.isNew).map((t) => t.id));
+      const currentIds = new Set(
+        textbooksDraft.filter((t) => !t.isNew).map((t) => t.id),
+      );
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
@@ -2295,7 +2584,9 @@ const InsCourseArtifacts = () => {
               authors: authorsArr,
               publisher: t.publisher?.trim() ?? undefined,
               edition: t.edition?.trim() ?? undefined,
-              publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+              publication_year: t.publication_year
+                ? Number(t.publication_year)
+                : undefined,
             });
           }
         } else {
@@ -2304,7 +2595,9 @@ const InsCourseArtifacts = () => {
             authors: authorsArr,
             publisher: t.publisher?.trim() ?? undefined,
             edition: t.edition?.trim() ?? undefined,
-            publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+            publication_year: t.publication_year
+              ? Number(t.publication_year)
+              : undefined,
           });
         }
       }
@@ -2324,8 +2617,10 @@ const InsCourseArtifacts = () => {
     setReferenceBooksDraft(
       (currentExt?.reference_books ?? []).map((t: any) => ({
         ...t,
-        authorsStr: Array.isArray(t.authors) ? t.authors.join(", ") : (t.authors ?? ""),
-      }))
+        authorsStr: Array.isArray(t.authors)
+          ? t.authors.join(", ")
+          : t.authors ?? "",
+      })),
     );
     setEditingSection("reference_books");
   };
@@ -2355,7 +2650,9 @@ const InsCourseArtifacts = () => {
     try {
       setSavingSection(true);
       const original = currentExt?.reference_books ?? [];
-      const currentIds = new Set(referenceBooksDraft.filter((t) => !t.isNew).map((t) => t.id));
+      const currentIds = new Set(
+        referenceBooksDraft.filter((t) => !t.isNew).map((t) => t.id),
+      );
 
       for (const orig of original) {
         if (!currentIds.has(orig.id)) {
@@ -2376,7 +2673,9 @@ const InsCourseArtifacts = () => {
               authors: authorsArr,
               publisher: t.publisher?.trim() ?? undefined,
               edition: t.edition?.trim() ?? undefined,
-              publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+              publication_year: t.publication_year
+                ? Number(t.publication_year)
+                : undefined,
             });
           }
         } else {
@@ -2385,7 +2684,9 @@ const InsCourseArtifacts = () => {
             authors: authorsArr,
             publisher: t.publisher?.trim() ?? undefined,
             edition: t.edition?.trim() ?? undefined,
-            publication_year: t.publication_year ? Number(t.publication_year) : undefined,
+            publication_year: t.publication_year
+              ? Number(t.publication_year)
+              : undefined,
           });
         }
       }
@@ -2411,25 +2712,29 @@ const InsCourseArtifacts = () => {
     setModalForm(
       mode === "edit"
         ? {
-          unit_number: unit.unit_number ?? 1,
-          unit_title: unit.unit_title ?? "",
-          unit_overview: unit.unit_overview ?? "",
-          theory_hours: unit.theory_hours ?? 0,
-          lab_hours: unit.lab_hours ?? 0,
-          tutorial_hours: unit.tutorial_hours ?? 0,
-        }
+            unit_number: unit.unit_number ?? 1,
+            unit_title: unit.unit_title ?? "",
+            unit_overview: unit.unit_overview ?? "",
+            theory_hours: unit.theory_hours ?? 0,
+            lab_hours: unit.lab_hours ?? 0,
+            tutorial_hours: unit.tutorial_hours ?? 0,
+          }
         : {
-          unit_number: units.length + 1,
-          unit_title: "",
-          unit_overview: "",
-          theory_hours: 0,
-          lab_hours: 0,
-          tutorial_hours: 0,
-        }
+            unit_number: units.length + 1,
+            unit_title: "",
+            unit_overview: "",
+            theory_hours: 0,
+            lab_hours: 0,
+            tutorial_hours: 0,
+          },
     );
   };
 
-  const openTopicModal = (mode: "add" | "edit", unitId: number, topic?: any) => {
+  const openTopicModal = (
+    mode: "add" | "edit",
+    unitId: number,
+    topic?: any,
+  ) => {
     setHierarchyModal({
       type: "topic",
       mode,
@@ -2440,23 +2745,27 @@ const InsCourseArtifacts = () => {
     setModalForm(
       mode === "edit"
         ? {
-          topic_code: topic.topic_code ?? "",
-          topic_name: topic.topic_name ?? "",
-          topic_description: topic.topic_description ?? "",
-          knowledge_level: topic.knowledge_level ?? "K2 - Understand",
-          learning_sequence: topic.learning_sequence ?? 1,
-        }
+            topic_code: topic.topic_code ?? "",
+            topic_name: topic.topic_name ?? "",
+            topic_description: topic.topic_description ?? "",
+            knowledge_level: topic.knowledge_level ?? "K2 - Understand",
+            learning_sequence: topic.learning_sequence ?? 1,
+          }
         : {
-          topic_code: "",
-          topic_name: "",
-          topic_description: "",
-          knowledge_level: "K2 - Understand",
-          learning_sequence: 1,
-        }
+            topic_code: "",
+            topic_name: "",
+            topic_description: "",
+            knowledge_level: "K2 - Understand",
+            learning_sequence: 1,
+          },
     );
   };
 
-  const openSubtopicModal = (mode: "add" | "edit", topicId: number, subtopic?: any) => {
+  const openSubtopicModal = (
+    mode: "add" | "edit",
+    topicId: number,
+    subtopic?: any,
+  ) => {
     setHierarchyModal({
       type: "subtopic",
       mode,
@@ -2467,15 +2776,15 @@ const InsCourseArtifacts = () => {
     setModalForm(
       mode === "edit"
         ? {
-          subtopic_code: subtopic.subtopic_code ?? "",
-          subtopic_name: subtopic.subtopic_name ?? "",
-          subtopic_description: subtopic.subtopic_description ?? "",
-        }
+            subtopic_code: subtopic.subtopic_code ?? "",
+            subtopic_name: subtopic.subtopic_name ?? "",
+            subtopic_description: subtopic.subtopic_description ?? "",
+          }
         : {
-          subtopic_code: "",
-          subtopic_name: "",
-          subtopic_description: "",
-        }
+            subtopic_code: "",
+            subtopic_name: "",
+            subtopic_description: "",
+          },
     );
   };
 
@@ -2534,14 +2843,16 @@ const InsCourseArtifacts = () => {
           await Models.syllabus.addSubtopic(extId, topicId as number, {
             subtopic_code: modalForm.subtopic_code?.trim() ?? "",
             subtopic_name: modalForm.subtopic_name.trim(),
-            subtopic_description: modalForm.subtopic_description?.trim() ?? undefined,
+            subtopic_description:
+              modalForm.subtopic_description?.trim() ?? undefined,
           });
           Success("Subtopic created successfully!");
         } else {
           await Models.syllabus.updateSubtopic(extId, subtopicId as number, {
             subtopic_code: modalForm.subtopic_code?.trim() ?? undefined,
             subtopic_name: modalForm.subtopic_name?.trim() ?? undefined,
-            subtopic_description: modalForm.subtopic_description?.trim() ?? undefined,
+            subtopic_description:
+              modalForm.subtopic_description?.trim() ?? undefined,
           });
           Success("Subtopic updated successfully!");
         }
@@ -2560,7 +2871,11 @@ const InsCourseArtifacts = () => {
   const handleDeleteUnit = async (unitId: number) => {
     const extId = currentExt?.extractions_id;
     if (!extId) return;
-    if (!confirm("Are you sure you want to delete this Unit and all its topics and subtopics?"))
+    if (
+      !confirm(
+        "Are you sure you want to delete this Unit and all its topics and subtopics?",
+      )
+    )
       return;
     try {
       await Models.syllabus.deleteUnit(extId, unitId);
@@ -2575,7 +2890,10 @@ const InsCourseArtifacts = () => {
   const handleDeleteTopic = async (topicId: number) => {
     const extId = currentExt?.extractions_id;
     if (!extId) return;
-    if (!confirm("Are you sure you want to delete this Topic and its subtopics?")) return;
+    if (
+      !confirm("Are you sure you want to delete this Topic and its subtopics?")
+    )
+      return;
     try {
       await Models.syllabus.deleteTopic(extId, topicId);
       Success("Topic deleted successfully!");
@@ -2598,59 +2916,75 @@ const InsCourseArtifacts = () => {
     } catch (err: any) {
       Failure(getErrorMessage(err, "Failed to delete subtopic"));
     }
-  }; return (
-    <div className="min-h-screen space-y-3 pb-8">
-      {/* Compact Course Header Card */}
-      <div className=" p-3  dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col justify-between gap-2.5 sm:flex-row sm:items-center">
-          {/* Left: Back + Badges + Title */}
-          <div className="flex flex-wrap items-center gap-4 min-w-0">
+  };
+  return (
+    <div className="min-h-screen space-y-4 pb-10">
+      {/* Course Hero Header Card */}
+      <div className="ui-hero-card">
+        <img
+          src="/assets/images/neurobe/pageHeader/header-book.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-2 left-[57%] h-44 w-auto -translate-x-1/2 select-none object-contain opacity-90 dark:opacity-40 sm:h-52"
+        />
+        <div className="relative z-10 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          {/* Left: Back + Thumbnail + Title + Code Badge */}
+          <div className="flex min-w-0 items-center gap-3.5">
             <button
               type="button"
               onClick={() => router.push("/neurobe/my-assigned-courses")}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-gray-800 transition hover:border-slate-300 hover:bg-slate-100 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="ui-btn-icon shrink-0"
               title="Back to My Courses"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline font-semibold">Courses</span>
+              <ArrowLeft className="h-4 w-4" />
             </button>
 
-            
+            <img
+              src="/assets/images/neurobe/pageHeader/course-img.png"
+              alt={course.course_title ?? "Course"}
+              className="h-14 w-24 shrink-0 rounded-xl object-cover shadow-sm sm:h-24 sm:w-32"
+            />
 
-            {/* {isCoord ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-green-200/60 bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold text-green-800 dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-300">
-                <ShieldCheck className="h-3 w-3" />
-                Coordinator
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <h1 className="page-ti">
+                {course.course_title ?? "Course Artifacts"}
+              </h1>
+              <span className="ui-badge-code">
+                {course.course_code ?? "Course"}
               </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-md border border-green-200/60 bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold text-green-800 dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-300">
-                <UserCheck className="h-3 w-3" />
-                Instructor
-              </span>
-            )} */}
-
-            <h1 className="text-sm font-bold  text-slate-900 dark:text-white sm:text-base md:text-2xl truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">
-              {course.course_title ?? "Course Artifacts"}
-            </h1> 
-            <span className="rounded-md border border-blue-200/60 bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300">
-              {course.course_code ?? "Course"}
-            </span>
+              {isCoord ? (
+                <span className="ui-badge-success">
+                  <ShieldCheck className="h-3 w-3" />
+                  Coordinator
+                </span>
+              ) : (
+                <span className="ui-badge-info">
+                  <UserCheck className="h-3 w-3" />
+                  Instructor
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Right: Action Buttons */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {activeSyllabus && (
               <button
                 type="button"
                 onClick={() => setSplitScreenView(!splitScreenView)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border border-[#005bff] px-2.5 py-2 text-xs font-semibold shadow-xs transition ${splitScreenView
-                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/70 dark:text-blue-300"
-                    : "border-[#005bff] bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  }`}
-                title={splitScreenView ? "Close split screen view" : "View source document in split screen"}
+                className={`ui-btn-secondary ${
+                  splitScreenView
+                    ? "!border-indigo-400 !bg-indigo-50 !text-indigo-700 dark:!bg-indigo-950/60 dark:!text-indigo-300"
+                    : ""
+                }`}
+                title={
+                  splitScreenView
+                    ? "Close split screen view"
+                    : "View source document in split screen"
+                }
               >
-                <Columns className="h-4 w-4 text-color2" />
-                <span className="text-color2 font-semibold text-sm">{splitScreenView ? "Close Split" : "Split View"}</span>
+                <Columns className="h-4 w-4 text-color2 dark:text-indigo-400" />
+                <span>{splitScreenView ? "Close Split" : "Split View"}</span>
               </button>
             )}
 
@@ -2659,13 +2993,15 @@ const InsCourseArtifacts = () => {
                 type="button"
                 onClick={() => {
                   if (isExtractionBusy) {
-                    Failure("An extraction job is already in progress for this course.");
+                    Failure(
+                      "An extraction job is already in progress for this course.",
+                    );
                     return;
                   }
                   setShowUploadModal(true);
                 }}
                 disabled={isExtractionBusy}
-                className="inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 disabled:opacity-50 dark:bg-blue-500"
+                className="ui-btn-primary"
               >
                 {isExtractionBusy ? (
                   <>
@@ -2685,177 +3021,176 @@ const InsCourseArtifacts = () => {
               type="button"
               onClick={() => fetchPortfolio(true)}
               disabled={refreshing || loading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm font-semibold text-gray-800 shadow-xs transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="ui-btn-secondary"
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-blue-500" : ""}`} />
-              <span className="text-gray-800 font-semibold ">{refreshing ? "..." : "Refresh"}</span>
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  refreshing ? "animate-spin text-color2" : ""
+                }`}
+              />
+              <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
+            </button>
+
+            {isCoord &&
+              (activeTab === "syllabus" ||
+                activeTab === "copo" ||
+                activeTab === "pedagogy" ||
+                activeTab === "lesson_plan") && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedVersionHistory((prev) => ({
+                      ...prev,
+                      [activeTab]: !prev[activeTab],
+                    }))
+                  }
+                  className="ui-btn-icon"
+                  title="Toggle version history"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              )}
+          </div>
+        </div>
+
+        {jobNotice && (
+          <div className="mt-3 flex items-center justify-between gap-2.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3.5 py-2.5 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+            <div className="flex min-w-0 items-center gap-2">
+              <Sparkles className="h-4 w-4 shrink-0 text-indigo-500" />
+              <span className="truncate">{jobNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setJobNotice(null)}
+              className="shrink-0 px-1 text-slate-400 hover:text-slate-600"
+            >
+              ✕
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Compact Metadata Strip */}
-        <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2 text-xs text-gray-900 font-medium dark:border-slate-800 dark:text-slate-400">
-          {course.programme_name && <div className="flex items-center gap-1">
-            <GraduationCap className="h-3.5 w-3.5 text-gray-900" />
-            <span className="font-medium text-gray-900 dark:text-slate-300">{course.programme_name}</span>
-          </div>}
-         {course.semester   &&
-         <> <span className="inline-block h-1 w-1 rounded-full bg-gray-400 dark:bg-slate-600" />
-           <div className="flex items-center gap-1">
-            <Layers className="h-3.5 w-3.5 text-gray-900" />
-            <span className="text-gray-900 font-medium">{`Sem ${course.semester}`}</span>
+        {error && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
-          </>
-          }
-           {(course.total_theory_hours || course.credits || course.total_lab_hours) && <>
-           <span className="inline-block h-1 w-1 rounded-full bg-gray-400 dark:bg-slate-600" />
-         <div className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5 text-gray-900" />
-            <span className="font-medium text-gray-900">
-              {course.credits ?? 0} Credits ({course.total_theory_hours ?? 0}h Theory / {course.total_lab_hours ?? 0}h Lab)
-            </span>
-          </div>
-          </>
-          }
+        )}
 
-           {course.department_name &&  
-           <>
-          <span className="inline-block h-1 w-1 rounded-full bg-gray-400 dark:bg-slate-600" />
-         <div className="flex items-center gap-1">
-            <BookOpen className="h-3.5 w-3.5 text-gray-900" />
-            <span className="text-gray-900 font-medium">{course.department_name }</span>
-          </div>
-           </>
-           }
-        </div>
-      </div>
-
-      {jobNotice && (
-        <div className="flex items-center justify-between gap-2.5 rounded-xl border border-blue-200 bg-blue-50/80 p-2.5 text-xs text-blue-900 shadow-2xs dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-            <span className="truncate">{jobNotice}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setJobNotice(null)}
-            className="text-slate-400 hover:text-slate-600 shrink-0 px-1"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* High Density Pill Navigation Bar */}
-      <div className="!mt-1  border-b border-slate-200/80 dark:border-slate-800">
-        <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 pb-3">
+        {/* Pill Navigation Bar */}
+        <nav className="ui-tab-bar relative z-10">
           <button
             type="button"
             onClick={() => handleTabChange("dashboard")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "dashboard"
-               ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            className={`ui-tab-pill ${
+              activeTab === "dashboard"
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "dashboard" ?  "text-[#fff]" :  "text-gray-900 "}`}>Dashboard</span>
+            <LayoutDashboard  className={`${ activeTab === "dashboard" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>Dashboard</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("syllabus")}
-            className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition shrink-0 ${activeTab === "syllabus"
-                ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            className={`ui-tab-pill ${
+              activeTab === "syllabus"
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "syllabus" ?  "text-[#fff]" :  "text-gray-900 "}`}>1. Syllabus</span>
+            <BookOpen className={`${activeTab === "syllabus" ? "text-white" : "text-color2"} h-4 w-4` }/>
+            <span>1. Syllabus</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("copo")}
-            className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition shrink-0 ${activeTab === "copo"
-                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            className={`ui-tab-pill ${
+              activeTab === "copo" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "copo" ?  "text-[#fff]" :  "text-gray-900 "}`}>2. CO-PO</span>
+            <GraduationCap className={`${activeTab === "copo" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>2. CO-PO</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("copso")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "copso"
-                ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            className={`ui-tab-pill ${
+              activeTab === "copso" ? "ui-tab-pill-active" : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "copso" ?  "text-[#fff]" :  "text-gray-900 "}`}>2b. CO-PSO</span>
+            <Users className={`${ activeTab === "copso" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>2b. CO-PSO</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("pedagogy")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "pedagogy"
-                ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            className={`ui-tab-pill ${
+              activeTab === "pedagogy"
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "pedagogy" ?  "text-[#fff]" :  "text-gray-900 "}`}>3. Pedagogy</span>
+            <Presentation className={`${activeTab === "pedagogy" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>3. Pedagogy</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("lesson_plan")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${activeTab === "lesson_plan"
-                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+            className={`ui-tab-pill ${
+              activeTab === "lesson_plan"
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "lesson_plan" ?  "text-[#fff]" :  "text-gray-900 "}`}>4. Lesson Plan</span>
+            <Calendar className={`${ activeTab === "lesson_plan" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>4. Lesson Plan</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("mcq_generation")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+            className={`ui-tab-pill ${
               activeTab === "mcq_generation" || activeTab === "mcq_viva"
-               ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "mcq_generation" || activeTab === "mcq_viva" ?  "text-[#fff]" :  "text-gray-900 "}`}>5. MCQ & Viva</span>
+            <ClipboardList className={`${activeTab === "mcq_generation" || activeTab === "mcq_viva" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>5. MCQ & Viva</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("cia")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+            className={`ui-tab-pill ${
               activeTab === "cia" || activeTab === "cia_analytics"
-                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "cia" || activeTab === "cia_analytics"?  "text-[#fff]" :  "text-gray-900 "}`}>{isCoord ? "6. CIA Assessment" : "5. CIA Assessment"}</span>
+            <BarChart2 className={`${activeTab === "cia" || activeTab === "cia_analytics" ? "text-white" : "text-color2"} h-4 w-4` } />
+            <span>
+              {isCoord ? "6. CIA Assessment" : "5. CIA Assessment"}
+            </span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange("report")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold transition shrink-0 ${
+            className={`ui-tab-pill ${
               activeTab === "report"
-                 ? "btn-bg text-white shadow-xs dark:bg-blue-500"
-                : " hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
+                ? "ui-tab-pill-active"
+                : "ui-tab-pill-idle"
+            }`}
           >
-            <span className={`text-sm font-semibold ${activeTab === "report" ?  "text-[#fff]" :  "text-gray-900 "}`}>{isCoord ? "7. Report" : "6. Report"}</span>
+            <FileBarChart2 className={`${ activeTab === "report" ? "text-white" : "text-color2"}  h-4 w-4` }/>
+            <span>{isCoord ? "7. Report" : "6. Report"}</span>
           </button>
         </nav>
       </div>
@@ -2872,132 +3207,270 @@ const InsCourseArtifacts = () => {
             )}
 
             {activeTab === "syllabus" && (
-              <div className="space-y-3">
-                {renderVersionCards("syllabus")}
-
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0">
-                      <FileText className="h-5 w-5" />
+              <div className="space-y-4">
+                {/* Syllabus Version & Active File Strip */}
+                <div className="ui-card-compact flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-color2 dark:text-indigo-400" />
+                      <span className="card-ti">Syllabus</span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold leading-tight">
-                        {selectedVersionData.syllabus
-                          ? "Viewing Version File"
-                          : "Active Curriculum File"}
-                      </p>
-                      <h4 className="mt-0.5 text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white truncate">
-                        {activeSyllabus?.original_filename ?? "No syllabus uploaded"}
-                      </h4>
+
+                    {isCoord && versionsExtractions.length > 0 && (
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={
+                            selectedVersionData.syllabus?.extractions_id ??
+                            currentExt?.extractions_id ??
+                            ""
+                          }
+                          onChange={(e) => {
+                            const targetId =
+                              Number(e.target.value) || e.target.value;
+                            const targetVer = versionsExtractions.find(
+                              (v: any) => v.extractions_id == targetId,
+                            );
+                            if (!targetVer) return;
+                            if (targetVer.is_active) {
+                              setSelectedVersionData((prev) => ({
+                                ...prev,
+                                syllabus: undefined,
+                              }));
+                              loadSectionData("syllabus", true);
+                            } else {
+                              handleSelectVersionCard(
+                                "syllabus",
+                                targetVer,
+                                "extractions_id",
+                              );
+                            }
+                          }}
+                          disabled={loadingVersionDetail}
+                          className="ui-select h-8 cursor-pointer appearance-none py-1 pl-3 pr-8"
+                        >
+                          {versionsExtractions.map((ver: any) => (
+                            <option
+                              key={ver.extractions_id}
+                              value={ver.extractions_id}
+                            >
+                              v{ver.version_number} -{" "}
+                              {ver.is_active
+                                ? "Active"
+                                : ver.is_approved
+                                ? "Approved"
+                                : "Draft"}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400" />
+                      </div>
+                    )}
+
+                    {selectedVersionData.syllabus &&
+                      !selectedVersionData.syllabus.is_active && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVersionData((prev) => ({
+                              ...prev,
+                              syllabus: undefined,
+                            }));
+                            loadSectionData("syllabus", true);
+                          }}
+                          className="ui-btn-secondary-sm"
+                          title="Return to the active live version"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          <span>Back to Live</span>
+                        </button>
+                      )}
+
+                    <div className="hidden h-7 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
+
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-500 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="card-ti max-w-[220px] truncate sm:max-w-xs">
+                            {activeSyllabus?.original_filename ??
+                              "No syllabus uploaded"}
+                          </h4>
+                          {(currentExt?.is_approved ||
+                            currentExt?.is_active) && (
+                            <CheckCheck className="h-4 w-4 shrink-0 text-emerald-500" />
+                          )}
+                        </div>
+                        <p className="ui-muted-text">
+                          {activeSyllabus
+                            ? `PDF${
+                                activeSyllabus.created_at
+                                  ? ` • Updated on ${new Date(
+                                      activeSyllabus.created_at,
+                                    ).toLocaleDateString(undefined, {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}`
+                                  : ""
+                              }`
+                            : selectedVersionData.syllabus
+                            ? "Viewing Version File"
+                            : "Active Curriculum File"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {currentExt?.is_approved ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[13px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Extraction Approved
-                      </span>
-                    ) : currentExt ? (
-                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[13px] font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/50 dark:text-amber-400">
-                        Draft Extraction (v{currentExt.version_number})
-                      </span>
-                    ) : null}
-
                     {isCoord && currentExt && !currentExt.is_approved && (
                       <button
                         type="button"
-                        onClick={() => handleApproveExtraction(currentExt.extractions_id)}
-                        disabled={actionLoading === `approve_syllabus_${currentExt.extractions_id}`}
-                        className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                        onClick={() =>
+                          handleApproveExtraction(currentExt.extractions_id)
+                        }
+                        disabled={
+                          actionLoading ===
+                          `approve_syllabus_${currentExt.extractions_id}`
+                        }
+                        className="ui-btn-success-sm"
                       >
-                        {actionLoading === `approve_syllabus_${currentExt.extractions_id}`
-                          ? "Approving..."
-                          : "Approve Extraction"}
+                        <Check className="h-4 w-4" />
+                        <span>
+                          {actionLoading ===
+                          `approve_syllabus_${currentExt.extractions_id}`
+                            ? "Approving..."
+                            : "Approve Extraction"}
+                        </span>
                       </button>
                     )}
 
-                    {isCoord && currentExt && currentExt.is_approved && !currentExt.is_active && (
-                      <button
-                        type="button"
-                        onClick={() => handleActivateExtraction(currentExt.extractions_id)}
-                        disabled={actionLoading === `activate_syllabus_${currentExt.extractions_id}`}
-                        className="rounded-xl btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-95 disabled:opacity-50"
-                      >
-                        {actionLoading === `activate_syllabus_${currentExt.extractions_id}`
-                          ? "Activating..."
-                          : "Set as Active"}
-                      </button>
-                    )}
+                    {isCoord &&
+                      currentExt &&
+                      currentExt.is_approved &&
+                      !currentExt.is_active && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleActivateExtraction(currentExt.extractions_id)
+                          }
+                          disabled={
+                            actionLoading ===
+                            `activate_syllabus_${currentExt.extractions_id}`
+                          }
+                          className="ui-btn-primary-sm"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          <span>
+                            {actionLoading ===
+                            `activate_syllabus_${currentExt.extractions_id}`
+                              ? "Activating..."
+                              : "Set as Active"}
+                          </span>
+                        </button>
+                      )}
 
                     {activeSyllabus && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleDownloadSyllabus}
+                          className="ui-btn-icon"
+                          title="Download Syllabus File"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSplitScreenView(!splitScreenView)}
+                          className="ui-btn-secondary-sm"
+                          title={
+                            splitScreenView
+                              ? "Close Document View"
+                              : "View Syllabus Document"
+                          }
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span>{splitScreenView ? "Close" : "View"}</span>
+                        </button>
+                      </>
+                    )}
+
+                    {canEdit && editingSection !== "hours" && (
                       <button
                         type="button"
-                        onClick={() => setSplitScreenView(!splitScreenView)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-semibold shadow-xs transition ${splitScreenView
-                            ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300"
-                            : "border-slate-300/80 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                          }`}
+                        onClick={startEditHours}
+                        className="ui-btn-primary-sm"
                       >
-                        <Columns className="h-4 w-4 text-slate-700 dark:text-slate-300" />
-                        <span>
-                          {splitScreenView ? "Close Split View" : "Split View (Source Document)"}
-                        </span>
+                        <Edit2 className="h-4 w-4" />
+                        <span>Edit Hours</span>
                       </button>
                     )}
                   </div>
                 </div>
 
-                {(sectionLoading.syllabus || loadingVersionDetail) && !currentExt && (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Loading syllabus data...
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Fetching latest extraction details</p>
-                  </div>
-                )}
+                {renderVersionCards("syllabus", { hideBar: true })}
 
-                {!sectionLoading.syllabus && !loadingVersionDetail && (() => {
-                  const isCurrentBusy = isBusyState(currentExt?.current_state);
-                  const inProgressExt = versionsExtractions.find((e: any) =>
-                    isBusyState(e.current_state)
-                  );
+                {(sectionLoading.syllabus || loadingVersionDetail) &&
+                  !currentExt && (
+                    <div className="ui-card flex flex-col items-center justify-center py-8 text-center">
+                      <RefreshCw className="mb-2 h-6 w-6 animate-spin text-color2" />
+                      <p className="card-ti">
+                        Loading syllabus data...
+                      </p>
+                      <p className="ui-muted-text mt-1">
+                        Fetching latest extraction details
+                      </p>
+                    </div>
+                  )}
 
-                  if (isCurrentBusy) {
-                    return renderGenerationLoadingScreen(
-                      "Syllabus Curriculum",
-                      currentExt.current_state,
-                      currentExt.version_number
+                {!sectionLoading.syllabus &&
+                  !loadingVersionDetail &&
+                  (() => {
+                    const isCurrentBusy = isBusyState(
+                      currentExt?.current_state,
                     );
-                  }
-                  if (!currentExt && inProgressExt) {
-                    return renderGenerationLoadingScreen(
-                      "Syllabus Curriculum",
-                      inProgressExt.current_state,
-                      inProgressExt.version_number
+                    const inProgressExt = versionsExtractions.find((e: any) =>
+                      isBusyState(e.current_state),
                     );
-                  }
-                  return null;
-                })()}
+
+                    if (isCurrentBusy) {
+                      return renderGenerationLoadingScreen(
+                        "Syllabus Curriculum",
+                        currentExt.current_state,
+                        currentExt.version_number,
+                      );
+                    }
+                    if (!currentExt && inProgressExt) {
+                      return renderGenerationLoadingScreen(
+                        "Syllabus Curriculum",
+                        inProgressExt.current_state,
+                        inProgressExt.version_number,
+                      );
+                    }
+                    return null;
+                  })()}
 
                 {!sectionLoading.syllabus &&
                   !loadingVersionDetail &&
                   !currentExt &&
-                  !versionsExtractions.some((e: any) => isBusyState(e.current_state)) && (
-                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
+                  !versionsExtractions.some((e: any) =>
+                    isBusyState(e.current_state),
+                  ) && (
+                    <div className="ui-empty-state">
                       <FileText className="h-8 w-8 text-slate-400" />
-                      <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
+                      <h3 className="section-ti mt-2.5">
                         {isCoord
                           ? versionsExtractions.length > 0
                             ? "Select a Version to View"
                             : "No Syllabus Extracted Yet"
                           : "No Active Curriculum Available"}
                       </h3>
-                      <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                      <p className="section-mini-cap mt-1 max-w-sm">
                         {isCoord
                           ? versionsExtractions.length > 0
-                            ? "Click 'View' on any version card above to load and inspect curriculum details."
+                            ? "Select a version from the dropdown above or open All Versions to inspect curriculum details."
                             : "Upload a PDF or DOCX syllabus document above to initiate AI extraction of objectives, outcomes, and curriculum hierarchy."
                           : "The course coordinator has not yet activated a syllabus extraction for this course."}
                       </p>
@@ -3007,16 +3480,16 @@ const InsCourseArtifacts = () => {
                           onClick={() => {
                             if (isExtractionBusy) {
                               Failure(
-                                "An extraction job is already in progress for this course. Please wait for it to complete."
+                                "An extraction job is already in progress for this course. Please wait for it to complete.",
                               );
                               return;
                             }
                             setShowUploadModal(true);
                           }}
                           disabled={isExtractionBusy}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                          className="ui-btn-primary-sm mt-3"
                         >
-                          <Upload className="h-3.5 w-3.5" />
+                          <Upload className="h-4 w-4" />
                           <span>Upload Syllabus Document</span>
                         </button>
                       )}
@@ -3024,50 +3497,19 @@ const InsCourseArtifacts = () => {
                   )}
 
                 {currentExt && !isBusyState(currentExt.current_state) && (
-                  <div className="space-y-3">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-                          <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
-                            Curriculum Hours & Credits
-                          </h3>
-                        </div>
-
-                        {canEdit && editingSection !== "hours" && (
-                          <button
-                            type="button"
-                            onClick={startEditHours}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          >
-                            <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
-                            <span>Edit Hours</span>
-                          </button>
-                        )}
+                  <div className="space-y-4">
+                    {/* Overview & Credits */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <BarChart2 className="h-4 w-4 text-color2 dark:text-indigo-400" />
+                        <h3 className="section-ti">Overview & Credits</h3>
                       </div>
 
                       {editingSection === "hours" ? (
-                        <div className="mt-3 space-y-3">
-                          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                        <div className="ui-card space-y-3">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                             <div>
-                              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                Credits
-                              </label>
-                              <input
-                                type="number"
-                                min={0}
-                                value={hoursDraft.credits}
-                                onChange={(e) =>
-                                  setHoursDraft({
-                                    ...hoursDraft,
-                                    credits: Number(e.target.value),
-                                  })
-                                }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                              <label className="ui-label">
                                 Total Theory Hrs
                               </label>
                               <input
@@ -3080,13 +3522,11 @@ const InsCourseArtifacts = () => {
                                     total_theory_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="ui-input"
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                Total Lab Hrs
-                              </label>
+                              <label className="ui-label">Total Lab Hrs</label>
                               <input
                                 type="number"
                                 min={0}
@@ -3097,13 +3537,11 @@ const InsCourseArtifacts = () => {
                                     total_lab_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="ui-input"
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                Lecture Hrs
-                              </label>
+                              <label className="ui-label">Lecture Hrs</label>
                               <input
                                 type="number"
                                 min={0}
@@ -3114,13 +3552,11 @@ const InsCourseArtifacts = () => {
                                     lecture_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="ui-input"
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                Tutorial Hrs
-                              </label>
+                              <label className="ui-label">Tutorial Hrs</label>
                               <input
                                 type="number"
                                 min={0}
@@ -3131,13 +3567,11 @@ const InsCourseArtifacts = () => {
                                     tutorial_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="ui-input"
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                Practical Hrs
-                              </label>
+                              <label className="ui-label">Practical Hrs</label>
                               <input
                                 type="number"
                                 min={0}
@@ -3148,17 +3582,32 @@ const InsCourseArtifacts = () => {
                                     practical_hours: Number(e.target.value),
                                   })
                                 }
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                className="ui-input"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">Credits</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={hoursDraft.credits}
+                                onChange={(e) =>
+                                  setHoursDraft({
+                                    ...hoursDraft,
+                                    credits: Number(e.target.value),
+                                  })
+                                }
+                                className="ui-input"
                               />
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-end gap-2 pt-1.5">
+                          <div className="flex items-center justify-end gap-2 pt-1">
                             <button
                               type="button"
                               onClick={() => setEditingSection(null)}
                               disabled={savingSection}
-                              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                              className="ui-btn-secondary-sm"
                             >
                               Cancel
                             </button>
@@ -3166,81 +3615,110 @@ const InsCourseArtifacts = () => {
                               type="button"
                               onClick={saveHours}
                               disabled={savingSection}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                              className="ui-btn-success-sm"
                             >
-                              <Save className="h-3 w-3" />
-                              <span>{savingSection ? "Saving..." : "Save Hours"}</span>
+                              <Save className="h-4 w-4" />
+                              <span>
+                                {savingSection ? "Saving..." : "Save Hours"}
+                              </span>
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <Layers aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                          <div className="stat-card stat-card-indigo">
+                            <BookOpen
+                              aria-hidden="true"
+                              className="h-8 w-8 shrink-0 text-color2 dark:text-indigo-400"
+                            />
                             <div>
-                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
-                                {currentExt?.credits ?? course?.credits ?? 0}
+                              <p className="stat-value">
+                                {currentExt?.total_theory_hours ??
+                                  course?.total_theory_hours ??
+                                  0}
                               </p>
-                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Credits</p>
+                              <p className="stat-label">Theory Hours</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <BookOpen aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div className="stat-card stat-card-cyan">
+                            <Beaker
+                              aria-hidden="true"
+                              className="h-8 w-8 shrink-0 text-teal-600 dark:text-teal-400"
+                            />
                             <div>
-                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-blue-400">
-                                {currentExt?.total_theory_hours ?? course?.total_theory_hours ?? 0}
+                              <p className="stat-value">
+                                {currentExt?.total_lab_hours ??
+                                  course?.total_lab_hours ??
+                                  0}
                               </p>
-                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Theory Hours</p>
+                              <p className="stat-label">Lab Hours</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <Beaker aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-emerald-400" />
+                          <div className="stat-card stat-card-amber">
+                            <Monitor
+                              aria-hidden="true"
+                              className="h-8 w-8 shrink-0 text-amber-500 dark:text-amber-400"
+                            />
                             <div>
-                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-emerald-400">
-                                {currentExt?.total_lab_hours ?? course?.total_lab_hours ?? 0}
-                              </p>
-                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Lab Hours</p>
-                            </div>
-                          </div>
-                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <Monitor aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
-                            <div>
-                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
+                              <p className="stat-value">
                                 {currentExt?.lecture_hours ?? 0}
                               </p>
-                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Lecture (L)</p>
+                              <p className="stat-label">Lecture (L)</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <Users aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div className="stat-card stat-card-purple">
+                            <Users
+                              aria-hidden="true"
+                              className="h-8 w-8 shrink-0 text-purple-600 dark:text-purple-400"
+                            />
                             <div>
-                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
+                              <p className="stat-value">
                                 {currentExt?.tutorial_hours ?? 0}
                               </p>
-                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Tutorial (T)</p>
+                              <p className="stat-label">Tutorial (T)</p>
                             </div>
                           </div>
-                          <div className="flex min-h-[80px] items-center gap-5 rounded-xl border border-blue-200 bg-[#EFF6FF] px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/20">
-                            <Settings aria-hidden="true" className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div className="stat-card stat-card-emerald">
+                            <Settings
+                              aria-hidden="true"
+                              className="h-8 w-8 shrink-0 text-emerald-600 dark:text-emerald-400"
+                            />
                             <div>
-                              <p className="text-xl sm:text-[22px] font-bold leading-6 text-slate-900 dark:text-white">
+                              <p className="stat-value">
                                 {currentExt?.practical_hours ?? 0}
                               </p>
-                              <p className="mt-0.5 text-[12.5px] font-semibold leading-4 text-slate-700 dark:text-slate-300">Practical (P)</p>
+                              <p className="stat-label">Practical (P)</p>
+                            </div>
+                          </div>
+                          <div className="stat-card stat-card-rose">
+                            <Layers
+                              aria-hidden="true"
+                              className="h-8 w-8 shrink-0 text-color2 dark:text-indigo-400"
+                            />
+                            <div>
+                              <p className="stat-value">
+                                {currentExt?.credits ?? course?.credits ?? 0}
+                              </p>
+                              <p className="stat-label">Credits</p>
                             </div>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                      <div className="space-y-3 lg:col-span-1">
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <Award className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-                              <span className="font-bold">Course Objectives</span>
-                            </h3>
+                    {/* Two-Column Syllabus Grid */}
+                    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+                      {/* Left Column: Objectives, COs, Books */}
+                      <div className="space-y-4 lg:col-span-5">
+                        {/* Course Objectives */}
+                        <div className="ui-card">
+                          <div className="ui-card-header">
+                            <div className="flex items-center gap-2.5">
+                              <div className="ui-icon-badge">
+                                <Target className="h-4 w-4" />
+                              </div>
+                              <h3 className="section-ti">Course Objectives</h3>
+                            </div>
 
                             {canEdit && (
                               <div>
@@ -3249,36 +3727,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddObjectiveRow}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                                      className="ui-btn-secondary-sm"
                                       title="Add Objective"
                                     >
-                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      <Plus className="h-4 w-4" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveObjectives}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
+                                      className="ui-btn-success-sm"
                                     >
-                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Save className="h-4 w-4" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                      className="ui-btn-secondary-sm !px-2"
                                     >
-                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <X className="h-4 w-4" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditObjectives}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    className="ui-btn-secondary-sm"
                                   >
-                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
+                                    <Edit2 className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3287,11 +3765,11 @@ const InsCourseArtifacts = () => {
                           </div>
 
                           {editingSection === "objectives" ? (
-                            <div className="mt-3 space-y-3">
+                            <div className="mt-3 space-y-2.5">
                               {objectivesDraft.map((obj) => (
                                 <div
                                   key={obj.id}
-                                  className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 dark:border-slate-700 dark:bg-slate-800/40"
+                                  className="ui-subcard flex items-start gap-2"
                                 >
                                   <input
                                     type="number"
@@ -3301,11 +3779,13 @@ const InsCourseArtifacts = () => {
                                       const val = Number(e.target.value);
                                       setObjectivesDraft(
                                         objectivesDraft.map((o) =>
-                                          o.id === obj.id ? { ...o, objective_number: val } : o
-                                        )
+                                          o.id === obj.id
+                                            ? { ...o, objective_number: val }
+                                            : o,
+                                        ),
                                       );
                                     }}
-                                    className="w-12 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-blue-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                                    className="ui-input-sm !w-12 shrink-0 font-bold text-color2"
                                     placeholder="#"
                                   />
                                   <textarea
@@ -3315,44 +3795,50 @@ const InsCourseArtifacts = () => {
                                       const val = e.target.value;
                                       setObjectivesDraft(
                                         objectivesDraft.map((o) =>
-                                          o.id === obj.id ? { ...o, description: val } : o
-                                        )
+                                          o.id === obj.id
+                                            ? { ...o, description: val }
+                                            : o,
+                                        ),
                                       );
                                     }}
-                                    className="flex-1 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    className="ui-input-sm flex-1"
                                     placeholder="Objective description..."
                                   />
                                   <button
                                     type="button"
-                                    onClick={() => handleDeleteObjectiveRow(obj.id)}
-                                    className="mt-0.5 rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                    onClick={() =>
+                                      handleDeleteObjectiveRow(obj.id)
+                                    }
+                                    className="ui-btn-icon-danger mt-0.5"
                                     title="Delete Objective"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
+                                    <Trash2 className="h-4 w-4" />
                                   </button>
                                 </div>
                               ))}
                               {objectivesDraft.length === 0 && (
-                                <p className="text-center text-xs text-slate-400 py-3 italic">
-                                  No objectives. Click &apos;Add&apos; to create one.
+                                <p className="py-3 text-center text-xs italic text-slate-400">
+                                  No objectives. Click &apos;Add&apos; to create
+                                  one.
                                 </p>
                               )}
                             </div>
                           ) : (
-                            <ul className="mt-3 space-y-2.5">
-                              {(currentExt?.objectives ?? []).map((obj: any, idx: number) => (
-                                <li
-                                  key={idx}
-                                  className="flex items-start gap-2.5 text-[13.5px] font-medium text-slate-800 dark:text-slate-200"
-                                >
-                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-400">
-                                    {obj.objective_number ?? idx + 1}
-                                  </span>
-                                  <span className="leading-relaxed text-[#040e1d] text-sm font-medium dark:text-slate-200">{obj.description}</span>
-                                </li>
-                              ))}
-                              {(!currentExt?.objectives || currentExt.objectives.length === 0) && (
-                                <li className="text-[13px] text-slate-500 italic">
+                            <ul className="mt-3.5 space-y-2.5">
+                                {(currentExt?.objectives ?? []).map(
+                                (obj: any, idx: number) => (
+                                  <li
+                                    key={idx}
+                                    className="ui-body-text flex items-start gap-2.5"
+                                  >
+                                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" />
+                                    <span className="ui-body-text">{obj.description}</span>
+                                  </li>
+                                ),
+                              )}
+                              {(!currentExt?.objectives ||
+                                currentExt.objectives.length === 0) && (
+                                <li className="no-content-text">
                                   No specific objectives defined.
                                 </li>
                               )}
@@ -3360,12 +3846,17 @@ const InsCourseArtifacts = () => {
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
-                              <span className="font-bold">Course Outcomes (COs)</span>
-                            </h3>
+                        {/* Course Outcomes (COs) */}
+                        <div className="ui-card">
+                          <div className="ui-card-header">
+                            <div className="flex items-center gap-2.5">
+                              <div className="ui-icon-badge">
+                                <Layers className="h-4 w-4" />
+                              </div>
+                              <h3 className="section-ti">
+                                Course Outcomes (COs)
+                              </h3>
+                            </div>
 
                             {canEdit && (
                               <div>
@@ -3374,36 +3865,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddOutcomeRow}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                                      className="ui-btn-secondary-sm"
                                       title="Add Course Outcome"
                                     >
-                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      <Plus className="h-4 w-4" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveOutcomes}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
+                                      className="ui-btn-success-sm"
                                     >
-                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Save className="h-4 w-4" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                      className="ui-btn-secondary-sm !px-2"
                                     >
-                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <X className="h-4 w-4" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditOutcomes}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    className="ui-btn-secondary-sm"
                                   >
-                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
+                                    <Edit2 className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3414,10 +3905,7 @@ const InsCourseArtifacts = () => {
                           {editingSection === "outcomes" ? (
                             <div className="mt-3 space-y-3">
                               {outcomesDraft.map((co) => (
-                                <div
-                                  key={co.id}
-                                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40"
-                                >
+                                <div key={co.id} className="ui-subcard space-y-2">
                                   <div className="flex items-center justify-between gap-2">
                                     <input
                                       type="text"
@@ -3426,26 +3914,33 @@ const InsCourseArtifacts = () => {
                                         const val = e.target.value;
                                         setOutcomesDraft(
                                           outcomesDraft.map((item) =>
-                                            item.id === co.id ? { ...item, co_code: val } : item
-                                          )
+                                            item.id === co.id
+                                              ? { ...item, co_code: val }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-blue-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+                                      className="ui-input-sm !w-20 font-bold text-color2"
                                       placeholder="CO#"
                                     />
                                     <select
-                                      value={co.knowledge_level ?? "K2 - Understand"}
+                                      value={
+                                        co.knowledge_level ?? "K2 - Understand"
+                                      }
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         setOutcomesDraft(
                                           outcomesDraft.map((item) =>
                                             item.id === co.id
-                                              ? { ...item, knowledge_level: val }
-                                              : item
-                                          )
+                                              ? {
+                                                  ...item,
+                                                  knowledge_level: val,
+                                                }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                      className="ui-select flex-1 py-1"
                                     >
                                       {KNOWLEDGE_LEVELS.map((lvl) => (
                                         <option key={lvl} value={lvl}>
@@ -3455,11 +3950,13 @@ const InsCourseArtifacts = () => {
                                     </select>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteOutcomeRow(co.id)}
-                                      className="rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                      onClick={() =>
+                                        handleDeleteOutcomeRow(co.id)
+                                      }
+                                      className="ui-btn-icon-danger"
                                       title="Delete Outcome"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Trash2 className="h-4 w-4" />
                                     </button>
                                   </div>
                                   <textarea
@@ -3469,52 +3966,80 @@ const InsCourseArtifacts = () => {
                                       const val = e.target.value;
                                       setOutcomesDraft(
                                         outcomesDraft.map((item) =>
-                                          item.id === co.id ? { ...item, description: val } : item
-                                        )
+                                          item.id === co.id
+                                            ? { ...item, description: val }
+                                            : item,
+                                        ),
                                       );
                                     }}
-                                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    className="ui-input-sm"
                                     placeholder="Course outcome description..."
                                   />
                                 </div>
                               ))}
                               {outcomesDraft.length === 0 && (
-                                <p className="text-center text-xs text-slate-400 py-3 italic">
-                                  No course outcomes. Click &apos;Add&apos; to create one.
+                                <p className="py-3 text-center text-xs italic text-slate-400">
+                                  No course outcomes. Click &apos;Add&apos; to
+                                  create one.
                                 </p>
                               )}
                             </div>
                           ) : (
-                            <div className="mt-3 space-y-3">
-                              {(currentExt?.outcomes ?? []).map((co: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="rounded-xl border border-slate-200 bg-[#F8FAFC] p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40"
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="rounded-md bg-blue-50 px-2.5 py-0.5 text-[13px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
-                                      {co.co_code}
-                                    </span>
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {co.knowledge_level && (
-                                        <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/80 dark:text-blue-300">
-                                          {co.knowledge_level}
+                            <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+                              {(currentExt?.outcomes ?? []).map(
+                                (co: any, idx: number) => {
+                                  const bloomLower = (
+                                    co.bloom_level || ""
+                                  ).toLowerCase();
+                                  const bloomColor = bloomLower.includes(
+                                    "understand",
+                                  )
+                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                    : bloomLower.includes("apply")
+                                    ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                                    : bloomLower.includes("analy")
+                                    ? "bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
+                                    : bloomLower.includes("evaluat")
+                                    ? "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="flex items-start justify-between gap-3 py-3 first:pt-1 last:pb-0"
+                                    >
+                                      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                                        <span className="ui-badge-code shrink-0 py-1">
+                                          {co.co_code}
                                         </span>
-                                      )}
-                                      {co.bloom_level && (
-                                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/80 dark:text-emerald-300">
-                                          {co.bloom_level}
-                                        </span>
-                                      )}
+                                        <p className="ui-body-text">
+                                          {co.description}
+                                        </p>
+                                      </div>
+
+                                      <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                                        {co.knowledge_level && (
+                                          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                            {getShortKnowledgeCode(
+                                              co.knowledge_level,
+                                            )}
+                                          </span>
+                                        )}
+                                        {co.bloom_level && (
+                                          <span
+                                            className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${bloomColor}`}
+                                          >
+                                            {co.bloom_level}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <p className="mt-4 text-sm text-[#040e1d] font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
-                                    {co.description}
-                                  </p>
-                                </div>
-                              ))}
-                              {(!currentExt?.outcomes || currentExt.outcomes.length === 0) && (
-                                <p className="text-[13px] text-slate-500 italic">
+                                  );
+                                },
+                              )}
+                              {(!currentExt?.outcomes ||
+                                currentExt.outcomes.length === 0) && (
+                                <p className="no-content-text py-2">
                                   No course outcomes extracted.
                                 </p>
                               )}
@@ -3522,12 +4047,17 @@ const InsCourseArtifacts = () => {
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <BookOpen className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-                              <span className="font-bold">Prescribed Textbooks</span>
-                            </h3>
+                        {/* Prescribed Textbooks */}
+                        <div className="ui-card">
+                          <div className="ui-card-header">
+                            <div className="flex items-center gap-2.5">
+                              <div className="ui-icon-badge">
+                                <BookOpen className="h-4 w-4" />
+                              </div>
+                              <h3 className="section-ti">
+                                Prescribed Textbooks
+                              </h3>
+                            </div>
 
                             {canEdit && (
                               <div>
@@ -3536,36 +4066,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddTextbookRow}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                                      className="ui-btn-secondary-sm"
                                       title="Add Textbook"
                                     >
-                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      <Plus className="h-4 w-4" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveTextbooks}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
+                                      className="ui-btn-success-sm"
                                     >
-                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Save className="h-4 w-4" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                      className="ui-btn-secondary-sm !px-2"
                                     >
-                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <X className="h-4 w-4" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditTextbooks}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    className="ui-btn-secondary-sm"
                                   >
-                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
+                                    <Edit2 className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3576,10 +4106,7 @@ const InsCourseArtifacts = () => {
                           {editingSection === "textbooks" ? (
                             <div className="mt-3 space-y-3">
                               {textbooksDraft.map((t) => (
-                                <div
-                                  key={t.id}
-                                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40"
-                                >
+                                <div key={t.id} className="ui-subcard space-y-2">
                                   <div className="flex items-center justify-between gap-2">
                                     <input
                                       type="text"
@@ -3588,20 +4115,24 @@ const InsCourseArtifacts = () => {
                                         const val = e.target.value;
                                         setTextbooksDraft(
                                           textbooksDraft.map((item) =>
-                                            item.id === t.id ? { ...item, title: val } : item
-                                          )
+                                            item.id === t.id
+                                              ? { ...item, title: val }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                      className="ui-input-sm flex-1 font-semibold"
                                       placeholder="Book Title"
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteTextbookRow(t.id)}
-                                      className="rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                      onClick={() =>
+                                        handleDeleteTextbookRow(t.id)
+                                      }
+                                      className="ui-btn-icon-danger"
                                       title="Delete Textbook"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Trash2 className="h-4 w-4" />
                                     </button>
                                   </div>
                                   <input
@@ -3611,11 +4142,13 @@ const InsCourseArtifacts = () => {
                                       const val = e.target.value;
                                       setTextbooksDraft(
                                         textbooksDraft.map((item) =>
-                                          item.id === t.id ? { ...item, authorsStr: val } : item
-                                        )
+                                          item.id === t.id
+                                            ? { ...item, authorsStr: val }
+                                            : item,
+                                        ),
                                       );
                                     }}
-                                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                    className="ui-input-sm"
                                     placeholder="Authors (comma-separated)"
                                   />
                                   <div className="grid grid-cols-2 gap-2">
@@ -3626,11 +4159,13 @@ const InsCourseArtifacts = () => {
                                         const val = e.target.value;
                                         setTextbooksDraft(
                                           textbooksDraft.map((item) =>
-                                            item.id === t.id ? { ...item, publisher: val } : item
-                                          )
+                                            item.id === t.id
+                                              ? { ...item, publisher: val }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                      className="ui-input-sm"
                                       placeholder="Publisher"
                                     />
                                     <input
@@ -3641,53 +4176,66 @@ const InsCourseArtifacts = () => {
                                         setTextbooksDraft(
                                           textbooksDraft.map((item) =>
                                             item.id === t.id
-                                              ? { ...item, publication_year: val }
-                                              : item
-                                          )
+                                              ? {
+                                                  ...item,
+                                                  publication_year: val,
+                                                }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                      className="ui-input-sm"
                                       placeholder="Year"
                                     />
                                   </div>
                                 </div>
                               ))}
                               {textbooksDraft.length === 0 && (
-                                <p className="text-center text-xs text-slate-400 py-3 italic">
-                                  No textbooks. Click &apos;Add&apos; to record one.
+                                <p className="py-3 text-center text-xs italic text-slate-400">
+                                  No textbooks. Click &apos;Add&apos; to record
+                                  one.
                                 </p>
                               )}
                             </div>
                           ) : (
                             <div className="mt-3 space-y-2.5">
-                              {(currentExt?.textbooks ?? []).map((b: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3 dark:border-slate-800 dark:bg-slate-800/40"
-                                >
-                                  <p className="text-[13.5px] sm:text-sm font-semibold text-slate-900 dark:text-white leading-snug">
-                                    {b.title}
-                                  </p>
-                                  <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-                                    {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
-                                    {b.publisher ? `— ${b.publisher}` : ""}{" "}
-                                    {b.publication_year ? `(${b.publication_year})` : ""}
-                                  </p>
-                                </div>
-                              ))}
-                              {(!currentExt?.textbooks || currentExt.textbooks.length === 0) && (
-                                <p className="text-[13px] text-slate-500 italic">No textbooks recorded.</p>
+                              {(currentExt?.textbooks ?? []).map(
+                                (b: any, idx: number) => (
+                                  <div key={idx} className="ui-subcard">
+                                    <p className="card-ti">
+                                      {b.title}
+                                    </p>
+                                    <p className="ui-muted-text mt-1">
+                                      {Array.isArray(b.authors)
+                                        ? b.authors.join(", ")
+                                        : b.authors}{" "}
+                                      {b.publisher ? `— ${b.publisher}` : ""}{" "}
+                                      {b.publication_year
+                                        ? `(${b.publication_year})`
+                                        : ""}
+                                    </p>
+                                  </div>
+                                ),
+                              )}
+                              {(!currentExt?.textbooks ||
+                                currentExt.textbooks.length === 0) && (
+                                <p className="no-content-text">
+                                  No textbooks recorded.
+                                </p>
                               )}
                             </div>
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                            <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <BookOpen className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-                              <span className="font-bold">Reference Books</span>
-                            </h3>
+                        {/* Reference Books */}
+                        <div className="ui-card">
+                          <div className="ui-card-header">
+                            <div className="flex items-center gap-2.5">
+                              <div className="ui-icon-badge">
+                                <BookOpen className="h-4 w-4" />
+                              </div>
+                              <h3 className="section-ti">Reference Books</h3>
+                            </div>
 
                             {canEdit && (
                               <div>
@@ -3696,36 +4244,36 @@ const InsCourseArtifacts = () => {
                                     <button
                                       type="button"
                                       onClick={handleAddReferenceBookRow}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                                      className="ui-btn-secondary-sm"
                                       title="Add Reference Book"
                                     >
-                                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      <Plus className="h-4 w-4" />
                                       <span>Add</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={saveReferenceBooks}
                                       disabled={savingSection}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-50"
+                                      className="ui-btn-success-sm"
                                     >
-                                      <Save className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Save className="h-4 w-4" />
                                       <span>Save</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingSection(null)}
-                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                      className="ui-btn-secondary-sm !px-2"
                                     >
-                                      <X className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <X className="h-4 w-4" />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={startEditReferenceBooks}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-[13px] font-semibold text-slate-900 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    className="ui-btn-secondary-sm"
                                   >
-                                    <Edit2 className="h-3.5 w-3.5 stroke-[2.25] text-blue-600 dark:text-blue-400" />
+                                    <Edit2 className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                                     <span>Edit</span>
                                   </button>
                                 )}
@@ -3736,10 +4284,7 @@ const InsCourseArtifacts = () => {
                           {editingSection === "reference_books" ? (
                             <div className="mt-3 space-y-3">
                               {referenceBooksDraft.map((t) => (
-                                <div
-                                  key={t.id}
-                                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40"
-                                >
+                                <div key={t.id} className="ui-subcard space-y-2">
                                   <div className="flex items-center justify-between gap-2">
                                     <input
                                       type="text"
@@ -3748,20 +4293,24 @@ const InsCourseArtifacts = () => {
                                         const val = e.target.value;
                                         setReferenceBooksDraft(
                                           referenceBooksDraft.map((item) =>
-                                            item.id === t.id ? { ...item, title: val } : item
-                                          )
+                                            item.id === t.id
+                                              ? { ...item, title: val }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                      className="ui-input-sm flex-1 font-semibold"
                                       placeholder="Reference Book Title"
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteReferenceBookRow(t.id)}
-                                      className="rounded-lg border border-rose-200 bg-rose-50/80 p-1.5 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                                      onClick={() =>
+                                        handleDeleteReferenceBookRow(t.id)
+                                      }
+                                      className="ui-btn-icon-danger"
                                       title="Delete Reference Book"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
+                                      <Trash2 className="h-4 w-4" />
                                     </button>
                                   </div>
                                   <input
@@ -3771,11 +4320,13 @@ const InsCourseArtifacts = () => {
                                       const val = e.target.value;
                                       setReferenceBooksDraft(
                                         referenceBooksDraft.map((item) =>
-                                          item.id === t.id ? { ...item, authorsStr: val } : item
-                                        )
+                                          item.id === t.id
+                                            ? { ...item, authorsStr: val }
+                                            : item,
+                                        ),
                                       );
                                     }}
-                                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                    className="ui-input-sm"
                                     placeholder="Authors (comma-separated)"
                                   />
                                   <div className="grid grid-cols-2 gap-2">
@@ -3786,11 +4337,13 @@ const InsCourseArtifacts = () => {
                                         const val = e.target.value;
                                         setReferenceBooksDraft(
                                           referenceBooksDraft.map((item) =>
-                                            item.id === t.id ? { ...item, publisher: val } : item
-                                          )
+                                            item.id === t.id
+                                              ? { ...item, publisher: val }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                      className="ui-input-sm"
                                       placeholder="Publisher"
                                     />
                                     <input
@@ -3801,281 +4354,378 @@ const InsCourseArtifacts = () => {
                                         setReferenceBooksDraft(
                                           referenceBooksDraft.map((item) =>
                                             item.id === t.id
-                                              ? { ...item, publication_year: val }
-                                              : item
-                                          )
+                                              ? {
+                                                  ...item,
+                                                  publication_year: val,
+                                                }
+                                              : item,
+                                          ),
                                         );
                                       }}
-                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                      className="ui-input-sm"
                                       placeholder="Year"
                                     />
                                   </div>
                                 </div>
                               ))}
                               {referenceBooksDraft.length === 0 && (
-                                <p className="text-center text-xs text-slate-400 py-3 italic">
-                                  No reference books. Click &apos;Add&apos; to record one.
+                                <p className="py-3 text-center text-xs italic text-slate-400">
+                                  No reference books. Click &apos;Add&apos; to
+                                  record one.
                                 </p>
                               )}
                             </div>
                           ) : (
                             <div className="mt-3 space-y-2.5">
-                              {(currentExt?.reference_books ?? []).map((b: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3 dark:border-slate-800 dark:bg-slate-800/40"
-                                >
-                                  <p className="text-[13.5px] sm:text-sm font-semibold text-slate-900 dark:text-white leading-snug">
-                                    {b.title}
-                                  </p>
-                                  <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-                                    {Array.isArray(b.authors) ? b.authors.join(", ") : b.authors}{" "}
-                                    {b.publisher ? `— ${b.publisher}` : ""}{" "}
-                                    {b.publication_year ? `(${b.publication_year})` : ""}
-                                  </p>
-                                </div>
-                              ))}
+                              {(currentExt?.reference_books ?? []).map(
+                                (b: any, idx: number) => (
+                                  <div key={idx} className="ui-subcard">
+                                    <p className="card-ti">
+                                      {b.title}
+                                    </p>
+                                    <p className="ui-muted-text mt-1">
+                                      {Array.isArray(b.authors)
+                                        ? b.authors.join(", ")
+                                        : b.authors}{" "}
+                                      {b.publisher ? `— ${b.publisher}` : ""}{" "}
+                                      {b.publication_year
+                                        ? `(${b.publication_year})`
+                                        : ""}
+                                    </p>
+                                  </div>
+                                ),
+                              )}
                               {(!currentExt?.reference_books ||
                                 currentExt.reference_books.length === 0) && (
-                                  <p className="text-[13px] text-slate-500 italic">
-                                    No reference books recorded.
-                                  </p>
-                                )}
+                                <p className="no-content-text">
+                                  No reference books recorded.
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="space-y-3 lg:col-span-2">
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                            <div>
-                              <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
-                                Curriculum Hierarchy (Units, Topics & Subtopics)
-                              </h3>
-                              <p className="mt-0.5 text-[13px] font-medium text-slate-600 dark:text-slate-400">
-                                {units.length} Units &bull; Structured hierarchical teaching units
-                              </p>
+                      {/* Right Column: Curriculum Hierarchy */}
+                      <div className="space-y-4 lg:col-span-7">
+                        <div className="ui-card">
+                          <div className="flex flex-wrap items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-3">
+                              <BookOpen className="h-5 w-5 shrink-0 text-color2 dark:text-indigo-400" />
+                              <div>
+                                <h3 className="section-ti">
+                                  Curriculum Hierarchy (Units, Topics &
+                                  Subtopics)
+                                </h3>
+                                <p className="section-mini-cap">
+                                  {units.length} Units &bull; Structured
+                                  hierarchical teaching units
+                                </p>
+                              </div>
                             </div>
 
                             {canEdit && (
                               <button
                                 type="button"
                                 onClick={() => openUnitModal("add")}
-                                className="inline-flex items-center gap-1.5 rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 dark:bg-blue-500"
+                                className="ui-btn-primary-sm"
                               >
-                                <Plus className="h-4 w-4 stroke-[2.5]" />
+                                <Plus className="h-4 w-4" />
                                 <span>Add Unit</span>
                               </button>
                             )}
                           </div>
 
-                          <div className="mt-3 space-y-3">
-                            {units.map((u: any, uIdx: number) => (
-                              <div
-                                key={u.id ?? uIdx}
-                                className="rounded-xl border border-blue-200/80 bg-[#EAF2FF] p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40"
-                              >
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2.5">
-                                      <span className="rounded-md btn-bg px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:bg-blue-500">
+                          <div className="mt-4 space-y-4">
+                            {units.map((u: any, uIdx: number) => {
+                              const unitKey = u.id ?? uIdx;
+                              const isCollapsed = Boolean(
+                                collapsedUnits[unitKey],
+                              );
+                              return (
+                                <div key={unitKey} className="bg-white p-2 space-y-3">
+                                  <div className="unit-header-bar">
+                                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          toggleUnitCollapse(unitKey)
+                                        }
+                                        className="rounded-md p-1 text-white/90 transition hover:bg-white/15 hover:text-white"
+                                        title={
+                                          isCollapsed
+                                            ? "Expand Unit"
+                                            : "Collapse Unit"
+                                        }
+                                      >
+                                        {isCollapsed ? (
+                                          <ChevronDown className="h-4 w-4" />
+                                        ) : (
+                                          <ChevronUp className="h-4 w-4" />
+                                        )}
+                                      </button>
+                                      <span className="shrink-0 rounded-full bg-white px-3.5 py-0.5 text-xs font-bold !text-slate-900 shadow-sm">
                                         Unit {u.unit_number}
                                       </span>
-                                      <h4 className="text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white">
+                                      <h4 className="truncate text-xs font-bold uppercase tracking-wide !text-white sm:text-[13px]">
                                         {u.unit_title}
                                       </h4>
                                     </div>
-                                    {u.unit_overview && (
-                                      <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed max-w-xl">
-                                        {u.unit_overview}
-                                      </p>
-                                    )}
-                                  </div>
 
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="rounded-md border border-slate-300/80 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                                      {u.theory_hours ?? 0} Th / {u.lab_hours ?? 0} Lab
-                                    </span>
-
-                                    {canEdit && (
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => openTopicModal("add", u.id)}
-                                          className="inline-flex items-center gap-1 rounded-lg border border-blue-300/80 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 shadow-2xs transition hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
-                                          title="Add Topic to this Unit"
-                                        >
-                                          <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                                          <span>Add Topic</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => openUnitModal("edit", u)}
-                                          className="rounded-lg border border-slate-300 bg-white p-1.5 text-blue-600 shadow-2xs transition hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
-                                          title="Edit Unit"
-                                        >
-                                          <Edit2 className="h-3.5 w-3.5 stroke-[2.25]" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteUnit(u.id)}
-                                          className="rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-rose-600 shadow-2xs transition hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
-                                          title="Delete Unit"
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 space-y-2">
-                                  {(u.topics ?? []).map((t: any, tIdx: number) => (
-                                    <div
-                                      key={t.id ?? tIdx}
-                                      className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800"
-                                    >
-                                      <div className="flex flex-wrap items-center justify-between gap-1.5">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-[13.5px] sm:text-sm text-slate-900 dark:text-white">
-                                            {t.topic_code ? `${t.topic_code} : ` : ""}
-                                            {t.topic_name}
-                                          </span>
-                                          {t.knowledge_level && (
-                                            <span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                                              {t.knowledge_level}
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      <span className="shrink-0 rounded-full bg-white px-3.5 py-0.5 text-xs font-bold !text-slate-900 shadow-sm">
+                                        {u.theory_hours ?? 0} Th /{" "}
+                                        {u.lab_hours ?? 0} Lab
+                                      </span>
+                                      {canEdit && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openTopicModal("add", u.id)
+                                            }
+                                            className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold !text-white transition hover:bg-white/25"
+                                            title="Add Topic to this Unit"
+                                          >
+                                            <Plus className="h-3 w-3" />
+                                            <span className="!text-white">
+                                              Add Topic
                                             </span>
-                                          )}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openUnitModal("edit", u)
+                                            }
+                                            className="rounded-lg p-1.5 text-white/90 transition hover:bg-white/15 hover:text-white"
+                                            title="Edit Unit"
+                                          >
+                                            <Edit2 className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleDeleteUnit(u.id)
+                                            }
+                                            className="rounded-lg p-1.5 text-white/90 transition hover:bg-rose-500/40 hover:text-white"
+                                            title="Delete Unit"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {!isCollapsed && (
+                                    <div className="space-y-2.5">
+                                      {u.unit_overview && (
+                                        <div className="rounded-xl border border-indigo-100/80 bg-indigo-50/40 px-4 py-2 text-xs font-medium text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                                          {u.unit_overview}
                                         </div>
-
-                                        {canEdit && (
-                                          <div className="flex items-center gap-1.5">
-                                            <button
-                                              type="button"
-                                              onClick={() => openSubtopicModal("add", t.id)}
-                                              className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
-                                              title="Add Subtopic under this Topic"
-                                            >
-                                              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                                              <span>Subtopic</span>
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openTopicModal("edit", u.id, t)}
-                                              className="rounded-md border border-slate-200 bg-slate-50 p-1.5 text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
-                                              title="Edit Topic"
-                                            >
-                                              <Edit2 className="h-3.5 w-3.5 stroke-[2.25]" />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleDeleteTopic(t.id)}
-                                              className="rounded-md border border-rose-200 bg-rose-50/70 p-1.5 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
-                                              title="Delete Topic"
-                                            >
-                                              <Trash2 className="h-3.5 w-3.5 stroke-[2.25]" />
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {t.topic_description && (
-                                        <p className="mt-1 text-[13px] font-medium text-slate-600 dark:text-slate-300">
-                                          {t.topic_description}
-                                        </p>
                                       )}
 
-                                      <div className="mt-2 ml-2 border-l-2 border-blue-300 pl-3 space-y-1.5 dark:border-blue-900/60">
-                                        {(t.subtopics ?? []).map((st: any, stIdx: number) => (
-                                          <div
-                                            key={st.id ?? stIdx}
-                                            className="group flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2.5 py-1.5 text-[13px] transition hover:bg-slate-100 dark:bg-slate-855/60 dark:hover:bg-slate-850"
-                                          >
-                                            <div className="flex items-center gap-2">
-                                              <span className="h-1.5 w-1.5 shrink-0 rounded-full btn-bg" />
-                                              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                                                {st.subtopic_code ? `${st.subtopic_code} : ` : ""}
-                                                {st.subtopic_name}
-                                              </span>
-                                              {st.subtopic_description && (
-                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                                  — {st.subtopic_description}
-                                                </span>
-                                              )}
-                                            </div>
+                                      {(u.topics ?? []).map(
+                                        (t: any, tIdx: number) => {
+                                          const topicHours =
+                                            t.hours ??
+                                            t.estimated_hours ??
+                                            t.theory_hours;
+                                          return (
+                                            <div
+                                              key={t.id ?? tIdx}
+                                              className="ui-card"
+                                            >
+                                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                                <div className="flex min-w-0 flex-1 items-start gap-3">
+                                                  <Network className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                                                  <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                      <span className="card-ti">
+                                                        {t.topic_code
+                                                          ? `${t.topic_code}  `
+                                                          : ""}
+                                                        {t.topic_name}
+                                                      </span>
+                                                      {t.knowledge_level && (
+                                                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold !text-indigo-700 dark:bg-indigo-950/60 dark:!text-indigo-300">
+                                                          {t.knowledge_level}
+                                                        </span>
+                                                      )}
+                                                    </div>
 
-                                            {canEdit && (
-                                              <div className="flex items-center gap-1.5">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => openSubtopicModal("edit", t.id, st)}
-                                                  className="rounded-md border border-slate-200 bg-white p-1 text-blue-600 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
-                                                  title="Edit Subtopic"
-                                                >
-                                                  <Edit2 className="h-3 w-3 stroke-[2.25]" />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleDeleteSubtopic(st.id)}
-                                                  className="rounded-md border border-rose-200 bg-rose-50/80 p-1 text-rose-600 shadow-2xs transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
-                                                  title="Delete Subtopic"
-                                                >
-                                                  <Trash2 className="h-3 w-3 stroke-[2.25]" />
-                                                </button>
+                                                    {t.topic_description && (
+                                                      <p className="ui-muted-text mt-1">
+                                                        {t.topic_description}
+                                                      </p>
+                                                    )}
+
+                                                    {(t.subtopics?.length ??
+                                                      0) > 0 && (
+                                                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                                        {(
+                                                          t.subtopics ?? []
+                                                        ).map(
+                                                          (
+                                                            st: any,
+                                                            stIdx: number,
+                                                          ) => (
+                                                            <div
+                                                              key={
+                                                                st.id ?? stIdx
+                                                              }
+                                                              title={
+                                                                st.subtopic_description ||
+                                                                st.subtopic_name
+                                                              }
+                                                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2.5 py-1 text-[11px] font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50/40 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
+                                                            >
+                                                              <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                                                                {st.subtopic_code
+                                                                  ? `${st.subtopic_code}  `
+                                                                  : ""}
+                                                                {
+                                                                  st.subtopic_name
+                                                                }
+                                                              </span>
+                                                              {canEdit && (
+                                                                <span className="ml-1 inline-flex items-center gap-0.5 border-l border-slate-200 pl-1.5 dark:border-slate-700">
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                      openSubtopicModal(
+                                                                        "edit",
+                                                                        t.id,
+                                                                        st,
+                                                                      )
+                                                                    }
+                                                                    className="rounded p-0.5 text-slate-400 hover:text-color2"
+                                                                    title="Edit Subtopic"
+                                                                  >
+                                                                    <Edit2 className="h-3 w-3" />
+                                                                  </button>
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                      handleDeleteSubtopic(
+                                                                        st.id,
+                                                                      )
+                                                                    }
+                                                                    className="rounded p-0.5 text-slate-400 hover:text-rose-600"
+                                                                    title="Delete Subtopic"
+                                                                  >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                  </button>
+                                                                </span>
+                                                              )}
+                                                            </div>
+                                                          ),
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </div>
+
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                  {topicHours !== undefined &&
+                                                    topicHours !== null &&
+                                                    topicHours !== "" && (
+                                                      <span className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50/70 px-2.5 py-1 text-[11px] font-semibold !text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/50 dark:!text-indigo-300">
+                                                        <Clock className="h-3 w-3" />
+                                                        <span className="text-[11px] font-semibold !text-indigo-700 dark:!text-indigo-300">
+                                                          {topicHours} Hours
+                                                        </span>
+                                                      </span>
+                                                    )}
+                                                  {canEdit && (
+                                                    <>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          openSubtopicModal(
+                                                            "add",
+                                                            t.id,
+                                                          )
+                                                        }
+                                                        className="inline-flex items-center gap-1 rounded-full bg-slate-50/80 px-3 py-1 text-xs font-semibold text-[#203796] transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                                                        title="Add Subtopic under this Topic"
+                                                      >
+                                                        <Plus className="h-4 w-4" />
+                                                        <span>
+                                                          Add Subtopic
+                                                        </span>
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          openTopicModal(
+                                                            "edit",
+                                                            u.id,
+                                                            t,
+                                                          )
+                                                        }
+                                                        className="ui-btn-icon-edit"
+                                                        title="Edit Topic"
+                                                      >
+                                                        <Edit2 className="h-4 w-4 text-black" />
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          handleDeleteTopic(
+                                                            t.id,
+                                                          )
+                                                        }
+                                                        className="ui-btn-icon-danger !rounded-full !p-2"
+                                                        title="Delete Topic"
+                                                      >
+                                                        <Trash2 className="h-4 w-4" />
+                                                      </button>
+                                                    </>
+                                                  )}
+                                                </div>
                                               </div>
-                                            )}
-                                          </div>
-                                        ))}
+                                            </div>
+                                          );
+                                        },
+                                      )}
 
-                                        {(!t.subtopics || t.subtopics.length === 0) && (
-                                          <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 italic">
-                                            <span>No subtopics nested.</span>
-                                            {canEdit && (
-                                              <button
-                                                type="button"
-                                                onClick={() => openSubtopicModal("add", t.id)}
-                                                className="inline-flex items-center gap-0.5 rounded-md border border-blue-200 bg-blue-50/80 px-2 py-0.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300 not-italic"
-                                              >
-                                                + Add Subtopic
-                                              </button>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-
-                                  {(!u.topics || u.topics.length === 0) && (
-                                    <div className="rounded-lg border border-dashed border-slate-300 p-3 text-center text-[13px] font-medium text-slate-600 dark:border-slate-800">
-                                      <span>No topics in this unit yet.</span>
-                                      {canEdit && (
-                                        <button
-                                          type="button"
-                                          onClick={() => openTopicModal("add", u.id)}
-                                          className="ml-2 inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
-                                        >
-                                          Add Topic
-                                        </button>
+                                      {(!u.topics || u.topics.length === 0) && (
+                                        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3.5 text-center text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800">
+                                          <span>
+                                            No topics in this unit yet.
+                                          </span>
+                                          {canEdit && (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openTopicModal("add", u.id)
+                                              }
+                                              className="ui-btn-ghost ml-2"
+                                            >
+                                              + Add Topic
+                                            </button>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
                                   )}
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
 
                             {units.length === 0 && (
-                              <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center dark:border-slate-800">
-                                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+                              <div className="ui-empty-state">
+                                <p className="card-ti">
                                   No curriculum units recorded
                                 </p>
                                 {canEdit && (
                                   <button
                                     type="button"
                                     onClick={() => openUnitModal("add")}
-                                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700"
+                                    className="ui-btn-primary-sm mt-3"
                                   >
-                                    <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                                    <Plus className="h-4 w-4" />
                                     <span>Create First Unit</span>
                                   </button>
                                 )}
@@ -4091,18 +4741,25 @@ const InsCourseArtifacts = () => {
             )}
 
             {activeTab === "copo" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {renderVersionCards("copo")}
 
                 {!currentCopo && (
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                    <div>
-                      <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
-                        Course Outcome to Program Outcome (CO-PO) Correlation Matrix
-                      </h3>
-                      <p className="mt-0.5 text-[13px] font-medium text-slate-600 dark:text-slate-400">
-                        Accreditation correlation matrix (1 = Low, 2 = Medium, 3 = High, 0 = None)
-                      </p>
+                  <div className="ui-card-compact flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="ui-icon-badge">
+                        <GraduationCap className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="section-ti">
+                          Course Outcome to Program Outcome (CO-PO) Correlation
+                          Matrix
+                        </h3>
+                        <p className="section-mini-cap">
+                          Accreditation correlation matrix (1 = Low, 2 = Medium,
+                          3 = High, 0 = None)
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -4110,10 +4767,17 @@ const InsCourseArtifacts = () => {
                         <button
                           type="button"
                           onClick={openGenerateCopoModal}
-                          disabled={isCopoBusy || actionLoading === "generate_copo"}
-                          className="rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                          disabled={
+                            isCopoBusy || actionLoading === "generate_copo"
+                          }
+                          className="ui-btn-primary-sm"
                         >
-                          {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
+                          <Sparkles className="h-4 w-4" />
+                          <span>
+                            {isCopoBusy
+                              ? "Generating..."
+                              : "Generate CO-PO Mapping"}
+                          </span>
                         </button>
                       )}
                     </div>
@@ -4121,19 +4785,20 @@ const InsCourseArtifacts = () => {
                 )}
 
                 {Object.keys(copoDirtyCells).length > 0 && (
-                  <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-200">
+                  <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/80 p-3.5 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/50 dark:text-indigo-200">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span>
-                        You have <strong>{Object.keys(copoDirtyCells).length}</strong> unsaved matrix
-                        cell change(s).
+                      <Sparkles className="h-4 w-4 text-color2 dark:text-indigo-400" />
+                      <span className="ui-body-text">
+                        You have{" "}
+                        <strong>{Object.keys(copoDirtyCells).length}</strong>{" "}
+                        unsaved matrix cell change(s).
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setCopoDirtyCells({})}
-                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        className="ui-btn-secondary-sm"
                       >
                         Discard
                       </button>
@@ -4141,62 +4806,71 @@ const InsCourseArtifacts = () => {
                         type="button"
                         onClick={saveCopoDeltaChanges}
                         disabled={savingCopoDelta}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                        className="ui-btn-success-sm"
                       >
-                        <Save className="h-3 w-3" />
-                        <span>{savingCopoDelta ? "Saving..." : "Save Changes"}</span>
+                        <Save className="h-4 w-4" />
+                        <span>
+                          {savingCopoDelta ? "Saving..." : "Save Changes"}
+                        </span>
                       </button>
                     </div>
                   </div>
                 )}
 
-                {(sectionLoading.copo || loadingVersionDetail) && !currentCopo && (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Loading CO-PO matrix data...
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Fetching latest correlation matrix</p>
-                  </div>
-                )}
+                {(sectionLoading.copo || loadingVersionDetail) &&
+                  !currentCopo && (
+                    <div className="ui-card flex flex-col items-center justify-center py-8 text-center">
+                      <RefreshCw className="mb-2 h-6 w-6 animate-spin text-color2" />
+                      <p className="card-ti">Loading CO-PO matrix data...</p>
+                      <p className="ui-muted-text mt-1">
+                        Fetching latest correlation matrix
+                      </p>
+                    </div>
+                  )}
 
-                {!sectionLoading.copo && !loadingVersionDetail && (() => {
-                  const isCurrentBusy = isBusyState(currentCopo?.current_state);
-                  const inProgressCopo = versionsCopo.find((c: any) =>
-                    isBusyState(c.current_state)
-                  );
+                {!sectionLoading.copo &&
+                  !loadingVersionDetail &&
+                  (() => {
+                    const isCurrentBusy = isBusyState(
+                      currentCopo?.current_state,
+                    );
+                    const inProgressCopo = versionsCopo.find((c: any) =>
+                      isBusyState(c.current_state),
+                    );
 
-                  if (isCurrentBusy) {
-                    return renderGenerationLoadingScreen(
-                      "CO-PO Correlation Matrix",
-                      currentCopo.current_state,
-                      currentCopo.version_number
-                    );
-                  }
-                  if (!currentCopo && inProgressCopo) {
-                    return renderGenerationLoadingScreen(
-                      "CO-PO Correlation Matrix",
-                      inProgressCopo.current_state,
-                      inProgressCopo.version_number
-                    );
-                  }
-                  return null;
-                })()}
+                    if (isCurrentBusy) {
+                      return renderGenerationLoadingScreen(
+                        "CO-PO Correlation Matrix",
+                        currentCopo.current_state,
+                        currentCopo.version_number,
+                      );
+                    }
+                    if (!currentCopo && inProgressCopo) {
+                      return renderGenerationLoadingScreen(
+                        "CO-PO Correlation Matrix",
+                        inProgressCopo.current_state,
+                        inProgressCopo.version_number,
+                      );
+                    }
+                    return null;
+                  })()}
 
                 {!sectionLoading.copo &&
                   !loadingVersionDetail &&
                   !currentCopo &&
-                  !versionsCopo.some((c: any) => isBusyState(c.current_state)) && (
-                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
+                  !versionsCopo.some((c: any) =>
+                    isBusyState(c.current_state),
+                  ) && (
+                    <div className="ui-empty-state">
                       <Layers className="h-8 w-8 text-slate-400" />
-                      <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
+                      <h3 className="section-ti mt-2.5">
                         {isCoord
                           ? versionsCopo.length > 0
                             ? "Select a Version to View"
                             : "No CO-PO Mapping Generated"
                           : "No Active CO-PO Mapping Available"}
                       </h3>
-                      <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                      <p className="section-mini-cap mt-1 max-w-sm">
                         {isCoord
                           ? versionsCopo.length > 0
                             ? "Click 'View' on any version card above to load and inspect its correlation matrix."
@@ -4208,305 +4882,375 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={openGenerateCopoModal}
                           disabled={isCopoBusy}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                          className="ui-btn-primary-sm mt-3"
                         >
-                          <Sparkles className="h-3.5 w-3.5" />
+                          <Sparkles className="h-4 w-4" />
                           <span>Generate CO-PO Mapping</span>
                         </button>
                       )}
                     </div>
                   )}
 
-                {currentCopo && !isBusyState(currentCopo.current_state) && (() => {
-                  const entries = currentCopo.matrix_entries ?? [];
-                  const posMap = new Map<number, { po_id: number; po_code: string }>();
-                  const cosMap = new Map<
-                    number,
-                    { course_outcome_id: number; co_code: string; description?: string }
-                  >();
-                  const cellMap = new Map<string, any>();
-                  const extOutcomesMap = new Map<number, any>();
-                  (currentExt?.outcomes ?? []).forEach((o: any) => extOutcomesMap.set(o.id, o));
+                {currentCopo &&
+                  !isBusyState(currentCopo.current_state) &&
+                  (() => {
+                    const entries = currentCopo.matrix_entries ?? [];
+                    const posMap = new Map<
+                      number,
+                      { po_id: number; po_code: string }
+                    >();
+                    const cosMap = new Map<
+                      number,
+                      {
+                        course_outcome_id: number;
+                        co_code: string;
+                        description?: string;
+                      }
+                    >();
+                    const cellMap = new Map<string, any>();
+                    const extOutcomesMap = new Map<number, any>();
+                    (currentExt?.outcomes ?? []).forEach((o: any) =>
+                      extOutcomesMap.set(o.id, o),
+                    );
 
-                  entries.forEach((e: any) => {
-                    if (!posMap.has(e.po_id)) {
-                      posMap.set(e.po_id, {
-                        po_id: e.po_id,
-                        po_code: e.po_code ?? `PO${e.po_id}`,
-                      });
-                    }
-                    if (!cosMap.has(e.course_outcome_id)) {
-                      const extCo = extOutcomesMap.get(e.course_outcome_id);
-                      cosMap.set(e.course_outcome_id, {
-                        course_outcome_id: e.course_outcome_id,
-                        co_code: e.co_code ?? extCo?.co_code ?? `CO${e.course_outcome_id}`,
-                        description: e.co_description ?? extCo?.description,
-                      });
-                    }
-                    cellMap.set(`${e.course_outcome_id}_${e.po_id}`, e);
-                  });
+                    entries.forEach((e: any) => {
+                      if (!posMap.has(e.po_id)) {
+                        posMap.set(e.po_id, {
+                          po_id: e.po_id,
+                          po_code: e.po_code ?? `PO${e.po_id}`,
+                        });
+                      }
+                      if (!cosMap.has(e.course_outcome_id)) {
+                        const extCo = extOutcomesMap.get(e.course_outcome_id);
+                        cosMap.set(e.course_outcome_id, {
+                          course_outcome_id: e.course_outcome_id,
+                          co_code:
+                            e.co_code ??
+                            extCo?.co_code ??
+                            `CO${e.course_outcome_id}`,
+                          description: e.co_description ?? extCo?.description,
+                        });
+                      }
+                      cellMap.set(`${e.course_outcome_id}_${e.po_id}`, e);
+                    });
 
-                  const posList = Array.from(posMap.values()).sort((a, b) => {
-                    const numA = parseInt(a.po_code.replace(/\D/g, "")) || a.po_id;
-                    const numB = parseInt(b.po_code.replace(/\D/g, "")) || b.po_id;
-                    return numA - numB;
-                  });
+                    const posList = Array.from(posMap.values()).sort((a, b) => {
+                      const numA =
+                        parseInt(a.po_code.replace(/\D/g, "")) || a.po_id;
+                      const numB =
+                        parseInt(b.po_code.replace(/\D/g, "")) || b.po_id;
+                      return numA - numB;
+                    });
 
-                  const cosList = Array.from(cosMap.values()).sort((a, b) => {
-                    const numA = parseInt(a.co_code.replace(/\D/g, "")) || a.course_outcome_id;
-                    const numB = parseInt(b.co_code.replace(/\D/g, "")) || b.course_outcome_id;
-                    return numA - numB;
-                  });
+                    const cosList = Array.from(cosMap.values()).sort((a, b) => {
+                      const numA =
+                        parseInt(a.co_code.replace(/\D/g, "")) ||
+                        a.course_outcome_id;
+                      const numB =
+                        parseInt(b.co_code.replace(/\D/g, "")) ||
+                        b.course_outcome_id;
+                      return numA - numB;
+                    });
 
-                  const canEditMatrix = Boolean((isCoord || perms.can_edit) && currentCopo);
+                    const canEditMatrix = Boolean(
+                      (isCoord || perms.can_edit) && currentCopo,
+                    );
 
-                  return (
-                    <div className="space-y-3">
-                      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-x-auto">
-                        {/* Streamlined Header Bar */}
-                        <div className="space-y-1.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2.5">
-                              <h3 className="text-[15px] sm:text-base font-bold text-slate-900 dark:text-white">
-                                Course Outcome to Program Outcome (CO-PO) Correlation Matrix
-                              </h3>
-                              <span className="text-[13px] font-semibold text-slate-600 dark:text-slate-400">
-                                ({cosList.length} COs × {posList.length} POs)
-                              </span>
-                              {currentCopo?.is_approved ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-400">
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  Approved
+                    return (
+                      <div className="space-y-4">
+                        <div className="ui-card overflow-x-auto">
+                          {/* Streamlined Header Bar */}
+                          <div className="space-y-1.5 border-b border-slate-100 pb-3 dark:border-slate-800">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2.5">
+                                <div className="ui-icon-badge">
+                                  <GraduationCap className="h-4 w-4" />
+                                </div>
+                                <h3 className="section-ti">
+                                  Course Outcome to Program Outcome (CO-PO)
+                                  Correlation Matrix
+                                </h3>
+                                <span className="section-mini-cap">
+                                  ({cosList.length} COs × {posList.length} POs)
                                 </span>
-                              ) : (
-                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/50 dark:text-amber-400">
-                                  Draft Version {currentCopo?.version_number}
-                                </span>
-                              )}
+                                {currentCopo?.is_approved ? (
+                                  <span className="ui-badge-success">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Approved
+                                  </span>
+                                ) : (
+                                  <span className="ui-badge-warning">
+                                    Draft Version {currentCopo?.version_number}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                {isCoord && (
+                                  <button
+                                    type="button"
+                                    onClick={openGenerateCopoModal}
+                                    disabled={
+                                      isCopoBusy ||
+                                      actionLoading === "generate_copo"
+                                    }
+                                    className="ui-btn-primary-sm"
+                                  >
+                                    {isCopoBusy
+                                      ? "Generating..."
+                                      : "Generate CO-PO Mapping"}
+                                  </button>
+                                )}
+
+                                {isCoord &&
+                                  currentCopo &&
+                                  !currentCopo.is_approved && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleApproveCopo(currentCopo.copo_id)
+                                      }
+                                      disabled={
+                                        actionLoading ===
+                                        `approve_copo_${currentCopo.copo_id}`
+                                      }
+                                      className="ui-btn-success-sm"
+                                    >
+                                      {actionLoading ===
+                                      `approve_copo_${currentCopo.copo_id}`
+                                        ? "Approving..."
+                                        : "Approve CO-PO"}
+                                    </button>
+                                  )}
+
+                                {isCoord &&
+                                  currentCopo &&
+                                  currentCopo.is_approved &&
+                                  !currentCopo.is_active && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleActivateCopo(currentCopo.copo_id)
+                                      }
+                                      disabled={
+                                        actionLoading ===
+                                        `activate_copo_${currentCopo.copo_id}`
+                                      }
+                                      className="ui-btn-primary-sm"
+                                    >
+                                      {actionLoading ===
+                                      `activate_copo_${currentCopo.copo_id}`
+                                        ? "Activating..."
+                                        : "Set as Active"}
+                                    </button>
+                                  )}
+                              </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                              {isCoord && (
-                                <button
-                                  type="button"
-                                  onClick={openGenerateCopoModal}
-                                  disabled={isCopoBusy || actionLoading === "generate_copo"}
-                                  className="rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                  {isCopoBusy ? "Generating..." : "Generate CO-PO Mapping"}
-                                </button>
-                              )}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-600">
+                              <div>
+                                {canEditMatrix ? (
+                                  <span className="ui-badge-code">
+                                    Click any cell to edit score & justification
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-medium text-slate-600">
+                                    Matrix is read-only
+                                  </span>
+                                )}
+                              </div>
 
-                              {isCoord && currentCopo && !currentCopo.is_approved && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleApproveCopo(currentCopo.copo_id)}
-                                  disabled={actionLoading === `approve_copo_${currentCopo.copo_id}`}
-                                  className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
-                                >
-                                  {actionLoading === `approve_copo_${currentCopo.copo_id}`
-                                    ? "Approving..."
-                                    : "Approve CO-PO"}
-                                </button>
-                              )}
-
-                              {isCoord && currentCopo && currentCopo.is_approved && !currentCopo.is_active && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleActivateCopo(currentCopo.copo_id)}
-                                  disabled={actionLoading === `activate_copo_${currentCopo.copo_id}`}
-                                  className="rounded-lg btn-bg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                  {actionLoading === `activate_copo_${currentCopo.copo_id}`
-                                    ? "Activating..."
-                                    : "Set as Active"}
-                                </button>
-                              )}
+                              <div className="flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                <span className="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-slate-200">
+                                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />{" "}
+                                  3 = High
+                                </span>
+                                <span className="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-slate-200">
+                                  <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />{" "}
+                                  2 = Medium
+                                </span>
+                                <span className="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-slate-200">
+                                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />{" "}
+                                  1 = Low
+                                </span>
+                                <span className="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-slate-200">
+                                  <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />{" "}
+                                  0 = None
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-600">
-                            <div>
-                              {canEditMatrix ? (
-                                <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950 dark:text-blue-400">
-                                  Click any cell to edit score & justification
-                                </span>
-                              ) : (
-                                <span className="text-xs font-medium text-slate-600">
-                                  Matrix is read-only
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                              <span className="flex items-center gap-1.5 font-semibold text-gray-900 ">
-                                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 3 = High
-                              </span>
-                              <span className="flex items-center gap-1.5 font-semibold text-gray-900">
-                                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 2 = Medium
-                              </span>
-                              <span className="flex items-center gap-1.5 font-semibold text-gray-900">
-                                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 1 = Low
-                              </span>
-                              <span className="flex items-center gap-1.5 font-semibold text-gray-900">
-                                <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" /> 0 = None
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <table className="mt-3 w-full text-left text-[13px] border-collapse">
-                          <thead>
-                            <tr className="border-b border-blue-200/80 dark:border-slate-700 bg-[#EAF2FF] dark:bg-slate-800/60">
-                              <th className="!py-5 px-3 font-bold text-slate-900 dark:text-slate-100 w-20 text-[16px]">
-                                CO
-                              </th>
-                              <th className="!py-5 px-3 font-bold text-slate-900 dark:text-slate-100 min-w-[180px] text-[16px]">
-                                Outcome Description
-                              </th>
-                              {posList.map((po) => (
-                                <th
-                                  key={po.po_id}
-                                  className="!py-5 px-1 text-center font-bold text-slate-900 dark:text-slate-100 w-14 text-[16px]"
-                                >
-                                  {po.po_code}
+                          <table className="mt-3 w-full border-collapse text-left text-[13px]">
+                            <thead>
+                              <tr className="border-b border-indigo-200/80 bg-[#EEF2FF] dark:border-slate-700 dark:bg-slate-800/60">
+                                <th className="w-20 !py-4 px-3 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                                  CO
                                 </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
-                            {cosList.map((co) => (
-                              <tr
-                                key={co.course_outcome_id}
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
-                              >
-                                <td className="!py-4 px-3 font-bold text-blue-700 dark:text-blue-400 text-[13.5px]">
-                                  {co.co_code}
-                                </td>
-                                <td className="!py-4 px-3 text-[#040e1d] dark:text-slate-200 text-sm font-medium leading-relaxed max-w-sm">
-                                  {co.description ?? "—"}
-                                </td>
-                                {posList.map((po) => {
-                                  const entry = cellMap.get(
-                                    `${co.course_outcome_id}_${po.po_id}`
-                                  );
-                                  if (!entry) {
+                                <th className="min-w-[180px] !py-4 px-3 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                                  Outcome Description
+                                </th>
+                                {posList.map((po) => (
+                                  <th
+                                    key={po.po_id}
+                                    className="w-14 !py-4 px-1 text-center text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100"
+                                  >
+                                    {po.po_code}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
+                              {cosList.map((co) => (
+                                <tr
+                                  key={co.course_outcome_id}
+                                  className="transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                >
+                                  <td className="!py-3.5 px-3 text-[13px] font-bold text-indigo-700 dark:text-indigo-400">
+                                    {co.co_code}
+                                  </td>
+                                  <td className="ui-body-text max-w-sm !py-3.5 px-3">
+                                    {co.description ?? "—"}
+                                  </td>
+                                  {posList.map((po) => {
+                                    const entry = cellMap.get(
+                                      `${co.course_outcome_id}_${po.po_id}`,
+                                    );
+                                    if (!entry) {
+                                      return (
+                                        <td
+                                          key={po.po_id}
+                                          className="!py-3.5 px-1 text-center text-slate-400"
+                                        >
+                                          —
+                                        </td>
+                                      );
+                                    }
+                                    const dirty = copoDirtyCells[entry.id];
+                                    const currentVal =
+                                      dirty !== undefined
+                                        ? dirty.matrix_value
+                                        : entry.matrix_value ?? 0;
+                                    const currentJust =
+                                      dirty?.justification !== undefined
+                                        ? dirty.justification
+                                        : entry.justification ?? "";
+                                    const isDirty = dirty !== undefined;
+
+                                    let colorClass =
+                                      "bg-slate-100 text-slate-600 border-slate-300/80 font-semibold dark:bg-slate-800 dark:text-slate-400";
+                                    if (currentVal === 3)
+                                      colorClass =
+                                        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-bold";
+                                    else if (currentVal === 2)
+                                      colorClass =
+                                        "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 font-bold";
+                                    else if (currentVal === 1)
+                                      colorClass =
+                                        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-bold";
+
                                     return (
                                       <td
                                         key={po.po_id}
-                                        className="!py-4 px-1 text-center text-slate-400"
+                                        className="!py-3.5 px-1 text-center"
                                       >
-                                        —
+                                        <button
+                                          type="button"
+                                          disabled={!canEditMatrix}
+                                          onClick={() =>
+                                            setCopoEditingCell({
+                                              id: entry.id,
+                                              co_code: co.co_code,
+                                              po_code: po.po_code,
+                                              matrix_value: currentVal,
+                                              justification: currentJust,
+                                            })
+                                          }
+                                          title={
+                                            currentJust
+                                              ? `${co.co_code} → ${po.po_code}: ${currentJust}`
+                                              : `${co.co_code} → ${po.po_code} (${currentVal})`
+                                          }
+                                          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-[13px] transition ${colorClass} ${
+                                            canEditMatrix
+                                              ? "cursor-pointer hover:scale-110 hover:shadow-sm"
+                                              : "cursor-default"
+                                          } ${
+                                            isDirty
+                                              ? "ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900"
+                                              : ""
+                                          }`}
+                                        >
+                                          {currentVal}
+                                        </button>
                                       </td>
                                     );
-                                  }
-                                  const dirty = copoDirtyCells[entry.id];
-                                  const currentVal =
-                                    dirty !== undefined
-                                      ? dirty.matrix_value
-                                      : (entry.matrix_value ?? 0);
-                                  const currentJust =
-                                    dirty?.justification !== undefined
-                                      ? dirty.justification
-                                      : (entry.justification ?? "");
-                                  const isDirty = dirty !== undefined;
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
 
-                                  let colorClass =
-                                    "bg-slate-100 text-slate-600 border-slate-300/80 font-semibold dark:bg-slate-800 dark:text-slate-400";
-                                  if (currentVal === 3)
-                                    colorClass =
-                                      "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-bold";
-                                  else if (currentVal === 2)
-                                    colorClass =
-                                      "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 font-bold";
-                                  else if (currentVal === 1)
-                                    colorClass =
-                                      "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 font-bold";
-
-                                  return (
-                                    <td key={po.po_id} className="!py-4 px-1 text-center">
-                                      <button
-                                        type="button"
-                                        disabled={!canEditMatrix}
-                                        onClick={() =>
-                                          setCopoEditingCell({
-                                            id: entry.id,
-                                            co_code: co.co_code,
-                                            po_code: po.po_code,
-                                            matrix_value: currentVal,
-                                            justification: currentJust,
-                                          })
-                                        }
-                                        title={
-                                          currentJust
-                                            ? `${co.co_code} → ${po.po_code}: ${currentJust}`
-                                            : `${co.co_code} → ${po.po_code} (${currentVal})`
-                                        }
-                                        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-[13px] transition ${colorClass} ${canEditMatrix
-                                            ? "cursor-pointer hover:scale-110 hover:shadow-sm"
-                                            : "cursor-default"
-                                          } ${isDirty ? "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-900" : ""}`}
-                                      >
-                                        {currentVal}
-                                      </button>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                        <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                          Matrix Correlation Justifications (
-                          {
-                            entries.filter(
-                              (e: any) =>
-                                Boolean(e.justification) ||
-                                Boolean(copoDirtyCells[e.id]?.justification)
-                            ).length
-                          }
-                          )
-                        </h4>
-                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto pr-1">
-                          {entries
-                            .filter(
-                              (e: any) =>
-                                Boolean(copoDirtyCells[e.id]?.justification) ||
-                                Boolean(e.justification)
-                            )
-                            .map((e: any) => {
-                              const val =
-                                copoDirtyCells[e.id]?.matrix_value ?? e.matrix_value;
-                              const just =
-                                copoDirtyCells[e.id]?.justification ?? e.justification;
-                              return (
-                                <div
-                                  key={e.id}
-                                  className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3 text-[13px] dark:border-slate-800 dark:bg-slate-800/40"
-                                >
-                                  <div className="flex items-center justify-between gap-1 font-bold text-slate-900 dark:text-slate-100">
-                                    <span className="font-bold text-blue-700">
-                                      {e.co_code ?? `CO${e.course_outcome_id}`} →{" "}
-                                      {e.po_code ?? `PO${e.po_id}`}
-                                    </span>
-                                    <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950 dark:text-blue-300">
-                                      Level {val}
-                                    </span>
+                        <div className="ui-card">
+                          <div className="ui-card-header">
+                            <div className="flex items-center gap-2.5">
+                              <div className="ui-icon-badge">
+                                <Sparkles className="h-4 w-4" />
+                              </div>
+                              <h4 className="section-ti">
+                                Matrix Correlation Justifications (
+                                {
+                                  entries.filter(
+                                    (e: any) =>
+                                      Boolean(e.justification) ||
+                                      Boolean(
+                                        copoDirtyCells[e.id]?.justification,
+                                      ),
+                                  ).length
+                                }
+                                )
+                              </h4>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid max-h-80 grid-cols-1 gap-2.5 overflow-y-auto pr-1 md:grid-cols-2 lg:grid-cols-3">
+                            {entries
+                              .filter(
+                                (e: any) =>
+                                  Boolean(
+                                    copoDirtyCells[e.id]?.justification,
+                                  ) || Boolean(e.justification),
+                              )
+                              .map((e: any) => {
+                                const val =
+                                  copoDirtyCells[e.id]?.matrix_value ??
+                                  e.matrix_value;
+                                const just =
+                                  copoDirtyCells[e.id]?.justification ??
+                                  e.justification;
+                                return (
+                                  <div key={e.id} className="ui-subcard">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="card-ti !text-indigo-700 dark:!text-indigo-400">
+                                        {e.co_code ??
+                                          `CO${e.course_outcome_id}`}{" "}
+                                        → {e.po_code ?? `PO${e.po_id}`}
+                                      </span>
+                                      <span className="ui-badge-code">
+                                        Level {val}
+                                      </span>
+                                    </div>
+                                    <p className="ui-body-text mt-2.5">
+                                      {just}
+                                    </p>
                                   </div>
-                                  <p className="mt-4 text-sm font-medium text-[#040e1d] dark:text-slate-300 leading-relaxed">
-                                    {just}
-                                  </p>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
               </div>
             )}
 
@@ -4516,32 +5260,40 @@ const InsCourseArtifacts = () => {
                 courseTitle={course?.course_title}
                 courseCode={course?.course_code}
                 isCoord={isCoord}
-                approvedExtractionId={prioritizedExt?.extractions_id || currentExt?.extractions_id}
+                approvedExtractionId={
+                  prioritizedExt?.extractions_id || currentExt?.extractions_id
+                }
               />
             )}
 
             {activeTab === "pedagogy" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {renderVersionCards("pedagogy")}
 
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      Instructional Strategies & Topic Delivery Methods
-                    </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Suggested pedagogical approaches, activity models, and learning modes
-                    </p>
+                <div className="ui-card-compact flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="ui-icon-badge">
+                      <Presentation className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="section-ti">
+                        Instructional Strategies & Topic Delivery Methods
+                      </h3>
+                      <p className="section-mini-cap">
+                        Suggested pedagogical approaches, activity models, and
+                        learning modes
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {currentPedagogy?.is_approved ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="ui-badge-success">
+                        <CheckCircle2 className="h-4 w-4" />
                         Pedagogy Approved
                       </span>
                     ) : currentPedagogy ? (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                      <span className="ui-badge-warning">
                         Draft Version {currentPedagogy.version_number}
                       </span>
                     ) : null}
@@ -4550,27 +5302,36 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={openGeneratePedagogyModal}
-                        disabled={isPedagogyBusy || actionLoading === "generate_pedagogy"}
-                        className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                        disabled={
+                          isPedagogyBusy ||
+                          actionLoading === "generate_pedagogy"
+                        }
+                        className="ui-btn-primary-sm"
                       >
                         {isPedagogyBusy ? "Generating..." : "Generate Pedagogy"}
                       </button>
                     )}
 
-                    {isCoord && currentPedagogy && !currentPedagogy.is_approved && (
-                      <button
-                        type="button"
-                        onClick={() => handleApprovePedagogy(currentPedagogy.pedagogy_id)}
-                        disabled={
-                          actionLoading === `approve_pedagogy_${currentPedagogy.pedagogy_id}`
-                        }
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {actionLoading === `approve_pedagogy_${currentPedagogy.pedagogy_id}`
-                          ? "Approving..."
-                          : "Approve Pedagogy"}
-                      </button>
-                    )}
+                    {isCoord &&
+                      currentPedagogy &&
+                      !currentPedagogy.is_approved && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApprovePedagogy(currentPedagogy.pedagogy_id)
+                          }
+                          disabled={
+                            actionLoading ===
+                            `approve_pedagogy_${currentPedagogy.pedagogy_id}`
+                          }
+                          className="ui-btn-success-sm"
+                        >
+                          {actionLoading ===
+                          `approve_pedagogy_${currentPedagogy.pedagogy_id}`
+                            ? "Approving..."
+                            : "Approve Pedagogy"}
+                        </button>
+                      )}
 
                     {isCoord &&
                       currentPedagogy &&
@@ -4578,13 +5339,17 @@ const InsCourseArtifacts = () => {
                       !currentPedagogy.is_active && (
                         <button
                           type="button"
-                          onClick={() => handleActivatePedagogy(currentPedagogy.pedagogy_id)}
-                          disabled={
-                            actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}`
+                          onClick={() =>
+                            handleActivatePedagogy(currentPedagogy.pedagogy_id)
                           }
-                          className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                          disabled={
+                            actionLoading ===
+                            `activate_pedagogy_${currentPedagogy.pedagogy_id}`
+                          }
+                          className="ui-btn-primary-sm"
                         >
-                          {actionLoading === `activate_pedagogy_${currentPedagogy.pedagogy_id}`
+                          {actionLoading ===
+                          `activate_pedagogy_${currentPedagogy.pedagogy_id}`
                             ? "Activating..."
                             : "Set as Active"}
                         </button>
@@ -4592,53 +5357,62 @@ const InsCourseArtifacts = () => {
                   </div>
                 </div>
 
-                {(sectionLoading.pedagogy || loadingVersionDetail) && !currentPedagogy && (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Loading pedagogy suggestions...
-                    </p>
-                    <p className="text-[11px] text-slate-400">Fetching latest instructional strategies</p>
-                  </div>
-                )}
+                {(sectionLoading.pedagogy || loadingVersionDetail) &&
+                  !currentPedagogy && (
+                    <div className="ui-card flex flex-col items-center justify-center py-8 text-center">
+                      <RefreshCw className="mb-2 h-6 w-6 animate-spin text-color2" />
+                      <p className="card-ti">
+                        Loading pedagogy suggestions...
+                      </p>
+                      <p className="ui-muted-text mt-1">
+                        Fetching latest instructional strategies
+                      </p>
+                    </div>
+                  )}
 
-                {!sectionLoading.pedagogy && !loadingVersionDetail && (() => {
-                  const isCurrentBusy = isBusyState(currentPedagogy?.current_state);
-                  const inProgressPedagogy = versionsPedagogies.find((p: any) =>
-                    isBusyState(p.current_state)
-                  );
+                {!sectionLoading.pedagogy &&
+                  !loadingVersionDetail &&
+                  (() => {
+                    const isCurrentBusy = isBusyState(
+                      currentPedagogy?.current_state,
+                    );
+                    const inProgressPedagogy = versionsPedagogies.find(
+                      (p: any) => isBusyState(p.current_state),
+                    );
 
-                  if (isCurrentBusy) {
-                    return renderGenerationLoadingScreen(
-                      "Instructional Pedagogy",
-                      currentPedagogy.current_state,
-                      currentPedagogy.version_number
-                    );
-                  }
-                  if (!currentPedagogy && inProgressPedagogy) {
-                    return renderGenerationLoadingScreen(
-                      "Instructional Pedagogy",
-                      inProgressPedagogy.current_state,
-                      inProgressPedagogy.version_number
-                    );
-                  }
-                  return null;
-                })()}
+                    if (isCurrentBusy) {
+                      return renderGenerationLoadingScreen(
+                        "Instructional Pedagogy",
+                        currentPedagogy.current_state,
+                        currentPedagogy.version_number,
+                      );
+                    }
+                    if (!currentPedagogy && inProgressPedagogy) {
+                      return renderGenerationLoadingScreen(
+                        "Instructional Pedagogy",
+                        inProgressPedagogy.current_state,
+                        inProgressPedagogy.version_number,
+                      );
+                    }
+                    return null;
+                  })()}
 
                 {!sectionLoading.pedagogy &&
                   !loadingVersionDetail &&
                   !currentPedagogy &&
-                  !versionsPedagogies.some((p: any) => isBusyState(p.current_state)) && (
-                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
+                  !versionsPedagogies.some((p: any) =>
+                    isBusyState(p.current_state),
+                  ) && (
+                    <div className="ui-empty-state">
                       <Presentation className="h-8 w-8 text-slate-400" />
-                      <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
+                      <h3 className="section-ti mt-2.5">
                         {isCoord
                           ? versionsPedagogies.length > 0
                             ? "Select a Version to View"
                             : "No Pedagogy Generated"
                           : "No Active Pedagogy Available"}
                       </h3>
-                      <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                      <p className="section-mini-cap mt-1 max-w-sm">
                         {isCoord
                           ? versionsPedagogies.length > 0
                             ? "Click 'View' on any version card above to load and inspect topic-level teaching delivery methods."
@@ -4650,466 +5424,611 @@ const InsCourseArtifacts = () => {
                           type="button"
                           onClick={openGeneratePedagogyModal}
                           disabled={isPedagogyBusy}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                          className="ui-btn-primary-sm mt-3"
                         >
-                          <Sparkles className="h-3.5 w-3.5" />
+                          <Sparkles className="h-4 w-4" />
                           <span>Generate Pedagogy</span>
                         </button>
                       )}
                     </div>
                   )}
 
-                {currentPedagogy && !isBusyState(currentPedagogy.current_state) && (() => {
-                  const unitsList = currentExt?.units ?? [];
-                  const topicSuggestions = currentPedagogy.topic_suggestions ?? [];
-                  const sugByTopicId = new Map<number, any>();
-                  topicSuggestions.forEach((s: any) => sugByTopicId.set(s.topic_id, s));
+                {currentPedagogy &&
+                  !isBusyState(currentPedagogy.current_state) &&
+                  (() => {
+                    const unitsList = currentExt?.units ?? [];
+                    const topicSuggestions =
+                      currentPedagogy.topic_suggestions ?? [];
+                    const sugByTopicId = new Map<number, any>();
+                    topicSuggestions.forEach((s: any) =>
+                      sugByTopicId.set(s.topic_id, s),
+                    );
 
-                  const canEditPedagogy = Boolean((isCoord || perms.can_edit) && currentPedagogy);
-                  const renderedSugIds = new Set<number>();
-                  const hasUnits = unitsList.length > 0;
+                    const canEditPedagogy = Boolean(
+                      (isCoord || perms.can_edit) && currentPedagogy,
+                    );
+                    const renderedSugIds = new Set<number>();
+                    const hasUnits = unitsList.length > 0;
 
-                  const BLOOM_LEVELS = [
-                    "K1 - Remember",
-                    "K2 - Understand",
-                    "K3 - Apply",
-                    "K4 - Analyze",
-                    "K5 - Evaluate",
-                    "K6 - Create",
-                  ];
+                    const BLOOM_LEVELS = [
+                      "K1 - Remember",
+                      "K2 - Understand",
+                      "K3 - Apply",
+                      "K4 - Analyze",
+                      "K5 - Evaluate",
+                      "K6 - Create",
+                    ];
 
-                  const renderStrategyCards = (sug: any) => (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="rounded-xl border border-emerald-200/80 bg-white p-3.5 shadow-2xs dark:border-emerald-900/60 dark:bg-slate-900 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1 mb-2">
-                            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                    const renderStrategyCards = (sug: any) => (
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="flex flex-col justify-between rounded-xl border border-emerald-200/80 bg-white p-3.5 shadow-sm dark:border-emerald-900/60 dark:bg-slate-900">
+                          <div>
+                            <div className="mb-2 flex items-center justify-between gap-1">
+                              <span className="ui-badge-success">
+                                1. Primary Strategy
+                              </span>
+                              {sug.bloom_level_1 && (
+                                <span className="ui-badge-code">
+                                  {sug.bloom_level_1}
+                                </span>
+                              )}
+                            </div>
+                            <h5 className="card-ti">
+                              {sug.pedagogy_suggested_1 ??
+                                "Direct Instruction & Discussion"}
+                            </h5>
+                            {sug.methodology_1 && (
+                              <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                {sug.methodology_1}
+                              </p>
+                            )}
+                            {sug.description_1 && (
+                              <p className="ui-body-text mt-1.5">
+                                {sug.description_1}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col justify-between rounded-xl border border-sky-200/80 bg-white p-3.5 shadow-sm dark:border-sky-900/60 dark:bg-slate-900">
+                          <div>
+                            <div className="mb-2 flex items-center justify-between gap-1">
+                              <span className="ui-badge-info">
+                                2. Alternative Strategy 1
+                              </span>
+                              {sug.bloom_level_2 && (
+                                <span className="ui-badge-code">
+                                  {sug.bloom_level_2}
+                                </span>
+                              )}
+                            </div>
+                            <h5 className="card-ti">
+                              {sug.pedagogy_suggested_2 ??
+                                "Collaborative Problem Solving"}
+                            </h5>
+                            {sug.methodology_2 && (
+                              <p className="mt-1 text-xs font-semibold text-sky-600 dark:text-sky-400">
+                                {sug.methodology_2}
+                              </p>
+                            )}
+                            {sug.description_2 && (
+                              <p className="ui-body-text mt-1.5">
+                                {sug.description_2}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col justify-between rounded-xl border border-violet-200/80 bg-white p-3.5 shadow-sm dark:border-violet-900/60 dark:bg-slate-900">
+                          <div>
+                            <div className="mb-2 flex items-center justify-between gap-1">
+                              <span className="ui-badge-purple">
+                                3. Alternative Strategy 2
+                              </span>
+                              {sug.bloom_level_3 && (
+                                <span className="ui-badge-code">
+                                  {sug.bloom_level_3}
+                                </span>
+                              )}
+                            </div>
+                            <h5 className="card-ti">
+                              {sug.pedagogy_suggested_3 ??
+                                "Flipped Classroom / Project Work"}
+                            </h5>
+                            {sug.methodology_3 && (
+                              <p className="mt-1 text-xs font-semibold text-violet-600 dark:text-violet-400">
+                                {sug.methodology_3}
+                              </p>
+                            )}
+                            {sug.description_3 && (
+                              <p className="ui-body-text mt-1.5">
+                                {sug.description_3}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+
+                    const renderEditingForm = (sug: any) => (
+                      <div className="ui-card space-y-4">
+                        <div className="ui-card-header">
+                          <h5 className="section-ti">
+                            Edit Strategies for:{" "}
+                            {sug.topic_name || `Topic #${sug.topic_id}`}
+                          </h5>
+                          <span className="section-mini-cap">
+                            Specify 3 pedagogical delivery methods
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                          {/* Strategy 1 */}
+                          <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/30 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                            <span className="ui-badge-success">
                               1. Primary Strategy
                             </span>
-                            {sug.bloom_level_1 && (
-                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                {sug.bloom_level_1}
-                              </span>
-                            )}
+                            <div>
+                              <label className="ui-label">
+                                Strategy Name
+                              </label>
+                              <input
+                                type="text"
+                                value={pedagogyDraft.pedagogy_suggested_1 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    pedagogy_suggested_1: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. Direct Instruction & Discussion"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">
+                                Bloom&apos;s Level
+                              </label>
+                              <select
+                                value={
+                                  pedagogyDraft.bloom_level_1 ??
+                                  "K2 - Understand"
+                                }
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    bloom_level_1: e.target.value,
+                                  })
+                                }
+                                className="ui-select mt-1 w-full"
+                              >
+                                {BLOOM_LEVELS.map((lvl) => (
+                                  <option key={lvl} value={lvl}>
+                                    {lvl}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="ui-label">Methodology</label>
+                              <input
+                                type="text"
+                                value={pedagogyDraft.methodology_1 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    methodology_1: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. Chalk & Talk, Interactive Slides"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">Description</label>
+                              <textarea
+                                rows={2}
+                                value={pedagogyDraft.description_1 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    description_1: e.target.value,
+                                  })
+                                }
+                                placeholder="Brief strategy description"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
                           </div>
-                          <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
-                            {sug.pedagogy_suggested_1 ?? "Direct Instruction & Discussion"}
-                          </h5>
-                          {sug.methodology_1 && (
-                            <p className="mt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                              {sug.methodology_1}
-                            </p>
-                          )}
-                          {sug.description_1 && (
-                            <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                              {sug.description_1}
-                            </p>
-                          )}
-                        </div>
-                      </div>
 
-                      <div className="rounded-xl border border-sky-200/80 bg-white p-3.5 shadow-2xs dark:border-sky-900/60 dark:bg-slate-900 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1 mb-2">
-                            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                          {/* Strategy 2 */}
+                          <div className="space-y-2 rounded-xl border border-sky-200 bg-sky-50/30 p-3 dark:border-sky-900/50 dark:bg-sky-950/20">
+                            <span className="ui-badge-info">
                               2. Alternative Strategy 1
                             </span>
-                            {sug.bloom_level_2 && (
-                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                {sug.bloom_level_2}
-                              </span>
-                            )}
+                            <div>
+                              <label className="ui-label">
+                                Strategy Name
+                              </label>
+                              <input
+                                type="text"
+                                value={pedagogyDraft.pedagogy_suggested_2 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    pedagogy_suggested_2: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. Collaborative Problem Solving"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">
+                                Bloom&apos;s Level
+                              </label>
+                              <select
+                                value={
+                                  pedagogyDraft.bloom_level_2 ?? "K3 - Apply"
+                                }
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    bloom_level_2: e.target.value,
+                                  })
+                                }
+                                className="ui-select mt-1 w-full"
+                              >
+                                {BLOOM_LEVELS.map((lvl) => (
+                                  <option key={lvl} value={lvl}>
+                                    {lvl}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="ui-label">Methodology</label>
+                              <input
+                                type="text"
+                                value={pedagogyDraft.methodology_2 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    methodology_2: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. Think-Pair-Share, Case Study"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">Description</label>
+                              <textarea
+                                rows={2}
+                                value={pedagogyDraft.description_2 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    description_2: e.target.value,
+                                  })
+                                }
+                                placeholder="Brief strategy description"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
                           </div>
-                          <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
-                            {sug.pedagogy_suggested_2 ?? "Collaborative Problem Solving"}
-                          </h5>
-                          {sug.methodology_2 && (
-                            <p className="mt-1 text-[11px] font-medium text-sky-600 dark:text-sky-400">
-                              {sug.methodology_2}
-                            </p>
-                          )}
-                          {sug.description_2 && (
-                            <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                              {sug.description_2}
-                            </p>
-                          )}
-                        </div>
-                      </div>
 
-                      <div className="rounded-xl border border-violet-200/80 bg-white p-3.5 shadow-2xs dark:border-violet-900/60 dark:bg-slate-900 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1 mb-2">
-                            <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                          {/* Strategy 3 */}
+                          <div className="space-y-2 rounded-xl border border-violet-200 bg-violet-50/30 p-3 dark:border-violet-900/50 dark:bg-violet-950/20">
+                            <span className="ui-badge-purple">
                               3. Alternative Strategy 2
                             </span>
-                            {sug.bloom_level_3 && (
-                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                {sug.bloom_level_3}
-                              </span>
-                            )}
-                          </div>
-                          <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
-                            {sug.pedagogy_suggested_3 ?? "Flipped Classroom / Project Work"}
-                          </h5>
-                          {sug.methodology_3 && (
-                            <p className="mt-1 text-[11px] font-medium text-violet-600 dark:text-violet-400">
-                              {sug.methodology_3}
-                            </p>
-                          )}
-                          {sug.description_3 && (
-                            <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                              {sug.description_3}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-
-                  const renderEditingForm = (sug: any) => (
-                    <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-900/60 dark:bg-slate-900 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-850">
-                        <h5 className="text-xs font-bold text-slate-900 dark:text-white">
-                          Edit Strategies for: {sug.topic_name || `Topic #${sug.topic_id}`}
-                        </h5>
-                        <span className="text-[11px] text-slate-400">Specify 3 pedagogical delivery methods</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {/* Strategy 1 */}
-                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/30 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20 space-y-2">
-                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                            1. Primary Strategy
-                          </span>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Strategy Name</label>
-                            <input
-                              type="text"
-                              value={pedagogyDraft.pedagogy_suggested_1 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_1: e.target.value })}
-                              placeholder="e.g. Direct Instruction & Discussion"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Bloom's Level</label>
-                            <select
-                              value={pedagogyDraft.bloom_level_1 ?? "K2 - Understand"}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_1: e.target.value })}
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            >
-                              {BLOOM_LEVELS.map((lvl) => (
-                                <option key={lvl} value={lvl}>{lvl}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Methodology</label>
-                            <input
-                              type="text"
-                              value={pedagogyDraft.methodology_1 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_1: e.target.value })}
-                              placeholder="e.g. Chalk & Talk, Interactive Slides"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Description</label>
-                            <textarea
-                              rows={2}
-                              value={pedagogyDraft.description_1 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_1: e.target.value })}
-                              placeholder="Brief strategy description"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
+                            <div>
+                              <label className="ui-label">
+                                Strategy Name
+                              </label>
+                              <input
+                                type="text"
+                                value={pedagogyDraft.pedagogy_suggested_3 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    pedagogy_suggested_3: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. Flipped Classroom / Project Work"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">
+                                Bloom&apos;s Level
+                              </label>
+                              <select
+                                value={
+                                  pedagogyDraft.bloom_level_3 ?? "K4 - Analyze"
+                                }
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    bloom_level_3: e.target.value,
+                                  })
+                                }
+                                className="ui-select mt-1 w-full"
+                              >
+                                {BLOOM_LEVELS.map((lvl) => (
+                                  <option key={lvl} value={lvl}>
+                                    {lvl}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="ui-label">Methodology</label>
+                              <input
+                                type="text"
+                                value={pedagogyDraft.methodology_3 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    methodology_3: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. Guided Lab / Demo"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="ui-label">Description</label>
+                              <textarea
+                                rows={2}
+                                value={pedagogyDraft.description_3 ?? ""}
+                                onChange={(e) =>
+                                  setPedagogyDraft({
+                                    ...pedagogyDraft,
+                                    description_3: e.target.value,
+                                  })
+                                }
+                                placeholder="Brief strategy description"
+                                className="ui-input-sm mt-1"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        {/* Strategy 2 */}
-                        <div className="rounded-lg border border-sky-200 bg-sky-50/30 p-3 dark:border-sky-900/50 dark:bg-sky-950/20 space-y-2">
-                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-                            2. Alternative Strategy 1
-                          </span>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Strategy Name</label>
-                            <input
-                              type="text"
-                              value={pedagogyDraft.pedagogy_suggested_2 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_2: e.target.value })}
-                              placeholder="e.g. Collaborative Problem Solving"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Bloom's Level</label>
-                            <select
-                              value={pedagogyDraft.bloom_level_2 ?? "K3 - Apply"}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_2: e.target.value })}
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            >
-                              {BLOOM_LEVELS.map((lvl) => (
-                                <option key={lvl} value={lvl}>{lvl}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Methodology</label>
-                            <input
-                              type="text"
-                              value={pedagogyDraft.methodology_2 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_2: e.target.value })}
-                              placeholder="e.g. Think-Pair-Share, Case Study"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Description</label>
-                            <textarea
-                              rows={2}
-                              value={pedagogyDraft.description_2 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_2: e.target.value })}
-                              placeholder="Brief strategy description"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Strategy 3 */}
-                        <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3 dark:border-violet-900/50 dark:bg-violet-950/20 space-y-2">
-                          <span className="rounded bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-800 dark:bg-violet-950 dark:text-violet-300">
-                            3. Alternative Strategy 2
-                          </span>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Strategy Name</label>
-                            <input
-                              type="text"
-                              value={pedagogyDraft.pedagogy_suggested_3 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, pedagogy_suggested_3: e.target.value })}
-                              placeholder="e.g. Flipped Classroom / Project Work"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Bloom's Level</label>
-                            <select
-                              value={pedagogyDraft.bloom_level_3 ?? "K4 - Analyze"}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, bloom_level_3: e.target.value })}
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            >
-                              {BLOOM_LEVELS.map((lvl) => (
-                                <option key={lvl} value={lvl}>{lvl}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Methodology</label>
-                            <input
-                              type="text"
-                              value={pedagogyDraft.methodology_3 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, methodology_3: e.target.value })}
-                              placeholder="e.g. Guided Lab / Demo"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Description</label>
-                            <textarea
-                              rows={2}
-                              value={pedagogyDraft.description_3 ?? ""}
-                              onChange={(e) => setPedagogyDraft({ ...pedagogyDraft, description_3: e.target.value })}
-                              placeholder="Brief strategy description"
-                              className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-850">
-                        <button
-                          type="button"
-                          onClick={() => savePedagogyTopic(sug.id)}
-                          disabled={savingPedagogyTopic}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          <Save className="h-3 w-3" />
-                          <span>{savingPedagogyTopic ? "Saving..." : "Save Strategies"}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingPedagogyTopicId(null)}
-                          disabled={savingPedagogyTopic}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  );
-
-                  const renderTopicItem = (topicName: string, seqLabel: string, sug: any, key: any) => (
-                    <div
-                      key={key}
-                      className="rounded-lg border border-slate-200/70 bg-slate-50/60 p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50 space-y-2"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5 dark:border-slate-750">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                            {seqLabel}
-                          </span>
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                            {topicName}
-                          </span>
-                        </div>
-                        {canEditPedagogy && sug && editingPedagogyTopicId !== sug.id && (
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
                           <button
                             type="button"
-                            onClick={() => startEditPedagogyTopic(sug)}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            onClick={() => savePedagogyTopic(sug.id)}
+                            disabled={savingPedagogyTopic}
+                            className="ui-btn-success-sm"
                           >
-                            <Edit2 className="h-3 w-3 text-blue-500" />
-                            <span>Edit Strategies</span>
+                            <Save className="h-3 w-3" />
+                            <span>
+                              {savingPedagogyTopic
+                                ? "Saving..."
+                                : "Save Strategies"}
+                            </span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingPedagogyTopicId(null)}
+                            disabled={savingPedagogyTopic}
+                            className="ui-btn-secondary-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+
+                    const renderTopicItem = (
+                      topicName: string,
+                      seqLabel: string,
+                      sug: any,
+                      key: any,
+                    ) => (
+                      <div
+                        key={key}
+                        className="ui-subcard space-y-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-700">
+                          <div className="flex items-center gap-2">
+                            <span className="ui-badge-code">
+                              {seqLabel}
+                            </span>
+                            <span className="card-ti">
+                              {topicName}
+                            </span>
+                          </div>
+                          {canEditPedagogy &&
+                            sug &&
+                            editingPedagogyTopicId !== sug.id && (
+                              <button
+                                type="button"
+                                onClick={() => startEditPedagogyTopic(sug)}
+                                className="ui-btn-secondary-sm"
+                              >
+                                <Edit2 className="h-3 w-3 text-indigo-500" />
+                                <span>Edit Strategies</span>
+                              </button>
+                            )}
+                        </div>
+
+                        {sug ? (
+                          editingPedagogyTopicId === sug.id ? (
+                            renderEditingForm(sug)
+                          ) : (
+                            renderStrategyCards(sug)
+                          )
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
+                            No pedagogy strategies recorded for this topic.
+                          </div>
                         )}
                       </div>
+                    );
 
-                      {sug ? (
-                        editingPedagogyTopicId === sug.id ? (
-                          renderEditingForm(sug)
-                        ) : (
-                          renderStrategyCards(sug)
+                    const unitsWithTopics = hasUnits
+                      ? unitsList.filter(
+                          (u: any) => (u.topics?.length ?? 0) > 0,
                         )
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
-                          No pedagogy strategies recorded for this topic.
-                        </div>
-                      )}
-                    </div>
-                  );
+                      : [];
+                    const showByUnits = unitsWithTopics.length > 0;
 
-                  const unitsWithTopics = hasUnits ? unitsList.filter((u: any) => (u.topics?.length ?? 0) > 0) : [];
-                  const showByUnits = unitsWithTopics.length > 0;
+                    return (
+                      <div className="space-y-4">
+                        {showByUnits ? (
+                          <>
+                            {unitsWithTopics.map((unit: any, uIdx: number) => {
+                              const uTopics = unit.topics ?? [];
+                              return (
+                                <div
+                                  key={unit.id ?? uIdx}
+                                  className="ui-card space-y-3"
+                                >
+                                  <div className="ui-card-header">
+                                    <div className="flex items-center gap-2.5">
+                                      <span className="ui-badge-code">
+                                        Unit {unit.unit_number}
+                                      </span>
+                                      <h4 className="section-ti">
+                                        {unit.unit_title}
+                                      </h4>
+                                    </div>
+                                  </div>
 
-                  return (
-                    <div className="space-y-3">
-                      {showByUnits ? (
-                        <>
-                          {unitsWithTopics.map((unit: any, uIdx: number) => {
-                            const uTopics = unit.topics ?? [];
-                            return (
-                              <div
-                                key={unit.id ?? uIdx}
-                                className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
-                                  <div className="flex items-center gap-2">
-                                    <span className="rounded-md btn-bg px-2 py-0.5 text-xs font-bold text-white shadow-2xs dark:bg-blue-500">
-                                      Unit {unit.unit_number}
-                                    </span>
-                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                                      {unit.unit_title}
-                                    </h4>
+                                  <div className="space-y-2.5">
+                                    {uTopics.map((topic: any, tIdx: number) => {
+                                      const sug = sugByTopicId.get(topic.id);
+                                      if (sug) renderedSugIds.add(sug.id);
+                                      const topicLabel = `Topic ${
+                                        unit.unit_number
+                                      }.${topic.learning_sequence ?? tIdx + 1}`;
+                                      return renderTopicItem(
+                                        topic.topic_name,
+                                        topicLabel,
+                                        sug,
+                                        topic.id ?? tIdx,
+                                      );
+                                    })}
                                   </div>
                                 </div>
-
-                                <div className="space-y-2">
-                                  {uTopics.map((topic: any, tIdx: number) => {
-                                    const sug = sugByTopicId.get(topic.id);
-                                    if (sug) renderedSugIds.add(sug.id);
-                                    const topicLabel = `Topic ${unit.unit_number}.${topic.learning_sequence ?? tIdx + 1}`;
-                                    return renderTopicItem(topic.topic_name, topicLabel, sug, topic.id ?? tIdx);
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {/* Any unmatched topic suggestions */}
-                          {(() => {
-                            const unmatched = topicSuggestions.filter((s: any) => !renderedSugIds.has(s.id));
-                            if (unmatched.length === 0) return null;
-                            return (
-                              <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5">
-                                <div className="border-b border-slate-100 pb-2 dark:border-slate-800">
-                                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                                    Additional Topic Strategies
-                                  </h4>
-                                </div>
-                                <div className="space-y-2">
-                                  {unmatched.map((sug: any, sIdx: number) => {
-                                    const topicName = sug.topic_name || `Topic #${sug.topic_id}`;
-                                    return renderTopicItem(topicName, `Topic ${sIdx + 1}`, sug, sug.id ?? sIdx);
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </>
-                      ) : topicSuggestions.length > 0 ? (
-                        /* Fallback when units are not structured or not loaded: render topic suggestions directly! */
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                              Curriculum Topic Delivery Strategies ({topicSuggestions.length})
-                            </h4>
-                          </div>
-                          <div className="space-y-2">
-                            {topicSuggestions.map((sug: any, sIdx: number) => {
-                              const topicName = sug.topic_name || `Topic #${sug.topic_id}`;
-                              return renderTopicItem(topicName, `Topic ${sIdx + 1}`, sug, sug.id ?? sIdx);
+                              );
                             })}
+
+                            {/* Any unmatched topic suggestions */}
+                            {(() => {
+                              const unmatched = topicSuggestions.filter(
+                                (s: any) => !renderedSugIds.has(s.id),
+                              );
+                              if (unmatched.length === 0) return null;
+                              return (
+                                <div className="ui-card space-y-3">
+                                  <div className="ui-card-header">
+                                    <h4 className="section-ti">
+                                      Additional Topic Strategies
+                                    </h4>
+                                  </div>
+                                  <div className="space-y-2.5">
+                                    {unmatched.map((sug: any, sIdx: number) => {
+                                      const topicName =
+                                        sug.topic_name ||
+                                        `Topic #${sug.topic_id}`;
+                                      return renderTopicItem(
+                                        topicName,
+                                        `Topic ${sIdx + 1}`,
+                                        sug,
+                                        sug.id ?? sIdx,
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </>
+                        ) : topicSuggestions.length > 0 ? (
+                          /* Fallback when units are not structured or not loaded: render topic suggestions directly! */
+                          <div className="ui-card space-y-3">
+                            <div className="ui-card-header">
+                              <h4 className="section-ti">
+                                Curriculum Topic Delivery Strategies (
+                                {topicSuggestions.length})
+                              </h4>
+                            </div>
+                            <div className="space-y-2.5">
+                              {topicSuggestions.map(
+                                (sug: any, sIdx: number) => {
+                                  const topicName =
+                                    sug.topic_name || `Topic #${sug.topic_id}`;
+                                  return renderTopicItem(
+                                    topicName,
+                                    `Topic ${sIdx + 1}`,
+                                    sug,
+                                    sug.id ?? sIdx,
+                                  );
+                                },
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        /* Empty state */
-                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-10 text-center dark:border-slate-800 dark:bg-slate-900">
-                          <Presentation className="h-8 w-8 text-slate-400" />
-                          <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
-                            No Topic Strategies Recorded
-                          </h3>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            No pedagogy suggestions have been generated for this version yet.
-                          </p>
-                          {isCoord && (
-                            <button
-                              type="button"
-                              onClick={openGeneratePedagogyModal}
-                              disabled={isPedagogyBusy}
-                              className="mt-3 inline-flex items-center gap-1.5 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              <Sparkles className="h-3.5 w-3.5" />
-                              <span>Generate Pedagogy</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                        ) : (
+                          /* Empty state */
+                          <div className="ui-empty-state">
+                            <Presentation className="h-8 w-8 text-slate-400" />
+                            <h3 className="section-ti mt-2.5">
+                              No Topic Strategies Recorded
+                            </h3>
+                            <p className="section-mini-cap mt-1">
+                              No pedagogy suggestions have been generated for
+                              this version yet.
+                            </p>
+                            {isCoord && (
+                              <button
+                                type="button"
+                                onClick={openGeneratePedagogyModal}
+                                disabled={isPedagogyBusy}
+                                className="ui-btn-primary-sm mt-3"
+                              >
+                                <Sparkles className="h-4 w-4" />
+                                <span>Generate Pedagogy</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
               </div>
             )}
 
             {activeTab === "lesson_plan" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {renderVersionCards("lesson_plan")}
 
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      Lecture Plan, Hourly Allocation & Delivery Schedule
-                    </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Target hours: {currentLessonPlan?.target_total_hours ?? 45} Hrs
-                    </p>
+                <div className="ui-card-compact flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="ui-icon-badge">
+                      <Calendar className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="section-ti">
+                        Lecture Plan, Hourly Allocation & Delivery Schedule
+                      </h3>
+                      <p className="section-mini-cap">
+                        Target hours:{" "}
+                        {currentLessonPlan?.target_total_hours ?? 45} Hrs
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {currentLessonPlan?.is_approved ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="ui-badge-success">
+                        <CheckCircle2 className="h-4 w-4" />
                         Lesson Plan Approved
                       </span>
                     ) : currentLessonPlan ? (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                      <span className="ui-badge-warning">
                         Draft Version {currentLessonPlan.version_number}
                       </span>
                     ) : null}
@@ -5118,29 +6037,39 @@ const InsCourseArtifacts = () => {
                       <button
                         type="button"
                         onClick={openGenerateLessonPlanModal}
-                        disabled={isLessonPlanBusy || actionLoading === "generate_lp"}
-                        className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                        disabled={
+                          isLessonPlanBusy || actionLoading === "generate_lp"
+                        }
+                        className="ui-btn-primary-sm"
                       >
-                        {isLessonPlanBusy ? "Generating..." : "Generate Lesson Plan"}
+                        {isLessonPlanBusy
+                          ? "Generating..."
+                          : "Generate Lesson Plan"}
                       </button>
                     )}
 
-                    {isCoord && currentLessonPlan && !currentLessonPlan.is_approved && (
-                      <button
-                        type="button"
-                        onClick={() => handleApproveLessonPlan(currentLessonPlan.lesson_plan_id)}
-                        disabled={
-                          actionLoading ===
+                    {isCoord &&
+                      currentLessonPlan &&
+                      !currentLessonPlan.is_approved && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApproveLessonPlan(
+                              currentLessonPlan.lesson_plan_id,
+                            )
+                          }
+                          disabled={
+                            actionLoading ===
+                            `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`
+                          }
+                          className="ui-btn-success-sm"
+                        >
+                          {actionLoading ===
                           `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`
-                        }
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {actionLoading ===
-                          `approve_lesson_plan_${currentLessonPlan.lesson_plan_id}`
-                          ? "Approving..."
-                          : "Approve Lesson Plan"}
-                      </button>
-                    )}
+                            ? "Approving..."
+                            : "Approve Lesson Plan"}
+                        </button>
+                      )}
 
                     {isCoord &&
                       currentLessonPlan &&
@@ -5148,15 +6077,19 @@ const InsCourseArtifacts = () => {
                       !currentLessonPlan.is_active && (
                         <button
                           type="button"
-                          onClick={() => handleActivateLessonPlan(currentLessonPlan.lesson_plan_id)}
+                          onClick={() =>
+                            handleActivateLessonPlan(
+                              currentLessonPlan.lesson_plan_id,
+                            )
+                          }
                           disabled={
                             actionLoading ===
                             `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
                           }
-                          className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                          className="ui-btn-primary-sm"
                         >
                           {actionLoading ===
-                            `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
+                          `activate_lesson_plan_${currentLessonPlan.lesson_plan_id}`
                             ? "Activating..."
                             : "Set as Active"}
                         </button>
@@ -5164,187 +6097,215 @@ const InsCourseArtifacts = () => {
                   </div>
                 </div>
 
-                {(sectionLoading.lesson_plan || loadingVersionDetail) && !currentLessonPlan && (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-8 text-center dark:border-slate-800 dark:bg-slate-900">
-                    <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mb-2" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Loading lesson plan schedule...
-                    </p>
-                  </div>
-                )}
+                {(sectionLoading.lesson_plan || loadingVersionDetail) &&
+                  !currentLessonPlan && (
+                    <div className="ui-card flex flex-col items-center justify-center py-8 text-center">
+                      <RefreshCw className="mb-2 h-6 w-6 animate-spin text-color2" />
+                      <p className="card-ti">
+                        Loading lesson plan schedule...
+                      </p>
+                    </div>
+                  )}
 
-                {!sectionLoading.lesson_plan && !loadingVersionDetail && (() => {
-                  const isCurrentBusy = isBusyState(currentLessonPlan?.current_state);
-                  const inProgressLessonPlan = versionsLessonPlans.find((l: any) =>
-                    isBusyState(l.current_state)
-                  );
-
-                  if (isCurrentBusy) {
-                    return renderGenerationLoadingScreen(
-                      "Lesson Plan Timeline",
-                      currentLessonPlan.current_state,
-                      currentLessonPlan.version_number
+                {!sectionLoading.lesson_plan &&
+                  !loadingVersionDetail &&
+                  (() => {
+                    const isCurrentBusy = isBusyState(
+                      currentLessonPlan?.current_state,
                     );
-                  }
-                  if (!currentLessonPlan && inProgressLessonPlan) {
-                    return renderGenerationLoadingScreen(
-                      "Lesson Plan Timeline",
-                      inProgressLessonPlan.current_state,
-                      inProgressLessonPlan.version_number
+                    const inProgressLessonPlan = versionsLessonPlans.find(
+                      (l: any) => isBusyState(l.current_state),
                     );
-                  }
-                  return null;
-                })()}
 
-                {currentLessonPlan && !isBusyState(currentLessonPlan.current_state) && (() => {
-                  const slots = currentLessonPlan.topic_slots ?? [];
-                  const groupsMap = new Map<
-                    string,
-                    { unitTitle: string; slots: any[]; totalHours: number }
-                  >();
-
-                  slots.forEach((slot: any) => {
-                    const uKey = slot.unit_title ?? "Curriculum Topics";
-                    if (!groupsMap.has(uKey)) {
-                      groupsMap.set(uKey, { unitTitle: uKey, slots: [], totalHours: 0 });
+                    if (isCurrentBusy) {
+                      return renderGenerationLoadingScreen(
+                        "Lesson Plan Timeline",
+                        currentLessonPlan.current_state,
+                        currentLessonPlan.version_number,
+                      );
                     }
-                    const g = groupsMap.get(uKey)!;
-                    g.slots.push(slot);
-                    g.totalHours += Number(slot.time_allocated) || 0;
-                  });
+                    if (!currentLessonPlan && inProgressLessonPlan) {
+                      return renderGenerationLoadingScreen(
+                        "Lesson Plan Timeline",
+                        inProgressLessonPlan.current_state,
+                        inProgressLessonPlan.version_number,
+                      );
+                    }
+                    return null;
+                  })()}
 
-                  const groupsList = Array.from(groupsMap.values());
-                  const canEditLp = Boolean((isCoord || perms.can_edit) && currentLessonPlan);
+                {currentLessonPlan &&
+                  !isBusyState(currentLessonPlan.current_state) &&
+                  (() => {
+                    const slots = currentLessonPlan.topic_slots ?? [];
+                    const groupsMap = new Map<
+                      string,
+                      { unitTitle: string; slots: any[]; totalHours: number }
+                    >();
 
-                  return (
-                    <div className="space-y-3">
-                      {groupsList.map((group, gIdx) => (
-                        <div
-                          key={gIdx}
-                          className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-2.5"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                              {group.unitTitle}
-                            </h4>
-                            <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                              {formatMinutes(group.totalHours)} Total Allocated
-                            </span>
-                          </div>
+                    slots.forEach((slot: any) => {
+                      const uKey = slot.unit_title ?? "Curriculum Topics";
+                      if (!groupsMap.has(uKey)) {
+                        groupsMap.set(uKey, {
+                          unitTitle: uKey,
+                          slots: [],
+                          totalHours: 0,
+                        });
+                      }
+                      const g = groupsMap.get(uKey)!;
+                      g.slots.push(slot);
+                      g.totalHours += Number(slot.time_allocated) || 0;
+                    });
 
-                          <div className="space-y-2">
-                            {group.slots.map((slot: any, sIdx: number) => {
-                              const isEditingThisSlot = editingLpSlotId === slot.id;
-                              const subSlots = slot.subtopic_slots ?? [];
+                    const groupsList = Array.from(groupsMap.values());
+                    const canEditLp = Boolean(
+                      (isCoord || perms.can_edit) && currentLessonPlan,
+                    );
 
-                              return (
-                                <div
-                                  key={slot.id ?? sIdx}
-                                  className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850/40 space-y-2"
-                                >
-                                  <div className="flex flex-wrap items-start justify-between gap-2">
-                                    <div className="space-y-0.5">
-                                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 mr-2">
-                                        Slot #{sIdx + 1}
-                                      </span>
-                                      <span className="text-xs font-bold text-slate-900 dark:text-white">
-                                        {slot.topic_name}
-                                      </span>
-                                    </div>
+                    return (
+                      <div className="space-y-4">
+                        {groupsList.map((group, gIdx) => (
+                          <div key={gIdx} className="ui-card space-y-3">
+                            <div className="ui-card-header">
+                              <div className="flex items-center gap-2.5">
+                                <div className="ui-icon-badge">
+                                  <BookOpen className="h-4 w-4" />
+                                </div>
+                                <h4 className="section-ti">{group.unitTitle}</h4>
+                              </div>
+                              <span className="ui-badge-code">
+                                {formatMinutes(group.totalHours)} Total
+                                Allocated
+                              </span>
+                            </div>
 
-                                    <div className="flex items-center gap-2">
-                                      <span className="rounded-lg bg-blue-100/70 px-2.5 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                                        {formatMinutes(slot.time_allocated)}
-                                      </span>
-                                      {canEditLp && !isEditingThisSlot && (
-                                        <button
-                                          type="button"
-                                          onClick={() => startEditLpSlot(slot)}
-                                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                                        >
-                                          <Edit2 className="h-3 w-3 text-blue-500" />
-                                          <span>Edit Slot</span>
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
+                            <div className="space-y-2.5">
+                              {group.slots.map((slot: any, sIdx: number) => {
+                                const isEditingThisSlot =
+                                  editingLpSlotId === slot.id;
 
-                                  {isEditingThisSlot ? (
-                                    <div className="rounded-lg border border-blue-200 bg-white p-3 dark:border-blue-900 dark:bg-slate-900 space-y-3">
-                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        <div>
-                                          <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                            Allocated Time ({formatMinutes(lpSlotDraft.time_allocated)})
-                                          </label>
-                                          <input
-                                            type="number"
-                                            min={0.1}
-                                            step={0.05}
-                                            value={lpSlotDraft.time_allocated}
-                                            onChange={(e) =>
-                                              setLpSlotDraft({
-                                                ...lpSlotDraft,
-                                                time_allocated: Number(e.target.value),
-                                              })
+                                return (
+                                  <div
+                                    key={slot.id ?? sIdx}
+                                    className="ui-subcard space-y-2"
+                                  >
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="ui-badge-code">
+                                          Slot #{sIdx + 1}
+                                        </span>
+                                        <span className="card-ti">
+                                          {slot.topic_name}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        <span className="ui-badge-code">
+                                          {formatMinutes(slot.time_allocated)}
+                                        </span>
+                                        {canEditLp && !isEditingThisSlot && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              startEditLpSlot(slot)
                                             }
-                                            className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                          />
+                                            className="ui-btn-secondary-sm"
+                                          >
+                                            <Edit2 className="h-3 w-3 text-indigo-500" />
+                                            <span>Edit Slot</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {isEditingThisSlot ? (
+                                      <div className="space-y-3 rounded-xl border border-indigo-200 bg-white p-3 dark:border-indigo-900 dark:bg-slate-900">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                          <div>
+                                            <label className="ui-label">
+                                              Allocated Time (
+                                              {formatMinutes(
+                                                lpSlotDraft.time_allocated,
+                                              )}
+                                              )
+                                            </label>
+                                            <input
+                                              type="number"
+                                              min={0.1}
+                                              step={0.05}
+                                              value={lpSlotDraft.time_allocated}
+                                              onChange={(e) =>
+                                                setLpSlotDraft({
+                                                  ...lpSlotDraft,
+                                                  time_allocated: Number(
+                                                    e.target.value,
+                                                  ),
+                                                })
+                                              }
+                                              className="ui-input"
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center justify-end gap-2 pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => saveLpSlot(slot.id)}
+                                            disabled={savingLpSlot}
+                                            className="ui-btn-success-sm"
+                                          >
+                                            <Check className="h-3 w-3" />
+                                            <span>
+                                              {savingLpSlot
+                                                ? "Saving..."
+                                                : "Save"}
+                                            </span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setEditingLpSlotId(null)
+                                            }
+                                            className="ui-btn-secondary-sm"
+                                          >
+                                            Cancel
+                                          </button>
                                         </div>
                                       </div>
-                                      <div className="flex items-center justify-end gap-2 pt-1">
-                                        <button
-                                          type="button"
-                                          onClick={() => saveLpSlot(slot.id)}
-                                          disabled={savingLpSlot}
-                                          className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                                        >
-                                          <Check className="h-3 w-3" />
-                                          <span>{savingLpSlot ? "Saving..." : "Save"}</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setEditingLpSlotId(null)}
-                                          className="rounded border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                                        >
-                                          Cancel
-                                        </button>
+                                    ) : (
+                                      <div className="rounded-xl border border-slate-100 bg-white px-3 py-2 dark:border-slate-700/70 dark:bg-slate-800/60">
+                                        <span className="card-ti">
+                                          Activity:{" "}
+                                        </span>
+                                        <span className="ui-body-text">
+                                          {slot.suggested_activity ??
+                                            "Interactive lecture with hands-on practice"}
+                                        </span>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div className="rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-                                      <span className="font-semibold text-slate-700 dark:text-slate-200">
-                                        Activity:{" "}
-                                      </span>
-                                      <span>
-                                        {slot.suggested_activity ??
-                                          "Interactive lecture with hands-on practice"}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                        ))}
+                      </div>
+                    );
+                  })()}
               </div>
             )}
 
             {(activeTab === "mcq_generation" || activeTab === "mcq_viva") && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* MCQ & Viva Sub-navigation Toggle */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-800 pb-3">
+                <div className="ui-card-compact flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setMcqSubTab("generator")}
-                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                      className={`ui-tab-pill ${
                         mcqSubTab === "generator"
-                          ? "bg-purple-600 text-white shadow-xs"
-                          : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                          ? "ui-tab-pill-active"
+                          : "ui-tab-pill-idle"
                       }`}
                     >
                       <Sparkles className="h-4 w-4" />
@@ -5354,10 +6315,10 @@ const InsCourseArtifacts = () => {
                     <button
                       type="button"
                       onClick={() => setMcqSubTab("viva_report")}
-                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                      className={`ui-tab-pill ${
                         mcqSubTab === "viva_report"
-                          ? "bg-purple-600 text-white shadow-xs"
-                          : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                          ? "ui-tab-pill-active"
+                          : "ui-tab-pill-idle"
                       }`}
                     >
                       <BarChart2 className="h-4 w-4" />
@@ -5370,13 +6331,15 @@ const InsCourseArtifacts = () => {
                     onClick={() =>
                       router.push(
                         `/neurobe/question-bank/${courseIdParam}?code=${encodeURIComponent(
-                          course?.course_code ?? ""
-                        )}&title=${encodeURIComponent(course?.course_title ?? "")}`
+                          course?.course_code ?? "",
+                        )}&title=${encodeURIComponent(
+                          course?.course_title ?? "",
+                        )}`,
                       )
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 rounded-xl transition cursor-pointer"
+                    className="ui-btn-secondary-sm"
                   >
-                    <Layers className="h-3.5 w-3.5" />
+                    <Layers className="h-4 w-4 text-color2" />
                     <span>View Question Bank</span>
                     <ExternalLink className="h-3 w-3 opacity-70" />
                   </button>
@@ -5388,7 +6351,11 @@ const InsCourseArtifacts = () => {
                     courseCode={course?.course_code ?? "COURSE"}
                     courseTitle={course?.course_title ?? "Academic Course"}
                     hierarchyUnits={mcqHierarchyUnits}
-                    loadingHierarchy={Boolean(loadingHierarchyUnits || sectionLoading.syllabus || loading)}
+                    loadingHierarchy={Boolean(
+                      loadingHierarchyUnits ||
+                        sectionLoading.syllabus ||
+                        loading,
+                    )}
                     onGenerate={handleSimplifiedMCQGenerate}
                     isGeneratingAI={isGeneratingMCQ}
                   />
@@ -5405,7 +6372,9 @@ const InsCourseArtifacts = () => {
                 courseId={courseIdParam || 1}
                 courseCode={course?.course_code ?? "COURSE"}
                 courseTitle={course?.course_title ?? "Academic Course"}
-                initialSubTab={activeTab === "cia_analytics" ? "analytics" : "builder"}
+                initialSubTab={
+                  activeTab === "cia_analytics" ? "analytics" : "builder"
+                }
               />
             )}
 
@@ -5422,64 +6391,67 @@ const InsCourseArtifacts = () => {
 
         if (splitScreenView) {
           return (
-            <div className="mt-2.5 grid grid-cols-1 gap-3 lg:grid-cols-12 items-start">
-              <div className="lg:col-span-6 h-[calc(100vh-140px)] min-h-[580px] sticky top-3 rounded-xl border border-slate-200/90 bg-slate-900 shadow-xs overflow-hidden dark:border-slate-800 flex flex-col">
-                <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300">
+            <div className="mt-2.5 grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+              <div className="sticky top-3 flex h-[calc(100vh-140px)] min-h-[580px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-900 shadow-sm dark:border-slate-800 lg:col-span-6">
+                <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-300">
                   <div className="flex items-center gap-2 truncate">
-                    <FileText className="h-4 w-4 text-blue-400 shrink-0" />
-                    <span className="font-semibold truncate">
+                    <FileText className="h-4 w-4 shrink-0 text-indigo-400" />
+                    <span className="truncate font-semibold !text-slate-200">
                       {activeSyllabus?.original_filename ?? "Syllabus Document"}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSplitScreenView(false)}
-                    className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded-md hover:bg-slate-800 transition"
+                    className="rounded-md px-2 py-0.5 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-white"
                   >
                     Close Split View ✕
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
                   {loadingDoc ? (
-                    <div className="flex h-full items-center justify-center text-slate-400 text-xs">
-                      <RefreshCw className="h-5 w-5 animate-spin mr-2 text-blue-400" />
+                    <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                      <RefreshCw className="mr-2 h-5 w-5 animate-spin text-indigo-400" />
                       Loading document preview...
                     </div>
                   ) : (
                     <PDFViewer
                       file={documentBlobUrl}
-                      fileName={activeSyllabus?.original_filename ?? "Syllabus_Document.pdf"}
+                      fileName={
+                        activeSyllabus?.original_filename ??
+                        "Syllabus_Document.pdf"
+                      }
                     />
                   )}
                 </div>
               </div>
 
-              <div className="lg:col-span-6 h-[calc(100vh-140px)] min-h-[580px] overflow-y-auto pr-1 space-y-3">
+              <div className="h-[calc(100vh-140px)] min-h-[580px] space-y-4 overflow-y-auto pr-1 lg:col-span-6">
                 {tabContent}
               </div>
             </div>
           );
         }
 
-        return <div className="!mt-3 space-y-3">{tabContent}</div>;
+        return <div className="space-y-4">{tabContent}</div>;
       })()}
 
       {hierarchyModal && canEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+        <div className="ui-modal-backdrop">
+          <div className="ui-modal-lg">
+            <div className="ui-card-header">
+              <h3 className="section-ti">
                 {hierarchyModal.type === "unit"
                   ? hierarchyModal.mode === "add"
                     ? "Add Curriculum Unit"
                     : `Edit Unit ${modalForm.unit_number}`
                   : hierarchyModal.type === "topic"
-                    ? hierarchyModal.mode === "add"
-                      ? "Add Topic to Unit"
-                      : "Edit Topic"
-                    : hierarchyModal.mode === "add"
-                      ? "Add Subtopic to Topic"
-                      : "Edit Subtopic"}
+                  ? hierarchyModal.mode === "add"
+                    ? "Add Topic to Unit"
+                    : "Edit Topic"
+                  : hierarchyModal.mode === "add"
+                  ? "Add Subtopic to Topic"
+                  : "Edit Subtopic"}
               </h3>
               <button
                 type="button"
@@ -5495,48 +6467,51 @@ const InsCourseArtifacts = () => {
                 <>
                   <div className="grid grid-cols-4 gap-3">
                     <div className="col-span-1">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Unit #
-                      </label>
+                      <label className="ui-label">Unit #</label>
                       <input
                         type="number"
                         min={1}
                         required
                         value={modalForm.unit_number}
                         onChange={(e) =>
-                          setModalForm({ ...modalForm, unit_number: Number(e.target.value) })
+                          setModalForm({
+                            ...modalForm,
+                            unit_number: Number(e.target.value),
+                          })
                         }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="ui-input font-bold"
                       />
                     </div>
                     <div className="col-span-3">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Unit Title
-                      </label>
+                      <label className="ui-label">Unit Title</label>
                       <input
                         type="text"
                         required
                         value={modalForm.unit_title}
                         onChange={(e) =>
-                          setModalForm({ ...modalForm, unit_title: e.target.value })
+                          setModalForm({
+                            ...modalForm,
+                            unit_title: e.target.value,
+                          })
                         }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="ui-input"
                         placeholder="e.g., Introduction to Neural Networks"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Unit Overview
-                    </label>
+                    <label className="ui-label">Unit Overview</label>
                     <textarea
                       rows={3}
                       value={modalForm.unit_overview}
                       onChange={(e) =>
-                        setModalForm({ ...modalForm, unit_overview: e.target.value })
+                        setModalForm({
+                          ...modalForm,
+                          unit_overview: e.target.value,
+                        })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="ui-input p-3"
                     />
                   </div>
                 </>
@@ -5546,31 +6521,33 @@ const InsCourseArtifacts = () => {
                 <>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Topic Code
-                      </label>
+                      <label className="ui-label">Topic Code</label>
                       <input
                         type="text"
                         value={modalForm.topic_code}
                         onChange={(e) =>
-                          setModalForm({ ...modalForm, topic_code: e.target.value })
+                          setModalForm({
+                            ...modalForm,
+                            topic_code: e.target.value,
+                          })
                         }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="ui-input"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Topic Name
-                    </label>
+                    <label className="ui-label">Topic Name</label>
                     <input
                       type="text"
                       required
                       value={modalForm.topic_name}
                       onChange={(e) =>
-                        setModalForm({ ...modalForm, topic_name: e.target.value })
+                        setModalForm({
+                          ...modalForm,
+                          topic_name: e.target.value,
+                        })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="ui-input"
                     />
                   </div>
                 </>
@@ -5579,50 +6556,52 @@ const InsCourseArtifacts = () => {
               {hierarchyModal.type === "subtopic" && (
                 <>
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Subtopic Code
-                    </label>
+                    <label className="ui-label">Subtopic Code</label>
                     <input
                       type="text"
                       value={modalForm.subtopic_code}
                       onChange={(e) =>
-                        setModalForm({ ...modalForm, subtopic_code: e.target.value })
+                        setModalForm({
+                          ...modalForm,
+                          subtopic_code: e.target.value,
+                        })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="ui-input"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Subtopic Name
-                    </label>
+                    <label className="ui-label">Subtopic Name</label>
                     <input
                       type="text"
                       required
                       value={modalForm.subtopic_name}
                       onChange={(e) =>
-                        setModalForm({ ...modalForm, subtopic_name: e.target.value })
+                        setModalForm({
+                          ...modalForm,
+                          subtopic_name: e.target.value,
+                        })
                       }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="ui-input"
                     />
                   </div>
                 </>
               )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="ui-modal-footer">
                 <button
                   type="button"
                   onClick={() => setHierarchyModal(null)}
                   disabled={submittingModal}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="ui-btn-secondary-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingModal}
-                  className="inline-flex items-center gap-1.5 rounded-xl btn-bg px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                  className="ui-btn-primary-sm"
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-4 w-4" />
                   <span>{submittingModal ? "Saving..." : "Save Changes"}</span>
                 </button>
               </div>
@@ -5632,13 +6611,13 @@ const InsCourseArtifacts = () => {
       )}
 
       {showUploadModal && isCoord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Upload Course Syllabus
-            </h3>
+        <div className="ui-modal-backdrop">
+          <div className="ui-modal">
+            <div className="ui-card-header">
+              <h3 className="section-ti">Upload Course Syllabus</h3>
+            </div>
             <form onSubmit={handleUploadSyllabus} className="mt-4 space-y-3">
-              <div className="rounded-lg border-2 border-dashed border-slate-300 p-4 text-center hover:border-blue-500 dark:border-slate-700">
+              <div className="rounded-xl border-2 border-dashed border-slate-300 p-5 text-center transition hover:border-indigo-500 dark:border-slate-700">
                 <input
                   type="file"
                   accept=".pdf,.docx,.doc"
@@ -5646,27 +6625,30 @@ const InsCourseArtifacts = () => {
                   className="hidden"
                   id="syllabus-upload-input"
                 />
-                <label htmlFor="syllabus-upload-input" className="cursor-pointer flex flex-col items-center">
+                <label
+                  htmlFor="syllabus-upload-input"
+                  className="flex cursor-pointer flex-col items-center"
+                >
                   <Upload className="h-6 w-6 text-slate-400" />
-                  <span className="mt-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                  <span className="mt-1.5 text-xs font-semibold text-color2 dark:text-indigo-400">
                     {uploadFile ? uploadFile.name : "Click to browse file"}
                   </span>
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1.5">
+              <div className="ui-modal-footer">
                 <button
                   type="button"
                   onClick={() => setShowUploadModal(false)}
                   disabled={uploading}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="ui-btn-secondary-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!uploadFile || uploading || isExtractionBusy}
-                  className="rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                  className="ui-btn-primary-sm"
                 >
                   {uploading ? "Uploading..." : "Upload & Extract"}
                 </button>
@@ -5677,11 +6659,11 @@ const InsCourseArtifacts = () => {
       )}
 
       {showGenerateCopoModal && isCoord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-blue-500" />
+        <div className="ui-modal-backdrop">
+          <div className="ui-modal">
+            <div className="ui-card-header">
+              <h3 className="section-ti flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-indigo-500" />
                 <span>Generate CO-PO Mapping</span>
               </h3>
               <button
@@ -5694,39 +6676,46 @@ const InsCourseArtifacts = () => {
             </div>
 
             <div className="mt-4 space-y-3">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className="ui-label">
                 Select Approved Extraction Version
               </label>
               <select
                 value={selectedExtractionForCopo ?? ""}
-                onChange={(e) => setSelectedExtractionForCopo(Number(e.target.value))}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                onChange={(e) =>
+                  setSelectedExtractionForCopo(Number(e.target.value))
+                }
+                className="ui-input font-semibold"
               >
                 {versionsExtractions
                   .filter((e: any) => Boolean(e.is_approved))
                   .map((e: any) => (
                     <option key={e.extractions_id} value={e.extractions_id}>
-                      Version {e.version_number} — {e.is_active ? "Active" : "Approved"}
+                      Version {e.version_number} —{" "}
+                      {e.is_active ? "Active" : "Approved"}
                     </option>
                   ))}
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-5 border-t border-slate-100 dark:border-slate-800 mt-5">
+            <div className="ui-modal-footer">
               <button
                 type="button"
                 onClick={() => setShowGenerateCopoModal(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="ui-btn-secondary-sm"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmGenerateCopo}
-                disabled={actionLoading === "generate_copo" || !selectedExtractionForCopo || isCopoBusy}
-                className="inline-flex items-center gap-1.5 rounded-xl btn-bg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                disabled={
+                  actionLoading === "generate_copo" ||
+                  !selectedExtractionForCopo ||
+                  isCopoBusy
+                }
+                className="ui-btn-primary-sm"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-4 w-4" />
                 <span>Queue Generation</span>
               </button>
             </div>
@@ -5735,11 +6724,11 @@ const InsCourseArtifacts = () => {
       )}
 
       {showGeneratePedagogyModal && isCoord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Presentation className="h-4 w-4 text-blue-500" />
+        <div className="ui-modal-backdrop">
+          <div className="ui-modal">
+            <div className="ui-card-header">
+              <h3 className="section-ti flex items-center gap-1.5">
+                <Presentation className="h-4 w-4 text-indigo-500" />
                 <span>Generate Pedagogy Strategies</span>
               </h3>
               <button
@@ -5752,39 +6741,46 @@ const InsCourseArtifacts = () => {
             </div>
 
             <div className="mt-3.5 space-y-2.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className="ui-label">
                 Select Approved Extraction Version
               </label>
               <select
                 value={selectedExtractionForPedagogy ?? ""}
-                onChange={(e) => setSelectedExtractionForPedagogy(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                onChange={(e) =>
+                  setSelectedExtractionForPedagogy(Number(e.target.value))
+                }
+                className="ui-input font-semibold"
               >
                 {versionsExtractions
                   .filter((e: any) => Boolean(e.is_approved))
                   .map((e: any) => (
                     <option key={e.extractions_id} value={e.extractions_id}>
-                      Version {e.version_number} — {e.is_active ? "Active" : "Approved"}
+                      Version {e.version_number} —{" "}
+                      {e.is_active ? "Active" : "Approved"}
                     </option>
                   ))}
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3.5 border-t border-slate-100 dark:border-slate-800 mt-4">
+            <div className="ui-modal-footer">
               <button
                 type="button"
                 onClick={() => setShowGeneratePedagogyModal(false)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="ui-btn-secondary-sm"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmGeneratePedagogy}
-                disabled={actionLoading === "generate_pedagogy" || !selectedExtractionForPedagogy || isPedagogyBusy}
-                className="inline-flex items-center gap-1 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                disabled={
+                  actionLoading === "generate_pedagogy" ||
+                  !selectedExtractionForPedagogy ||
+                  isPedagogyBusy
+                }
+                className="ui-btn-primary-sm"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-4 w-4" />
                 <span>Queue Generation</span>
               </button>
             </div>
@@ -5793,11 +6789,11 @@ const InsCourseArtifacts = () => {
       )}
 
       {showGenerateLessonPlanModal && isCoord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-blue-500" />
+        <div className="ui-modal-backdrop">
+          <div className="ui-modal-lg">
+            <div className="ui-card-header">
+              <h3 className="section-ti flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-indigo-500" />
                 <span>Generate Lesson Plan Schedule</span>
               </h3>
               <button
@@ -5811,76 +6807,86 @@ const InsCourseArtifacts = () => {
 
             <div className="mt-3.5 space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="ui-label">
                   Select Approved Extraction Version
                 </label>
                 <select
                   value={selectedExtractionForLp ?? ""}
-                  onChange={(e) => setSelectedExtractionForLp(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  onChange={(e) =>
+                    setSelectedExtractionForLp(Number(e.target.value))
+                  }
+                  className="ui-input font-semibold"
                 >
                   {versionsExtractions
                     .filter((e: any) => Boolean(e.is_approved))
                     .map((e: any) => (
                       <option key={e.extractions_id} value={e.extractions_id}>
-                        Extraction v{e.version_number} — {e.is_active ? "Active" : "Approved"}
+                        Extraction v{e.version_number} —{" "}
+                        {e.is_active ? "Active" : "Approved"}
                       </option>
                     ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="ui-label">
                   Select Approved Pedagogy Version (Optional)
                 </label>
                 <select
                   value={selectedPedagogyForLp ?? ""}
                   onChange={(e) =>
-                    setSelectedPedagogyForLp(e.target.value ? Number(e.target.value) : null)
+                    setSelectedPedagogyForLp(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="ui-input font-semibold"
                 >
-                  <option value="">None (Use standard classroom delivery activities)</option>
+                  <option value="">
+                    None (Use standard classroom delivery activities)
+                  </option>
                   {versionsPedagogies
                     .filter((p: any) => Boolean(p.is_approved))
                     .map((p: any) => (
                       <option key={p.pedagogy_id} value={p.pedagogy_id}>
-                        Pedagogy v{p.version_number} — {p.is_active ? "Active" : "Approved"}
+                        Pedagogy v{p.version_number} —{" "}
+                        {p.is_active ? "Active" : "Approved"}
                       </option>
                     ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Target Total Hours
-                </label>
+                <label className="ui-label">Target Total Hours</label>
                 <input
                   type="number"
                   min={1}
                   value={lpTargetHours}
                   onChange={(e) => setLpTargetHours(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="ui-input font-semibold"
                   placeholder="e.g. 45"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3.5 border-t border-slate-100 dark:border-slate-800 mt-4">
+            <div className="ui-modal-footer">
               <button
                 type="button"
                 onClick={() => setShowGenerateLessonPlanModal(false)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="ui-btn-secondary-sm"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmGenerateLessonPlan}
-                disabled={actionLoading === "generate_lp" || !selectedExtractionForLp || isLessonPlanBusy}
-                className="inline-flex items-center gap-1 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                disabled={
+                  actionLoading === "generate_lp" ||
+                  !selectedExtractionForLp ||
+                  isLessonPlanBusy
+                }
+                className="ui-btn-primary-sm"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-4 w-4" />
                 <span>Queue Generation</span>
               </button>
             </div>
@@ -5889,13 +6895,14 @@ const InsCourseArtifacts = () => {
       )}
 
       {copoEditingCell && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 sm:p-5 shadow-xl dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Edit2 className="h-4 w-4 text-blue-500" />
+        <div className="ui-modal-backdrop">
+          <div className="ui-modal">
+            <div className="ui-card-header">
+              <h3 className="section-ti flex items-center gap-1.5">
+                <Edit2 className="h-4 w-4 text-indigo-500" />
                 <span>
-                  Edit Cell: {copoEditingCell.co_code} → {copoEditingCell.po_code}
+                  Edit Cell: {copoEditingCell.co_code} →{" "}
+                  {copoEditingCell.po_code}
                 </span>
               </h3>
               <button
@@ -5909,26 +6916,50 @@ const InsCourseArtifacts = () => {
 
             <div className="mt-3.5 space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Correlation Level
-                </label>
+                <label className="ui-label">Correlation Level</label>
                 <div className="mt-1.5 grid grid-cols-4 gap-1.5">
                   {[
-                    { val: 0, label: "0 - None", color: "hover:border-slate-400 bg-slate-50 dark:bg-slate-800" },
-                    { val: 1, label: "1 - Low", color: "hover:border-amber-400 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
-                    { val: 2, label: "2 - Medium", color: "hover:border-sky-400 bg-sky-50/70 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300" },
-                    { val: 3, label: "3 - High", color: "hover:border-emerald-400 bg-emerald-50/70 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
+                    {
+                      val: 0,
+                      label: "0 - None",
+                      color:
+                        "hover:border-slate-400 bg-slate-50 dark:bg-slate-800",
+                    },
+                    {
+                      val: 1,
+                      label: "1 - Low",
+                      color:
+                        "hover:border-amber-400 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+                    },
+                    {
+                      val: 2,
+                      label: "2 - Medium",
+                      color:
+                        "hover:border-sky-400 bg-sky-50/70 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+                    },
+                    {
+                      val: 3,
+                      label: "3 - High",
+                      color:
+                        "hover:border-emerald-400 bg-emerald-50/70 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+                    },
                   ].map((opt) => (
                     <button
                       key={opt.val}
                       type="button"
                       onClick={() =>
-                        setCopoEditingCell({ ...copoEditingCell, matrix_value: opt.val })
+                        setCopoEditingCell({
+                          ...copoEditingCell,
+                          matrix_value: opt.val,
+                        })
                       }
-                      className={`rounded-lg border py-2 text-center text-xs font-bold transition ${opt.color} ${copoEditingCell.matrix_value === opt.val
-                          ? "border-blue-600 ring-2 ring-blue-500/30"
+                      className={`rounded-xl border py-2 text-center text-xs font-bold transition ${
+                        opt.color
+                      } ${
+                        copoEditingCell.matrix_value === opt.val
+                          ? "border-indigo-600 ring-2 ring-indigo-500/30"
                           : "border-slate-200 dark:border-slate-700"
-                        }`}
+                      }`}
                     >
                       {opt.label}
                     </button>
@@ -5937,9 +6968,7 @@ const InsCourseArtifacts = () => {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Accreditation Justification
-                </label>
+                <label className="ui-label">Accreditation Justification</label>
                 <textarea
                   rows={2.5}
                   value={copoEditingCell.justification ?? ""}
@@ -5950,16 +6979,16 @@ const InsCourseArtifacts = () => {
                     })
                   }
                   placeholder="Explain why this CO supports this Program Outcome..."
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="ui-input p-2.5"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 mt-4">
+            <div className="ui-modal-footer">
               <button
                 type="button"
                 onClick={() => setCopoEditingCell(null)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="ui-btn-secondary-sm"
               >
                 Cancel
               </button>
@@ -5970,14 +6999,15 @@ const InsCourseArtifacts = () => {
                     ...prev,
                     [copoEditingCell.id]: {
                       matrix_value: Number(copoEditingCell.matrix_value) || 0,
-                      justification: copoEditingCell.justification?.trim() ?? "",
+                      justification:
+                        copoEditingCell.justification?.trim() ?? "",
                     },
                   }));
                   setCopoEditingCell(null);
                 }}
-                className="inline-flex items-center gap-1 rounded-lg btn-bg px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-95"
+                className="ui-btn-primary-sm"
               >
-                <Check className="h-3.5 w-3.5" />
+                <Check className="h-4 w-4" />
                 <span>Apply to Cell</span>
               </button>
             </div>
@@ -5989,5 +7019,3 @@ const InsCourseArtifacts = () => {
 };
 
 export default PrivateRouter(InsCourseArtifacts);
-
-

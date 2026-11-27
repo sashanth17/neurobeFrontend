@@ -17,6 +17,7 @@ const DefaultLayout = ({ children }: PropsWithChildren) => {
     const [showLoader, setShowLoader] = useState(true);
     const [showTopButton, setShowTopButton] = useState(false);
     const [tourRun, setTourRun] = useState(false);
+    const [sidebarHovered, setSidebarHovered] = useState(false);
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
     const [animation, setAnimation] = useState(themeConfig.animation);
     const dispatch = useDispatch();
@@ -139,10 +140,10 @@ const DefaultLayout = ({ children }: PropsWithChildren) => {
                 {/* BEGIN APP SETTING LAUNCHER */}
                 {/* <Setting /> */}
                 {/* END APP SETTING LAUNCHER */}
-                <div className={`${themeConfig.navbar} main-container min-h-screen text-black dark:text-white-dark`}>
+                <div className={`${themeConfig.navbar} main-container ${sidebarHovered ? 'sidebar-hovered' : ''} min-h-screen text-black dark:text-white-dark`}>
                     {/* BEGIN SIDEBAR */}
                     <AppTour run={tourRun} onFinish={() => setTourRun(false)} />
-                    <SidebarDynamic />
+                    <SidebarDynamic onHoverChange={setSidebarHovered} />
                     <Header />
                     {/* END SIDEBAR */}
                     <div className="main-content flex flex-col min-h-screen">
